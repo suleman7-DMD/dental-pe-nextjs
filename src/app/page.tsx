@@ -13,48 +13,59 @@ export const metadata = {
 }
 
 export default async function HomePage() {
-  const supabase = await createServerClient()
+  try {
+    const supabase = await createServerClient()
 
-  const [
-    dealStats,
-    practiceStats,
-    watchedZips,
-    retirementRisk,
-    acquisitionTargets,
-    recentDeals,
-  ] = await Promise.all([
-    getDealStats(supabase),
-    getPracticeStats(supabase),
-    getWatchedZipCount(supabase),
-    getRetirementRiskCount(supabase),
-    getAcquisitionTargetCount(supabase),
-    getRecentDeals(supabase, 5),
-  ])
+    const [
+      dealStats,
+      practiceStats,
+      watchedZips,
+      retirementRisk,
+      acquisitionTargets,
+      recentDeals,
+    ] = await Promise.all([
+      getDealStats(supabase).catch(() => ({ totalDeals: 0, ytdDeals: 0, activeSponsors: 0, activePlatforms: 0, avgDealSize: null, totalStates: 0, sponsorList: [], platformList: [], stateList: [] })),
+      getPracticeStats(supabase).catch(() => ({ totalPractices: 0, consolidatedPct: '--', independentPct: '--' })),
+      getWatchedZipCount(supabase).catch(() => 0),
+      getRetirementRiskCount(supabase).catch(() => 0),
+      getAcquisitionTargetCount(supabase).catch(() => 0),
+      getRecentDeals(supabase, 5).catch(() => []),
+    ])
 
-  // Get last pipeline run from pipeline_events if available
-  // Falls back to most recent deal created_at
-  const { data: latestDeal } = await supabase
-    .from('deals')
-    .select('created_at')
-    .order('created_at', { ascending: false })
-    .limit(1)
+    const { data: latestDeal } = await supabase
+      .from('deals')
+      .select('created_at')
+      .order('created_at', { ascending: false })
+      .limit(1)
 
-  const lastPipelineRun = latestDeal?.[0]?.created_at
-    ? latestDeal[0].created_at.slice(0, 10)
-    : null
+    const lastPipelineRun = latestDeal?.[0]?.created_at
+      ? String(latestDeal[0].created_at).slice(0, 10)
+      : null
 
-  const summary: HomeSummary = {
-    totalDeals: dealStats.totalDeals,
-    ytdDeals: dealStats.ytdDeals,
-    activeSponsors: dealStats.activeSponsors,
-    totalPractices: practiceStats.totalPractices,
-    consolidatedPct: practiceStats.consolidatedPct,
-    independentPct: practiceStats.independentPct,
-    watchedZips,
-    lastPipelineRun,
-    retirementRisk,
-    recentDeals,
+    const summary: HomeSummary = {
+      totalDeals: dealStats.totalDeals,
+      ytdDeals: dealStats.ytdDeals,
+      activeSponsors: dealStats.activeSponsors,
+      totalPractices: practiceStats.totalPractices,
+      consolidatedPct: practiceStats.consolidatedPct,
+      independentPct: practiceStats.independentPct,
+      watchedZips,
+      lastPipelineRun,
+      retirementRisk,
+      recentDeals,
+    }
+
+    return <HomeShell summary={summary} acquisitionTargets={acquisitionTargets} />
+  } catch (error) {
+    console.error('HomePage error:', error)
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#0B1121] text-white">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Loading...</h1>
+          <p className="text-gray-400">Data is being fetched. Please refresh in a moment.</p>
+          <p className="text-gray-600 text-sm mt-4">If this persists, check Supabase connection.</p>
+        </div>
+      </div>
+    )
   }
-
-  return <HomeShell summary={summary} acquisitionTargets={acquisitionTargets} />
 }
