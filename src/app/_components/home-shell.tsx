@@ -263,7 +263,7 @@ export function HomeShell({ summary, acquisitionTargets }: HomeShellProps) {
           <KpiCard
             icon={<BarChart3 className="h-4 w-4" />}
             label="Known Corporate"
-            value={summary.consolidatedPct}
+            value={summary.consolidatedPct.includes('%') ? summary.consolidatedPct : `${summary.consolidatedPct}%`}
             tooltip="High-confidence corporate rate in watched ZIPs (DSO brands + EIN-verified entities). See Market Intel for full tiered breakdown."
             accentColor="#EF4444"
           />
@@ -302,7 +302,7 @@ export function HomeShell({ summary, acquisitionTargets }: HomeShellProps) {
         <RecentDealsTable deals={summary.recentDeals} />
 
         {/* Data Freshness Bar */}
-        <div className="flex items-center gap-4 rounded-lg border border-[#1E293B] bg-[#0F1629] px-4 py-2.5 text-xs text-[#94A3B8]">
+        <div className="flex flex-wrap items-center gap-4 rounded-lg border border-[#1E293B] bg-[#0F1629] px-4 py-2.5 text-xs text-[#94A3B8]">
           <span className="relative flex h-2.5 w-2.5 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22C55E] opacity-75" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#22C55E]" />
@@ -319,6 +319,13 @@ export function HomeShell({ summary, acquisitionTargets }: HomeShellProps) {
               {summary.totalDeals.toLocaleString()}
             </span>{' '}
             deals tracked
+          </span>
+          <span className="text-[#1E293B]">|</span>
+          <span>
+            <span className="text-[#F8FAFC] font-medium">
+              {summary.enrichedCount.toLocaleString()}
+            </span>{' '}
+            enriched ({summary.totalPractices > 0 ? ((summary.enrichedCount / summary.totalPractices) * 100).toFixed(1) : '0.0'}%)
           </span>
           <span className="text-[#1E293B]">|</span>
           <span>

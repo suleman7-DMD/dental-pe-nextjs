@@ -262,3 +262,16 @@ export interface DataFreshness {
   last_deal_date: string | null;
   last_practice_update: string | null;
 }
+
+/** Tiered practice stats returned by getPracticeStats() */
+export interface PracticeStats {
+  totalPractices: number;
+  total: number;
+  corporate: number;
+  corporateHighConf: number;
+  independent: number;
+  unknown: number;
+  enriched: number;
+  consolidatedPct: string;
+  independentPct: string;
+}

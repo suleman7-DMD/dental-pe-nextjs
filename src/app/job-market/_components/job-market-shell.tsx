@@ -13,7 +13,7 @@ import { OpportunitySignals } from './opportunity-signals'
 import { OwnershipLandscape } from './ownership-landscape'
 import { MarketAnalytics } from './market-analytics'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
-import { isIndependentClassification, isCorporateClassification, classifyPractice } from '@/lib/constants/entity-classifications'
+import { isIndependentClassification, isCorporateClassification, classifyPractice, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
 import { Hospital, CircleCheck, BarChart3, Target, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
@@ -221,6 +221,11 @@ export function JobMarketShell({
     let dso_cnt = 0
     let unk_cnt = 0
 
+    // Tiered consolidation tracking
+    let dsoNationalReal = 0
+    let dsoRegionalStrong = 0
+    let dsoSpecialists = 0
+
     for (const p of practices) {
       const category = classifyPractice(p.entity_classification, p.ownership_status)
       if (category === 'corporate') {
@@ -230,12 +235,48 @@ export function JobMarketShell({
       } else {
         unk_cnt++
       }
+
+      // High-confidence corporate classification
+      const ec = (p.entity_classification ?? '').trim().toLowerCase()
+      if (ec === 'dso_national') {
+        // Exclude taxonomy leaks from affiliated_dso
+        const dso = (p.affiliated_dso ?? '').trim()
+        const isTaxonomyLeak = dso && DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))
+        if (!isTaxonomyLeak) {
+          dsoNationalReal++
+        }
+      } else if (ec === 'dso_regional') {
+        // Only count dso_regional with strong signals (EIN, brand, parent, franchise, branch)
+        const reasoning = (p.classification_reasoning ?? '').toLowerCase()
+        if (
+          reasoning.includes('ein=') ||
+          reasoning.includes('generic brand') ||
+          reasoning.includes('parent_company') ||
+          reasoning.includes('franchise') ||
+          reasoning.includes('branch')
+        ) {
+          dsoRegionalStrong++
+        }
+      } else if (ec === 'specialist') {
+        // DSO-owned specialists
+        const os = (p.ownership_status ?? '').trim().toLowerCase()
+        if (os === 'dso_affiliated' || os === 'pe_backed') {
+          dsoSpecialists++
+        }
+      }
     }
+
+    const highConfCorporate = dsoNationalReal + dsoRegionalStrong + dsoSpecialists
+    const allSignalsCorporate = dso_cnt + pe_cnt
 
     const unk_pct = total_p > 0 ? (unk_cnt / total_p) * 100 : 100
     const indep_pct = total_p > 0 ? ((indep_cnt / total_p) * 100).toFixed(1) + '%' : '--'
     const consol_pct =
       total_p > 0 ? (((pe_cnt + dso_cnt) / total_p) * 100).toFixed(1) + '%' : '--'
+    const highConf_pct =
+      total_p > 0 ? ((highConfCorporate / total_p) * 100).toFixed(1) + '%' : '--'
+    const allSignals_pct =
+      total_p > 0 ? ((allSignalsCorporate / total_p) * 100).toFixed(1) + '%' : '--'
 
     // Avg buyability
     const buyScores = practices
@@ -302,6 +343,10 @@ export function JobMarketShell({
       unk_pct,
       indep_pct,
       consol_pct,
+      highConf_pct,
+      allSignals_pct,
+      highConfCorporate,
+      allSignalsCorporate,
       avg_buy,
       large_count,
       retirement_risk,
@@ -373,9 +418,23 @@ export function JobMarketShell({
                 />
                 <KpiCard
                   icon={<BarChart3 className="h-5 w-5" />}
-                  label="Known Consolidated %"
-                  value={kpis.consol_pct}
-                  accentColor="#EF4444"
+                  label="High-Confidence Corporate"
+                  value={kpis.highConf_pct}
+                  accentColor="#10B981"
+                  tooltip={`High-confidence includes practices with DSO brand matches, shared EIN, or corporate parent signals. All-signals adds ${(kpis.allSignalsCorporate - kpis.highConfCorporate).toLocaleString()} practices detected only by shared phone numbers (a weaker signal). Industry estimates from ADA HPI suggest actual consolidation is 25-35%, as stealth acquisitions keep the original practice name.`}
+                  subtitle={
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#F59E0B]" />
+                        <span className="text-[10px] text-[#F59E0B] font-mono font-medium">
+                          All detected signals: {kpis.allSignals_pct}
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-[#64748B] leading-tight">
+                        Industry estimate: 25-35%
+                      </p>
+                    </div>
+                  }
                 />
                 <KpiCard
                   icon={<Target className="h-5 w-5" />}

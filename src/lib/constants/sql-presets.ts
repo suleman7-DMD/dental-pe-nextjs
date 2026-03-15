@@ -13,9 +13,10 @@ ORDER BY deal_date DESC`,
   {
     name: 'ZIP ownership',
     query: `SELECT zip, city, state,
-  SUM(CASE WHEN ownership_status='independent' THEN 1 ELSE 0 END) as independent,
-  SUM(CASE WHEN ownership_status='dso_affiliated' THEN 1 ELSE 0 END) as dso,
-  SUM(CASE WHEN ownership_status='pe_backed' THEN 1 ELSE 0 END) as pe,
+  SUM(CASE WHEN entity_classification IN ('solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group') THEN 1 ELSE 0 END) as independent,
+  SUM(CASE WHEN entity_classification IN ('dso_regional','dso_national') THEN 1 ELSE 0 END) as corporate,
+  SUM(CASE WHEN entity_classification = 'specialist' THEN 1 ELSE 0 END) as specialist,
+  SUM(CASE WHEN entity_classification IS NULL AND ownership_status IN ('dso_affiliated','pe_backed') THEN 1 ELSE 0 END) as corporate_by_status_fallback,
   COUNT(*) as total
 FROM practices WHERE zip IN (SELECT zip_code FROM watched_zips)
 GROUP BY zip, city, state ORDER BY total DESC`,
@@ -73,7 +74,6 @@ ORDER BY p.zip, p.address`,
 FROM practices p
 WHERE p.zip IN (SELECT zip_code FROM watched_zips)
   AND p.entity_classification = 'solo_high_volume'
-  AND p.ownership_status IN ('independent', 'likely_independent')
 ORDER BY p.estimated_revenue DESC NULLS LAST`,
   },
   {

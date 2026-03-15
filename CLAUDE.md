@@ -74,8 +74,10 @@ Key tables (mirrored from Python pipeline's SQLite via `sync_to_supabase.py`):
 - 2,512 deals (105 YTD 2026)
 - 2,992 Data Axle enriched practices (with lat/lon, revenue, employees, year established)
 - 290 scored ZIPs (279 with saturation metrics)
-- 226 retirement risk practices (independent, established before 1995)
-- 30 buyability targets (independent, score >= 50)
+- 226 retirement risk practices (independent, established before 1995, in watched ZIPs)
+- 34 buyability targets (buyability_score >= 50, in watched ZIPs)
+- 262 high-confidence corporate (1.9%): 199 real dso_national + 23 strong dso_regional + 40 DSO-owned specialists
+- 1,392 all-signals corporate (9.9%): all dso_regional + all dso_national
 
 ## Environment Variables
 
@@ -93,7 +95,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token
 | `/deal-flow` | **Deal Flow** | 2,512 PE deals — KPIs, monthly stacked bar timeline, top 15 sponsors/platforms, state choropleth, searchable deals table with CSV. All queries paginated (no 1000-row truncation). |
 | `/market-intel` | **Market Intel** | Tiered consolidation KPIs (high-confidence corporate ~2.3% vs all-signals ~9.9%), saturation table, consolidation map, ZIP score table, city practice tree with pre-loaded counts, recent changes, ADA benchmarks |
 | `/buyability` | **Buyability** | Data-driven KPIs (Acquisition Targets, Dead Ends, Job Targets, Specialists computed from entity_classification + buyability_score), 25-row paginated table with category badges, color-coded by category |
-| `/job-market` | **Job Market** | Living location selector, 9 KPI cards, pydeck density map, market overview (donut, bar, histogram, top DSOs), paginated practice directory with 4 tabs, opportunity signals, ownership landscape, market analytics |
+| `/job-market` | **Job Market** | Living location selector, 9 KPI cards with **tiered consolidation display** (high-confidence 1.9% + all-signals 9.9% + industry estimate), pydeck density map, market overview (donut, bar, histogram, top DSOs), paginated practice directory with 4 tabs, opportunity signals, ownership landscape, market analytics |
 | `/research` | **Research** | 4 tabs — PE sponsor profiles, platform profiles, state deep dive, SQL explorer with preset queries |
 | `/system` | **System** | Data source coverage table, freshness timestamps, completeness bars, pipeline log viewer, manual entry forms (add deal, update practice, add ZIP) |
 
@@ -264,6 +266,24 @@ The Python scraper pipeline lives in the parent repo (`dental-pe-tracker/scraper
 Step 9 (`sync_to_supabase.py`) pushes changes incrementally from local SQLite to Supabase Postgres. Three sync strategies: incremental_updated_at (practices), incremental_id (deals, changes), full_replace (zip_scores, watched_zips, etc.).
 
 Monthly NPPES refresh (first Sunday 6am): downloads federal provider data updates.
+
+## Bug Fixes Applied (2026-03-15 Full Audit) — Do Not Regress
+
+| File | Fix |
+|------|-----|
+| `practices.ts` | `getRetirementRiskCount()` now filters by watched ZIPs + `year_established < 1995` + 7 independent EC types (was missing ZIP filter → returned 0) |
+| `practices.ts` | `getAcquisitionTargetCount()` now filters by watched ZIPs + `buyability_score >= 50` (was missing ZIP filter → returned 0) |
+| `practices.ts` | `getPracticeStats()` returns full `PracticeStats` with tiered corporate counts: `corporate` (all-signals 1,392), `corporateHighConf` (262), `independent`, `unknown`, `enriched` |
+| `practices.ts` | `getPracticeCountsByStatus()` uses entity_classification as primary with ownership_status fallback (was purely ownership_status-based) |
+| `page.tsx` (Home) | Calls fixed `getRetirementRiskCount()` and `getAcquisitionTargetCount()` instead of inline queries; fetches enrichment count |
+| `home-shell.tsx` | Defensive `%` suffix on consolidatedPct; enrichment bar shows `2,992 enriched (0.7%)` |
+| `kpi-card.tsx` | Added `subtitle?: React.ReactNode` prop for tiered consolidation display |
+| `job-market-shell.tsx` | Tiered consolidation KPI: "High-Confidence Corporate: 1.9%" primary, "All detected signals: 9.9%" secondary (amber), "Industry estimate: 25-35%" subtitle |
+| `entity-classifications.ts` | Added `INDEPENDENT_CLASSIFICATIONS`, `DSO_NATIONAL_TAXONOMY_LEAKS`, `DSO_REGIONAL_STRONG_SIGNAL_FILTER` constants |
+| `zip-score-table.tsx` | Fixed `fmtPct` helper for percentage columns; fixed confidence/opportunity_score renderers to handle both cell-value and row-object patterns |
+| `sql-presets.ts` | "ZIP ownership" preset uses entity_classification; "High-Vol Solos" removes redundant ownership_status filter |
+| `system.ts` | "Ownership Classified" completeness metric counts entity_classification (primary) + ownership_status fallback |
+| `types.ts` + `types/index.ts` | Added `PracticeStats` interface; added `enrichedCount` to `HomeSummary` |
 
 ## Development
 

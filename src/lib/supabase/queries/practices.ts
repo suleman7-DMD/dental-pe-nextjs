@@ -1,5 +1,10 @@
 import { SupabaseClient } from "@supabase/supabase-js";
-import type { Practice } from "../types";
+import type { Practice, PracticeStats } from "../types";
+import {
+  INDEPENDENT_CLASSIFICATIONS,
+  DSO_NATIONAL_TAXONOMY_LEAKS,
+  DSO_REGIONAL_STRONG_SIGNAL_FILTER,
+} from "../../constants/entity-classifications";
 
 export async function getPracticesByZips(
   supabase: SupabaseClient,
@@ -63,39 +68,76 @@ export async function getPracticeCountsByStatus(
   supabase: SupabaseClient,
   zips?: string[]
 ): Promise<Record<string, number>> {
-  // Use count queries per status to avoid fetching all rows
-  // (practices table has 400k+ rows, exceeds Supabase default 1000 limit)
-  const statuses = ["independent", "likely_independent", "dso_affiliated", "pe_backed", "unknown"];
+  // Use entity_classification as PRIMARY field for ownership counts,
+  // with ownership_status as fallback only when entity_classification is null.
   const counts: Record<string, number> = {};
 
-  for (const status of statuses) {
-    let q = supabase
-      .from("practices")
-      .select("*", { count: "exact", head: true })
-      .eq("ownership_status", status);
-
-    if (zips && zips.length > 0) {
-      q = q.in("zip", zips);
-    }
-
-    const { count } = await q;
-    if (count && count > 0) counts[status] = count;
-  }
-
-  // Count null ownership_status as unknown
-  let nullQ = supabase
+  // Independent by entity_classification (7 types)
+  let indepQ = supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .is("ownership_status", null);
+    .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS]);
+  if (zips && zips.length > 0) indepQ = indepQ.in("zip", zips);
+  const { count: indepByEC } = await indepQ;
 
-  if (zips && zips.length > 0) {
-    nullQ = nullQ.in("zip", zips);
-  }
+  // Independent by ownership_status fallback (entity_classification is null)
+  let indepFallbackQ = supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .is("entity_classification", null)
+    .in("ownership_status", ["independent", "likely_independent"]);
+  if (zips && zips.length > 0) indepFallbackQ = indepFallbackQ.in("zip", zips);
+  const { count: indepByOS } = await indepFallbackQ;
 
-  const { count: nullCount } = await nullQ;
-  if (nullCount && nullCount > 0) {
-    counts["unknown"] = (counts["unknown"] ?? 0) + nullCount;
-  }
+  counts["independent"] = (indepByEC ?? 0) + (indepByOS ?? 0);
+
+  // Corporate by entity_classification
+  let corpQ = supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .in("entity_classification", ["dso_regional", "dso_national"]);
+  if (zips && zips.length > 0) corpQ = corpQ.in("zip", zips);
+  const { count: corpByEC } = await corpQ;
+
+  // Corporate by ownership_status fallback (entity_classification is null)
+  let corpFallbackQ = supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .is("entity_classification", null)
+    .in("ownership_status", ["dso_affiliated", "pe_backed"]);
+  if (zips && zips.length > 0) corpFallbackQ = corpFallbackQ.in("zip", zips);
+  const { count: corpByOS } = await corpFallbackQ;
+
+  counts["dso_affiliated"] = (corpByEC ?? 0) + (corpByOS ?? 0);
+
+  // Specialist by entity_classification
+  let specQ = supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .eq("entity_classification", "specialist");
+  if (zips && zips.length > 0) specQ = specQ.in("zip", zips);
+  const { count: specCount } = await specQ;
+  if (specCount && specCount > 0) counts["specialist"] = specCount;
+
+  // Non-clinical by entity_classification
+  let ncQ = supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .eq("entity_classification", "non_clinical");
+  if (zips && zips.length > 0) ncQ = ncQ.in("zip", zips);
+  const { count: ncCount } = await ncQ;
+  if (ncCount && ncCount > 0) counts["non_clinical"] = ncCount;
+
+  // Total for unknown calculation
+  let totalQ = supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true });
+  if (zips && zips.length > 0) totalQ = totalQ.in("zip", zips);
+  const { count: total } = await totalQ;
+
+  const known = (counts["independent"] ?? 0) + (counts["dso_affiliated"] ?? 0)
+    + (counts["specialist"] ?? 0) + (counts["non_clinical"] ?? 0);
+  counts["unknown"] = Math.max(0, (total ?? 0) - known);
 
   return counts;
 }
@@ -136,129 +178,192 @@ export async function getPracticesWithCoords(
 }
 
 /**
- * Aggregate practice statistics for watched ZIPs: total, consolidated %, independent %.
- * Scoped to watched ZIPs where classification data is meaningful.
+ * Aggregate practice statistics for watched ZIPs with tiered consolidation.
+ * Returns full PracticeStats including high-confidence corporate count,
+ * all-signals corporate count, independent count, unknown count, and enriched count.
  * Also returns global total for the "Practices Tracked" KPI.
  */
 export async function getPracticeStats(
   supabase: SupabaseClient
-): Promise<{
-  totalPractices: number;
-  consolidatedPct: string;
-  independentPct: string;
-}> {
-  // Global total (for "Practices Tracked" headline)
-  const { count: globalTotal } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true });
+): Promise<PracticeStats> {
+  // ── Phase 1: Global counts (parallel) ─────────────────────────────────
+  const [
+    { count: globalTotal },
+    { data: watchedZipRows },
+    { count: enrichedCount },
+  ] = await Promise.all([
+    supabase.from("practices").select("*", { count: "exact", head: true }),
+    supabase.from("watched_zips").select("zip_code"),
+    supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .not("data_axle_import_date", "is", null),
+  ]);
 
-  // Get watched ZIP codes for scoped stats
-  const { data: watchedZipRows } = await supabase
-    .from("watched_zips")
-    .select("zip_code");
-  const watchedZips = (watchedZipRows ?? []).map((z: { zip_code: string }) => z.zip_code);
+  const watchedZips = (watchedZipRows ?? []).map(
+    (z: { zip_code: string }) => z.zip_code
+  );
 
   if (watchedZips.length === 0) {
     return {
       totalPractices: globalTotal ?? 0,
+      total: 0,
+      corporate: 0,
+      corporateHighConf: 0,
+      independent: 0,
+      unknown: 0,
+      enriched: enrichedCount ?? 0,
       consolidatedPct: "--",
       independentPct: "--",
     };
   }
 
-  // Total practices in watched ZIPs
-  const { count: total } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .in("zip", watchedZips);
+  // ── Phase 2: Watched-ZIP scoped counts (parallel) ─────────────────────
+  const [
+    { count: watchedTotal },
+    { count: allDsoRegional },
+    { count: allDsoNational },
+    { count: dsoNationalReal },
+    { count: dsoRegionalStrong },
+    { count: dsoSpecialists },
+    { count: independentByEC },
+  ] = await Promise.all([
+    // Total in watched ZIPs
+    supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .in("zip", watchedZips),
 
-  // High-confidence corporate: dso_national with real brands (exclude taxonomy leaks)
-  const taxonomyLeaks = ["General Dentistry", "Oral Surgery", "Orthodontics", "Periodontics", "Endodontics", "Pediatric Dentistry", "Prosthodontics", "Dental Hygiene"];
-  const { count: dsoNationalReal } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .in("zip", watchedZips)
-    .eq("entity_classification", "dso_national")
-    .not("affiliated_dso", "in", `(${taxonomyLeaks.join(",")})`);
+    // All dso_regional
+    supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .in("zip", watchedZips)
+      .eq("entity_classification", "dso_regional"),
 
-  // High-confidence corporate: dso_regional with strong signals (EIN, brand, parent, franchise)
-  const { count: dsoRegionalStrong } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .in("zip", watchedZips)
-    .eq("entity_classification", "dso_regional")
-    .or("classification_reasoning.ilike.%EIN=%,classification_reasoning.ilike.%generic brand%,classification_reasoning.ilike.%parent_company%,classification_reasoning.ilike.%franchise%,classification_reasoning.ilike.%branch%");
+    // All dso_national
+    supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .in("zip", watchedZips)
+      .eq("entity_classification", "dso_national"),
 
-  // DSO-owned specialists
-  const { count: dsoSpecialists } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .in("zip", watchedZips)
-    .eq("entity_classification", "specialist")
-    .in("ownership_status", ["dso_affiliated", "pe_backed"]);
+    // High-conf dso_national: real brands (exclude taxonomy leaks)
+    supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .in("zip", watchedZips)
+      .eq("entity_classification", "dso_national")
+      .not(
+        "affiliated_dso",
+        "in",
+        `(${DSO_NATIONAL_TAXONOMY_LEAKS.join(",")})`
+      ),
 
-  // Independent by entity_classification
-  const { count: independentByEC } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .in("zip", watchedZips)
-    .in("entity_classification", [
-      "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
-      "family_practice", "small_group", "large_group"
-    ]);
+    // High-conf dso_regional: strong signals (EIN, generic brand, parent, franchise, branch)
+    supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .in("zip", watchedZips)
+      .eq("entity_classification", "dso_regional")
+      .or(DSO_REGIONAL_STRONG_SIGNAL_FILTER),
 
-  const t = total ?? 0;
-  const highConfCorporate = (dsoNationalReal ?? 0) + (dsoRegionalStrong ?? 0) + (dsoSpecialists ?? 0);
+    // DSO-owned specialists
+    supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .in("zip", watchedZips)
+      .eq("entity_classification", "specialist")
+      .in("ownership_status", ["dso_affiliated", "pe_backed"]),
+
+    // Independent by entity_classification (7 types)
+    supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .in("zip", watchedZips)
+      .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS]),
+  ]);
+
+  const t = watchedTotal ?? 0;
+  const corporate = (allDsoRegional ?? 0) + (allDsoNational ?? 0);
+  const highConfCorporate =
+    (dsoNationalReal ?? 0) + (dsoRegionalStrong ?? 0) + (dsoSpecialists ?? 0);
   const independent = independentByEC ?? 0;
+  // "Unknown" = total - corporate - independent.
+  // This remainder includes specialist, non_clinical, and any truly unclassified.
+  // All watched ZIP practices have entity_classification set per CLAUDE.md,
+  // so this is primarily specialist + non_clinical practices.
+  const unknownCount = Math.max(0, t - corporate - independent);
 
   return {
     totalPractices: globalTotal ?? 0,
-    consolidatedPct: t > 0 ? ((highConfCorporate / t) * 100).toFixed(1) + "%" : "0.0%",
-    independentPct: t > 0 ? ((independent / t) * 100).toFixed(1) + "%" : "0.0%",
+    total: t,
+    corporate,
+    corporateHighConf: highConfCorporate,
+    independent,
+    unknown: unknownCount,
+    enriched: enrichedCount ?? 0,
+    consolidatedPct:
+      t > 0 ? ((highConfCorporate / t) * 100).toFixed(1) + "%" : "0.0%",
+    independentPct:
+      t > 0 ? ((independent / t) * 100).toFixed(1) + "%" : "0.0%",
   };
 }
 
 /**
- * Count practices at retirement risk (independent, established 30+ years ago).
- * Scoped to watched ZIPs. Uses entity_classification with ownership_status fallback.
+ * Count practices at retirement risk: independent, established before 1995.
+ * Scoped to watched ZIPs only. Uses entity_classification (7 independent types).
+ * Ground truth: 226.
  */
 export async function getRetirementRiskCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  // Independent practices established 30+ years ago.
-  // year_established only exists on Data Axle enriched practices,
-  // which all have entity_classification set — no fallback needed.
+  // First get watched ZIP codes
+  const { data: watchedZipRows } = await supabase
+    .from("watched_zips")
+    .select("zip_code");
+  const watchedZips = (watchedZipRows ?? []).map(
+    (z: { zip_code: string }) => z.zip_code
+  );
+
+  if (watchedZips.length === 0) return 0;
+
   const { count, error } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .in("entity_classification", [
-      "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
-      "family_practice", "small_group", "large_group"
-    ])
-    .lt("year_established", new Date().getFullYear() - 30);
+    .in("zip", watchedZips)
+    .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS])
+    .not("year_established", "is", null)
+    .lt("year_established", 1995);
 
   if (error) throw error;
   return count ?? 0;
 }
 
 /**
- * Count practices that are high-value acquisition targets
- * (high buyability score, independent ownership).
+ * Count practices that are high-value acquisition targets in watched ZIPs.
+ * Criteria: buyability_score >= 50.
+ * Ground truth: 34.
  */
 export async function getAcquisitionTargetCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  // Independent practices with buyability_score >= 50.
-  // buyability_score only exists on Data Axle enriched practices,
-  // which all have entity_classification set — no fallback needed.
+  // First get watched ZIP codes
+  const { data: watchedZipRows } = await supabase
+    .from("watched_zips")
+    .select("zip_code");
+  const watchedZips = (watchedZipRows ?? []).map(
+    (z: { zip_code: string }) => z.zip_code
+  );
+
+  if (watchedZips.length === 0) return 0;
+
   const { count, error } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .gte("buyability_score", 50)
-    .in("entity_classification", [
-      "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
-      "family_practice", "small_group", "large_group"
-    ]);
+    .in("zip", watchedZips)
+    .not("buyability_score", "is", null)
+    .gte("buyability_score", 50);
 
   if (error) throw error;
   return count ?? 0;

@@ -135,6 +135,30 @@ export const DSO_FILTER_KEYWORDS = [
   'dental hygiene',
 ];
 
+/** All 7 independent entity_classification values as a readonly array (for Supabase .in() filters). */
+export const INDEPENDENT_CLASSIFICATIONS = [
+  'solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume',
+  'family_practice', 'small_group', 'large_group',
+] as const;
+
+/** Taxonomy description strings that leak into affiliated_dso for dso_national (case-sensitive). */
+export const DSO_NATIONAL_TAXONOMY_LEAKS = [
+  'General Dentistry', 'Oral Surgery', 'Orthodontics', 'Periodontics',
+  'Endodontics', 'Pediatric Dentistry', 'Prosthodontics', 'Dental Hygiene',
+] as const;
+
+/**
+ * Supabase .or() filter string for dso_regional classification_reasoning
+ * that indicates a strong corporate signal (not just shared phone).
+ * Matches: EIN=, generic brand, parent_company, franchise, branch (location_type).
+ */
+export const DSO_REGIONAL_STRONG_SIGNAL_FILTER =
+  'classification_reasoning.ilike.%EIN=%,' +
+  'classification_reasoning.ilike.%generic brand%,' +
+  'classification_reasoning.ilike.%parent_company%,' +
+  'classification_reasoning.ilike.%franchise%,' +
+  'classification_reasoning.ilike.%branch%';
+
 /** Classify a practice using entity_classification with ownership_status fallback. */
 export function classifyPractice(
   entityClassification: string | null | undefined,

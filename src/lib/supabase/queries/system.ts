@@ -120,11 +120,20 @@ export async function getCompletenessMetrics(
   const t = total ?? 0;
   if (t === 0) return [];
 
-  // Ownership classified
-  const { count: classified } = await supabase
+  // Ownership classified — count practices with entity_classification set (primary)
+  // OR ownership_status not 'unknown' (legacy fallback for practices without entity_classification)
+  const { count: classifiedByEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
+    .not("entity_classification", "is", null);
+
+  const { count: classifiedByOS } = await supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .is("entity_classification", null)
     .neq("ownership_status", "unknown");
+
+  const classified = (classifiedByEC ?? 0) + (classifiedByOS ?? 0);
 
   // Have coordinates
   const { count: withCoords } = await supabase
@@ -159,7 +168,7 @@ export async function getCompletenessMetrics(
   });
 
   return [
-    make("Ownership Classified", classified ?? 0),
+    make("Ownership Classified", classified),
     make("Geocoded (lat/lon)", withCoords ?? 0),
     make("Phone Number", withPhone ?? 0),
     make("Entity Classification", withEntity ?? 0),

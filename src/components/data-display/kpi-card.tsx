@@ -22,6 +22,8 @@ export interface KpiCardProps {
   tooltip?: string;
   accentColor?: string;
   className?: string;
+  /** Secondary line rendered below the value (e.g. tiered consolidation detail). */
+  subtitle?: React.ReactNode;
 }
 
 export function KpiCard({
@@ -34,6 +36,7 @@ export function KpiCard({
   tooltip,
   accentColor,
   className,
+  subtitle,
 }: KpiCardProps) {
   // Normalize delta to { value, label } or null
   const normalizedDelta = useMemo(() => {
@@ -111,6 +114,9 @@ export function KpiCard({
           <span className="text-xs text-[#94A3B8] font-mono">{suffix}</span>
         )}
       </div>
+
+      {/* Subtitle */}
+      {subtitle && <div className="mt-1.5">{subtitle}</div>}
 
       {/* Delta */}
       {normalizedDelta && (

@@ -70,6 +70,16 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
     })
   }, [zipScores])
 
+  // Format a percentage value — accepts cell value (number) or full row object
+  const fmtPct = (v: unknown, field: string): string => {
+    if (typeof v === 'number') return `${v.toFixed(1)}%`
+    if (v != null && typeof v === 'object' && field in (v as Record<string, unknown>)) {
+      const n = (v as Record<string, unknown>)[field]
+      if (typeof n === 'number') return `${n.toFixed(1)}%`
+    }
+    return '\u2014'
+  }
+
   const columns = [
     { key: 'zip_code', header: 'ZIP' },
     { key: 'city', header: 'City' },
@@ -102,34 +112,27 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       key: 'consolidation_pct',
       header: 'Known Consol. %',
       align: 'right' as const,
-      render: (v: unknown) => {
-        const num = typeof v === 'number' ? v : (v as Record<string, unknown>)?.consolidation_pct as number | undefined
-        return num != null ? `${num.toFixed(1)}%` : '\u2014'
-      },
+      render: (v: unknown) => fmtPct(v, 'consolidation_pct'),
     },
     {
       key: 'independent_pct',
       header: 'Indep. %',
       align: 'right' as const,
-      render: (v: unknown) => {
-        const num = typeof v === 'number' ? v : (v as Record<string, unknown>)?.independent_pct as number | undefined
-        return num != null ? `${num.toFixed(1)}%` : '\u2014'
-      },
+      render: (v: unknown) => fmtPct(v, 'independent_pct'),
     },
     {
       key: 'unknown_pct',
       header: '% Unknown',
       align: 'right' as const,
-      render: (v: unknown) => {
-        const num = typeof v === 'number' ? v : (v as Record<string, unknown>)?.unknown_pct as number | undefined
-        return num != null ? `${num.toFixed(1)}%` : '\u2014'
-      },
+      render: (v: unknown) => fmtPct(v, 'unknown_pct'),
     },
     {
       key: 'confidence',
       header: 'Confidence',
       render: (v: unknown) => {
-        const str = typeof v === 'string' ? v : (v as Record<string, unknown>)?.confidence as string | undefined
+        const str = typeof v === 'string' ? v
+          : (v != null && typeof v === 'object') ? String((v as Record<string, unknown>).confidence ?? '')
+          : ''
         if (!str) return '\u2014'
         return str.charAt(0).toUpperCase() + str.slice(1)
       },
@@ -138,6 +141,14 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       key: 'opportunity_score',
       header: 'Opp. Score',
       align: 'right' as const,
+      render: (v: unknown) => {
+        if (typeof v === 'number') return String(v)
+        if (v != null && typeof v === 'object') {
+          const n = (v as Record<string, unknown>).opportunity_score
+          if (typeof n === 'number') return String(n)
+        }
+        return '\u2014'
+      },
     },
   ]
 

@@ -164,6 +164,27 @@ export interface PipelineEvent {
   }
 }
 
+export interface PracticeStats {
+  /** Global total practices (400k+) */
+  totalPractices: number
+  /** Total practices in watched ZIPs */
+  total: number
+  /** All dso_regional + dso_national in watched ZIPs */
+  corporate: number
+  /** High-confidence corporate: real dso_national + strong dso_regional + DSO-owned specialists */
+  corporateHighConf: number
+  /** Sum of all 7 independent entity_classification types in watched ZIPs */
+  independent: number
+  /** Practices with null entity_classification AND non-corporate ownership_status in watched ZIPs */
+  unknown: number
+  /** Practices with data_axle_import_date IS NOT NULL (global) */
+  enriched: number
+  /** Backward compat: high-confidence corporate % of watched total */
+  consolidatedPct: string
+  /** Backward compat: independent % of watched total */
+  independentPct: string
+}
+
 export interface HomeSummary {
   totalDeals: number
   ytdDeals: number
@@ -174,5 +195,6 @@ export interface HomeSummary {
   watchedZips: number
   lastPipelineRun: string | null
   retirementRisk: number
+  enrichedCount: number
   recentDeals: Deal[]
 }

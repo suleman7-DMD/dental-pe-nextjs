@@ -1,6 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { getDealStats, getRecentDeals } from '@/lib/supabase/queries/deals'
-import { getPracticeStats } from '@/lib/supabase/queries/practices'
+import { getPracticeStats, getRetirementRiskCount, getAcquisitionTargetCount } from '@/lib/supabase/queries/practices'
 import { getWatchedZipCount } from '@/lib/supabase/queries/watched-zips'
 import { HomeShell } from './_components/home-shell'
 import type { HomeSummary } from '@/lib/types'
@@ -51,46 +51,27 @@ export default async function HomePage() {
       ])
 
     // Phase 2: fetch secondary metrics sequentially (avoids concurrency issues)
-    let retirementRisk = 0
-    try {
-      const { count, error } = await supabase
-        .from('practices')
-        .select('*', { count: 'exact', head: true })
-        .in('entity_classification', [
-          'solo_established',
-          'solo_new',
-          'solo_inactive',
-          'solo_high_volume',
-          'family_practice',
-          'small_group',
-          'large_group',
-        ])
-        .lt('year_established', 1995)
-      if (error) console.error('[HomePage] retirementRisk error:', error)
-      else retirementRisk = count ?? 0
-    } catch (err) {
-      console.error('[HomePage] retirementRisk exception:', err)
-    }
+    const retirementRisk = await getRetirementRiskCount(supabase).catch((err) => {
+      console.error('[HomePage] retirementRisk error:', err)
+      return 0
+    })
 
-    let acquisitionTargets = 0
+    const acquisitionTargets = await getAcquisitionTargetCount(supabase).catch((err) => {
+      console.error('[HomePage] acquisitionTargets error:', err)
+      return 0
+    })
+
+    // Data Axle enrichment count
+    let enrichedCount = 0
     try {
       const { count, error } = await supabase
         .from('practices')
         .select('*', { count: 'exact', head: true })
-        .gte('buyability_score', 50)
-        .in('entity_classification', [
-          'solo_established',
-          'solo_new',
-          'solo_inactive',
-          'solo_high_volume',
-          'family_practice',
-          'small_group',
-          'large_group',
-        ])
-      if (error) console.error('[HomePage] acquisitionTargets error:', error)
-      else acquisitionTargets = count ?? 0
+        .not('data_axle_import_date', 'is', null)
+      if (error) console.error('[HomePage] enrichedCount error:', error)
+      else enrichedCount = count ?? 0
     } catch (err) {
-      console.error('[HomePage] acquisitionTargets exception:', err)
+      console.error('[HomePage] enrichedCount exception:', err)
     }
 
     const { data: latestDeal } = await supabase
@@ -113,6 +94,7 @@ export default async function HomePage() {
       watchedZips,
       lastPipelineRun,
       retirementRisk,
+      enrichedCount,
       recentDeals,
     }
 
