@@ -245,24 +245,24 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
   }, [filtered])
 
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-[#475569]" />
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-[#B5B5A8]" />
     return sortAsc ? (
-      <ChevronUp className="h-3 w-3 text-[#3B82F6]" />
+      <ChevronUp className="h-3 w-3 text-[#B8860B]" />
     ) : (
-      <ChevronDown className="h-3 w-3 text-[#3B82F6]" />
+      <ChevronDown className="h-3 w-3 text-[#B8860B]" />
     )
   }
 
   const categoryColor = (cat: BuyabilityCategory) => {
     switch (cat) {
       case 'acquisition_target':
-        return 'text-[#22C55E]'
+        return 'text-[#2D8B4E]'
       case 'dead_end':
-        return 'text-[#EF4444]'
+        return 'text-[#C23B3B]'
       case 'job_target':
-        return 'text-[#3B82F6]'
+        return 'text-[#B8860B]'
       case 'specialist':
-        return 'text-[#A855F7]'
+        return 'text-[#7C3AED]'
     }
   }
 
@@ -281,10 +281,10 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
 
   if (analyzed.length === 0) {
     return (
-      <div className="min-h-screen bg-[#0A0F1E] p-6">
-        <h1 className="font-sans font-bold text-2xl text-[#F8FAFC] mb-2">Buyability Scanner</h1>
-        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-8 text-center text-[#94A3B8] mt-6">
-          <p className="font-medium text-[#F8FAFC] mb-2">No analyzed practices yet.</p>
+      <div className="min-h-screen bg-[#FAFAF7] p-6">
+        <h1 className="font-sans font-bold text-2xl text-[#1A1A1A] mb-2">Buyability Scanner</h1>
+        <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-8 text-center text-[#6B6B60] mt-6">
+          <p className="font-medium text-[#1A1A1A] mb-2">No analyzed practices yet.</p>
           <p className="text-sm">
             Run the directory importer to load practice analysis data, or import Data Axle records
             for automated scoring.
@@ -295,12 +295,12 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E]">
+    <div className="min-h-screen bg-[#FAFAF7]">
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="font-sans font-bold text-2xl text-[#F8FAFC]">Buyability Scanner</h1>
-          <p className="text-[#94A3B8] text-sm mt-1 max-w-3xl">
+          <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">Buyability Scanner</h1>
+          <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
             {analyzed.length} practices scored by acquisition likelihood. Acquisition Targets =
             independent with high buyability. Dead Ends = corporate/DSO. Job Targets = good
             associate opportunities. Specialists = ortho, perio, endo, etc.
@@ -313,25 +313,25 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
             icon={<Target className="h-4 w-4" />}
             label="Acquisition Targets"
             value={kpis.acq.toLocaleString()}
-            accentColor="#22C55E"
+            accentColor="#2D8B4E"
           />
           <KpiCard
             icon={<ShieldOff className="h-4 w-4" />}
             label="Dead Ends"
             value={kpis.dead.toLocaleString()}
-            accentColor="#EF4444"
+            accentColor="#C23B3B"
           />
           <KpiCard
             icon={<Briefcase className="h-4 w-4" />}
             label="Job Targets"
             value={kpis.job.toLocaleString()}
-            accentColor="#3B82F6"
+            accentColor="#B8860B"
           />
           <KpiCard
             icon={<Microscope className="h-4 w-4" />}
             label="Specialists"
             value={kpis.spec.toLocaleString()}
-            accentColor="#A855F7"
+            accentColor="#7C3AED"
           />
         </div>
 
@@ -345,7 +345,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
           <select
             value={category}
             onChange={(e) => handleCategoryChange(e.target.value)}
-            className="rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6] min-w-[200px]"
+            className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B] min-w-[200px]"
           >
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>
@@ -357,7 +357,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
           <select
             value={zipFilter}
             onChange={(e) => handleZipChange(e.target.value)}
-            className="rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6] min-w-[160px]"
+            className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B] min-w-[160px]"
           >
             {zipOptions.map((z) => (
               <option key={z} value={z}>
@@ -368,7 +368,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
 
           <button
             onClick={handleDownload}
-            className="ml-auto flex items-center gap-1.5 rounded-md border border-[#1E293B] bg-[#0F1629] px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#334155] transition-colors"
+            className="ml-auto flex items-center gap-1.5 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-3 py-2 text-sm text-[#6B6B60] hover:text-[#1A1A1A] hover:border-[#D4D0C8] transition-colors"
           >
             <Download className="h-4 w-4" />
             CSV
@@ -376,13 +376,13 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
         </div>
 
         {/* Data Table with pagination */}
-        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] overflow-hidden">
+        <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b-2 border-[#1E293B] text-[#94A3B8] bg-[#0D1424]">
+                <tr className="border-b-2 border-[#E8E5DE] text-[#6B6B60] bg-[#F5F5F0]">
                   <th
-                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#F8FAFC]"
+                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#1A1A1A]"
                     onClick={() => handleSort('practice_name')}
                   >
                     <span className="flex items-center gap-1">
@@ -393,7 +393,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     Address
                   </th>
                   <th
-                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#F8FAFC]"
+                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#1A1A1A]"
                     onClick={() => handleSort('city')}
                   >
                     <span className="flex items-center gap-1">
@@ -401,7 +401,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     </span>
                   </th>
                   <th
-                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#F8FAFC]"
+                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#1A1A1A]"
                     onClick={() => handleSort('zip')}
                   >
                     <span className="flex items-center gap-1">
@@ -415,7 +415,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     Classification
                   </th>
                   <th
-                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#F8FAFC]"
+                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#1A1A1A]"
                     onClick={() => handleSort('buyability_score')}
                   >
                     <span className="flex items-center gap-1">
@@ -426,7 +426,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     Confidence
                   </th>
                   <th
-                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#F8FAFC]"
+                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#1A1A1A]"
                     onClick={() => handleSort('year_established')}
                   >
                     <span className="flex items-center gap-1">
@@ -434,7 +434,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     </span>
                   </th>
                   <th
-                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#F8FAFC]"
+                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#1A1A1A]"
                     onClick={() => handleSort('employee_count')}
                   >
                     <span className="flex items-center gap-1">
@@ -449,7 +449,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
               <tbody>
                 {pageData.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-8 text-center text-[#94A3B8]">
+                    <td colSpan={11} className="px-4 py-8 text-center text-[#6B6B60]">
                       No practices match the selected filters.
                     </td>
                   </tr>
@@ -457,34 +457,34 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                   pageData.map((p, idx) => (
                     <tr
                       key={p.npi ?? idx}
-                      className={`border-b border-[#1E293B]/50 hover:bg-[#1E293B]/20 transition-colors ${
-                        idx % 2 === 0 ? 'bg-[#0A0F1E]' : 'bg-[#0F1629]'
+                      className={`border-b border-black/[0.06] hover:bg-black/[0.04] transition-colors ${
+                        idx % 2 === 0 ? 'bg-[#FAFAF7]' : 'bg-[#FFFFFF]'
                       }`}
                     >
-                      <td className="px-4 py-2.5 text-[#F8FAFC] max-w-[200px] truncate">
+                      <td className="px-4 py-2.5 text-[#1A1A1A] max-w-[200px] truncate">
                         {p.practice_name ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#94A3B8] max-w-[180px] truncate text-xs">
+                      <td className="px-4 py-2.5 text-[#6B6B60] max-w-[180px] truncate text-xs">
                         {p.address ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#94A3B8]">{p.city ?? '--'}</td>
-                      <td className="px-4 py-2.5 text-[#94A3B8] font-mono text-xs">
+                      <td className="px-4 py-2.5 text-[#6B6B60]">{p.city ?? '--'}</td>
+                      <td className="px-4 py-2.5 text-[#6B6B60] font-mono text-xs">
                         {p.zip ?? '--'}
                       </td>
                       <td className="px-4 py-2.5">
                         <StatusBadge status={p.entity_classification ?? p.ownership_status} />
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-[#94A3B8]">
+                      <td className="px-4 py-2.5 text-xs text-[#6B6B60]">
                         {getEntityClassificationLabel(p.entity_classification)}
                       </td>
-                      <td className="px-4 py-2.5 text-[#F8FAFC] font-mono font-bold tabular-nums">
+                      <td className="px-4 py-2.5 text-[#1A1A1A] font-mono font-bold tabular-nums">
                         {p.buyability_score ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#F59E0B] text-xs">{p.confidenceStars}</td>
-                      <td className="px-4 py-2.5 text-[#94A3B8] font-mono text-xs">
+                      <td className="px-4 py-2.5 text-[#D4920B] text-xs">{p.confidenceStars}</td>
+                      <td className="px-4 py-2.5 text-[#6B6B60] font-mono text-xs">
                         {p.year_established ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#94A3B8] font-mono text-xs">
+                      <td className="px-4 py-2.5 text-[#6B6B60] font-mono text-xs">
                         {p.employee_count ?? '--'}
                       </td>
                       <td className="px-4 py-2.5">
@@ -493,12 +493,12 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                           style={{
                             backgroundColor:
                               p.category === 'acquisition_target'
-                                ? 'rgba(34,197,94,0.1)'
+                                ? 'rgba(45,139,78,0.1)'
                                 : p.category === 'dead_end'
-                                  ? 'rgba(239,68,68,0.1)'
+                                  ? 'rgba(194,59,59,0.1)'
                                   : p.category === 'job_target'
-                                    ? 'rgba(59,130,246,0.1)'
-                                    : 'rgba(168,85,247,0.1)',
+                                    ? 'rgba(184,134,11,0.1)'
+                                    : 'rgba(124,58,237,0.1)',
                           }}
                         >
                           {categoryLabel(p.category)}
@@ -512,8 +512,8 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
           </div>
 
           {/* Pagination footer */}
-          <div className="px-4 py-3 border-t border-[#1E293B] flex items-center justify-between">
-            <span className="text-[11px] text-[#64748B]">
+          <div className="px-4 py-3 border-t border-[#E8E5DE] flex items-center justify-between">
+            <span className="text-[11px] text-[#9C9C90]">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of{' '}
               {filtered.length.toLocaleString()} practices
             </span>
@@ -522,17 +522,17 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                 <button
                   onClick={() => setPage(Math.max(0, page - 1))}
                   disabled={page === 0}
-                  className="h-8 w-8 flex items-center justify-center rounded-md border border-[#1E293B] bg-[#0D1220] text-[#64748B] hover:bg-[#1A2035] hover:text-[#CBD5E1] disabled:opacity-30 transition-colors"
+                  className="h-8 w-8 flex items-center justify-center rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30 transition-colors"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <span className="text-[11px] text-[#64748B] px-2">
+                <span className="text-[11px] text-[#9C9C90] px-2">
                   Page {page + 1} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                   disabled={page >= totalPages - 1}
-                  className="h-8 w-8 flex items-center justify-center rounded-md border border-[#1E293B] bg-[#0D1220] text-[#64748B] hover:bg-[#1A2035] hover:text-[#CBD5E1] disabled:opacity-30 transition-colors"
+                  className="h-8 w-8 flex items-center justify-center rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30 transition-colors"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>

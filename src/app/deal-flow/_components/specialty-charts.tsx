@@ -82,11 +82,11 @@ export function SpecialtyCharts({ deals }: SpecialtyChartsProps) {
           title="Deals by Specialty"
           helpText="Breakdown of deals by dental specialty. General dentistry dominates, but orthodontics, oral surgery, and pediatric are also PE targets."
         />
-        <div className="mt-4 rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+        <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           {donutData.length > 0 ? (
             <DonutChart data={donutData} height={350} />
           ) : (
-            <div className="flex items-center justify-center h-[350px] text-[#94A3B8] text-sm">
+            <div className="flex items-center justify-center h-[350px] text-[#6B6B60] text-sm">
               No specialty data available
             </div>
           )}
@@ -99,7 +99,7 @@ export function SpecialtyCharts({ deals }: SpecialtyChartsProps) {
           title="Specialty Trends"
           helpText="How each specialty's deal volume is changing over time (by quarter). Rising areas show where PE firms are expanding focus."
         />
-        <div className="mt-4 rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+        <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           {trendData.length > 0 ? (
             <AreaChart
               data={trendData}
@@ -109,7 +109,7 @@ export function SpecialtyCharts({ deals }: SpecialtyChartsProps) {
               stacked
             />
           ) : (
-            <div className="flex items-center justify-center h-[350px] text-[#94A3B8] text-sm">
+            <div className="flex items-center justify-center h-[350px] text-[#6B6B60] text-sm">
               No specialty trend data available
             </div>
           )}

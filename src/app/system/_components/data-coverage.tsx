@@ -9,11 +9,11 @@ interface DataCoverageProps {
 
 export function DataCoverage({ sources }: DataCoverageProps) {
   return (
-    <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] overflow-hidden">
+    <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[#1E293B] text-[#94A3B8]">
+            <tr className="border-b border-[#E8E5DE] text-[#6B6B60]">
               <th className="text-left px-4 py-2.5 font-medium text-xs">Source</th>
               <th className="text-left px-4 py-2.5 font-medium text-xs">Records</th>
               <th className="text-left px-4 py-2.5 font-medium text-xs">Date Range</th>
@@ -25,16 +25,16 @@ export function DataCoverage({ sources }: DataCoverageProps) {
             {sources.map((src) => (
               <tr
                 key={src.source}
-                className="border-b border-[#1E293B]/50 hover:bg-[#1E293B]/20 transition-colors"
+                className="border-b border-[#E8E5DE]/50 hover:bg-[#E8E5DE]/20 transition-colors"
               >
-                <td className="px-4 py-2.5 text-[#F8FAFC] font-medium">{src.source}</td>
-                <td className="px-4 py-2.5 text-[#94A3B8] font-mono tabular-nums">
+                <td className="px-4 py-2.5 text-[#1A1A1A] font-medium">{src.source}</td>
+                <td className="px-4 py-2.5 text-[#6B6B60] font-mono tabular-nums">
                   {src.records.toLocaleString()}
                 </td>
-                <td className="px-4 py-2.5 text-[#94A3B8] font-mono text-xs">
+                <td className="px-4 py-2.5 text-[#6B6B60] font-mono text-xs">
                   {src.dateRange}
                 </td>
-                <td className="px-4 py-2.5 text-[#94A3B8] font-mono text-xs">
+                <td className="px-4 py-2.5 text-[#6B6B60] font-mono text-xs">
                   {src.lastUpdated}
                 </td>
                 <td className="px-4 py-2.5">

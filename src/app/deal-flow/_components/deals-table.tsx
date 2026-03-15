@@ -14,13 +14,13 @@ interface DealsTableProps {
 }
 
 const DEAL_TYPE_TAG_COLORS: Record<string, string> = {
-  buyout: 'bg-[#3B82F6]/20 text-[#66B2FF]',
-  'add-on': 'bg-[#22C55E]/20 text-[#66FF99]',
-  recapitalization: 'bg-[#F59E0B]/20 text-[#FFD54F]',
-  growth: 'bg-[#A855F7]/20 text-[#CE93D8]',
-  de_novo: 'bg-[#06B6D4]/20 text-[#80DEEA]',
-  partnership: 'bg-[#7C4DFF]/20 text-[#B39DDB]',
-  other: 'bg-[#64748B]/20 text-[#94A3B8]',
+  buyout: 'bg-[#B8860B]/15 text-[#8B6914]',
+  'add-on': 'bg-[#2D8B4E]/15 text-[#1E6B3A]',
+  recapitalization: 'bg-[#D4920B]/15 text-[#A67308]',
+  growth: 'bg-[#7C3AED]/15 text-[#5B21B6]',
+  de_novo: 'bg-[#0891B2]/15 text-[#0E7490]',
+  partnership: 'bg-[#6D28D9]/15 text-[#5B21B6]',
+  other: 'bg-[#9C9C90]/15 text-[#6B6B60]',
 }
 
 export function DealsTable({ deals }: DealsTableProps) {
@@ -64,7 +64,7 @@ export function DealsTable({ deals }: DealsTableProps) {
       key: 'pe_sponsor',
       header: 'PE Sponsor',
       render: (row: Record<string, unknown>) => (
-        <span className="text-[#94A3B8]">{(row.pe_sponsor as string) ?? '\u2014'}</span>
+        <span className="text-[#6B6B60]">{(row.pe_sponsor as string) ?? '\u2014'}</span>
       ),
     },
     { key: 'target_name', header: 'Target' },
@@ -96,7 +96,7 @@ export function DealsTable({ deals }: DealsTableProps) {
       key: 'source',
       header: 'Source',
       render: (row: Record<string, unknown>) => (
-        <span className="text-[#64748B] text-[0.75rem]">{(row.source as string) ?? '\u2014'}</span>
+        <span className="text-[#9C9C90] text-[0.75rem]">{(row.source as string) ?? '\u2014'}</span>
       ),
     },
   ]

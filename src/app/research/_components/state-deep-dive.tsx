@@ -71,7 +71,7 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
 
   if (states.length === 0) {
     return (
-      <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+      <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
         No state data available.
       </div>
     )
@@ -83,7 +83,7 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
       <select
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
-        className="rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6] min-w-[200px]"
+        className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B] min-w-[200px]"
       >
         {states.map((s) => (
           <option key={s} value={s}>
@@ -93,8 +93,8 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
       </select>
 
       {loading ? (
-        <div className="flex items-center gap-2 text-[#7eb8e0] text-sm">
-          <div className="h-4 w-4 border-2 border-[#7eb8e0] border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center gap-2 text-[#B8860B] text-sm">
+          <div className="h-4 w-4 border-2 border-[#B8860B] border-t-transparent rounded-full animate-spin" />
           Loading deals...
         </div>
       ) : (
@@ -109,21 +109,21 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
 
           {/* Deals by quarter - bar chart */}
           {quarterData.length > 0 && (
-            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-              <h3 className="text-sm font-medium text-[#F8FAFC] mb-4">Deals by Quarter</h3>
+            <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+              <h3 className="text-sm font-medium text-[#1A1A1A] mb-4">Deals by Quarter</h3>
               <div className="space-y-2">
                 {quarterData.map((q) => (
                   <div key={q.quarter} className="flex items-center gap-3">
-                    <span className="text-xs text-[#94A3B8] w-20 font-mono shrink-0">
+                    <span className="text-xs text-[#6B6B60] w-20 font-mono shrink-0">
                       {q.quarter}
                     </span>
-                    <div className="flex-1 h-6 bg-[#1E293B]/50 rounded overflow-hidden">
+                    <div className="flex-1 h-6 bg-[#E8E5DE]/50 rounded overflow-hidden">
                       <div
-                        className="h-full bg-[#3B82F6] rounded transition-all"
+                        className="h-full bg-[#B8860B] rounded transition-all"
                         style={{ width: `${(q.count / maxQuarterCount) * 100}%` }}
                       />
                     </div>
-                    <span className="text-xs text-[#F8FAFC] font-mono w-8 text-right">
+                    <span className="text-xs text-[#1A1A1A] font-mono w-8 text-right">
                       {q.count}
                     </span>
                   </div>
@@ -134,23 +134,23 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
 
           {/* Top 10 platforms - horizontal bar chart */}
           {topPlatforms.length > 0 && (
-            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-              <h3 className="text-sm font-medium text-[#F8FAFC] mb-4">
+            <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+              <h3 className="text-sm font-medium text-[#1A1A1A] mb-4">
                 Top 10 Platforms in {selected}
               </h3>
               <div className="space-y-2">
                 {topPlatforms.map((p) => (
                   <div key={p.platform} className="flex items-center gap-3">
-                    <span className="text-xs text-[#94A3B8] w-40 truncate shrink-0" title={p.platform}>
+                    <span className="text-xs text-[#6B6B60] w-40 truncate shrink-0" title={p.platform}>
                       {p.platform}
                     </span>
-                    <div className="flex-1 h-6 bg-[#1E293B]/50 rounded overflow-hidden">
+                    <div className="flex-1 h-6 bg-[#E8E5DE]/50 rounded overflow-hidden">
                       <div
-                        className="h-full bg-[#22C55E] rounded transition-all"
+                        className="h-full bg-[#2D8B4E] rounded transition-all"
                         style={{ width: `${(p.count / maxPlatformCount) * 100}%` }}
                       />
                     </div>
-                    <span className="text-xs text-[#F8FAFC] font-mono w-8 text-right">
+                    <span className="text-xs text-[#1A1A1A] font-mono w-8 text-right">
                       {p.count}
                     </span>
                   </div>

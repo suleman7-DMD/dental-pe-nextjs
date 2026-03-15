@@ -88,10 +88,10 @@ export function StateChoropleth({ deals }: StateChoroplethProps) {
             ],
             0
           ],
-          0, '#E3F2FD',
-          Math.max(1, maxDeals * 0.25), '#64B5F6',
-          Math.max(2, maxDeals * 0.5), '#1976D2',
-          Math.max(3, maxDeals), '#0D47A1',
+          0, '#FFF8E1',
+          Math.max(1, maxDeals * 0.25), '#F9C74F',
+          Math.max(2, maxDeals * 0.5), '#D4920B',
+          Math.max(3, maxDeals), '#8B5E00',
         ]
 
         map.addLayer({
@@ -113,7 +113,7 @@ export function StateChoropleth({ deals }: StateChoroplethProps) {
           'source-layer': 'boundaries_admin_1',
           filter: ['==', ['get', 'iso_3166_1'], 'US'],
           paint: {
-            'line-color': '#ffffff',
+            'line-color': '#D4D0C8',
             'line-width': 0.5,
           },
         })
@@ -169,7 +169,7 @@ export function StateChoropleth({ deals }: StateChoroplethProps) {
         <div className="md:col-span-2">
           <SectionHeader
             title="Deal Activity by State"
-            helpText="Geographic heatmap of PE deal activity. Darker blue = more deals. States with heavy activity (FL, TX, CA) are consolidation hotspots."
+            helpText="Geographic heatmap of PE deal activity. Darker = more deals. States with heavy activity (FL, TX, CA) are consolidation hotspots."
           />
           <div className="mt-4">
             <MapContainer height={400}>

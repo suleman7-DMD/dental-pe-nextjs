@@ -12,6 +12,15 @@ import { StateChoropleth } from './state-choropleth'
 import { SpecialtyCharts } from './specialty-charts'
 import { DealsTable } from './deals-table'
 
+const TABS = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'sponsors', label: 'Sponsors' },
+  { key: 'geography', label: 'Geography' },
+  { key: 'deals', label: 'Deals' },
+] as const
+
+type TabKey = (typeof TABS)[number]['key']
+
 interface DealFlowShellProps {
   initialDeals: Deal[]
   distinctSponsors: string[]
@@ -34,6 +43,17 @@ export function DealFlowShell({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
+
+  // Tab state from URL
+  const currentTab = (searchParams.get('tab') as TabKey) || 'overview'
+  const setTab = useCallback(
+    (tab: TabKey) => {
+      const sp = new URLSearchParams(searchParams.toString())
+      sp.set('tab', tab)
+      router.replace(`${pathname}?${sp.toString()}`, { scroll: false })
+    },
+    [searchParams, router, pathname]
+  )
 
   // Filter state from URL params
   const [startDate, setStartDate] = useState(searchParams.get('start') ?? '')
@@ -61,6 +81,7 @@ export function DealFlowShell({
   const updateUrl = useCallback(
     (params: Record<string, string[]>) => {
       const sp = new URLSearchParams()
+      sp.set('tab', currentTab)
       for (const [key, values] of Object.entries(params)) {
         if (values.length > 0) sp.set(key, values.join(','))
       }
@@ -68,7 +89,7 @@ export function DealFlowShell({
       if (endDate) sp.set('end', endDate)
       router.replace(`${pathname}?${sp.toString()}`, { scroll: false })
     },
-    [startDate, endDate, router, pathname]
+    [startDate, endDate, router, pathname, currentTab]
   )
 
   // Apply filters
@@ -115,21 +136,23 @@ export function DealFlowShell({
     setSelectedStates([])
     setSelectedSpecialties([])
     setSelectedSources([])
-    router.replace(pathname, { scroll: false })
-  }, [router, pathname])
+    const sp = new URLSearchParams()
+    sp.set('tab', currentTab)
+    router.replace(`${pathname}?${sp.toString()}`, { scroll: false })
+  }, [router, pathname, currentTab])
 
   const hasFilters = startDate || endDate || selectedTypes.length > 0 || selectedSponsors.length > 0 || selectedPlatforms.length > 0 || selectedStates.length > 0 || selectedSpecialties.length > 0 || selectedSources.length > 0
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E] text-[#F8FAFC] font-sans">
+    <div className="min-h-screen bg-[#FAFAF7] text-[#1A1A1A] font-sans">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dental PE Consolidation Intelligence</h1>
-          <p className="text-[#94A3B8] mt-1 text-sm">
+          <p className="text-[#6B6B60] mt-1 text-sm">
             Real-time tracking of private equity activity in U.S. dentistry
           </p>
-          <p className="text-[#64748B] text-xs mt-0.5">
+          <p className="text-[#9C9C90] text-xs mt-0.5">
             {totalCount.toLocaleString()} deals | {sourceCount} sources | Filtered view
           </p>
         </div>
@@ -195,7 +218,7 @@ export function DealFlowShell({
           {hasFilters && (
             <button
               onClick={handleReset}
-              className="self-end px-3 py-1.5 rounded-md text-[0.78rem] text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors"
+              className="self-end px-3 py-1.5 rounded-md text-[0.78rem] text-[#C23B3B] hover:bg-[#C23B3B]/10 transition-colors"
             >
               Reset
             </button>
@@ -203,28 +226,52 @@ export function DealFlowShell({
         </FilterBar>
 
         {filteredDeals.length === 0 ? (
-          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-8 text-center text-[#94A3B8] text-sm">
+          <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-8 text-center text-[#6B6B60] text-sm">
             No deals match current filters. Adjust the filters above or run the scrapers to ingest new data.
           </div>
         ) : (
           <>
-            {/* KPIs */}
+            {/* Persistent KPI Strip */}
             <DealKpis deals={filteredDeals} allDeals={initialDeals} />
 
-            {/* Deal Volume Timeline */}
-            <DealVolumeTimeline deals={filteredDeals} />
+            {/* Tab Bar */}
+            <div className="border-b border-[#E8E5DE]">
+              <nav className="flex gap-0 -mb-px">
+                {TABS.map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setTab(tab.key)}
+                    className={`px-5 py-2.5 text-sm font-medium transition-colors relative ${
+                      currentTab === tab.key
+                        ? 'text-[#B8860B] border-b-2 border-[#B8860B]'
+                        : 'text-[#6B6B60] hover:text-[#1A1A1A] hover:bg-black/[0.04]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
 
-            {/* Sponsor + Platform charts */}
-            <SponsorPlatformCharts deals={filteredDeals} />
+            {/* Tab Content */}
+            {currentTab === 'overview' && (
+              <div className="space-y-6">
+                <DealVolumeTimeline deals={filteredDeals} />
+                <SpecialtyCharts deals={filteredDeals} />
+              </div>
+            )}
 
-            {/* State choropleth + top states */}
-            <StateChoropleth deals={filteredDeals} />
+            {currentTab === 'sponsors' && (
+              <SponsorPlatformCharts deals={filteredDeals} />
+            )}
 
-            {/* Specialty charts */}
-            <SpecialtyCharts deals={filteredDeals} />
+            {currentTab === 'geography' && (
+              <StateChoropleth deals={filteredDeals} />
+            )}
 
-            {/* Deals table */}
-            <DealsTable deals={filteredDeals} />
+            {currentTab === 'deals' && (
+              <DealsTable deals={filteredDeals} />
+            )}
           </>
         )}
       </div>

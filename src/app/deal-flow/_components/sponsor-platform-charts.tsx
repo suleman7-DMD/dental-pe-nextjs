@@ -44,20 +44,20 @@ export function SponsorPlatformCharts({ deals }: SponsorPlatformChartsProps) {
           title="Top 15 PE Sponsors"
           helpText="Private equity firms ranked by deal count. These are the financial backers funding dental acquisitions. Higher bars = more aggressive acquirers in dentistry."
         />
-        <div className="mt-4 rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+        <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           {sponsorData.length > 0 ? (
             <BarChart
               data={sponsorData}
               xKey="name"
               yKey="deals"
-              color="#3B82F6"
+              color="#B8860B"
               height={450}
               horizontal
               showValues
               xLabel="Deals"
             />
           ) : (
-            <div className="flex items-center justify-center h-[300px] text-[#94A3B8] text-sm">
+            <div className="flex items-center justify-center h-[300px] text-[#6B6B60] text-sm">
               No PE sponsor data available.
             </div>
           )}
@@ -70,20 +70,20 @@ export function SponsorPlatformCharts({ deals }: SponsorPlatformChartsProps) {
           title="Top 15 Platforms"
           helpText="Platform companies (DSOs) ranked by deal count. These are the dental companies doing the buying. Examples: Heartland Dental, Aspen Dental. They buy individual practices and bolt them on."
         />
-        <div className="mt-4 rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+        <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           {platformData.length > 0 ? (
             <BarChart
               data={platformData}
               xKey="name"
               yKey="deals"
-              color="#22C55E"
+              color="#2D8B4E"
               height={450}
               horizontal
               showValues
               xLabel="Deals"
             />
           ) : (
-            <div className="flex items-center justify-center h-[300px] text-[#94A3B8] text-sm">
+            <div className="flex items-center justify-center h-[300px] text-[#6B6B60] text-sm">
               No platform data available.
             </div>
           )}

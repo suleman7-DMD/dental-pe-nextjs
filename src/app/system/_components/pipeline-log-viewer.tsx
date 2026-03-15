@@ -48,22 +48,22 @@ export function PipelineLogViewer() {
   const statusIcon = (status: string) => {
     switch (status) {
       case 'success':
-        return <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+        return <span className="inline-block h-2 w-2 rounded-full bg-green-600" />
       case 'error':
-        return <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+        return <span className="inline-block h-2 w-2 rounded-full bg-red-600" />
       case 'info':
-        return <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
+        return <span className="inline-block h-2 w-2 rounded-full bg-blue-600" />
       default:
-        return <span className="inline-block h-2 w-2 rounded-full bg-gray-500" />
+        return <span className="inline-block h-2 w-2 rounded-full bg-gray-400" />
     }
   }
 
   if (loading) {
     return (
-      <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 animate-pulse">
+      <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-6 animate-pulse">
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-8 w-full rounded bg-[#1E293B]" />
+            <div key={i} className="h-8 w-full rounded bg-[#E8E5DE]" />
           ))}
         </div>
       </div>
@@ -72,7 +72,7 @@ export function PipelineLogViewer() {
 
   if (events.length === 0) {
     return (
-      <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8] text-sm">
+      <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60] text-sm">
         No pipeline events yet. Events will appear after the first automated refresh runs.
         Pipeline events are logged to pipeline_events.jsonl by each scraper.
       </div>
@@ -95,22 +95,22 @@ export function PipelineLogViewer() {
               return (
                 <div
                   key={source}
-                  className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4"
+                  className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4"
                 >
                   <div className="flex items-center gap-2 mb-2">
                     {isSuccess ? (
-                      <span className="text-green-400 text-sm">OK</span>
+                      <span className="text-green-700 text-sm">OK</span>
                     ) : (
-                      <span className="text-red-400 text-sm">ERR</span>
+                      <span className="text-red-700 text-sm">ERR</span>
                     )}
-                    <span className="text-xs font-medium text-[#F8FAFC]">
+                    <span className="text-xs font-medium text-[#1A1A1A]">
                       {source.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                     </span>
                   </div>
-                  <p className="text-lg font-bold text-[#F8FAFC]">
+                  <p className="text-lg font-bold text-[#1A1A1A]">
                     {newRecords ? `${newRecords} new` : 'No changes'}
                   </p>
-                  <p className="text-xs text-[#94A3B8] mt-1">
+                  <p className="text-xs text-[#6B6B60] mt-1">
                     {duration}s -- {ts}
                   </p>
                 </div>
@@ -120,11 +120,11 @@ export function PipelineLogViewer() {
       )}
 
       {/* Event table */}
-      <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] overflow-hidden">
+      <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">
         <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-[#0F1629]">
-              <tr className="border-b border-[#1E293B] text-[#94A3B8]">
+            <thead className="sticky top-0 bg-[#FFFFFF]">
+              <tr className="border-b border-[#E8E5DE] text-[#6B6B60]">
                 <th className="text-left px-4 py-2 font-medium text-xs">Time</th>
                 <th className="text-left px-4 py-2 font-medium text-xs">Source</th>
                 <th className="text-left px-4 py-2 font-medium text-xs">Status</th>
@@ -137,24 +137,24 @@ export function PipelineLogViewer() {
               {events.map((ev, idx) => (
                 <tr
                   key={idx}
-                  className="border-b border-[#1E293B]/50 hover:bg-[#1E293B]/20"
+                  className="border-b border-[#E8E5DE]/50 hover:bg-[#E8E5DE]/20"
                 >
-                  <td className="px-4 py-2 text-[#94A3B8] font-mono text-xs whitespace-nowrap">
+                  <td className="px-4 py-2 text-[#9C9C90] font-mono text-xs whitespace-nowrap">
                     {ev.timestamp.slice(0, 19).replace('T', ' ')}
                   </td>
-                  <td className="px-4 py-2 text-[#F8FAFC] text-xs">{ev.source}</td>
+                  <td className="px-4 py-2 text-[#1A1A1A] text-xs">{ev.source}</td>
                   <td className="px-4 py-2">
-                    <span className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
+                    <span className="flex items-center gap-1.5 text-xs text-[#6B6B60]">
                       {statusIcon(ev.status)} {ev.status}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-[#94A3B8] text-xs max-w-[300px] truncate">
+                  <td className="px-4 py-2 text-[#3D3D35] text-xs max-w-[300px] truncate">
                     {ev.summary}
                   </td>
-                  <td className="px-4 py-2 text-[#94A3B8] font-mono text-xs">
+                  <td className="px-4 py-2 text-[#6B6B60] font-mono text-xs">
                     {ev.details?.new_records ?? '--'}
                   </td>
-                  <td className="px-4 py-2 text-[#94A3B8] font-mono text-xs">
+                  <td className="px-4 py-2 text-[#6B6B60] font-mono text-xs">
                     {ev.details?.duration_seconds
                       ? `${ev.details.duration_seconds}s`
                       : '--'}

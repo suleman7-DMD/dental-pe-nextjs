@@ -46,34 +46,34 @@ export function ResearchShell({ sponsors, platforms, states }: ResearchShellProp
   )
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E]">
+    <div className="min-h-screen bg-[#FAFAF7]">
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="font-sans font-bold text-2xl text-[#F8FAFC]">
+          <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">
             Research Tools
           </h1>
-          <p className="text-[#94A3B8] text-sm mt-1 max-w-3xl">
+          <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
             Deep-dive into specific PE sponsors, platforms, states, or write custom SQL queries.
             Use these tools to research specific companies or markets.
           </p>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-[#1E293B]">
+        <div className="flex gap-1 border-b border-[#E8E5DE]">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setTab(tab.id)}
               className={`px-4 py-2.5 text-sm font-medium transition-colors relative ${
                 currentTab === tab.id
-                  ? 'text-[#F8FAFC]'
-                  : 'text-[#94A3B8] hover:text-[#F8FAFC]'
+                  ? 'text-[#1A1A1A]'
+                  : 'text-[#6B6B60] hover:text-[#1A1A1A]'
               }`}
             >
               {tab.label}
               {currentTab === tab.id && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#3B82F6]" />
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#B8860B]" />
               )}
             </button>
           ))}
