@@ -1,4 +1,4 @@
-import { OWNERSHIP_STATUS_COLORS } from "@/lib/constants/colors";
+import { OWNERSHIP_STATUS_COLORS, ENTITY_CLASSIFICATION_COLORS } from "@/lib/constants/colors";
 
 /** Format a number as USD currency. */
 export function formatCurrency(value: number | null | undefined): string {
@@ -98,15 +98,16 @@ export function formatStatus(status: string | null | undefined): {
     string,
     { label: string; color: string; dotClass: string }
   > = {
+    // --- Legacy ownership_status values ---
     independent: {
       label: "Independent",
       color: OWNERSHIP_STATUS_COLORS.independent,
-      dotClass: "bg-green-500",
+      dotClass: "bg-blue-600",
     },
     likely_independent: {
       label: "Likely Independent",
       color: OWNERSHIP_STATUS_COLORS.likely_independent,
-      dotClass: "bg-green-500",
+      dotClass: "bg-blue-600",
     },
     dso_affiliated: {
       label: "DSO Affiliated",
@@ -122,6 +123,62 @@ export function formatStatus(status: string | null | undefined): {
       label: "Unknown",
       color: OWNERSHIP_STATUS_COLORS.unknown,
       dotClass: "bg-gray-500",
+    },
+    // --- Entity classification values (11 types) ---
+    solo_established: {
+      label: "Solo Established",
+      color: ENTITY_CLASSIFICATION_COLORS.solo_established,
+      dotClass: "bg-green-600",
+    },
+    solo_new: {
+      label: "Solo New",
+      color: ENTITY_CLASSIFICATION_COLORS.solo_new,
+      dotClass: "bg-green-500",
+    },
+    solo_inactive: {
+      label: "Solo Inactive",
+      color: ENTITY_CLASSIFICATION_COLORS.solo_inactive,
+      dotClass: "bg-gray-400",
+    },
+    solo_high_volume: {
+      label: "Solo High Volume",
+      color: ENTITY_CLASSIFICATION_COLORS.solo_high_volume,
+      dotClass: "bg-green-700",
+    },
+    family_practice: {
+      label: "Family Practice",
+      color: ENTITY_CLASSIFICATION_COLORS.family_practice,
+      dotClass: "bg-amber-500",
+    },
+    small_group: {
+      label: "Small Group",
+      color: ENTITY_CLASSIFICATION_COLORS.small_group,
+      dotClass: "bg-blue-600",
+    },
+    large_group: {
+      label: "Large Group",
+      color: ENTITY_CLASSIFICATION_COLORS.large_group,
+      dotClass: "bg-blue-700",
+    },
+    dso_regional: {
+      label: "Regional DSO",
+      color: ENTITY_CLASSIFICATION_COLORS.dso_regional,
+      dotClass: "bg-orange-500",
+    },
+    dso_national: {
+      label: "National DSO",
+      color: ENTITY_CLASSIFICATION_COLORS.dso_national,
+      dotClass: "bg-red-500",
+    },
+    specialist: {
+      label: "Specialist",
+      color: ENTITY_CLASSIFICATION_COLORS.specialist,
+      dotClass: "bg-purple-500",
+    },
+    non_clinical: {
+      label: "Non-Clinical",
+      color: ENTITY_CLASSIFICATION_COLORS.non_clinical,
+      dotClass: "bg-gray-400",
     },
   };
 

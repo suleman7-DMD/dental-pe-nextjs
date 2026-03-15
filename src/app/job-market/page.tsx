@@ -49,27 +49,25 @@ export default async function JobMarketPage() {
   const defaultLocationKey = Object.keys(LIVING_LOCATIONS)[0]
   const defaultZips = LIVING_LOCATIONS[defaultLocationKey].commutable_zips
 
-  // Supabase returns max 1000 rows per query — must paginate
-  const allPractices: Record<string, unknown>[] = []
-  const pageSize = 1000
-  let offset = 0
-  let hasMore = true
-  while (hasMore) {
-    const { data: batch } = await supabase
-      .from('practices')
-      .select('*')
-      .in('zip', defaultZips)
-      .order('practice_name', { ascending: true })
-      .range(offset, offset + pageSize - 1)
-    if (batch && batch.length > 0) {
-      allPractices.push(...batch)
-      offset += batch.length
-      hasMore = batch.length === pageSize
-    } else {
-      hasMore = false
-    }
-  }
-  const initialPractices = allPractices as unknown as import('@/lib/types').Practice[]
+  // Only fetch essential fields for initial render (not all 30+ columns)
+  // and cap at 500 rows — the client shell fetches more on-demand via React Query
+  const practiceFields = [
+    'id', 'npi', 'practice_name', 'doing_business_as', 'city', 'state', 'zip',
+    'phone', 'website', 'entity_classification', 'ownership_status',
+    'affiliated_dso', 'buyability_score', 'classification_confidence',
+    'classification_reasoning', 'year_established', 'employee_count',
+    'estimated_revenue', 'latitude', 'longitude', 'data_axle_import_date',
+    'num_providers', 'location_type', 'taxonomy_code',
+  ].join(',')
+
+  const { data: initialBatch } = await supabase
+    .from('practices')
+    .select(practiceFields)
+    .in('zip', defaultZips)
+    .order('practice_name', { ascending: true })
+    .range(0, 499)
+
+  const initialPractices = (initialBatch ?? []) as unknown as import('@/lib/types').Practice[]
 
   return (
     <JobMarketShell

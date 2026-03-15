@@ -153,10 +153,29 @@ export function IntelligenceShell({
   // ── KPI computations ────────────────────────────────────────────────────
 
   const totalResearchCost = useMemo(() => {
+    // Sum actual costs from individual records when available
+    let totalFromRecords = 0
+    let hasAnyRecordCost = false
+    for (const z of initialZipIntel) {
+      if (z.cost_usd != null) {
+        totalFromRecords += z.cost_usd
+        hasAnyRecordCost = true
+      }
+    }
+    for (const p of initialPracticeIntel) {
+      if (p.cost_usd != null) {
+        totalFromRecords += p.cost_usd
+        hasAnyRecordCost = true
+      }
+    }
+    if (hasAnyRecordCost) {
+      return { value: totalFromRecords.toFixed(2), estimated: false }
+    }
+    // Fallback: estimate from average cost
     const avgCost = stats.avgCostUsd ?? 0
     const totalItems = stats.totalZipsResearched + stats.totalPracticesResearched
-    return (avgCost * totalItems).toFixed(2)
-  }, [stats])
+    return { value: (avgCost * totalItems).toFixed(2), estimated: true }
+  }, [stats, initialZipIntel, initialPracticeIntel])
 
   const zipCoveragePct = useMemo(() => {
     if (watchedZipCount === 0) return '0.0'
@@ -361,7 +380,7 @@ export function IntelligenceShell({
             <KpiCard
               icon={<DollarSign className="h-4 w-4" />}
               label="Total Research Cost"
-              value={`$${totalResearchCost}`}
+              value={`${totalResearchCost.estimated ? '~' : ''}$${totalResearchCost.value}`}
               accentColor="#D4920B"
             />
             <KpiCard

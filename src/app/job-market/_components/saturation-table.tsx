@@ -73,7 +73,19 @@ interface SaturationRow {
 }
 
 export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps) {
-  if (zipScores.length === 0) return null
+  if (zipScores.length === 0) {
+    return (
+      <div>
+        <SectionHeader
+          title="Saturation Analysis"
+          helpText="Cross-ZIP comparison of dental market metrics."
+        />
+        <div className="mt-4 rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
+          No saturation data available for the selected location. ZIP scores have not been computed for these ZIPs yet.
+        </div>
+      </div>
+    )
+  }
 
   // Merge zip_scores with watched_zips demographics
   const wzMap = useMemo(() => {

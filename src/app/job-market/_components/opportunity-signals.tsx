@@ -41,6 +41,7 @@ interface PracticeChange {
 export function OpportunitySignals({ practices, zipList }: OpportunitySignalsProps) {
   const [changes, setChanges] = useState<PracticeChange[]>([])
   const [changesLoading, setChangesLoading] = useState(false)
+  const [activeSignalTab, setActiveSignalTab] = useState('retirement')
 
   const currentYear = new Date().getFullYear()
 
@@ -131,6 +132,8 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
 
   // ── Recent Changes ────────────────────────────────────────────────────
   useEffect(() => {
+    let cancelled = false
+
     async function fetchChanges() {
       if (zipList.length === 0) return
       setChangesLoading(true)
@@ -153,6 +156,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         const npiArr = Array.from(npiSet)
 
         for (let i = 0; i < npiArr.length; i += batchSize) {
+          if (cancelled) return
           const batch = npiArr.slice(i, i + batchSize)
           const { data } = await supabase
             .from('practice_changes')
@@ -180,16 +184,17 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
           }
         }
 
-        setChanges(allChanges)
+        if (!cancelled) setChanges(allChanges)
       } catch {
         // Silently handle - changes data is supplementary
-        setChanges([])
+        if (!cancelled) setChanges([])
       } finally {
-        setChangesLoading(false)
+        if (!cancelled) setChangesLoading(false)
       }
     }
 
     fetchChanges()
+    return () => { cancelled = true }
   }, [zipList, practices])
 
   const changeKpis = useMemo(() => {
@@ -207,7 +212,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         helpText="Each practice scored 0-100: independent ownership (30), buyability (25), size (20), young practice (15), unknown status (10)."
       />
 
-      <Tabs defaultValue="retirement" className="mt-4">
+      <Tabs value={activeSignalTab} onValueChange={setActiveSignalTab} className="mt-4">
         <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
           <TabsTrigger value="retirement">Retirement Risk</TabsTrigger>
           <TabsTrigger value="buyability">High Buyability</TabsTrigger>

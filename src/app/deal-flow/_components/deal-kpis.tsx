@@ -7,10 +7,9 @@ import type { Deal } from '@/lib/supabase/queries/deals'
 
 interface DealKpisProps {
   deals: Deal[]
-  allDeals: Deal[]
 }
 
-export function DealKpis({ deals, allDeals }: DealKpisProps) {
+export function DealKpis({ deals }: DealKpisProps) {
   const kpis = useMemo(() => {
     const now = new Date()
     const thisYear = now.getFullYear()

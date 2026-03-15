@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { SearchInput } from '@/components/filters/search-input'
 import { FilterGroup, MultiSelect } from '@/components/filters/filter-bar'
@@ -10,9 +10,11 @@ import { StatusBadge } from '@/components/data-display/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { PracticeDetailDrawer } from './practice-detail-drawer'
+import { Download } from 'lucide-react'
 import { exportToCsv } from '@/lib/utils/csv-export'
 import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
 import { formatStatusLabel } from '@/lib/utils/formatting'
+import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 
 import type { Practice } from '@/lib/types'
 
@@ -224,6 +226,21 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   const [sortBy, setSortBy] = useState<SortOption>('job_score')
   const [selectedPractice, setSelectedPractice] = useState<Practice | null>(null)
   const [page, setPage] = useState(1)
+  const [activeView, setActiveView] = useState('employment')
+
+  // Reset filters when location changes (practices prop changes)
+  useEffect(() => {
+    setPage(1)
+    setSearchTerm('')
+    setSelectedStatuses([])
+    setSelectedSources(['All'])
+  }, [practices.length])
+
+  // Compute job_opp_score on allPractices so drawer lookups have scores
+  const scoredAllPractices = useMemo(
+    () => computeJobOpportunityScore(allPractices),
+    [allPractices]
+  )
 
   const totalPractices = practices.length
   const enrichedCount = useMemo(
@@ -424,7 +441,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="employment" className="mt-4">
+      <Tabs value={activeView} onValueChange={setActiveView} className="mt-4">
         <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
           <TabsTrigger value="employment">Employment Opportunities</TabsTrigger>
           <TabsTrigger value="ownership">Ownership Pipeline</TabsTrigger>
@@ -561,7 +578,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
           onClick={handleDownloadCsv}
           className="inline-flex items-center gap-2 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-4 py-2 text-sm text-[#1A1A1A] hover:border-[#D4D0C8] hover:bg-[#F7F7F4] transition-colors"
         >
-          <DownloadIcon />
+          <Download className="h-4 w-4" />
           Download filtered practices (CSV)
         </button>
       </div>
@@ -569,7 +586,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       {/* Practice Detail Drawer */}
       <PracticeDetailDrawer
         practice={selectedPractice}
-        allPractices={allPractices}
+        allPractices={scoredAllPractices}
         onClose={() => setSelectedPractice(null)}
       />
     </div>
@@ -619,26 +636,3 @@ function Pagination({
   )
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Download icon
-// ────────────────────────────────────────────────────────────────────────────
-
-function DownloadIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M8 1v9m0 0l3-3m-3 3L5 7m-3 5v1a2 2 0 002 2h8a2 2 0 002-2v-1"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}

@@ -547,7 +547,7 @@ export function JobMarketShell({
 
             {/* Overview Tab */}
             {activeTab === 'overview' && (
-              <div className="space-y-6">
+              <div key="overview" className="space-y-6">
                 <SaturationTable
                   zipScores={zipScores}
                   watchedZips={initialWatchedZips}
@@ -564,24 +564,28 @@ export function JobMarketShell({
 
             {/* Map Tab */}
             {activeTab === 'map' && (
-              <PracticeDensityMap
-                practices={practices}
-                centerLat={loc.center_lat}
-                centerLon={loc.center_lon}
-              />
+              <div key="map">
+                <PracticeDensityMap
+                  practices={practices}
+                  centerLat={loc.center_lat}
+                  centerLon={loc.center_lon}
+                />
+              </div>
             )}
 
             {/* Directory Tab */}
             {activeTab === 'directory' && (
-              <PracticeDirectory
-                practices={practicesWithScore}
-                allPractices={practices}
-              />
+              <div key="directory">
+                <PracticeDirectory
+                  practices={practicesWithScore}
+                  allPractices={practices}
+                />
+              </div>
             )}
 
             {/* Analytics Tab */}
             {activeTab === 'analytics' && (
-              <div className="space-y-6">
+              <div key="analytics" className="space-y-6">
                 <MarketOverviewCharts
                   practices={practices}
                   zipStats={zipStats}

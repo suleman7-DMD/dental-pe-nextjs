@@ -34,7 +34,6 @@ export function DealsTable({ deals }: DealsTableProps) {
         if (!b.deal_date) return -1
         return b.deal_date.localeCompare(a.deal_date)
       })
-      .slice(0, 100)
 
     if (search) {
       const lowerSearch = search.toLowerCase()
@@ -51,29 +50,31 @@ export function DealsTable({ deals }: DealsTableProps) {
     {
       key: 'deal_date',
       header: 'Date',
-      render: (row: Record<string, unknown>) => formatDate(row.deal_date as string | null),
+      render: (val: unknown) => formatDate(val as string | null),
     },
     {
       key: 'platform_company',
       header: 'Platform',
-      render: (row: Record<string, unknown>) => (
-        <span className="font-medium">{(row.platform_company as string) ?? '\u2014'}</span>
-      ),
+      render: (val: unknown) => {
+        const v = val as string | null
+        return <span className="font-medium">{v ?? '\u2014'}</span>
+      },
     },
     {
       key: 'pe_sponsor',
       header: 'PE Sponsor',
-      render: (row: Record<string, unknown>) => (
-        <span className="text-[#6B6B60]">{(row.pe_sponsor as string) ?? '\u2014'}</span>
-      ),
+      render: (val: unknown) => {
+        const v = val as string | null
+        return <span className="text-[#6B6B60]">{v ?? '\u2014'}</span>
+      },
     },
     { key: 'target_name', header: 'Target' },
     { key: 'target_state', header: 'State' },
     {
       key: 'deal_type',
       header: 'Type',
-      render: (row: Record<string, unknown>) => {
-        const type = row.deal_type as string | null
+      render: (val: unknown) => {
+        const type = val as string | null
         const tagClass = DEAL_TYPE_TAG_COLORS[type ?? 'other'] ?? DEAL_TYPE_TAG_COLORS.other
         return (
           <span className={`inline-block px-2 py-0.5 rounded text-[0.72rem] font-medium ${tagClass}`}>
@@ -87,17 +88,18 @@ export function DealsTable({ deals }: DealsTableProps) {
       key: 'deal_size_mm',
       header: 'Size ($M)',
       align: 'right' as const,
-      render: (row: Record<string, unknown>) => {
-        const v = row.deal_size_mm as number | null
+      render: (val: unknown) => {
+        const v = val as number | null
         return v != null ? `$${v.toFixed(1)}M` : '\u2014'
       },
     },
     {
       key: 'source',
       header: 'Source',
-      render: (row: Record<string, unknown>) => (
-        <span className="text-[#9C9C90] text-[0.75rem]">{(row.source as string) ?? '\u2014'}</span>
-      ),
+      render: (val: unknown) => {
+        const v = val as string | null
+        return <span className="text-[#9C9C90] text-[0.75rem]">{v ?? '\u2014'}</span>
+      },
     },
   ]
 
@@ -105,7 +107,7 @@ export function DealsTable({ deals }: DealsTableProps) {
     <div>
       <SectionHeader
         title="Recent Deal Activity"
-        helpText="The 100 most recent deals matching your filters. Use the search box to find specific companies. Column headers are sortable. Download exports to CSV."
+        helpText="All deals matching your filters, sorted by date. Use the search box to find specific companies. Column headers are sortable. Download exports to CSV."
       />
       <div className="mt-4 space-y-3">
         <SearchInput

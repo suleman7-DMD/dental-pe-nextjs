@@ -10,7 +10,7 @@ export const metadata = {
 }
 
 export default async function IntelligencePage() {
-  const supabase = createServerClient()
+  const supabase = await createServerClient()
 
   const [zipIntel, practiceIntel, stats] = await Promise.all([
     getZipIntel(supabase),

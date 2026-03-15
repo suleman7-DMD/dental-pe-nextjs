@@ -21,42 +21,51 @@ export interface CompletenessMetric {
 export async function getDataFreshness(
   supabase: SupabaseClient
 ): Promise<DataFreshness> {
-  // Total practices
-  const { count: totalPractices } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true });
+  const [
+    { count: totalPractices },
+    { count: enrichedCount },
+    { count: totalDeals },
+    { count: totalWatchedZips },
+    { data: recentDeal },
+    { data: recentPractice },
+  ] = await Promise.all([
+    // Total practices
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true }),
 
-  // Enriched (Data Axle) count
-  const { count: enrichedCount } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .not("data_axle_import_date", "is", null);
+    // Enriched (Data Axle) count
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .not("data_axle_import_date", "is", null),
 
-  // Total deals
-  const { count: totalDeals } = await supabase
-    .from("deals")
-    .select("*", { count: "exact", head: true });
+    // Total deals
+    supabase
+      .from("deals")
+      .select("id", { count: "exact", head: true }),
 
-  // Total watched ZIPs
-  const { count: totalWatchedZips } = await supabase
-    .from("watched_zips")
-    .select("*", { count: "exact", head: true });
+    // Total watched ZIPs
+    supabase
+      .from("watched_zips")
+      .select("zip_code", { count: "exact", head: true }),
 
-  // Most recent deal date
-  const { data: recentDeal } = await supabase
-    .from("deals")
-    .select("deal_date")
-    .order("deal_date", { ascending: false })
-    .limit(1)
-    .single();
+    // Most recent deal date
+    supabase
+      .from("deals")
+      .select("deal_date")
+      .order("deal_date", { ascending: false })
+      .limit(1)
+      .single(),
 
-  // Most recent practice update
-  const { data: recentPractice } = await supabase
-    .from("practices")
-    .select("updated_at")
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .single();
+    // Most recent practice update
+    supabase
+      .from("practices")
+      .select("updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single(),
+  ]);
 
   return {
     total_practices: totalPractices ?? 0,
@@ -71,31 +80,40 @@ export async function getDataFreshness(
 export async function getSourceCoverage(
   supabase: SupabaseClient
 ): Promise<Record<string, number>> {
-  // Count practices per data_source using separate count queries
+  // Count practices per data_source using parallel count queries
   // (avoids fetching 400k+ rows which exceeds Supabase's default 1000 row limit)
-  const knownSources = ["nppes", "data_axle", "manual", "unknown"];
-  const counts: Record<string, number> = {};
-
-  // Get total count first
-  const { count: total } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true });
-
-  // Count each known source
-  for (const src of knownSources) {
-    if (src === "unknown") continue; // handle below
-    const { count } = await supabase
+  const [
+    { count: total },
+    { count: nppesCount },
+    { count: dataAxleCount },
+    { count: manualCount },
+    { count: nullCount },
+  ] = await Promise.all([
+    supabase
       .from("practices")
-      .select("*", { count: "exact", head: true })
-      .eq("data_source", src);
-    if (count && count > 0) counts[src] = count;
-  }
+      .select("npi", { count: "exact", head: true }),
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .eq("data_source", "nppes"),
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .eq("data_source", "data_axle"),
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .eq("data_source", "manual"),
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .is("data_source", null),
+  ]);
 
-  // Count nulls as unknown
-  const { count: nullCount } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .is("data_source", null);
+  const counts: Record<string, number> = {};
+  if ((nppesCount ?? 0) > 0) counts["nppes"] = nppesCount ?? 0;
+  if ((dataAxleCount ?? 0) > 0) counts["data_axle"] = dataAxleCount ?? 0;
+  if ((manualCount ?? 0) > 0) counts["manual"] = manualCount ?? 0;
 
   // Calculate any remaining sources not in knownSources
   const knownTotal = Object.values(counts).reduce((a, b) => a + b, 0) + (nullCount ?? 0);
@@ -113,52 +131,64 @@ export async function getSourceCoverage(
 export async function getCompletenessMetrics(
   supabase: SupabaseClient
 ): Promise<CompletenessMetric[]> {
-  // Total practices count
-  const { count: total } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true });
+  // Run all count queries in parallel
+  const [
+    { count: total },
+    { count: classifiedByEC },
+    { count: classifiedByOS },
+    { count: withCoords },
+    { count: withPhone },
+    { count: withEntity },
+    { count: enriched },
+  ] = await Promise.all([
+    // Total practices count
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true }),
+
+    // Ownership classified by entity_classification (primary)
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .not("entity_classification", "is", null),
+
+    // Ownership classified by ownership_status fallback (entity_classification is null)
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .is("entity_classification", null)
+      .neq("ownership_status", "unknown"),
+
+    // Have coordinates
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .not("latitude", "is", null)
+      .not("longitude", "is", null),
+
+    // Have phone
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .not("phone", "is", null),
+
+    // Entity classification set
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .not("entity_classification", "is", null),
+
+    // Data Axle enriched
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .not("data_axle_import_date", "is", null),
+  ]);
+
   const t = total ?? 0;
   if (t === 0) return [];
 
-  // Ownership classified — count practices with entity_classification set (primary)
-  // OR ownership_status not 'unknown' (legacy fallback for practices without entity_classification)
-  const { count: classifiedByEC } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .not("entity_classification", "is", null);
-
-  const { count: classifiedByOS } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .is("entity_classification", null)
-    .neq("ownership_status", "unknown");
-
   const classified = (classifiedByEC ?? 0) + (classifiedByOS ?? 0);
-
-  // Have coordinates
-  const { count: withCoords } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .not("latitude", "is", null)
-    .not("longitude", "is", null);
-
-  // Have phone
-  const { count: withPhone } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .not("phone", "is", null);
-
-  // Entity classification
-  const { count: withEntity } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .not("entity_classification", "is", null);
-
-  // Data Axle enriched
-  const { count: enriched } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .not("data_axle_import_date", "is", null);
 
   const make = (label: string, count: number): CompletenessMetric => ({
     label,

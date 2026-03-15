@@ -63,7 +63,7 @@ export async function getDealStats(
     const to = from + pageSize - 1;
     const { data, count, error } = await supabase
       .from("deals")
-      .select("*", { count: "exact" })
+      .select("id, deal_date, platform_company, pe_sponsor, target_name, target_city, target_state, target_zip, deal_type, deal_size_mm, ebitda_multiple, specialty, num_locations, source, source_url, notes, created_at, updated_at", { count: "exact" })
       .order("deal_date", { ascending: false })
       .range(from, to);
 

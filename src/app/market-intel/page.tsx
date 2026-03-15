@@ -119,7 +119,7 @@ export default async function MarketIntelPage() {
     corporate: allCorporate,
     corporateHighConf: highConfCorporate,
     independent: (independentByEC ?? 0) + (independentByStatus ?? 0),
-    unknown: (watchedTotal ?? 0) - allCorporate - (independentByEC ?? 0) - (independentByStatus ?? 0),
+    unknown: Math.max(0, (watchedTotal ?? 0) - allCorporate - (independentByEC ?? 0) - (independentByStatus ?? 0)),
   }
 
   return (

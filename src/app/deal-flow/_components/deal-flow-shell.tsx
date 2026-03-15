@@ -232,7 +232,7 @@ export function DealFlowShell({
         ) : (
           <>
             {/* Persistent KPI Strip */}
-            <DealKpis deals={filteredDeals} allDeals={initialDeals} />
+            <DealKpis deals={filteredDeals} />
 
             {/* Tab Bar */}
             <div className="border-b border-[#E8E5DE]">
