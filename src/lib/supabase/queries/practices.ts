@@ -97,7 +97,9 @@ export async function getPracticesWithCoords(
 }
 
 /**
- * Aggregate practice statistics: total, consolidated %, independent %.
+ * Aggregate practice statistics for watched ZIPs: total, consolidated %, independent %.
+ * Scoped to watched ZIPs where classification data is meaningful.
+ * Also returns global total for the "Practices Tracked" KPI.
  */
 export async function getPracticeStats(
   supabase: SupabaseClient
@@ -106,21 +108,43 @@ export async function getPracticeStats(
   consolidatedPct: string;
   independentPct: string;
 }> {
-  // Total practices
-  const { count: total } = await supabase
+  // Global total (for "Practices Tracked" headline)
+  const { count: globalTotal } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true });
 
-  // Corporate by entity_classification (primary)
+  // Get watched ZIP codes for scoped stats
+  const { data: watchedZipRows } = await supabase
+    .from("watched_zips")
+    .select("zip_code");
+  const watchedZips = (watchedZipRows ?? []).map((z: { zip_code: string }) => z.zip_code);
+
+  if (watchedZips.length === 0) {
+    return {
+      totalPractices: globalTotal ?? 0,
+      consolidatedPct: "--",
+      independentPct: "--",
+    };
+  }
+
+  // Total practices in watched ZIPs
+  const { count: total } = await supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .in("zip", watchedZips);
+
+  // Corporate by entity_classification (primary) — in watched ZIPs
   const { count: corporateByEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
+    .in("zip", watchedZips)
     .in("entity_classification", ["dso_regional", "dso_national"]);
 
   // Corporate by ownership_status where entity_classification is missing (fallback)
   const { count: dsoByStatus } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
+    .in("zip", watchedZips)
     .in("ownership_status", ["dso_affiliated", "pe_backed"])
     .is("entity_classification", null);
 
@@ -128,6 +152,7 @@ export async function getPracticeStats(
   const { count: independentByEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
+    .in("zip", watchedZips)
     .in("entity_classification", [
       "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
       "family_practice", "small_group", "large_group", "specialist", "non_clinical"
@@ -137,6 +162,7 @@ export async function getPracticeStats(
   const { count: independentByStatus } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
+    .in("zip", watchedZips)
     .in("ownership_status", ["independent", "likely_independent"])
     .is("entity_classification", null);
 
@@ -145,28 +171,46 @@ export async function getPracticeStats(
   const independent = (independentByEC ?? 0) + (independentByStatus ?? 0);
 
   return {
-    totalPractices: t,
+    totalPractices: globalTotal ?? 0,
     consolidatedPct: t > 0 ? ((consolidated / t) * 100).toFixed(1) : "0.0",
     independentPct: t > 0 ? ((independent / t) * 100).toFixed(1) : "0.0",
   };
 }
 
 /**
- * Count practices at retirement risk (solo, established 20+ years ago).
+ * Count practices at retirement risk (independent, established 30+ years ago).
+ * Scoped to watched ZIPs. Uses entity_classification with ownership_status fallback.
  */
 export async function getRetirementRiskCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  const cutoffYear = new Date().getFullYear() - 20;
+  const cutoffYear = new Date().getFullYear() - 30;
 
-  const { count, error } = await supabase
+  // Get watched ZIP codes
+  const { data: watchedZipRows } = await supabase
+    .from("watched_zips")
+    .select("zip_code");
+  const watchedZips = (watchedZipRows ?? []).map((z: { zip_code: string }) => z.zip_code);
+  if (watchedZips.length === 0) return 0;
+
+  // By entity_classification (solo practices, 30+ years)
+  const { count: byEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .in("entity_classification", ["solo_established", "solo_inactive"])
+    .in("zip", watchedZips)
+    .in("entity_classification", ["solo_established", "solo_inactive", "solo_high_volume"])
     .lte("year_established", cutoffYear);
 
-  if (error) throw error;
-  return count ?? 0;
+  // Fallback: by ownership_status where entity_classification is missing
+  const { count: byStatus } = await supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .in("zip", watchedZips)
+    .in("ownership_status", ["independent", "likely_independent"])
+    .is("entity_classification", null)
+    .lte("year_established", cutoffYear);
+
+  return (byEC ?? 0) + (byStatus ?? 0);
 }
 
 /**
