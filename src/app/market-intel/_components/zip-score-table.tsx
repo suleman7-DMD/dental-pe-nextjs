@@ -13,72 +13,82 @@ interface ZipScoreRow {
   zip_code: string
   city: string
   total_practices: number
+  gp_locations: number
+  corporate_count: number
   independent_count: number
-  dso_count: number
-  pe_count: number
-  unknown_count: number
   consolidation_pct: number
   independent_pct: number
   unknown_pct: number
   confidence: string
   opportunity_score: number
+  market_type: string
 }
 
 export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
   if (zipScores.length === 0) return null
 
-  // Compute derived fields from zip_scores data
+  // Compute derived fields from zip_scores data.
+  // Primary data source: saturation metric columns (corporate_share_pct, total_gp_locations,
+  // metrics_confidence, opportunity_score). Falls back to legacy count columns only when
+  // saturation metrics are unavailable.
   const rows = useMemo((): ZipScoreRow[] => {
     return zipScores.map(z => {
-      const total = z.total_practices ?? 0
-      const dso = z.dso_affiliated_count ?? 0
-      const pe = z.pe_backed_count ?? 0
-      const indep = z.independent_count ?? 0
-      const unk = z.unknown_count ?? 0
+      // Total practices — prefer total_practices, fall back to sum of GP + specialist locations
+      const total = z.total_practices ?? ((z.total_gp_locations ?? 0) + (z.total_specialist_locations ?? 0))
+      const gpLoc = z.total_gp_locations ?? total
 
-      // Use corporate_share_pct if available (entity_classification-based, more accurate)
+      // Corporate count from saturation metrics (entity_classification-based)
       const corporateFromSaturation = z.corporate_share_pct != null && z.total_gp_locations != null
         ? Math.round(z.corporate_share_pct * z.total_gp_locations)
         : null
+      // Legacy fallback
+      const corporateFromLegacy = (z.dso_affiliated_count ?? 0) + (z.pe_backed_count ?? 0)
+      const corporateCount = corporateFromSaturation ?? corporateFromLegacy
 
-      const consolidatedCount = corporateFromSaturation ?? (dso + pe)
-      const consolPct = total > 0 ? (consolidatedCount / total) * 100 : 0
-      const indepPct = total > 0 ? (indep / total) * 100 : 0
-      const unkPct = total > 0 ? (unk / total) * 100 : 0
+      // Independent count — use legacy if available, otherwise estimate from GP locations minus corporate
+      const indepCount = z.independent_count != null && z.independent_count > 0
+        ? z.independent_count
+        : Math.max(0, gpLoc - corporateCount)
 
-      // Opportunity score: use DB value when available, otherwise compute locally
-      const oppScore = z.opportunity_score != null
-        ? z.opportunity_score
+      // Consolidation % — use corporate_share_pct directly (already a 0-1 fraction)
+      const consolPct = z.corporate_share_pct != null
+        ? z.corporate_share_pct * 100
         : total > 0
-          ? Math.round(indepPct - consolPct + (z.buyable_practice_ratio != null ? z.buyable_practice_ratio * 50 : 0))
+          ? (corporateCount / total) * 100
           : 0
+
+      // Independent % — compute from total minus corporate and specialists
+      const specialistCount = z.total_specialist_locations ?? 0
+      const nonClinicalEtc = total - corporateCount - indepCount - specialistCount
+      const indepPct = total > 0 ? (indepCount / total) * 100 : 0
+      // Unknown/other % (specialist + non-clinical + unclassified)
+      const unkPct = total > 0 ? (Math.max(0, nonClinicalEtc + specialistCount) / total) * 100 : 0
+
+      // Opportunity score — use DB value directly
+      const oppScore = z.opportunity_score ?? 0
+
+      // Confidence — use metrics_confidence from saturation metrics
+      const confidence = z.metrics_confidence ?? z.data_confidence ?? ''
+
+      // Market type
+      const marketType = z.market_type ?? ''
 
       return {
         zip_code: z.zip_code,
         city: z.city ?? '\u2014',
         total_practices: total,
-        independent_count: indep,
-        dso_count: dso,
-        pe_count: pe,
-        unknown_count: unk,
+        gp_locations: gpLoc,
+        corporate_count: corporateCount,
+        independent_count: indepCount,
         consolidation_pct: consolPct,
         independent_pct: indepPct,
         unknown_pct: unkPct,
-        confidence: z.metrics_confidence ?? '',
+        confidence,
         opportunity_score: oppScore,
+        market_type: marketType,
       }
     })
   }, [zipScores])
-
-  // Format a percentage value — accepts cell value (number) or full row object
-  const fmtPct = (v: unknown, field: string): string => {
-    if (typeof v === 'number') return `${v.toFixed(1)}%`
-    if (v != null && typeof v === 'object' && field in (v as Record<string, unknown>)) {
-      const n = (v as Record<string, unknown>)[field]
-      if (typeof n === 'number') return `${n.toFixed(1)}%`
-    }
-    return '\u2014'
-  }
 
   const columns = [
     { key: 'zip_code', header: 'ZIP' },
@@ -89,50 +99,52 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       align: 'right' as const,
     },
     {
+      key: 'gp_locations',
+      header: 'GP Locations',
+      align: 'right' as const,
+    },
+    {
+      key: 'corporate_count',
+      header: 'Corporate',
+      align: 'right' as const,
+    },
+    {
       key: 'independent_count',
       header: 'Independent',
-      align: 'right' as const,
-    },
-    {
-      key: 'dso_count',
-      header: 'DSO',
-      align: 'right' as const,
-    },
-    {
-      key: 'pe_count',
-      header: 'PE',
-      align: 'right' as const,
-    },
-    {
-      key: 'unknown_count',
-      header: 'Unknown',
       align: 'right' as const,
     },
     {
       key: 'consolidation_pct',
       header: 'Known Consol. %',
       align: 'right' as const,
-      render: (v: unknown) => fmtPct(v, 'consolidation_pct'),
+      render: (v: unknown) => {
+        if (typeof v === 'number') return `${v.toFixed(1)}%`
+        return '\u2014'
+      },
     },
     {
       key: 'independent_pct',
       header: 'Indep. %',
       align: 'right' as const,
-      render: (v: unknown) => fmtPct(v, 'independent_pct'),
+      render: (v: unknown) => {
+        if (typeof v === 'number') return `${v.toFixed(1)}%`
+        return '\u2014'
+      },
     },
     {
       key: 'unknown_pct',
-      header: '% Unknown',
+      header: '% Other',
       align: 'right' as const,
-      render: (v: unknown) => fmtPct(v, 'unknown_pct'),
+      render: (v: unknown) => {
+        if (typeof v === 'number') return `${v.toFixed(1)}%`
+        return '\u2014'
+      },
     },
     {
       key: 'confidence',
       header: 'Confidence',
       render: (v: unknown) => {
-        const str = typeof v === 'string' ? v
-          : (v != null && typeof v === 'object') ? String((v as Record<string, unknown>).confidence ?? '')
-          : ''
+        const str = typeof v === 'string' ? v : ''
         if (!str) return '\u2014'
         return str.charAt(0).toUpperCase() + str.slice(1)
       },
@@ -143,11 +155,16 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       align: 'right' as const,
       render: (v: unknown) => {
         if (typeof v === 'number') return String(v)
-        if (v != null && typeof v === 'object') {
-          const n = (v as Record<string, unknown>).opportunity_score
-          if (typeof n === 'number') return String(n)
-        }
         return '\u2014'
+      },
+    },
+    {
+      key: 'market_type',
+      header: 'Market Type',
+      render: (v: unknown) => {
+        const str = typeof v === 'string' ? v : ''
+        if (!str) return '\u2014'
+        return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
       },
     },
   ]
@@ -156,7 +173,7 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
     <div>
       <SectionHeader
         title="ZIP Code Consolidation Detail"
-        helpText="Each row = one ZIP code. Consolidation % = (DSO + PE) / total practices (conservative -- treats unknowns as not consolidated). Opportunity Score = higher means more independent practices."
+        helpText="Each row = one ZIP code. Consolidation % = corporate_share_pct from entity_classification-based saturation metrics. Confidence = metrics_confidence (high/medium/low). Opportunity Score from pipeline."
       />
       <div className="mt-4">
         <DataTable

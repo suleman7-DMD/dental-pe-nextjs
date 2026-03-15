@@ -11,6 +11,7 @@ export interface Deal {
   target_state: string | null
   deal_type: string | null
   deal_size_mm: number | null
+  ebitda_multiple: number | null
   specialty: string | null
   source: string | null
   notes: string | null
@@ -175,10 +176,16 @@ export interface PracticeStats {
   corporateHighConf: number
   /** Sum of all 7 independent entity_classification types in watched ZIPs */
   independent: number
+  /** Specialist practices in watched ZIPs (entity_classification = 'specialist') */
+  specialist?: number
+  /** Non-clinical entities in watched ZIPs (entity_classification = 'non_clinical') */
+  nonClinical?: number
   /** Practices with null entity_classification AND non-corporate ownership_status in watched ZIPs */
   unknown: number
   /** Practices with data_axle_import_date IS NOT NULL (global) */
   enriched: number
+  /** Alias for enriched — Data Axle enriched count */
+  enrichedCount?: number
   /** Backward compat: high-confidence corporate % of watched total */
   consolidatedPct: string
   /** Backward compat: independent % of watched total */

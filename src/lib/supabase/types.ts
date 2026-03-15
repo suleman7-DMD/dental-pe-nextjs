@@ -270,8 +270,11 @@ export interface PracticeStats {
   corporate: number;
   corporateHighConf: number;
   independent: number;
+  specialist?: number;
+  nonClinical?: number;
   unknown: number;
   enriched: number;
+  enrichedCount?: number;
   consolidatedPct: string;
   independentPct: string;
 }

@@ -91,27 +91,34 @@ export function MarketIntelShell({
 
     // For filtered metro, use zip_scores
     if (zipScores.length === 0) return null
-    const totalP = zipScores.reduce((sum, z) => sum + (z.total_practices ?? 0), 0)
+    // Total practices: prefer total_practices, fall back to GP + specialist locations
+    const totalP = zipScores.reduce((sum, z) => {
+      const t = z.total_practices ?? ((z.total_gp_locations ?? 0) + (z.total_specialist_locations ?? 0))
+      return sum + t
+    }, 0)
     let corporateCount = 0
     for (const z of zipScores) {
       if (z.corporate_share_pct != null && z.total_gp_locations != null) {
         corporateCount += Math.round(z.corporate_share_pct * z.total_gp_locations)
+      } else {
+        corporateCount += (z.dso_affiliated_count ?? 0) + (z.pe_backed_count ?? 0)
       }
     }
-    const unkCount = zipScores.reduce((sum, z) => sum + (z.unknown_count ?? 0), 0)
-    const indepCount = totalP - corporateCount - unkCount
+    // Specialist + non-clinical count (not independent, not corporate)
+    const specialistCount = zipScores.reduce((sum, z) => sum + (z.total_specialist_locations ?? 0), 0)
+    const indepCount = Math.max(0, totalP - corporateCount - specialistCount)
     const allSignalsPct = totalP > 0 ? (corporateCount / totalP) * 100 : 0
 
     return {
       totalP,
       corporateHighConf: 0, // not available per-metro yet
       corporateAll: corporateCount,
-      indepCount: Math.max(0, indepCount),
-      unkCount,
+      indepCount,
+      unkCount: specialistCount, // "Other" = specialist + non-clinical
       highConfPct: 0,
       allSignalsPct,
       indepPct: totalP > 0 ? (indepCount / totalP) * 100 : 0,
-      unkPct: totalP > 0 ? (unkCount / totalP) * 100 : 100,
+      unkPct: totalP > 0 ? (specialistCount / totalP) * 100 : 0,
     }
   }, [zipScores, selectedMetro, classificationCounts])
 

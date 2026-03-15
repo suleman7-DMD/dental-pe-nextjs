@@ -107,7 +107,9 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
       const zips = cityZips[cityName]
 
       if (!loaded) {
-        // Use zip_scores data for initial totals
+        // Use zip_scores data for initial totals.
+        // Prefer total_practices; fall back to total_gp_locations + total_specialist_locations
+        // (the old ownership count columns may be null if only saturation metrics are populated).
         let total = 0
         let independent = 0
         let dso = 0
@@ -115,10 +117,22 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
         for (const zip of zips) {
           const zs = zipScoreMap.get(zip)
           if (zs) {
-            total += zs.total_practices ?? 0
-            independent += zs.independent_count ?? 0
-            dso += zs.dso_affiliated_count ?? 0
-            pe += zs.pe_backed_count ?? 0
+            const zipTotal = zs.total_practices
+              ?? ((zs.total_gp_locations ?? 0) + (zs.total_specialist_locations ?? 0))
+            total += zipTotal
+            // Corporate count: prefer saturation metric (corporate_share_pct * GP locations)
+            const corpFromSat = zs.corporate_share_pct != null && zs.total_gp_locations != null
+              ? Math.round(zs.corporate_share_pct * zs.total_gp_locations)
+              : null
+            const corpCount = corpFromSat ?? ((zs.dso_affiliated_count ?? 0) + (zs.pe_backed_count ?? 0))
+            dso += corpCount
+            // Independent count: prefer DB value, else estimate from total minus corporate minus specialist
+            const specCount = zs.total_specialist_locations ?? 0
+            const indepFromDb = zs.independent_count != null && zs.independent_count > 0
+              ? zs.independent_count
+              : Math.max(0, zipTotal - corpCount - specCount)
+            independent += indepFromDb
+            pe += 0  // PE is folded into corporate count from saturation metrics
           }
         }
         return {
@@ -146,8 +160,8 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
           return p.ownership_status === 'dso_affiliated'
         }).length,
         pe: cityPractices.filter(p => {
-          if (p.entity_classification) return false
-          return p.ownership_status === 'pe_backed'
+          const os = (p.ownership_status ?? '').trim().toLowerCase()
+          return os === 'pe_backed'
         }).length,
       }
     })
@@ -264,9 +278,11 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                           ? ` | Score: ${zipScore.opportunity_score}`
                           : ''
                         // Use zip_scores count before practices are loaded
+                        // Fall back to GP + specialist locations when total_practices is null
                         const zipPracticeCount = loaded
                           ? zipPractices.length
-                          : (zipScore?.total_practices ?? 0)
+                          : (zipScore?.total_practices
+                              ?? ((zipScore?.total_gp_locations ?? 0) + (zipScore?.total_specialist_locations ?? 0)))
 
                         return (
                           <div key={zip} className="border-t border-[#1E293B]/50">
@@ -307,7 +323,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                                         <tr key={p.npi} className="border-b border-[#1E293B]/30 hover:bg-[#1A2035]">
                                           <td className="py-1.5 px-2 text-[#F8FAFC]">{p.practice_name ?? '\u2014'}</td>
                                           <td className="py-1.5 px-2">
-                                            <StatusBadge status={p.ownership_status} />
+                                            <StatusBadge status={p.entity_classification ?? p.ownership_status} />
                                           </td>
                                           <td className="py-1.5 px-2 text-[#94A3B8]">
                                             {p.affiliated_dso ?? p.affiliated_pe_sponsor ?? '\u2014'}

@@ -472,7 +472,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                         {p.zip ?? '--'}
                       </td>
                       <td className="px-4 py-2.5">
-                        <StatusBadge status={p.ownership_status} />
+                        <StatusBadge status={p.entity_classification ?? p.ownership_status} />
                       </td>
                       <td className="px-4 py-2.5 text-xs text-[#94A3B8]">
                         {getEntityClassificationLabel(p.entity_classification)}

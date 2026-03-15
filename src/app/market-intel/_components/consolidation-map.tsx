@@ -54,40 +54,49 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
         const coords = ZIP_CENTROIDS[zs.zip_code]
         if (!coords) return null
 
-        const total = zs.total_practices ?? 0
-        const dso = zs.dso_affiliated_count ?? 0
-        const pe = zs.pe_backed_count ?? 0
-        const unk = zs.unknown_count ?? 0
+        // Total practices — prefer total_practices, fall back to GP + specialist locations
+        const total = zs.total_practices
+          ?? ((zs.total_gp_locations ?? 0) + (zs.total_specialist_locations ?? 0))
+        const gpLoc = zs.total_gp_locations ?? total
 
-        // Use corporate_share_pct from saturation metrics if available (entity_classification based)
+        // Corporate count from saturation metrics (entity_classification-based, most accurate)
         const corporateFromSaturation = zs.corporate_share_pct != null && zs.total_gp_locations != null
           ? Math.round(zs.corporate_share_pct * zs.total_gp_locations)
           : null
-        const consolCount = corporateFromSaturation ?? (dso + pe)
-        const consolPct = total > 0 ? (consolCount / total) * 100 : 0
-        const pctUnknown = total > 0 ? (unk / total) * 100 : 100
+        const corporateFromLegacy = (zs.dso_affiliated_count ?? 0) + (zs.pe_backed_count ?? 0)
+        const consolCount = corporateFromSaturation ?? corporateFromLegacy
 
-        const opacity = pctUnknown < 50 ? 0.9 : 0.5
+        // Consolidation % — use corporate_share_pct directly when available (already 0-1)
+        const consolPct = zs.corporate_share_pct != null
+          ? zs.corporate_share_pct * 100
+          : total > 0
+            ? (consolCount / total) * 100
+            : 0
+
+        // Independent count estimate
+        const indepCount = zs.independent_count != null && zs.independent_count > 0
+          ? zs.independent_count
+          : Math.max(0, gpLoc - consolCount)
+
+        // Confidence from metrics_confidence (saturation-based)
         const confidence = zs.metrics_confidence
           ? zs.metrics_confidence.charAt(0).toUpperCase() + zs.metrics_confidence.slice(1)
-          : pctUnknown < 30
-            ? 'High'
-            : pctUnknown < 60
-              ? 'Medium'
-              : 'Low'
+          : 'Low'
+
+        const opacity = confidence === 'Low' ? 0.5 : 0.9
 
         return {
           zip: zs.zip_code,
           city: zs.city ?? '',
           lat: coords[0],
           lon: coords[1],
-          total: zs.total_practices,
-          independent: zs.independent_count,
+          total,
+          independent: indepCount,
           consolCount,
           consolPct,
           opacity,
           confidence,
-          size: markerSize(zs.total_practices ?? 0),
+          size: markerSize(total),
           color: consolidationColor(consolPct),
         }
       })
