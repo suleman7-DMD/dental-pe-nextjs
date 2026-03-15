@@ -2,6 +2,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getDealStats, getRecentDeals } from '@/lib/supabase/queries/deals'
 import { getPracticeStats, getRetirementRiskCount, getAcquisitionTargetCount } from '@/lib/supabase/queries/practices'
 import { getWatchedZipCount } from '@/lib/supabase/queries/watched-zips'
+import { getRecentChanges } from '@/lib/supabase/queries/changes'
 import { HomeShell } from './_components/home-shell'
 import type { HomeSummary } from '@/lib/types'
 import type { DealStats } from '@/lib/supabase/types'
@@ -47,7 +48,7 @@ export default async function HomePage() {
           independentPct: '--',
         })),
         getWatchedZipCount(supabase).catch(() => 0),
-        getRecentDeals(supabase, 5).catch(() => []),
+        getRecentDeals(supabase, 10).catch(() => []),
       ])
 
     // Phase 2: fetch secondary metrics sequentially (avoids concurrency issues)
@@ -74,6 +75,14 @@ export default async function HomePage() {
       console.error('[HomePage] enrichedCount exception:', err)
     }
 
+    // Fetch recent practice changes (no ZIP filter, last 90 days, limit 8)
+    const recentChanges = await getRecentChanges(supabase, undefined, 90)
+      .then((changes) => changes.slice(0, 8))
+      .catch((err) => {
+        console.error('[HomePage] recentChanges error:', err)
+        return []
+      })
+
     const { data: latestDeal } = await supabase
       .from('deals')
       .select('created_at')
@@ -98,17 +107,17 @@ export default async function HomePage() {
       recentDeals,
     }
 
-    return <HomeShell summary={summary} acquisitionTargets={acquisitionTargets} />
+    return <HomeShell summary={summary} acquisitionTargets={acquisitionTargets} recentChanges={recentChanges} />
   } catch (error) {
     console.error('HomePage error:', error)
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0A0F1E] text-white">
+      <div className="flex items-center justify-center min-h-screen bg-[#FAFAF7] text-[#1A1A1A]">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Loading...</h1>
-          <p className="text-gray-400">
+          <p className="text-[#6B6B60]">
             Data is being fetched. Please refresh in a moment.
           </p>
-          <p className="text-gray-600 text-sm mt-4">
+          <p className="text-[#9C9C90] text-sm mt-4">
             If this persists, check Supabase connection.
           </p>
         </div>

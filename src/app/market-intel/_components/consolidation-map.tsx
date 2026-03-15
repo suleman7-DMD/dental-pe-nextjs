@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useMemo } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
-import { MapContainer } from '@/components/maps/map-container'
 import { ZIP_CENTROIDS, METRO_CENTERS } from '@/lib/constants/zip-centroids'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 
@@ -13,7 +12,7 @@ interface ConsolidationMapProps {
 
 /**
  * Interpolate a consolidation percentage (0-30+) into a green-yellow-red color.
- * 0% = green (#22C55E), 15% = yellow (#F59E0B), 30%+ = red (#EF4444)
+ * 0% = green (#2D8B4E), 15% = yellow (#D4920B), 30%+ = red (#C23B3B)
  */
 function consolidationColor(pct: number): string {
   const clamped = Math.min(Math.max(pct, 0), 30)
@@ -22,16 +21,16 @@ function consolidationColor(pct: number): string {
   if (ratio <= 0.5) {
     // Green to yellow
     const t = ratio / 0.5
-    const r = Math.round(76 + (255 - 76) * t)
-    const g = Math.round(175 + (193 - 175) * t)
-    const b = Math.round(80 + (7 - 80) * t)
+    const r = Math.round(45 + (212 - 45) * t)
+    const g = Math.round(139 + (146 - 139) * t)
+    const b = Math.round(78 + (11 - 78) * t)
     return `rgb(${r},${g},${b})`
   } else {
     // Yellow to red
     const t = (ratio - 0.5) / 0.5
-    const r = Math.round(255 + (244 - 255) * t)
-    const g = Math.round(193 + (67 - 193) * t)
-    const b = Math.round(7 + (54 - 7) * t)
+    const r = Math.round(212 + (194 - 212) * t)
+    const g = Math.round(146 + (59 - 146) * t)
+    const b = Math.round(11 + (59 - 11) * t)
     return `rgb(${r},${g},${b})`
   }
 }
@@ -188,7 +187,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
             'circle-color': ['get', 'color'],
             'circle-opacity': ['get', 'opacity'],
             'circle-stroke-width': 1,
-            'circle-stroke-color': 'rgba(255,255,255,0.3)',
+            'circle-stroke-color': 'rgba(0,0,0,0.15)',
           },
         })
 
@@ -218,7 +217,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
             'text-allow-overlap': false,
           },
           paint: {
-            'text-color': '#555555',
+            'text-color': '#3D3D35',
             'text-halo-color': '#ffffff',
             'text-halo-width': 1,
           },
@@ -286,48 +285,48 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
     <div>
       <SectionHeader
         title="Consolidation Map"
-        helpText="Each dot = one watched ZIP code. Size = practice count. Color = consolidation level (green = mostly independent, red = mostly consolidated). Dark areas = no data coverage."
+        helpText="Each dot = one watched ZIP code. Size = practice count. Color = consolidation level (green = mostly independent, red = mostly consolidated). Faded areas = low data confidence."
       />
 
       {mapData.length > 0 ? (
         <>
           <div
             ref={mapRef}
-            className="w-full rounded-xl border border-[var(--border)] overflow-hidden"
-            style={{ height: 620, boxShadow: '0 0 40px rgba(59, 130, 246, 0.08), 0 4px 24px rgba(0, 0, 0, 0.3)' }}
+            className="w-full rounded-xl border border-[#E8E5DE] overflow-hidden"
+            style={{ height: 620, boxShadow: '0 0 40px rgba(184, 134, 11, 0.06), 0 4px 24px rgba(0, 0, 0, 0.08)' }}
           />
 
           {/* Legend */}
           <div className="grid grid-cols-3 gap-4 mt-3">
             <div className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full bg-[#22C55E]" />
-              <span className="text-[#94A3B8]">Mostly Independent</span>
+              <span className="w-3 h-3 rounded-full bg-[#2D8B4E]" />
+              <span className="text-[#6B6B60]">Mostly Independent</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full bg-[#EF4444]" />
-              <span className="text-[#94A3B8]">Mostly Known Consolidated (DSO/PE)</span>
+              <span className="w-3 h-3 rounded-full bg-[#C23B3B]" />
+              <span className="text-[#6B6B60]">Mostly Known Consolidated (DSO/PE)</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="w-3 h-3 rounded-full bg-[#9E9E9E] opacity-30" />
-              <span className="text-[#94A3B8]">Low confidence areas</span>
+              <span className="text-[#6B6B60]">Low confidence areas</span>
             </div>
           </div>
 
           {/* Colorbar legend */}
           <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] text-[#94A3B8]">0%</span>
+            <span className="text-[10px] text-[#6B6B60]">0%</span>
             <div
               className="flex-1 h-2.5 rounded-full"
               style={{
-                background: 'linear-gradient(to right, #22C55E, #F59E0B, #EF4444)',
+                background: 'linear-gradient(to right, #2D8B4E, #D4920B, #C23B3B)',
               }}
             />
-            <span className="text-[10px] text-[#94A3B8]">30%+</span>
-            <span className="text-[10px] text-[#64748B] ml-1">Consolidation % (of total)</span>
+            <span className="text-[10px] text-[#6B6B60]">30%+</span>
+            <span className="text-[10px] text-[#9C9C90] ml-1">Consolidation % (of total)</span>
           </div>
         </>
       ) : (
-        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8] text-sm">
+        <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60] text-sm">
           No ZIP coordinates available for map display.
         </div>
       )}

@@ -102,7 +102,7 @@ function computeDataQuality(p: Practice): string {
 /** Render gold-colored confidence stars */
 function renderDataQualityStars(v: string): React.ReactElement {
   return React.createElement('span', {
-    style: { color: '#F59E0B', letterSpacing: '1px' },
+    style: { color: '#D4920B', letterSpacing: '1px' },
     title: v === '\u2605\u2605\u2605' ? 'Data Axle enriched' : v === '\u2605\u2605' ? 'Entity classified' : 'NPPES only',
   }, v || '\u2605')
 }
@@ -397,14 +397,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
             />
           </FilterGroup>
           <div>
-            <label className="text-xs font-medium text-[#94A3B8] block mb-1">Sort by</label>
+            <label className="text-xs font-medium text-[#6B6B60] block mb-1">Sort by</label>
             <select
               value={sortBy}
               onChange={(e) => {
                 setSortBy(e.target.value as SortOption)
                 setPage(1)
               }}
-              className="w-full rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+              className="w-full rounded-md border border-[#E8E5DE] bg-[#FFFFFF] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B]"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -416,7 +416,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         </div>
 
         {/* Results count */}
-        <div className="text-sm text-[#7eb8e0]">
+        <div className="text-sm text-[#B8860B]">
           Showing <strong>{filtered.length.toLocaleString()}</strong> of{' '}
           <strong>{totalPractices.toLocaleString()}</strong> practices |{' '}
           <strong>{filteredEnriched.toLocaleString()}</strong> enriched by Data Axle
@@ -425,7 +425,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
       {/* Tabs */}
       <Tabs defaultValue="employment" className="mt-4">
-        <TabsList className="bg-[#0F1629] border border-[#1E293B]">
+        <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
           <TabsTrigger value="employment">Employment Opportunities</TabsTrigger>
           <TabsTrigger value="ownership">Ownership Pipeline</TabsTrigger>
           <TabsTrigger value="enriched">Enriched Practices (Data Axle)</TabsTrigger>
@@ -433,14 +433,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         </TabsList>
 
         <TabsContent value="employment">
-          <p className="text-sm text-[#94A3B8] mb-2">
+          <p className="text-sm text-[#6B6B60] mb-2">
             Practices with high patient volume that are likely hiring associates.
           </p>
           {lowEnrichmentNote && (
-            <p className="text-xs text-[#F59E0B] mb-2">Warning: {lowEnrichmentNote}</p>
+            <p className="text-xs text-[#D4920B] mb-2">Warning: {lowEnrichmentNote}</p>
           )}
           {employmentPractices.length === 0 ? (
-            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+            <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
               No practices matching employment opportunity criteria in the current filters.
             </div>
           ) : (
@@ -451,7 +451,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
                 onRowClick={handleRowClick}
                 rowKey="npi"
               />
-              <p className="text-xs text-[#94A3B8] mt-2">
+              <p className="text-xs text-[#6B6B60] mt-2">
                 {employmentPractices.length} practices match employment criteria
               </p>
               <Pagination
@@ -465,14 +465,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         </TabsContent>
 
         <TabsContent value="ownership">
-          <p className="text-sm text-[#94A3B8] mb-2">
+          <p className="text-sm text-[#6B6B60] mb-2">
             Independent practices with indicators suggesting the owner may be approaching transition.
           </p>
           {lowEnrichmentNote && (
-            <p className="text-xs text-[#F59E0B] mb-2">Warning: {lowEnrichmentNote}</p>
+            <p className="text-xs text-[#D4920B] mb-2">Warning: {lowEnrichmentNote}</p>
           )}
           {ownershipPractices.length === 0 ? (
-            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+            <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
               No practices matching ownership pipeline criteria in the current filters.
             </div>
           ) : (
@@ -483,7 +483,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
                 onRowClick={handleRowClick}
                 rowKey="npi"
               />
-              <p className="text-xs text-[#94A3B8] mt-2">
+              <p className="text-xs text-[#6B6B60] mt-2">
                 {ownershipPractices.length} practices match ownership pipeline criteria
               </p>
               <Pagination
@@ -498,13 +498,13 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
         <TabsContent value="enriched">
           {enrichedPractices.length === 0 ? (
-            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+            <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
               No Data Axle-enriched practices match the current filters.
             </div>
           ) : (
             <>
               {enrichedPractices.length > 500 && (
-                <p className="text-xs text-[#7eb8e0] mb-2">
+                <p className="text-xs text-[#B8860B] mb-2">
                   Showing first 500 of {enrichedPractices.length.toLocaleString()} enriched
                   practices. Download CSV for full list.
                 </p>
@@ -527,13 +527,13 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
         <TabsContent value="all">
           {filtered.length === 0 ? (
-            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+            <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
               No practices match the current filters.
             </div>
           ) : (
             <>
               {filtered.length > 500 && (
-                <p className="text-xs text-[#7eb8e0] mb-2">
+                <p className="text-xs text-[#B8860B] mb-2">
                   Showing first 500 of {filtered.length.toLocaleString()} practices. Download CSV
                   for full list.
                 </p>
@@ -559,7 +559,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       <div className="mt-4">
         <button
           onClick={handleDownloadCsv}
-          className="inline-flex items-center gap-2 rounded-md border border-[#1E293B] bg-[#0F1629] px-4 py-2 text-sm text-[#F8FAFC] hover:border-[#334155] hover:bg-[#1A2035] transition-colors"
+          className="inline-flex items-center gap-2 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-4 py-2 text-sm text-[#1A1A1A] hover:border-[#D4D0C8] hover:bg-[#F7F7F4] transition-colors"
         >
           <DownloadIcon />
           Download filtered practices (CSV)
@@ -596,21 +596,21 @@ function Pagination({
 
   return (
     <div className="flex items-center justify-between mt-3">
-      <p className="text-xs text-[#94A3B8]">
+      <p className="text-xs text-[#6B6B60]">
         Page {page} of {totalPages} ({total.toLocaleString()} total)
       </p>
       <div className="flex gap-2">
         <button
           onClick={() => onChange(Math.max(1, page - 1))}
           disabled={page <= 1}
-          className="rounded border border-[#1E293B] bg-[#0F1629] px-3 py-1 text-xs text-[#F8FAFC] disabled:opacity-40 hover:border-[#334155] transition-colors"
+          className="rounded border border-[#E8E5DE] bg-[#FFFFFF] px-3 py-1 text-xs text-[#1A1A1A] disabled:opacity-40 hover:border-[#D4D0C8] transition-colors"
         >
           Previous
         </button>
         <button
           onClick={() => onChange(Math.min(totalPages, page + 1))}
           disabled={page >= totalPages}
-          className="rounded border border-[#1E293B] bg-[#0F1629] px-3 py-1 text-xs text-[#F8FAFC] disabled:opacity-40 hover:border-[#334155] transition-colors"
+          className="rounded border border-[#E8E5DE] bg-[#FFFFFF] px-3 py-1 text-xs text-[#1A1A1A] disabled:opacity-40 hover:border-[#D4D0C8] transition-colors"
         >
           Next
         </button>

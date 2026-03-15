@@ -1,6 +1,7 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { getZipScores } from '@/lib/supabase/queries/zip-scores'
 import { getWatchedZips } from '@/lib/supabase/queries/watched-zips'
+import { getADABenchmarks } from '@/lib/supabase/queries/ada-benchmarks'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { JobMarketShell } from './_components/job-market-shell'
 
@@ -15,9 +16,10 @@ export default async function JobMarketPage() {
   const supabase = await createServerClient()
 
   // Fetch zip_scores and watched_zips server-side for initial render
-  const [zipScores, watchedZips] = await Promise.all([
+  const [zipScores, watchedZips, adaBenchmarks] = await Promise.all([
     getZipScores(supabase),
     getWatchedZips(supabase),
+    getADABenchmarks(supabase),
   ])
 
   // Pre-fetch data freshness stats
@@ -75,6 +77,7 @@ export default async function JobMarketPage() {
       initialWatchedZips={watchedZips}
       initialPractices={initialPractices ?? []}
       freshness={freshness}
+      adaBenchmarks={adaBenchmarks}
     />
   )
 }

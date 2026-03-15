@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { StatusBadge } from '@/components/data-display/status-badge'
 import { createBrowserClient } from '@/lib/supabase/client'
@@ -108,8 +108,6 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
 
       if (!loaded) {
         // Use zip_scores data for initial totals.
-        // Prefer total_practices; fall back to total_gp_locations + total_specialist_locations
-        // (the old ownership count columns may be null if only saturation metrics are populated).
         let total = 0
         let independent = 0
         let dso = 0
@@ -211,60 +209,60 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
           const isExpanded = expandedCities.has(cg.cityName)
 
           return (
-            <div key={cg.cityName} className="rounded-lg border border-[#1E293B] bg-[#0F1629] overflow-hidden">
+            <div key={cg.cityName} className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">
               {/* City header */}
               <button
                 onClick={() => toggleCity(cg.cityName)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#1A2035] transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#F7F7F4] transition-colors"
               >
                 <svg
-                  className={`w-4 h-4 text-[#64748B] transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                  className={`w-4 h-4 text-[#9C9C90] transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                <span className="text-sm font-medium text-[#F8FAFC]">{cg.cityName}</span>
-                <span className="text-xs text-[#94A3B8]">
+                <span className="text-sm font-medium text-[#1A1A1A]">{cg.cityName}</span>
+                <span className="text-xs text-[#6B6B60]">
                   {cg.total} practices across {cg.zips.length} ZIP{cg.zips.length > 1 ? 's' : ''}
                 </span>
                 <div className="ml-auto flex items-center gap-3 text-xs">
-                  <span className="text-[#22C55E]">{cg.independent} indep.</span>
-                  <span className="text-[#F59E0B]">{cg.dso} DSO</span>
-                  <span className="text-[#EF4444]">{cg.pe} PE</span>
+                  <span className="text-[#2D8B4E]">{cg.independent} indep.</span>
+                  <span className="text-[#D4920B]">{cg.dso} DSO</span>
+                  <span className="text-[#C23B3B]">{cg.pe} PE</span>
                 </div>
               </button>
 
               {/* Expanded city content */}
               {isExpanded && (
-                <div className="border-t border-[#1E293B]">
+                <div className="border-t border-[#E8E5DE]">
                   {loading ? (
-                    <div className="px-6 py-4 text-center text-[#94A3B8] text-sm animate-pulse">
+                    <div className="px-6 py-4 text-center text-[#6B6B60] text-sm animate-pulse">
                       Loading practices...
                     </div>
                   ) : (
                     <>
                       {/* City mini KPIs */}
                       {cg.total > 0 && (
-                        <div className="grid grid-cols-4 gap-3 px-4 py-3 bg-[#0A0F1E]/50">
+                        <div className="grid grid-cols-4 gap-3 px-4 py-3 bg-[#FAFAF7]/50">
                           <div className="text-center">
-                            <div className="text-lg font-mono font-semibold text-[#F8FAFC]">{cg.total}</div>
-                            <div className="text-[0.7rem] text-[#94A3B8]">Total</div>
+                            <div className="text-lg font-mono font-semibold text-[#1A1A1A]">{cg.total}</div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">Total</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-lg font-mono font-semibold text-[#22C55E]">{cg.independent}</div>
-                            <div className="text-[0.7rem] text-[#94A3B8]">Independent</div>
+                            <div className="text-lg font-mono font-semibold text-[#2D8B4E]">{cg.independent}</div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">Independent</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-lg font-mono font-semibold text-[#F59E0B]">{cg.dso + cg.pe}</div>
-                            <div className="text-[0.7rem] text-[#94A3B8]">DSO + PE</div>
+                            <div className="text-lg font-mono font-semibold text-[#D4920B]">{cg.dso + cg.pe}</div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">DSO + PE</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-lg font-mono font-semibold text-[#F8FAFC]">
+                            <div className="text-lg font-mono font-semibold text-[#1A1A1A]">
                               {cg.total > 0 ? `${(((cg.dso + cg.pe) / cg.total) * 100).toFixed(0)}%` : '0%'}
                             </div>
-                            <div className="text-[0.7rem] text-[#94A3B8]">Known Consol. (of total)</div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">Known Consol. (of total)</div>
                           </div>
                         </div>
                       )}
@@ -278,28 +276,27 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                           ? ` | Score: ${zipScore.opportunity_score}`
                           : ''
                         // Use zip_scores count before practices are loaded
-                        // Fall back to GP + specialist locations when total_practices is null
                         const zipPracticeCount = loaded
                           ? zipPractices.length
                           : (zipScore?.total_practices
                               ?? ((zipScore?.total_gp_locations ?? 0) + (zipScore?.total_specialist_locations ?? 0)))
 
                         return (
-                          <div key={zip} className="border-t border-[#1E293B]/50">
+                          <div key={zip} className="border-t border-[#E8E5DE]/50">
                             <button
                               onClick={() => toggleZip(zip)}
-                              className="w-full flex items-center gap-3 px-6 py-2.5 text-left hover:bg-[#1A2035] transition-colors"
+                              className="w-full flex items-center gap-3 px-6 py-2.5 text-left hover:bg-[#F7F7F4] transition-colors"
                             >
                               <svg
-                                className={`w-3.5 h-3.5 text-[#64748B] transition-transform flex-shrink-0 ${zipIsExpanded ? 'rotate-90' : ''}`}
+                                className={`w-3.5 h-3.5 text-[#9C9C90] transition-transform flex-shrink-0 ${zipIsExpanded ? 'rotate-90' : ''}`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
                               >
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
-                              <span className="text-[0.82rem] text-[#F8FAFC]">{zip}</span>
-                              <span className="text-xs text-[#94A3B8]">
+                              <span className="text-[0.82rem] text-[#1A1A1A]">{zip}</span>
+                              <span className="text-xs text-[#6B6B60]">
                                 {zipPracticeCount} practices{scoreTag}
                               </span>
                             </button>
@@ -307,28 +304,28 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                             {zipIsExpanded && (
                               <div className="px-6 pb-3">
                                 {zipPractices.length === 0 ? (
-                                  <div className="text-sm text-[#94A3B8] py-2">No practices in this ZIP.</div>
+                                  <div className="text-sm text-[#6B6B60] py-2">No practices in this ZIP.</div>
                                 ) : (
                                   <table className="w-full text-[0.78rem]">
                                     <thead>
-                                      <tr className="border-b border-[#1E293B]">
-                                        <th className="text-left py-1.5 px-2 text-[#94A3B8] font-medium">Practice Name</th>
-                                        <th className="text-left py-1.5 px-2 text-[#94A3B8] font-medium">Status</th>
-                                        <th className="text-left py-1.5 px-2 text-[#94A3B8] font-medium">DSO</th>
-                                        <th className="text-left py-1.5 px-2 text-[#94A3B8] font-medium">Entity Type</th>
+                                      <tr className="border-b border-[#E8E5DE]">
+                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Practice Name</th>
+                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Status</th>
+                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">DSO</th>
+                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Entity Type</th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {zipPractices.map(p => (
-                                        <tr key={p.npi} className="border-b border-[#1E293B]/30 hover:bg-[#1A2035]">
-                                          <td className="py-1.5 px-2 text-[#F8FAFC]">{p.practice_name ?? '\u2014'}</td>
+                                        <tr key={p.npi} className="border-b border-[#E8E5DE]/30 hover:bg-[#F7F7F4]">
+                                          <td className="py-1.5 px-2 text-[#1A1A1A]">{p.practice_name ?? '\u2014'}</td>
                                           <td className="py-1.5 px-2">
                                             <StatusBadge status={p.entity_classification ?? p.ownership_status} />
                                           </td>
-                                          <td className="py-1.5 px-2 text-[#94A3B8]">
+                                          <td className="py-1.5 px-2 text-[#6B6B60]">
                                             {p.affiliated_dso ?? p.affiliated_pe_sponsor ?? '\u2014'}
                                           </td>
-                                          <td className="py-1.5 px-2 text-[#94A3B8]">{p.entity_type ?? '\u2014'}</td>
+                                          <td className="py-1.5 px-2 text-[#6B6B60]">{p.entity_type ?? '\u2014'}</td>
                                         </tr>
                                       ))}
                                     </tbody>

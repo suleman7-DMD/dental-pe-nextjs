@@ -113,7 +113,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
           y: Number(p.employee_count),
           label: p.practice_name ?? 'Unknown',
           group: getEntityClassificationLabel(ec),
-          color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#64748B',
+          color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#9C9C90',
           tooltip: `${p.practice_name ?? 'Unknown'}\n${p.city ?? ''}\nBuyability: ${Number(p.buyability_score).toFixed(0)}`,
         }
       })
@@ -208,7 +208,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
       />
 
       <Tabs defaultValue="retirement" className="mt-4">
-        <TabsList className="bg-[#0F1629] border border-[#1E293B]">
+        <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
           <TabsTrigger value="retirement">Retirement Risk</TabsTrigger>
           <TabsTrigger value="buyability">High Buyability</TabsTrigger>
           <TabsTrigger value="changes">Recent Changes</TabsTrigger>
@@ -235,7 +235,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
           </div>
 
           {retirementData.length === 0 ? (
-            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+            <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
               No independent practices with 30+ years of operation found in these ZIPs.
             </div>
           ) : (
@@ -280,7 +280,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         {/* ── High Buyability ──────────────────────────────────────────── */}
         <TabsContent value="buyability">
           {highBuyData.length === 0 ? (
-            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+            <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
               No practices with buyability score &gt;= 60 found in these ZIPs.
             </div>
           ) : (
@@ -293,13 +293,13 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                     yAxisLabel="Employee Count"
                     height={420}
                     groups={[
-                      { label: 'Solo Established', color: '#22C55E' },
-                      { label: 'Solo High Volume', color: '#2E7D32' },
-                      { label: 'Family Practice', color: '#FF9800' },
+                      { label: 'Solo Established', color: '#2D8B4E' },
+                      { label: 'Solo High Volume', color: '#1B5E20' },
+                      { label: 'Family Practice', color: '#D4920B' },
                       { label: 'Small Group', color: '#42A5F5' },
                       { label: 'DSO Regional', color: '#FFA726' },
-                      { label: 'DSO National', color: '#EF4444' },
-                      { label: 'Unknown', color: '#64748B' },
+                      { label: 'DSO National', color: '#C23B3B' },
+                      { label: 'Unknown', color: '#9C9C90' },
                     ]}
                   />
                 </div>
@@ -371,17 +371,17 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
               icon={<AlertCircle className="h-4 w-4" />}
               label="Ownership Changes"
               value={changeKpis.ownChg.toLocaleString()}
-              accentColor="#EF4444"
+              accentColor="#C23B3B"
             />
           </div>
 
           {changesLoading ? (
-            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
-              <div className="inline-block h-4 w-4 border-2 border-[#7eb8e0] border-t-transparent rounded-full animate-spin mr-2" />
+            <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
+              <div className="inline-block h-4 w-4 border-2 border-[#B8860B] border-t-transparent rounded-full animate-spin mr-2" />
               Loading recent changes...
             </div>
           ) : changes.length === 0 ? (
-            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+            <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
               No practice changes detected in the last 180 days for these ZIPs.
             </div>
           ) : (

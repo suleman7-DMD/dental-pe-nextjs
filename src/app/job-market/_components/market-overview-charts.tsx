@@ -32,18 +32,18 @@ interface MarketOverviewChartsProps {
 // ────────────────────────────────────────────────────────────────────────────
 
 const EC_HISTOGRAM_COLORS: Record<string, string> = {
-  'Solo Established': '#22C55E',
+  'Solo Established': '#2D8B4E',
   'Solo New': '#81C784',
   'Solo Inactive': '#9E9E9E',
-  'Solo High Volume': '#2E7D32',
-  'Family Practice': '#FF9800',
+  'Solo High Volume': '#1B5E20',
+  'Family Practice': '#D4920B',
   'Small Group': '#42A5F5',
   'Large Group': '#1565C0',
   'DSO Regional': '#FFA726',
-  'DSO National': '#EF4444',
-  'Specialist': '#AB47BC',
-  'Non-Clinical': '#64748B',
-  'Unknown': '#64748B',
+  'DSO National': '#C23B3B',
+  'Specialist': '#7C3AED',
+  'Non-Clinical': '#9C9C90',
+  'Unknown': '#9C9C90',
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ export function MarketOverviewCharts({
       .map(([key, value]) => ({
         label: getEntityClassificationLabel(key),
         value,
-        color: ENTITY_CLASSIFICATION_COLORS[key as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#64748B',
+        color: ENTITY_CLASSIFICATION_COLORS[key as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#9C9C90',
       }))
       .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value)
@@ -131,8 +131,8 @@ export function MarketOverviewCharts({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         {/* 1. Consolidation by ZIP */}
-        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">Consolidation by ZIP</h3>
+        <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">Consolidation by ZIP</h3>
           {consolidationByZip.length > 0 ? (
             <BarChart
               data={consolidationByZip}
@@ -144,20 +144,20 @@ export function MarketOverviewCharts({
                 type: 'gradient',
                 min: 0,
                 max: Math.max(...consolidationByZip.map((d) => d.value), 1),
-                colors: ['#22C55E', '#F59E0B', '#EF4444'],
+                colors: ['#2D8B4E', '#D4920B', '#C23B3B'],
               }}
               tooltipFormat={(d) => `ZIP ${d.label}: ${d.value.toFixed(1)}%`}
             />
           ) : (
-            <p className="text-sm text-[#94A3B8] text-center py-8">
+            <p className="text-sm text-[#6B6B60] text-center py-8">
               No ZIP-level consolidation data available.
             </p>
           )}
         </div>
 
         {/* 2. Ownership Breakdown Donut */}
-        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">Ownership Breakdown</h3>
+        <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">Ownership Breakdown</h3>
           <DonutChart
             segments={donutData.segments}
             centerLabel={donutData.centerLabel}
@@ -171,8 +171,8 @@ export function MarketOverviewCharts({
         </div>
 
         {/* 3. Practice Age Distribution */}
-        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">Practice Age Distribution</h3>
+        <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">Practice Age Distribution</h3>
           {ageHistogramData.length > 0 ? (
             <HistogramChart
               data={ageHistogramData}
@@ -200,22 +200,22 @@ export function MarketOverviewCharts({
               verticalLines={[
                 {
                   x: 1995,
-                  color: '#EF4444',
+                  color: '#C23B3B',
                   dash: true,
                   label: 'Retirement Risk Zone',
                 },
               ]}
             />
           ) : (
-            <p className="text-sm text-[#94A3B8] text-center py-8">
+            <p className="text-sm text-[#6B6B60] text-center py-8">
               No year-established data available for practice age chart.
             </p>
           )}
         </div>
 
         {/* 4. Top DSOs in Zone */}
-        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">Top DSOs in Zone</h3>
+        <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">Top DSOs in Zone</h3>
           {topDsos.length > 0 ? (
             <BarChart
               data={topDsos}
@@ -226,7 +226,7 @@ export function MarketOverviewCharts({
               tooltipFormat={(d) => `${d.label}: ${d.value} practices`}
             />
           ) : (
-            <p className="text-sm text-[#94A3B8] text-center py-8">
+            <p className="text-sm text-[#6B6B60] text-center py-8">
               No DSO-affiliated practices found in this zone.
             </p>
           )}

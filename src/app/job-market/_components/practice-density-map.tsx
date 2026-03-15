@@ -184,11 +184,11 @@ function PracticeMapInner({
               showIndividual ? 0.9 : 0.7,       // Precise (Data Axle coords)
             ],
             'circle-stroke-width': showIndividual ? 0.5 : 0,
-            'circle-stroke-color': 'rgba(255,255,255,0.3)',
+            'circle-stroke-color': 'rgba(0,0,0,0.15)',
           },
         })
 
-        // Popup on hover — dark panel styling
+        // Popup on hover — light panel styling
         const popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: false,
@@ -204,13 +204,13 @@ function PracticeMapInner({
           popup
             .setLngLat(coords)
             .setHTML(
-              `<div style="font-family:system-ui;font-size:12px;line-height:1.5;background:#0F1629;color:#F8FAFC;border:1px solid #1E293B;border-radius:8px;padding:10px 14px;margin:-10px -14px">
-                <strong style="color:#F8FAFC">${props.name}</strong><br/>
-                <span style="color:#94A3B8">${props.address}</span><br/>
-                <span style="color:#94A3B8">${props.city_zip}</span><br/>
-                <span style="color:#94A3B8">Status:</span> <strong style="color:#F8FAFC">${props.status_label}</strong><br/>
-                <span style="color:#94A3B8">DSO:</span> <span style="color:#F8FAFC">${props.dso}</span><br/>
-                <span style="color:#94A3B8">Employees:</span> <span style="color:#F8FAFC">${props.employees}</span> <span style="color:#94A3B8">| Est:</span> <span style="color:#F8FAFC">${props.year}</span>
+              `<div style="font-family:system-ui;font-size:12px;line-height:1.5;background:#FFFFFF;color:#1A1A1A;border:1px solid #E8E5DE;border-radius:8px;padding:10px 14px;margin:-10px -14px">
+                <strong style="color:#1A1A1A">${props.name}</strong><br/>
+                <span style="color:#6B6B60">${props.address}</span><br/>
+                <span style="color:#6B6B60">${props.city_zip}</span><br/>
+                <span style="color:#6B6B60">Status:</span> <strong style="color:#1A1A1A">${props.status_label}</strong><br/>
+                <span style="color:#6B6B60">DSO:</span> <span style="color:#1A1A1A">${props.dso}</span><br/>
+                <span style="color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">${props.employees}</span> <span style="color:#6B6B60">| Est:</span> <span style="color:#1A1A1A">${props.year}</span>
               </div>`
             )
             .addTo(map)
@@ -234,8 +234,8 @@ function PracticeMapInner({
   return (
     <div
       ref={mapRef}
-      className="w-full rounded-lg border border-[#1E293B] overflow-hidden"
-      style={{ height: 620, boxShadow: '0 0 40px rgba(59, 130, 246, 0.08), 0 4px 24px rgba(0, 0, 0, 0.3)' }}
+      className="w-full rounded-lg border border-[#E8E5DE] overflow-hidden"
+      style={{ height: 620, boxShadow: '0 0 40px rgba(184, 134, 11, 0.06), 0 4px 24px rgba(0, 0, 0, 0.08)' }}
     />
   )
 }
@@ -405,18 +405,18 @@ export function PracticeDensityMap({
     ? {
         html: `
           <div style="font-family:Inter,sans-serif;padding:4px 0">
-            <b style="font-size:13px;color:#F8FAFC">{practice_name}</b><br/>
-            <span style="font-size:11px;color:#94A3B8">{address}</span><br/>
-            <span style="font-size:11px;color:#94A3B8">{city_zip}</span><br/>
-            <span style="font-size:11px;color:#94A3B8">Status:</span> <b style="color:#F8FAFC">{status_label}</b><br/>
-            <span style="font-size:11px;color:#94A3B8">DSO:</span> <span style="color:#F8FAFC">{dso}</span><br/>
-            <span style="font-size:11px;color:#94A3B8">Employees:</span> <span style="color:#F8FAFC">{employees}</span><br/>
-            <span style="font-size:11px;color:#94A3B8">Established:</span> <span style="color:#F8FAFC">{year}</span>
+            <b style="font-size:13px;color:#1A1A1A">{practice_name}</b><br/>
+            <span style="font-size:11px;color:#6B6B60">{address}</span><br/>
+            <span style="font-size:11px;color:#6B6B60">{city_zip}</span><br/>
+            <span style="font-size:11px;color:#6B6B60">Status:</span> <b style="color:#1A1A1A">{status_label}</b><br/>
+            <span style="font-size:11px;color:#6B6B60">DSO:</span> <span style="color:#1A1A1A">{dso}</span><br/>
+            <span style="font-size:11px;color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">{employees}</span><br/>
+            <span style="font-size:11px;color:#6B6B60">Established:</span> <span style="color:#1A1A1A">{year}</span>
           </div>`,
         style: {
-          backgroundColor: '#0F1629',
-          color: '#F8FAFC',
-          border: '1px solid #1E293B',
+          backgroundColor: '#FFFFFF',
+          color: '#1A1A1A',
+          border: '1px solid #E8E5DE',
           borderRadius: '8px',
           padding: '8px 12px',
         },
@@ -431,28 +431,28 @@ export function PracticeDensityMap({
       />
 
       {geocoded.length === 0 ? (
-        <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+        <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
           No geocodable practices found.
         </div>
       ) : (
         <>
           {/* Controls */}
           <div className="flex items-center gap-6 mb-3">
-            <label className="flex items-center gap-2 text-sm text-[#F8FAFC] cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-[#1A1A1A] cursor-pointer">
               <input
                 type="checkbox"
                 checked={showIndividual}
                 onChange={(e) => setShowIndividual(e.target.checked)}
-                className="rounded border-[#1E293B] bg-[#0F1629] text-[#3B82F6] focus:ring-[#3B82F6]"
+                className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
               />
               Show individual practices
             </label>
-            <label className="flex items-center gap-2 text-sm text-[#F8FAFC] cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-[#1A1A1A] cursor-pointer">
               <input
                 type="checkbox"
                 checked={hideUnknown}
                 onChange={(e) => setHideUnknown(e.target.checked)}
-                className="rounded border-[#1E293B] bg-[#0F1629] text-[#3B82F6] focus:ring-[#3B82F6]"
+                className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
               />
               Hide unknown practices
             </label>
@@ -468,7 +468,7 @@ export function PracticeDensityMap({
 
           {/* Legend */}
           <div className="flex flex-wrap gap-6 mt-2 mb-1">
-            <span className="flex items-center gap-1.5 text-[13px] text-[#F8FAFC]">
+            <span className="flex items-center gap-1.5 text-[13px] text-[#1A1A1A]">
               <span
                 className="inline-block w-3.5 h-3.5 rounded-sm"
                 style={{
@@ -477,7 +477,7 @@ export function PracticeDensityMap({
               />
               Independent density
             </span>
-            <span className="flex items-center gap-1.5 text-[13px] text-[#F8FAFC]">
+            <span className="flex items-center gap-1.5 text-[13px] text-[#1A1A1A]">
               <span
                 className="inline-block w-3.5 h-3.5 rounded-sm"
                 style={{
@@ -486,11 +486,11 @@ export function PracticeDensityMap({
               />
               Consolidated density (DSO + PE)
             </span>
-            <span className="text-[13px] text-[#94A3B8]">Overlap = competitive market</span>
+            <span className="text-[13px] text-[#6B6B60]">Overlap = competitive market</span>
           </div>
 
           {/* Summary counts */}
-          <p className="text-xs text-[#94A3B8] mt-1">
+          <p className="text-xs text-[#6B6B60] mt-1">
             Showing {geocoded.length.toLocaleString()} practices (
             {independentData.length.toLocaleString()} independent,{' '}
             {consolidatedData.length.toLocaleString()} consolidated,{' '}

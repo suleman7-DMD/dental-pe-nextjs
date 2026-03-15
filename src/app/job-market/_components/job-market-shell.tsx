@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { StickySectionNav } from '@/components/layout/sticky-section-nav'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { DataFreshnessBar } from '@/components/data-display/data-freshness-bar'
 import { LivingLocationSelector } from './living-location-selector'
@@ -12,6 +11,8 @@ import { PracticeDirectory } from './practice-directory'
 import { OpportunitySignals } from './opportunity-signals'
 import { OwnershipLandscape } from './ownership-landscape'
 import { MarketAnalytics } from './market-analytics'
+import { SaturationTable } from './saturation-table'
+import { ADABenchmarks } from './ada-benchmarks'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { isIndependentClassification, isCorporateClassification, classifyPractice, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
@@ -19,6 +20,7 @@ import { createBrowserClient } from '@/lib/supabase/client'
 import { Hospital, CircleCheck, BarChart3, Target, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
 
 import type { Practice, ZipScore, WatchedZip } from '@/lib/types'
+import type { ADABenchmark } from '@/lib/supabase/queries/ada-benchmarks'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -33,6 +35,7 @@ interface JobMarketShellProps {
     daEnriched: number
     lastUpdated: string | null
   }
+  adaBenchmarks?: ADABenchmark[]
 }
 
 export interface ZipStats {
@@ -48,18 +51,17 @@ export interface ZipStats {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Section anchors
+// Tab definitions
 // ────────────────────────────────────────────────────────────────────────────
 
-const SECTIONS = [
-  { id: 'kpis', label: 'KPIs' },
-  { id: 'map', label: 'Map' },
+const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'map', label: 'Map' },
   { id: 'directory', label: 'Directory' },
-  { id: 'signals', label: 'Signals' },
-  { id: 'ownership', label: 'Ownership' },
   { id: 'analytics', label: 'Analytics' },
-]
+] as const
+
+type TabId = (typeof TABS)[number]['id']
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -127,6 +129,7 @@ export function JobMarketShell({
   initialWatchedZips,
   initialPractices,
   freshness,
+  adaBenchmarks,
 }: JobMarketShellProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -137,6 +140,16 @@ export function JobMarketShell({
   const urlLocation = searchParams.get('location')
   const currentLocation = locationKeys.includes(urlLocation ?? '') ? urlLocation! : locationKeys[0]
   const loc = LIVING_LOCATIONS[currentLocation]
+
+  // Tab state from URL
+  const urlTab = searchParams.get('tab')
+  const activeTab: TabId = TABS.some(t => t.id === urlTab) ? (urlTab as TabId) : 'overview'
+
+  const handleTabChange = (tab: TabId) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', tab)
+    router.push(`?${params.toString()}`, { scroll: false })
+  }
 
   const [practices, setPractices] = useState<Practice[]>(initialPractices)
   const [zipScores, setZipScores] = useState<ZipScore[]>(initialZipScores)
@@ -360,16 +373,14 @@ export function JobMarketShell({
   // ── Render ────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#0A0F1E]">
-      <StickySectionNav sections={SECTIONS} />
-
+    <div className="min-h-screen bg-[#FAFAF7]">
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="font-sans font-bold text-2xl text-[#F8FAFC]">
+          <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">
             Job Market Intelligence
           </h1>
-          <p className="text-[#94A3B8] text-sm mt-1 max-w-3xl">
+          <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
             Evaluate dental practice landscapes near your planned living locations --
             where are independent practices, and where is consolidation squeezing out opportunity?
           </p>
@@ -389,14 +400,14 @@ export function JobMarketShell({
         />
 
         {loading && (
-          <div className="flex items-center gap-2 text-[#7eb8e0] text-sm">
-            <div className="h-4 w-4 border-2 border-[#7eb8e0] border-t-transparent rounded-full animate-spin" />
+          <div className="flex items-center gap-2 text-[#B8860B] text-sm">
+            <div className="h-4 w-4 border-2 border-[#B8860B] border-t-transparent rounded-full animate-spin" />
             Loading practices for {currentLocation}...
           </div>
         )}
 
         {practices.length === 0 && !loading ? (
-          <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
+          <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
             No practices found for this zone.
           </div>
         ) : (
@@ -414,23 +425,23 @@ export function JobMarketShell({
                   icon={<CircleCheck className="h-5 w-5" />}
                   label="Independent %"
                   value={kpis.indep_pct}
-                  accentColor="#22C55E"
+                  accentColor="#2D8B4E"
                 />
                 <KpiCard
                   icon={<BarChart3 className="h-5 w-5" />}
                   label="High-Confidence Corporate"
                   value={kpis.highConf_pct}
-                  accentColor="#10B981"
+                  accentColor="#2D8B4E"
                   tooltip={`High-confidence includes practices with DSO brand matches, shared EIN, or corporate parent signals. All-signals adds ${(kpis.allSignalsCorporate - kpis.highConfCorporate).toLocaleString()} practices detected only by shared phone numbers (a weaker signal). Industry estimates from ADA HPI suggest actual consolidation is 25-35%, as stealth acquisitions keep the original practice name.`}
                   subtitle={
                     <div className="space-y-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#F59E0B]" />
-                        <span className="text-[10px] text-[#F59E0B] font-mono font-medium">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D4920B]" />
+                        <span className="text-[10px] text-[#D4920B] font-mono font-medium">
                           All detected signals: {kpis.allSignals_pct}
                         </span>
                       </div>
-                      <p className="text-[9px] text-[#64748B] leading-tight">
+                      <p className="text-[9px] text-[#9C9C90] leading-tight">
                         Industry estimate: 25-35%
                       </p>
                     </div>
@@ -450,7 +461,7 @@ export function JobMarketShell({
                   icon={<Clock className="h-5 w-5" />}
                   label="Retirement Risk"
                   value={kpis.retirement_risk.toLocaleString()}
-                  accentColor="#EF4444"
+                  accentColor="#C23B3B"
                 />
               </div>
 
@@ -462,7 +473,7 @@ export function JobMarketShell({
                     label="Avg Dental Density"
                     value={kpis.avgDldVal ? `${kpis.avgDldVal}/10k` : '--'}
                   />
-                  <p className="text-xs text-[#94A3B8] mt-1 px-1">
+                  <p className="text-xs text-[#6B6B60] mt-1 px-1">
                     GP offices per 10k residents. National avg ~6.1. Lower = less competition.
                   </p>
                 </div>
@@ -483,7 +494,7 @@ export function JobMarketShell({
                         : undefined
                     }
                   />
-                  <p className="text-xs text-[#94A3B8] mt-1 px-1">
+                  <p className="text-xs text-[#6B6B60] mt-1 px-1">
                     % of GP offices that are independently owned solos -- potential acquisition targets.
                   </p>
                 </div>
@@ -493,7 +504,7 @@ export function JobMarketShell({
                     label="High-Volume Solos"
                     value={kpis.highVolCount.toLocaleString()}
                   />
-                  <p className="text-xs text-[#94A3B8] mt-1 px-1">
+                  <p className="text-xs text-[#6B6B60] mt-1 px-1">
                     Solo practices with 5+ employees or $800k+ revenue. Likely need associate help.
                   </p>
                 </div>
@@ -501,7 +512,7 @@ export function JobMarketShell({
 
               {/* Unknown ownership warning */}
               {kpis.unk_pct > 30 && (
-                <p className="text-xs text-[#F59E0B] mt-3 flex items-start gap-1">
+                <p className="text-xs text-[#D4920B] mt-3 flex items-start gap-1">
                   <span className="shrink-0">Warning:</span>
                   <span>
                     {kpis.unk_pct.toFixed(0)}% of practices have unknown ownership (
@@ -513,62 +524,86 @@ export function JobMarketShell({
               )}
             </section>
 
-            {/* ── Practice Density Map ──────────────────────────── */}
-            <section id="map">
+            {/* ── Tab Navigation ────────────────────────────────── */}
+            <div className="border-b border-[#E8E5DE]">
+              <nav className="flex gap-0" aria-label="Job Market tabs">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`px-5 py-2.5 text-sm font-medium transition-colors relative ${
+                      activeTab === tab.id
+                        ? 'text-[#B8860B] border-b-2 border-[#B8860B]'
+                        : 'text-[#6B6B60] hover:text-[#1A1A1A] border-b-2 border-transparent'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* ── Tab Content ───────────────────────────────────── */}
+
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                <SaturationTable
+                  zipScores={zipScores}
+                  watchedZips={initialWatchedZips}
+                />
+                {adaBenchmarks && adaBenchmarks.length > 0 && (
+                  <ADABenchmarks data={adaBenchmarks} />
+                )}
+                <OpportunitySignals
+                  practices={practicesWithScore}
+                  zipList={loc.commutable_zips}
+                />
+              </div>
+            )}
+
+            {/* Map Tab */}
+            {activeTab === 'map' && (
               <PracticeDensityMap
                 practices={practices}
                 centerLat={loc.center_lat}
                 centerLon={loc.center_lon}
               />
-            </section>
+            )}
 
-            {/* ── Market Overview ───────────────────────────────── */}
-            <section id="overview">
-              <MarketOverviewCharts
-                practices={practices}
-                zipStats={zipStats}
-                kpis={{
-                  indep_cnt: kpis.indep_cnt,
-                  dso_cnt: kpis.dso_cnt,
-                  pe_cnt: kpis.pe_cnt,
-                  unk_cnt: kpis.unk_cnt,
-                }}
-              />
-            </section>
-
-            {/* ── Practice Directory ───────────────────────────── */}
-            <section id="directory">
+            {/* Directory Tab */}
+            {activeTab === 'directory' && (
               <PracticeDirectory
                 practices={practicesWithScore}
                 allPractices={practices}
               />
-            </section>
+            )}
 
-            {/* ── Opportunity Signals ──────────────────────────── */}
-            <section id="signals">
-              <OpportunitySignals
-                practices={practicesWithScore}
-                zipList={loc.commutable_zips}
-              />
-            </section>
-
-            {/* ── Ownership Landscape ──────────────────────────── */}
-            <section id="ownership">
-              <OwnershipLandscape
-                practices={practices}
-                zipStats={zipStats}
-                zipScores={zipScores}
-                watchedZips={initialWatchedZips}
-              />
-            </section>
-
-            {/* ── Market Analytics ─────────────────────────────── */}
-            <section id="analytics">
-              <MarketAnalytics
-                practices={practices}
-                zipStats={zipStats}
-              />
-            </section>
+            {/* Analytics Tab */}
+            {activeTab === 'analytics' && (
+              <div className="space-y-6">
+                <MarketOverviewCharts
+                  practices={practices}
+                  zipStats={zipStats}
+                  kpis={{
+                    indep_cnt: kpis.indep_cnt,
+                    dso_cnt: kpis.dso_cnt,
+                    pe_cnt: kpis.pe_cnt,
+                    unk_cnt: kpis.unk_cnt,
+                  }}
+                />
+                <OwnershipLandscape
+                  practices={practices}
+                  zipStats={zipStats}
+                  zipScores={zipScores}
+                  watchedZips={initialWatchedZips}
+                />
+                <MarketAnalytics
+                  practices={practices}
+                  zipStats={zipStats}
+                />
+              </div>
+            )}
           </>
         )}
       </div>

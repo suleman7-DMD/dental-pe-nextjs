@@ -201,7 +201,7 @@ export function PracticeDetailDrawer({
   if (!p) {
     return (
       <Sheet open={false} onOpenChange={() => onClose()}>
-        <SheetContent className="bg-[#0F1629] border-[#1E293B]" />
+        <SheetContent className="bg-[#FFFFFF] border-[#E8E5DE]" />
       </Sheet>
     )
   }
@@ -210,22 +210,22 @@ export function PracticeDetailDrawer({
   const isDaEnriched = hasDa && (p.import_batch_id ?? '').startsWith('DA_')
   const reasoning = p.classification_reasoning
   const observations = !reasoning ? generateBasicObservations(p) : []
-  const ecColor = ENTITY_CLASSIFICATION_COLORS[p.entity_classification ?? 'unknown'] ?? '#475569'
+  const ecColor = ENTITY_CLASSIFICATION_COLORS[p.entity_classification ?? 'unknown'] ?? '#B5B5A8'
   const osColor = ownershipColor(p.ownership_status)
   const totalZips = multiZipData.count + 1 // current ZIP + others
 
   return (
     <Sheet open={isOpen} onOpenChange={() => onClose()}>
       <SheetContent
-        className="bg-[#0F1629] border-[#1E293B] w-full sm:max-w-[480px] overflow-y-auto backdrop-blur-sm"
+        className="bg-[#FFFFFF] border-[#E8E5DE] w-full sm:max-w-[480px] overflow-y-auto backdrop-blur-sm"
         side="right"
       >
         {/* ── Header ─────────────────────────────────────────────── */}
         <SheetHeader className="relative pr-12">
-          <SheetTitle className="text-[#F8FAFC] font-bold text-lg leading-tight">
+          <SheetTitle className="text-[#1A1A1A] font-bold text-lg leading-tight">
             {p.practice_name ?? 'Unknown Practice'}
           </SheetTitle>
-          <p className="text-[13px] text-[#94A3B8] mt-0.5">
+          <p className="text-[13px] text-[#6B6B60] mt-0.5">
             {[p.address, p.city, p.state ? `${p.state} ${(p.zip ?? '').toString().slice(0, 5)}` : null]
               .filter(Boolean)
               .join(', ') || '\u2014'}
@@ -234,21 +234,21 @@ export function PracticeDetailDrawer({
           {/* Enrichment badge — top-right */}
           <div className="absolute top-0 right-0">
             {isDaEnriched ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(34,197,94,0.15)] text-[#22C55E] border border-[rgba(34,197,94,0.2)]">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(45,139,78,0.1)] text-[#2D8B4E] border border-[rgba(45,139,78,0.2)]">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D8B4E]" />
                 Data Axle Enriched
                 {p.classification_confidence != null && (
                   <span className="ml-0.5 text-[10px]">{confidenceStarsInline(p.classification_confidence)}</span>
                 )}
               </span>
             ) : hasDa ? (
-              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(34,197,94,0.15)] text-[#22C55E] border border-[rgba(34,197,94,0.2)]">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(45,139,78,0.1)] text-[#2D8B4E] border border-[rgba(45,139,78,0.2)]">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D8B4E]" />
                 Data Axle Enriched
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(100,116,139,0.15)] text-[#94A3B8] border border-[rgba(100,116,139,0.2)]">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#64748B]" />
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(156,156,144,0.1)] text-[#6B6B60] border border-[rgba(156,156,144,0.2)]">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#9C9C90]" />
                 NPPES Only
               </span>
             )}
@@ -312,32 +312,32 @@ export function PracticeDetailDrawer({
           </div>
 
           {/* ── Divider ──────────────────────────────────────────── */}
-          <div className="border-t border-[#1E293B]" />
+          <div className="border-t border-[#E8E5DE]" />
 
           {/* ── Classification Reasoning ─────────────────────────── */}
           <div className="px-4 py-4">
-            <h4 className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-2">
+            <h4 className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-2">
               Classification Reasoning
             </h4>
             {reasoning ? (
               <div
-                className="bg-[#0A0F1E] rounded-md p-3 font-mono text-xs text-[#F8FAFC] leading-relaxed whitespace-pre-wrap border-l-2"
+                className="bg-[#FAFAF7] rounded-md p-3 font-mono text-xs text-[#1A1A1A] leading-relaxed whitespace-pre-wrap border-l-2"
                 style={{ borderLeftColor: ecColor }}
               >
                 {reasoning}
               </div>
             ) : observations.length > 0 ? (
               <div
-                className="bg-[#0A0F1E] rounded-md p-3 font-mono text-xs text-[#F8FAFC] leading-relaxed border-l-2"
+                className="bg-[#FAFAF7] rounded-md p-3 font-mono text-xs text-[#1A1A1A] leading-relaxed border-l-2"
                 style={{ borderLeftColor: ecColor }}
               >
-                <p className="italic text-[#64748B] mb-2 text-[11px] font-sans">
+                <p className="italic text-[#9C9C90] mb-2 text-[11px] font-sans">
                   Auto-generated observations (no stored reasoning):
                 </p>
                 <ul className="space-y-1">
                   {observations.map((obs, i) => (
                     <li key={i} className="flex items-start gap-1.5">
-                      <span className="shrink-0 text-[#475569] mt-0.5">&bull;</span>
+                      <span className="shrink-0 text-[#B5B5A8] mt-0.5">&bull;</span>
                       <span>{obs}</span>
                     </li>
                   ))}
@@ -345,7 +345,7 @@ export function PracticeDetailDrawer({
               </div>
             ) : (
               <div
-                className="bg-[#0A0F1E] rounded-md p-3 font-mono text-xs text-[#475569] leading-relaxed border-l-2 border-l-[#475569]"
+                className="bg-[#FAFAF7] rounded-md p-3 font-mono text-xs text-[#B5B5A8] leading-relaxed border-l-2 border-l-[#B5B5A8]"
               >
                 No reasoning available.
               </div>
@@ -355,14 +355,14 @@ export function PracticeDetailDrawer({
           {/* ── Family Indicators ────────────────────────────────── */}
           {sharedLastNames && (
             <>
-              <div className="border-t border-[#1E293B]" />
+              <div className="border-t border-[#E8E5DE]" />
               <div className="px-4 py-4">
-                <h4 className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-2">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-2">
                   Family Indicators
                 </h4>
-                <div className="bg-[#0A0F1E] rounded-md p-3 border-l-2 border-l-[#F59E0B]">
-                  <p className="text-[13px] text-[#F8FAFC]">
-                    Shared last names at address: <span className="font-medium text-[#F59E0B]">{sharedLastNames}</span>
+                <div className="bg-[#FAFAF7] rounded-md p-3 border-l-2 border-l-[#D4920B]">
+                  <p className="text-[13px] text-[#1A1A1A]">
+                    Shared last names at address: <span className="font-medium text-[#D4920B]">{sharedLastNames}</span>
                   </p>
                 </div>
               </div>
@@ -372,24 +372,24 @@ export function PracticeDetailDrawer({
           {/* ── Providers at Address ─────────────────────────────── */}
           {sameAddress.length > 0 && (
             <>
-              <div className="border-t border-[#1E293B]" />
+              <div className="border-t border-[#E8E5DE]" />
               <div className="px-4 py-4">
-                <h4 className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-2">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-2">
                   Providers at Address
                 </h4>
-                <div className="bg-[#0A0F1E] rounded-md p-3 border-l-2 border-l-[#3B82F6]">
-                  <p className="text-[13px] text-[#F8FAFC] mb-2">
-                    <span className="font-medium text-[#3B82F6]">{sameAddress.length}</span>{' '}
+                <div className="bg-[#FAFAF7] rounded-md p-3 border-l-2 border-l-[#B8860B]">
+                  <p className="text-[13px] text-[#1A1A1A] mb-2">
+                    <span className="font-medium text-[#B8860B]">{sameAddress.length}</span>{' '}
                     other provider{sameAddress.length !== 1 ? 's' : ''} at this address
                   </p>
                   <ul className="space-y-0.5">
                     {sameAddress.slice(0, 10).map((pr) => (
-                      <li key={pr.npi} className="text-xs text-[#94A3B8] font-mono truncate">
+                      <li key={pr.npi} className="text-xs text-[#6B6B60] font-mono truncate">
                         {displayValue(pr.practice_name)}
                       </li>
                     ))}
                     {sameAddress.length > 10 && (
-                      <li className="text-xs text-[#475569]">
+                      <li className="text-xs text-[#B5B5A8]">
                         +{sameAddress.length - 10} more
                       </li>
                     )}
@@ -402,28 +402,28 @@ export function PracticeDetailDrawer({
           {/* ── Multi-ZIP Presence ───────────────────────────────── */}
           {totalZips >= 3 && multiZipData.count > 0 && (
             <>
-              <div className="border-t border-[#1E293B]" />
+              <div className="border-t border-[#E8E5DE]" />
               <div className="px-4 py-4">
-                <h4 className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-2">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-2">
                   Multi-ZIP Presence
                 </h4>
-                <div className="bg-[#0A0F1E] rounded-md p-3 border-l-2 border-l-[#EF4444]">
-                  <p className="text-[13px] text-[#F8FAFC] mb-2">
+                <div className="bg-[#FAFAF7] rounded-md p-3 border-l-2 border-l-[#C23B3B]">
+                  <p className="text-[13px] text-[#1A1A1A] mb-2">
                     This practice name appears in{' '}
-                    <span className="font-medium text-[#EF4444]">{totalZips}</span>{' '}
+                    <span className="font-medium text-[#C23B3B]">{totalZips}</span>{' '}
                     ZIPs — likely a chain entity
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {multiZipData.zips.slice(0, 20).map((z) => (
                       <span
                         key={z}
-                        className="inline-block rounded bg-[rgba(239,68,68,0.1)] px-2 py-0.5 text-[11px] font-mono text-[#EF4444]"
+                        className="inline-block rounded bg-[rgba(194,59,59,0.08)] px-2 py-0.5 text-[11px] font-mono text-[#C23B3B]"
                       >
                         {z}
                       </span>
                     ))}
                     {multiZipData.zips.length > 20 && (
-                      <span className="text-[11px] text-[#475569]">
+                      <span className="text-[11px] text-[#B5B5A8]">
                         +{multiZipData.zips.length - 20} more
                       </span>
                     )}
@@ -457,7 +457,7 @@ function DossierField({
   const isEmpty = value == null || value === '' || value === '\u2014'
   return (
     <div className="min-w-0">
-      <div className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-0.5">
+      <div className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-0.5">
         {label}
       </div>
       <div className="flex items-center gap-1.5 min-w-0">
@@ -468,7 +468,7 @@ function DossierField({
           />
         )}
         <span
-          className={`text-[14px] truncate ${isEmpty ? 'text-[#475569]' : 'text-[#F8FAFC]'}`}
+          className={`text-[14px] truncate ${isEmpty ? 'text-[#B5B5A8]' : 'text-[#1A1A1A]'}`}
         >
           {isEmpty ? '\u2014' : String(value)}
         </span>

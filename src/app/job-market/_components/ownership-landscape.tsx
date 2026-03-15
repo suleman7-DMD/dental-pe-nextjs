@@ -40,7 +40,7 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
       .map(([ec, count]) => ({
         label: getEntityClassificationLabel(ec),
         value: count,
-        color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#64748B',
+        color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#9C9C90',
       }))
       .sort((a, b) => b.value - a.value)
   }, [practices])
@@ -113,7 +113,7 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
 
       <div className="mt-4 space-y-6">
         {/* Ownership Status Bar */}
-        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+        <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           <BarChart
             data={ownershipData}
             orientation="horizontal"
@@ -125,8 +125,8 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
 
         {/* Practice Size Distribution */}
         {sizeData && (
-          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-            <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
+          <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">
               Practice Size Distribution
             </h3>
             <BarChart
@@ -142,8 +142,8 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
 
         {/* Top DSOs Table */}
         {topDsos.length > 0 && (
-          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-            <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
+          <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">
               Top DSOs in Zone
             </h3>
             <DataTable
@@ -163,8 +163,8 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
 
         {/* DSO Penetration by ZIP */}
         {dsoPenetration.length > 0 && (
-          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
-            <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
+          <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">
               DSO Penetration by ZIP
             </h3>
             <DataTable

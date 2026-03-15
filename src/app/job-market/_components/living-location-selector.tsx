@@ -14,7 +14,7 @@ export function LivingLocationSelector({ value, onChange }: LivingLocationSelect
     <div className="flex items-center gap-3">
       <label
         htmlFor="living-location"
-        className="text-sm font-medium text-[#94A3B8] whitespace-nowrap"
+        className="text-sm font-medium text-[#6B6B60] whitespace-nowrap"
       >
         Planned Living Area
       </label>
@@ -23,15 +23,15 @@ export function LivingLocationSelector({ value, onChange }: LivingLocationSelect
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="
-          rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC]
+          rounded-md border border-[#E8E5DE] bg-[#FFFFFF] text-[#1A1A1A]
           px-3 py-2 text-sm
-          focus:outline-none focus:ring-2 focus:ring-[#3B82F6] focus:border-[#3B82F6]
-          hover:border-[#334155] transition-colors
+          focus:outline-none focus:ring-2 focus:ring-[#B8860B] focus:border-[#B8860B]
+          hover:border-[#D4D0C8] transition-colors
           appearance-none cursor-pointer
           min-w-[220px]
         "
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='%2394A3B8'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='%236B6B60'%3E%3Cpath d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'right 10px center',
           paddingRight: '32px',
