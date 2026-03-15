@@ -4,6 +4,7 @@ import { getWatchedZips, getDistinctMetroAreas } from '@/lib/supabase/queries/wa
 import { getADABenchmarks } from '@/lib/supabase/queries/ada-benchmarks'
 import { MarketIntelShell } from './_components/market-intel-shell'
 
+export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'Market Intelligence | Dental PE Intelligence',
   description:

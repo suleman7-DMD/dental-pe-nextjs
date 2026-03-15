@@ -5,6 +5,7 @@ import { getWatchedZipCount } from '@/lib/supabase/queries/watched-zips'
 import { HomeShell } from './_components/home-shell'
 import type { HomeSummary } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'Dental PE Intelligence Platform',
   description:

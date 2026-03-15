@@ -3,6 +3,7 @@ import { getSourceCoverage, getCompletenessMetrics } from '@/lib/supabase/querie
 import type { SourceCoverage } from '@/lib/supabase/queries/system'
 import { SystemShell } from './_components/system-shell'
 
+export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'System Health | Dental PE Intelligence',
   description:

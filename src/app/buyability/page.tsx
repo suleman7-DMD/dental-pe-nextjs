@@ -2,6 +2,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getBuyabilityPractices } from '@/lib/supabase/queries/practices'
 import { BuyabilityShell } from './_components/buyability-shell'
 
+export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'Buyability Scanner | Dental PE Intelligence',
   description:

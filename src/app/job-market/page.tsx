@@ -4,6 +4,7 @@ import { getWatchedZips } from '@/lib/supabase/queries/watched-zips'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { JobMarketShell } from './_components/job-market-shell'
 
+export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'Job Market Intelligence | Dental PE Intelligence',
   description:

@@ -2,6 +2,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getDealStats } from '@/lib/supabase/queries/deals'
 import { DealFlowShell } from './_components/deal-flow-shell'
 
+export const dynamic = 'force-dynamic'
 export const metadata = {
   title: 'Deal Flow | Dental PE Intelligence',
   description:
