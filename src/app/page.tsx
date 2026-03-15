@@ -28,8 +28,8 @@ export default async function HomePage() {
       getDealStats(supabase).catch(() => ({ total_deals: 0, by_deal_type: {}, by_state: {}, avg_deal_size_mm: null, avg_ebitda_multiple: null, unique_pe_sponsors: 0, deals: [], distinctSponsors: [], distinctPlatforms: [], distinctStates: [], distinctSpecialties: [], distinctSources: [], distinctTypes: [], totalDeals: 0, ytdDeals: 0, activeSponsors: 0 } as DealStats)),
       getPracticeStats(supabase).catch(() => ({ totalPractices: 0, consolidatedPct: '--', independentPct: '--' })),
       getWatchedZipCount(supabase).catch(() => 0),
-      getRetirementRiskCount(supabase).catch(() => 0),
-      getAcquisitionTargetCount(supabase).catch(() => 0),
+      getRetirementRiskCount(supabase).catch((err) => { console.error('[HomePage] retirementRisk error:', err); return 0 }),
+      getAcquisitionTargetCount(supabase).catch((err) => { console.error('[HomePage] acquisitionTargets error:', err); return 0 }),
       getRecentDeals(supabase, 5).catch(() => []),
     ])
 

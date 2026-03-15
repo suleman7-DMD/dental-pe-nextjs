@@ -223,32 +223,20 @@ export async function getPracticeStats(
 export async function getRetirementRiskCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  // Ground truth: independent practices with year_established < 1995
-  const cutoffYear = 1995;
-
-  // Count globally (year_established only exists for Data Axle enriched practices,
-  // which are mostly in watched ZIPs anyway)
-  // Use all independent classifications
-  const { count: byEC } = await supabase
+  // Independent practices established before 1995 (30+ years).
+  // year_established only exists on Data Axle enriched practices,
+  // which all have entity_classification set — no fallback needed.
+  const { count, error } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
     .in("entity_classification", [
       "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
       "family_practice", "small_group", "large_group"
     ])
-    .not("year_established", "is", null)
-    .lt("year_established", cutoffYear);
+    .lt("year_established", 1995);
 
-  // Fallback: by ownership_status where entity_classification is missing
-  const { count: byStatus } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .in("ownership_status", ["independent", "likely_independent"])
-    .is("entity_classification", null)
-    .not("year_established", "is", null)
-    .lt("year_established", cutoffYear);
-
-  return (byEC ?? 0) + (byStatus ?? 0);
+  if (error) throw error;
+  return count ?? 0;
 }
 
 /**
@@ -258,9 +246,10 @@ export async function getRetirementRiskCount(
 export async function getAcquisitionTargetCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  // Count by entity_classification (primary) — independent solo/group practices with high buyability
-  // Ground truth: 34 targets at buyability_score >= 50
-  const { count: byEC } = await supabase
+  // Independent practices with buyability_score >= 50.
+  // buyability_score only exists on Data Axle enriched practices,
+  // which all have entity_classification set — no fallback needed.
+  const { count, error } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
     .gte("buyability_score", 50)
@@ -269,15 +258,8 @@ export async function getAcquisitionTargetCount(
       "family_practice", "small_group", "large_group"
     ]);
 
-  // Fallback: by ownership_status where entity_classification is missing
-  const { count: byStatus } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .gte("buyability_score", 50)
-    .is("entity_classification", null)
-    .in("ownership_status", ["independent", "likely_independent", "unknown"]);
-
-  return (byEC ?? 0) + (byStatus ?? 0);
+  if (error) throw error;
+  return count ?? 0;
 }
 
 /**
