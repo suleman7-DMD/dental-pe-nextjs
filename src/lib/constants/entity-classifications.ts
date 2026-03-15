@@ -100,3 +100,56 @@ export function getEntityClassificationLabel(value: string | null): string {
   if (!value) return "Unknown";
   return ENTITY_CLASSIFICATION_MAP.get(value)?.label ?? value;
 }
+
+/** Check if an entity_classification value represents an independent practice. */
+export function isIndependentClassification(ec: string | null | undefined): boolean {
+  if (!ec) return false;
+  const v = ec.trim().toLowerCase();
+  return (
+    v === "solo_established" ||
+    v === "solo_new" ||
+    v === "solo_inactive" ||
+    v === "solo_high_volume" ||
+    v === "family_practice" ||
+    v === "small_group" ||
+    v === "large_group"
+  );
+}
+
+/** Check if an entity_classification value represents a corporate/consolidated practice. */
+export function isCorporateClassification(ec: string | null | undefined): boolean {
+  if (!ec) return false;
+  const v = ec.trim().toLowerCase();
+  return v === "dso_regional" || v === "dso_national";
+}
+
+/** DSO/specialty names that should be filtered out of Top DSOs charts. */
+export const DSO_FILTER_KEYWORDS = [
+  'general dentistry',
+  'oral surgery',
+  'orthodontics',
+  'periodontics',
+  'endodontics',
+  'pediatric dentistry',
+  'prosthodontics',
+  'dental hygiene',
+];
+
+/** Classify a practice using entity_classification with ownership_status fallback. */
+export function classifyPractice(
+  entityClassification: string | null | undefined,
+  ownershipStatus: string | null | undefined
+): "independent" | "corporate" | "specialist" | "non_clinical" | "unknown" {
+  const ec = (entityClassification ?? "").trim().toLowerCase();
+  if (isCorporateClassification(ec)) return "corporate";
+  if (isIndependentClassification(ec)) return "independent";
+  if (ec === "specialist") return "specialist";
+  if (ec === "non_clinical") return "non_clinical";
+
+  // Fallback to ownership_status when entity_classification is empty
+  if (ec) return "unknown"; // ec is set but unrecognized
+  const s = (ownershipStatus ?? "unknown").trim().toLowerCase();
+  if (s === "dso_affiliated" || s === "pe_backed") return "corporate";
+  if (s === "independent" || s === "likely_independent") return "independent";
+  return "unknown";
+}

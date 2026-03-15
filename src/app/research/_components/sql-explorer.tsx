@@ -100,8 +100,8 @@ export function SqlExplorer() {
   return (
     <div className="space-y-4">
       {/* Description */}
-      <p className="text-sm text-[#8892A0]">
-        <span className="text-[#E8ECF1] font-medium">SQL Explorer</span> -- query the database
+      <p className="text-sm text-[#94A3B8]">
+        <span className="text-[#F8FAFC] font-medium">SQL Explorer</span> -- query the database
         directly. Tables available: deals, practices, watched_zips, practice_changes, dso_locations,
         zip_scores, ada_hpi_benchmarks. Only SELECT queries are allowed. Click preset buttons for
         example queries.
@@ -113,7 +113,7 @@ export function SqlExplorer() {
           <button
             key={preset.name}
             onClick={() => handlePreset(preset.query)}
-            className="rounded-md border border-[#1E2A3A] bg-[#141922] px-3 py-1.5 text-xs text-[#8892A0] hover:text-[#E8ECF1] hover:border-[#2A3A4A] transition-colors"
+            className="rounded-md border border-[#1E293B] bg-[#0F1629] px-3 py-1.5 text-xs text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#334155] transition-colors"
           >
             {preset.name}
           </button>
@@ -126,7 +126,7 @@ export function SqlExplorer() {
           <button
             key={preset.name}
             onClick={() => handlePreset(preset.query)}
-            className="rounded-md border border-[#1E2A3A] bg-[#141922] px-3 py-1.5 text-xs text-[#8892A0] hover:text-[#E8ECF1] hover:border-[#2A3A4A] transition-colors"
+            className="rounded-md border border-[#1E293B] bg-[#0F1629] px-3 py-1.5 text-xs text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#334155] transition-colors"
           >
             {preset.name}
           </button>
@@ -138,7 +138,7 @@ export function SqlExplorer() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Enter SQL SELECT query..."
-        className="w-full h-[150px] rounded-md border border-[#1E2A3A] bg-[#141922] text-[#E8ECF1] px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-[#0066FF] placeholder:text-[#4A5568]"
+        className="w-full h-[150px] rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-[#3B82F6] placeholder:text-[#475569]"
       />
 
       {/* Execute button */}
@@ -146,7 +146,7 @@ export function SqlExplorer() {
         <button
           onClick={executeQuery}
           disabled={loading}
-          className="flex items-center gap-1.5 rounded-md bg-[#0066FF] px-4 py-2 text-sm font-medium text-white hover:bg-[#0052CC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1.5 rounded-md bg-[#3B82F6] px-4 py-2 text-sm font-medium text-white hover:bg-[#2563EB] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
             <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -159,7 +159,7 @@ export function SqlExplorer() {
         {result && (
           <button
             onClick={handleDownload}
-            className="flex items-center gap-1.5 rounded-md border border-[#1E2A3A] bg-[#141922] px-3 py-2 text-sm text-[#8892A0] hover:text-[#E8ECF1] hover:border-[#2A3A4A] transition-colors"
+            className="flex items-center gap-1.5 rounded-md border border-[#1E293B] bg-[#0F1629] px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#334155] transition-colors"
           >
             <Download className="h-4 w-4" />
             CSV
@@ -184,11 +184,11 @@ export function SqlExplorer() {
 
       {/* Results table */}
       {result && result.rows.length > 0 && (
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] overflow-hidden">
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] overflow-hidden">
           <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-[#141922]">
-                <tr className="border-b border-[#1E2A3A] text-[#8892A0]">
+              <thead className="sticky top-0 bg-[#0F1629]">
+                <tr className="border-b border-[#1E293B] text-[#94A3B8]">
                   {result.columns.map((col) => (
                     <th key={col} className="text-left px-4 py-2 font-medium text-xs whitespace-nowrap">
                       {col}
@@ -200,12 +200,12 @@ export function SqlExplorer() {
                 {result.rows.map((row, rowIdx) => (
                   <tr
                     key={rowIdx}
-                    className="border-b border-[#1E2A3A]/50 hover:bg-[#1E2A3A]/20"
+                    className="border-b border-[#1E293B]/50 hover:bg-[#1E293B]/20"
                   >
                     {result.columns.map((col) => (
                       <td
                         key={col}
-                        className="px-4 py-2 text-[#E8ECF1] max-w-[300px] truncate text-xs"
+                        className="px-4 py-2 text-[#F8FAFC] max-w-[300px] truncate text-xs"
                         title={String(row[col] ?? '')}
                       >
                         {row[col] != null ? String(row[col]) : '--'}
@@ -216,7 +216,7 @@ export function SqlExplorer() {
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-2 border-t border-[#1E2A3A] text-xs text-[#8892A0]">
+          <div className="px-4 py-2 border-t border-[#1E293B] text-xs text-[#94A3B8]">
             {result.rowCount.toLocaleString()} rows
           </div>
         </div>

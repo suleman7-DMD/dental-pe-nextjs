@@ -153,7 +153,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
         helpText="Cross-ZIP comparison of dental market metrics. DLD-GP/10k = GP dental offices per 10,000 residents (national avg ~6.1). Buyable % = share of GP offices that are independently owned solos. Corporate % = share of GP offices that are DSO/PE-affiliated. Color codes: green = favorable, yellow = moderate, red = high competition or limited opportunity."
       />
 
-      <div className="mt-4 rounded-[10px] border border-[#1E2A3A] bg-[#141922] overflow-hidden">
+      <div className="mt-4 rounded-[10px] border border-[#1E293B] bg-[#0F1629] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[0.82rem] font-sans border-collapse">
             <thead>
@@ -161,7 +161,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
                 {columns.map(col => (
                   <th
                     key={col}
-                    className="px-2.5 py-2.5 text-left border-b-2 border-[#1E2A3A] text-[#8892A0] font-semibold whitespace-nowrap"
+                    className="px-2.5 py-2.5 text-left border-b-2 border-[#1E293B] text-[#94A3B8] font-semibold whitespace-nowrap"
                   >
                     {col}
                   </th>
@@ -175,12 +175,12 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
                 const corpStyle = corporateColor(row.corporateRaw)
 
                 return (
-                  <tr key={row.zip} className="border-b border-[#1E2A3A] hover:bg-[#1A2332] transition-colors">
-                    <td className="px-2.5 py-1.5 text-[#E8ECF1] whitespace-nowrap">{row.zip}</td>
-                    <td className="px-2.5 py-1.5 text-[#E8ECF1] whitespace-nowrap">{row.town}</td>
-                    <td className="px-2.5 py-1.5 text-[#E8ECF1] whitespace-nowrap">{row.pop}</td>
-                    <td className="px-2.5 py-1.5 text-[#E8ECF1] whitespace-nowrap">{row.mhi}</td>
-                    <td className="px-2.5 py-1.5 text-[#E8ECF1] whitespace-nowrap">{row.gpOffices}</td>
+                  <tr key={row.zip} className="border-b border-[#1E293B] hover:bg-[#1A2035] transition-colors">
+                    <td className="px-2.5 py-1.5 text-[#F8FAFC] whitespace-nowrap">{row.zip}</td>
+                    <td className="px-2.5 py-1.5 text-[#F8FAFC] whitespace-nowrap">{row.town}</td>
+                    <td className="px-2.5 py-1.5 text-[#F8FAFC] whitespace-nowrap">{row.pop}</td>
+                    <td className="px-2.5 py-1.5 text-[#F8FAFC] whitespace-nowrap">{row.mhi}</td>
+                    <td className="px-2.5 py-1.5 text-[#F8FAFC] whitespace-nowrap">{row.gpOffices}</td>
                     <td className="px-2.5 py-1.5 whitespace-nowrap">
                       {dldStyle ? (
                         <span
@@ -190,7 +190,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
                           {row.dld}
                         </span>
                       ) : (
-                        <span className="text-[#E8ECF1]">{row.dld}</span>
+                        <span className="text-[#F8FAFC]">{row.dld}</span>
                       )}
                     </td>
                     <td className="px-2.5 py-1.5 whitespace-nowrap">
@@ -202,7 +202,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
                           {row.buyable}
                         </span>
                       ) : (
-                        <span className="text-[#E8ECF1]">{row.buyable}</span>
+                        <span className="text-[#F8FAFC]">{row.buyable}</span>
                       )}
                     </td>
                     <td className="px-2.5 py-1.5 whitespace-nowrap">
@@ -214,11 +214,11 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
                           {row.corporate}
                         </span>
                       ) : (
-                        <span className="text-[#E8ECF1]">{row.corporate}</span>
+                        <span className="text-[#F8FAFC]">{row.corporate}</span>
                       )}
                     </td>
-                    <td className="px-2.5 py-1.5 text-[#E8ECF1] whitespace-nowrap">{row.type}</td>
-                    <td className="px-2.5 py-1.5 text-[#FFB300] whitespace-nowrap">{row.confidence}</td>
+                    <td className="px-2.5 py-1.5 text-[#F8FAFC] whitespace-nowrap">{row.type}</td>
+                    <td className="px-2.5 py-1.5 text-[#F59E0B] whitespace-nowrap">{row.confidence}</td>
                   </tr>
                 )
               })}
@@ -227,10 +227,10 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
         </div>
 
         {/* Footer with download and info */}
-        <div className="border-t border-[#1E2A3A] px-3 py-2 flex items-center justify-between flex-wrap gap-2">
+        <div className="border-t border-[#1E293B] px-3 py-2 flex items-center justify-between flex-wrap gap-2">
           <button
             onClick={handleDownload}
-            className="text-[0.78rem] text-[#0066FF] hover:text-[#3399FF] transition-colors flex items-center gap-1.5"
+            className="text-[0.78rem] text-[#3B82F6] hover:text-[#60A5FA] transition-colors flex items-center gap-1.5"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -238,7 +238,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
             Download saturation analysis
           </button>
           {demoDate && (
-            <span className="text-[0.72rem] text-[#566070]">
+            <span className="text-[0.72rem] text-[#64748B]">
               Demographics last updated: {demoDate}
             </span>
           )}

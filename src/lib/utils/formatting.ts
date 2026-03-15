@@ -134,6 +134,11 @@ export function formatStatus(status: string | null | undefined): {
   );
 }
 
+/** Get just the human-readable label for an ownership status (for DataTable renders). */
+export function formatStatusLabel(status: string | null | undefined): string {
+  return formatStatus(status).label;
+}
+
 /**
  * Compute consolidation display values using total_practices as denominator.
  * CRITICAL: Uses total practices, never classified_count (per CLAUDE.md rules).

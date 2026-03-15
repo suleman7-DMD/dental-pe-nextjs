@@ -13,7 +13,7 @@ interface ConsolidationMapProps {
 
 /**
  * Interpolate a consolidation percentage (0-30+) into a green-yellow-red color.
- * 0% = green (#4CAF50), 15% = yellow (#FFC107), 30%+ = red (#F44336)
+ * 0% = green (#22C55E), 15% = yellow (#F59E0B), 30%+ = red (#EF4444)
  */
 function consolidationColor(pct: number): string {
   const clamped = Math.min(Math.max(pct, 0), 30)
@@ -280,34 +280,34 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
           {/* Legend */}
           <div className="grid grid-cols-3 gap-4 mt-3">
             <div className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full bg-[#4CAF50]" />
-              <span className="text-[#8892A0]">Mostly Independent</span>
+              <span className="w-3 h-3 rounded-full bg-[#22C55E]" />
+              <span className="text-[#94A3B8]">Mostly Independent</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full bg-[#F44336]" />
-              <span className="text-[#8892A0]">Mostly Known Consolidated (DSO/PE)</span>
+              <span className="w-3 h-3 rounded-full bg-[#EF4444]" />
+              <span className="text-[#94A3B8]">Mostly Known Consolidated (DSO/PE)</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="w-3 h-3 rounded-full bg-[#9E9E9E] opacity-30" />
-              <span className="text-[#8892A0]">Low confidence areas</span>
+              <span className="text-[#94A3B8]">Low confidence areas</span>
             </div>
           </div>
 
           {/* Colorbar legend */}
           <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] text-[#8892A0]">0%</span>
+            <span className="text-[10px] text-[#94A3B8]">0%</span>
             <div
               className="flex-1 h-2.5 rounded-full"
               style={{
-                background: 'linear-gradient(to right, #4CAF50, #FFC107, #F44336)',
+                background: 'linear-gradient(to right, #22C55E, #F59E0B, #EF4444)',
               }}
             />
-            <span className="text-[10px] text-[#8892A0]">30%+</span>
-            <span className="text-[10px] text-[#566070] ml-1">Consolidation % (of total)</span>
+            <span className="text-[10px] text-[#94A3B8]">30%+</span>
+            <span className="text-[10px] text-[#64748B] ml-1">Consolidation % (of total)</span>
           </div>
         </>
       ) : (
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0] text-sm">
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8] text-sm">
           No ZIP coordinates available for map display.
         </div>
       )}

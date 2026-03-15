@@ -2,9 +2,9 @@
 
 import { useMemo } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { StatusBadge } from '@/components/data-display/status-badge'
-import { Badge } from '@/components/ui/badge'
-import { formatStatus } from '@/lib/utils/formatting'
+import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
+import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
+import { ownershipLabel, ownershipColor } from '@/lib/constants/design-tokens'
 
 import type { Practice } from '@/lib/types'
 
@@ -96,15 +96,24 @@ function generateBasicObservations(row: Practice): string[] {
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-function classificationLabel(ec: unknown): string {
-  if (ec == null || typeof ec !== 'string' || !ec) return 'Not classified'
-  return ec.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
-}
-
 function entityTypeLabel(et: string | null | undefined): string {
   if (et === '1') return 'Individual'
   if (et === '2') return 'Organization'
-  return '--'
+  return '\u2014'
+}
+
+function confidenceStarsInline(confidence: number | null | undefined): string {
+  if (confidence == null) return ''
+  const n = Number(confidence)
+  if (n >= 80) return '\u2605\u2605\u2605'
+  if (n >= 50) return '\u2605\u2605'
+  if (n > 0) return '\u2605'
+  return ''
+}
+
+function displayValue(v: string | number | null | undefined): string {
+  if (v == null || v === '') return '\u2014'
+  return String(v)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -171,9 +180,9 @@ export function PracticeDetailDrawer({
     return shared.map(([name, count]) => `${name} (${count}x)`).join(', ')
   }, [p, sameAddress])
 
-  // Multi-ZIP presence
-  const otherZipCount = useMemo(() => {
-    if (!p?.practice_name) return 0
+  // Multi-ZIP presence — returns both count and the list of ZIPs
+  const multiZipData = useMemo(() => {
+    if (!p?.practice_name) return { count: 0, zips: [] as string[] }
     const name = p.practice_name.toUpperCase()
     const myZip = (p.zip ?? '').toString().slice(0, 5)
 
@@ -186,165 +195,246 @@ export function PracticeDetailDrawer({
         otherZips.add((other.zip ?? '').toString().slice(0, 5))
       }
     }
-    return otherZips.size
+    return { count: otherZips.size, zips: Array.from(otherZips).sort() }
   }, [p, allPractices])
 
   if (!p) {
     return (
       <Sheet open={false} onOpenChange={() => onClose()}>
-        <SheetContent className="bg-[#0B1121] border-[#1E2A3A]" />
+        <SheetContent className="bg-[#0F1629] border-[#1E293B]" />
       </Sheet>
     )
   }
 
   const hasDa = p.data_axle_import_date != null && p.data_axle_import_date !== ''
+  const isDaEnriched = hasDa && (p.import_batch_id ?? '').startsWith('DA_')
   const reasoning = p.classification_reasoning
   const observations = !reasoning ? generateBasicObservations(p) : []
+  const ecColor = ENTITY_CLASSIFICATION_COLORS[p.entity_classification ?? 'unknown'] ?? '#475569'
+  const osColor = ownershipColor(p.ownership_status)
+  const totalZips = multiZipData.count + 1 // current ZIP + others
 
   return (
     <Sheet open={isOpen} onOpenChange={() => onClose()}>
       <SheetContent
-        className="bg-[#0B1121] border-[#1E2A3A] w-full sm:max-w-lg overflow-y-auto"
+        className="bg-[#0F1629] border-[#1E293B] w-full sm:max-w-[480px] overflow-y-auto backdrop-blur-sm"
         side="right"
       >
-        <SheetHeader>
-          <SheetTitle className="text-[#E8ECF1] font-['DM_Sans'] font-bold text-lg">
+        {/* ── Header ─────────────────────────────────────────────── */}
+        <SheetHeader className="relative pr-12">
+          <SheetTitle className="text-[#F8FAFC] font-bold text-lg leading-tight">
             {p.practice_name ?? 'Unknown Practice'}
           </SheetTitle>
-        </SheetHeader>
+          <p className="text-[13px] text-[#94A3B8] mt-0.5">
+            {[p.address, p.city, p.state ? `${p.state} ${(p.zip ?? '').toString().slice(0, 5)}` : null]
+              .filter(Boolean)
+              .join(', ') || '\u2014'}
+          </p>
 
-        <div className="mt-4 space-y-5">
-          {/* Enrichment badge */}
-          <div>
-            {hasDa ? (
-              <Badge className="bg-[#4CAF50] text-white text-xs">
-                Fully enriched (Data Axle + NPPES)
-              </Badge>
+          {/* Enrichment badge — top-right */}
+          <div className="absolute top-0 right-0">
+            {isDaEnriched ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(34,197,94,0.15)] text-[#22C55E] border border-[rgba(34,197,94,0.2)]">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
+                Data Axle Enriched
+                {p.classification_confidence != null && (
+                  <span className="ml-0.5 text-[10px]">{confidenceStarsInline(p.classification_confidence)}</span>
+                )}
+              </span>
+            ) : hasDa ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(34,197,94,0.15)] text-[#22C55E] border border-[rgba(34,197,94,0.2)]">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
+                Data Axle Enriched
+              </span>
             ) : (
-              <Badge className="bg-[#FFB300] text-white text-xs">NPPES-only data</Badge>
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(100,116,139,0.15)] text-[#94A3B8] border border-[rgba(100,116,139,0.2)]">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#64748B]" />
+                NPPES Only
+              </span>
             )}
           </div>
+        </SheetHeader>
 
-          {/* Two-column grid */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* Left: Basic Info */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-[#8892A0] uppercase tracking-wider">
-                Basic Information
-              </h4>
-              <InfoRow label="Name" value={p.practice_name} />
-              <InfoRow label="Address" value={p.address} />
-              <InfoRow
-                label="City/ZIP"
-                value={`${p.city ?? '--'}, ${p.state ?? '--'} ${(p.zip ?? '').toString().slice(0, 5)}`}
-              />
-              <InfoRow label="Phone" value={p.phone} />
-              <InfoRow label="Entity Type" value={entityTypeLabel(p.entity_type)} />
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[#8892A0]">Ownership:</span>
-                <StatusBadge status={p.ownership_status ?? 'unknown'} />
-              </div>
-            </div>
+        <div className="mt-5 space-y-0">
+          {/* ── Two-Column Info Grid ─────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 px-4 pb-5">
+            {/* Left column */}
+            <DossierField label="Phone" value={p.phone} />
+            <DossierField
+              label="Ownership Status"
+              value={ownershipLabel(p.ownership_status)}
+              dotColor={osColor}
+            />
 
-            {/* Right: Classification & Scoring */}
-            <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-[#8892A0] uppercase tracking-wider">
-                Classification & Scoring
-              </h4>
-              <InfoRow
-                label="Entity Classification"
-                value={classificationLabel(p.entity_classification)}
-              />
-              <InfoRow
-                label="Buyability Score"
-                value={
-                  p.buyability_score != null
-                    ? Number(p.buyability_score).toFixed(0)
-                    : '--'
-                }
-              />
-              {hasDa && (
-                <>
-                  <InfoRow
-                    label="Year Established"
-                    value={
-                      p.year_established != null
-                        ? Math.floor(Number(p.year_established)).toString()
-                        : '--'
-                    }
-                  />
-                  <InfoRow
-                    label="Employee Count"
-                    value={
-                      p.employee_count != null
-                        ? Math.floor(Number(p.employee_count)).toString()
-                        : '--'
-                    }
-                  />
-                  <InfoRow
-                    label="Est. Revenue"
-                    value={
-                      p.estimated_revenue != null
-                        ? `$${Number(p.estimated_revenue).toLocaleString()}`
-                        : '--'
-                    }
-                  />
-                  <InfoRow label="Parent Company" value={p.parent_company} />
-                </>
-              )}
-            </div>
+            <DossierField label="Entity Type" value={entityTypeLabel(p.entity_type)} />
+            <DossierField
+              label="Entity Classification"
+              value={getEntityClassificationLabel(p.entity_classification ?? null)}
+              dotColor={ecColor}
+            />
+
+            <DossierField
+              label="Year Established"
+              value={
+                p.year_established != null
+                  ? Math.floor(Number(p.year_established)).toString()
+                  : null
+              }
+            />
+            <DossierField label="Affiliated DSO" value={p.affiliated_dso} />
+
+            <DossierField
+              label="Employees"
+              value={
+                p.employee_count != null
+                  ? Math.floor(Number(p.employee_count)).toString()
+                  : null
+              }
+            />
+            <DossierField
+              label="Buyability Score"
+              value={
+                p.buyability_score != null
+                  ? Number(p.buyability_score).toFixed(0)
+                  : null
+              }
+            />
+
+            <DossierField
+              label="Revenue"
+              value={
+                p.estimated_revenue != null
+                  ? `$${Number(p.estimated_revenue).toLocaleString()}`
+                  : null
+              }
+            />
+            <DossierField label="NPI" value={p.npi} />
           </div>
 
-          {/* Classification Reasoning */}
-          <div>
-            <h4 className="text-xs font-semibold text-[#8892A0] uppercase tracking-wider mb-2">
+          {/* ── Divider ──────────────────────────────────────────── */}
+          <div className="border-t border-[#1E293B]" />
+
+          {/* ── Classification Reasoning ─────────────────────────── */}
+          <div className="px-4 py-4">
+            <h4 className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-2">
               Classification Reasoning
             </h4>
             {reasoning ? (
-              <div className="bg-[#141922] border border-[#1E2A3A] rounded-md p-3 text-sm text-[#c8d6e5] leading-relaxed">
+              <div
+                className="bg-[#0A0F1E] rounded-md p-3 font-mono text-xs text-[#F8FAFC] leading-relaxed whitespace-pre-wrap border-l-2"
+                style={{ borderLeftColor: ecColor }}
+              >
                 {reasoning}
               </div>
             ) : observations.length > 0 ? (
-              <div className="bg-[#141922] border border-[#1E2A3A] rounded-md p-3 text-sm text-[#c8d6e5] leading-relaxed">
-                <p className="italic text-[#8892A0] mb-1 text-xs">
+              <div
+                className="bg-[#0A0F1E] rounded-md p-3 font-mono text-xs text-[#F8FAFC] leading-relaxed border-l-2"
+                style={{ borderLeftColor: ecColor }}
+              >
+                <p className="italic text-[#64748B] mb-2 text-[11px] font-sans">
                   Auto-generated observations (no stored reasoning):
                 </p>
                 <ul className="space-y-1">
                   {observations.map((obs, i) => (
-                    <li key={i} className="flex items-start gap-1">
-                      <span className="shrink-0 text-[#8892A0]">&bull;</span>
+                    <li key={i} className="flex items-start gap-1.5">
+                      <span className="shrink-0 text-[#475569] mt-0.5">&bull;</span>
                       <span>{obs}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             ) : (
-              <p className="text-sm text-[#8892A0]">No reasoning available.</p>
+              <div
+                className="bg-[#0A0F1E] rounded-md p-3 font-mono text-xs text-[#475569] leading-relaxed border-l-2 border-l-[#475569]"
+              >
+                No reasoning available.
+              </div>
             )}
           </div>
 
-          {/* Providers at same address */}
+          {/* ── Family Indicators ────────────────────────────────── */}
+          {sharedLastNames && (
+            <>
+              <div className="border-t border-[#1E293B]" />
+              <div className="px-4 py-4">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-2">
+                  Family Indicators
+                </h4>
+                <div className="bg-[#0A0F1E] rounded-md p-3 border-l-2 border-l-[#F59E0B]">
+                  <p className="text-[13px] text-[#F8FAFC]">
+                    Shared last names at address: <span className="font-medium text-[#F59E0B]">{sharedLastNames}</span>
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── Providers at Address ─────────────────────────────── */}
           {sameAddress.length > 0 && (
-            <div>
-              <p className="text-sm text-[#E8ECF1]">
-                <strong>Other providers at this address:</strong> {sameAddress.length}
-              </p>
-
-              {sharedLastNames && (
-                <p className="text-sm text-[#E8ECF1] mt-1">
-                  <strong>Family indicator:</strong> Shared last names: {sharedLastNames}
-                </p>
-              )}
-            </div>
+            <>
+              <div className="border-t border-[#1E293B]" />
+              <div className="px-4 py-4">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-2">
+                  Providers at Address
+                </h4>
+                <div className="bg-[#0A0F1E] rounded-md p-3 border-l-2 border-l-[#3B82F6]">
+                  <p className="text-[13px] text-[#F8FAFC] mb-2">
+                    <span className="font-medium text-[#3B82F6]">{sameAddress.length}</span>{' '}
+                    other provider{sameAddress.length !== 1 ? 's' : ''} at this address
+                  </p>
+                  <ul className="space-y-0.5">
+                    {sameAddress.slice(0, 10).map((pr) => (
+                      <li key={pr.npi} className="text-xs text-[#94A3B8] font-mono truncate">
+                        {displayValue(pr.practice_name)}
+                      </li>
+                    ))}
+                    {sameAddress.length > 10 && (
+                      <li className="text-xs text-[#475569]">
+                        +{sameAddress.length - 10} more
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </>
           )}
 
-          {/* Multi-ZIP presence */}
-          {otherZipCount > 0 && (
-            <p className="text-sm text-[#E8ECF1]">
-              <strong>Multi-location:</strong> This practice name appears in {otherZipCount}{' '}
-              other ZIP(s)
-            </p>
+          {/* ── Multi-ZIP Presence ───────────────────────────────── */}
+          {totalZips >= 3 && multiZipData.count > 0 && (
+            <>
+              <div className="border-t border-[#1E293B]" />
+              <div className="px-4 py-4">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-2">
+                  Multi-ZIP Presence
+                </h4>
+                <div className="bg-[#0A0F1E] rounded-md p-3 border-l-2 border-l-[#EF4444]">
+                  <p className="text-[13px] text-[#F8FAFC] mb-2">
+                    This practice name appears in{' '}
+                    <span className="font-medium text-[#EF4444]">{totalZips}</span>{' '}
+                    ZIPs — likely a chain entity
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {multiZipData.zips.slice(0, 20).map((z) => (
+                      <span
+                        key={z}
+                        className="inline-block rounded bg-[rgba(239,68,68,0.1)] px-2 py-0.5 text-[11px] font-mono text-[#EF4444]"
+                      >
+                        {z}
+                      </span>
+                    ))}
+                    {multiZipData.zips.length > 20 && (
+                      <span className="text-[11px] text-[#475569]">
+                        +{multiZipData.zips.length - 20} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
           )}
+
+          {/* bottom spacing */}
+          <div className="h-4" />
         </div>
       </SheetContent>
     </Sheet>
@@ -355,17 +445,34 @@ export function PracticeDetailDrawer({
 // Sub-components
 // ────────────────────────────────────────────────────────────────────────────
 
-function InfoRow({
+function DossierField({
   label,
   value,
+  dotColor,
 }: {
   label: string
   value: string | number | null | undefined
+  dotColor?: string
 }) {
+  const isEmpty = value == null || value === '' || value === '\u2014'
   return (
-    <div>
-      <span className="text-xs text-[#8892A0]">{label}:</span>{' '}
-      <span className="text-sm text-[#E8ECF1]">{value ?? '--'}</span>
+    <div className="min-w-0">
+      <div className="text-[11px] uppercase tracking-wider text-[#64748B] font-medium mb-0.5">
+        {label}
+      </div>
+      <div className="flex items-center gap-1.5 min-w-0">
+        {dotColor && (
+          <span
+            className="inline-block h-2 w-2 rounded-full shrink-0"
+            style={{ backgroundColor: dotColor }}
+          />
+        )}
+        <span
+          className={`text-[14px] truncate ${isEmpty ? 'text-[#475569]' : 'text-[#F8FAFC]'}`}
+        >
+          {isEmpty ? '\u2014' : String(value)}
+        </span>
+      </div>
     </div>
   )
 }

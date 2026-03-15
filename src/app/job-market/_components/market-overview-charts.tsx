@@ -6,6 +6,9 @@ import { BarChart } from '@/components/charts/bar-chart'
 import { DonutChart } from '@/components/charts/donut-chart'
 import { HistogramChart } from '@/components/charts/histogram-chart'
 
+import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
+import { getEntityClassificationLabel, isCorporateClassification, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
+
 import type { Practice } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
 
@@ -28,19 +31,19 @@ interface MarketOverviewChartsProps {
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-const STATUS_MAP: Record<string, string> = {
-  independent: 'Independent',
-  likely_independent: 'Independent',
-  dso_affiliated: 'DSO-Affiliated',
-  pe_backed: 'PE-Backed',
-  unknown: 'Unknown',
-}
-
-const OWNERSHIP_COLORS: Record<string, string> = {
-  Independent: '#4CAF50',
-  'DSO-Affiliated': '#FFB74D',
-  'PE-Backed': '#F44336',
-  Unknown: '#78909C',
+const EC_HISTOGRAM_COLORS: Record<string, string> = {
+  'Solo Established': '#22C55E',
+  'Solo New': '#81C784',
+  'Solo Inactive': '#9E9E9E',
+  'Solo High Volume': '#2E7D32',
+  'Family Practice': '#FF9800',
+  'Small Group': '#42A5F5',
+  'Large Group': '#1565C0',
+  'DSO Regional': '#FFA726',
+  'DSO National': '#EF4444',
+  'Specialist': '#AB47BC',
+  'Non-Clinical': '#64748B',
+  'Unknown': '#64748B',
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -67,46 +70,50 @@ export function MarketOverviewCharts({
 
   // ── Chart 2: Ownership Donut ──────────────────────────────────────────
   const donutData = useMemo(() => {
-    const grandTotal = kpis.indep_cnt + kpis.dso_cnt + kpis.pe_cnt + kpis.unk_cnt
-    return {
-      segments: [
-        { label: 'Independent', value: kpis.indep_cnt, color: '#4CAF50' },
-        { label: 'DSO-Affiliated', value: kpis.dso_cnt, color: '#FFB74D' },
-        { label: 'PE-Backed', value: kpis.pe_cnt, color: '#F44336' },
-        { label: 'Unknown', value: kpis.unk_cnt, color: '#78909C' },
-      ],
-      centerLabel: grandTotal.toLocaleString(),
+    const counts: Record<string, number> = {}
+    for (const p of practices) {
+      const ec = (p.entity_classification ?? '').trim().toLowerCase() || 'unknown'
+      counts[ec] = (counts[ec] ?? 0) + 1
     }
-  }, [kpis])
+
+    const segments = Object.entries(counts)
+      .map(([key, value]) => ({
+        label: getEntityClassificationLabel(key),
+        value,
+        color: ENTITY_CLASSIFICATION_COLORS[key as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#64748B',
+      }))
+      .filter((s) => s.value > 0)
+      .sort((a, b) => b.value - a.value)
+
+    const grandTotal = segments.reduce((s, seg) => s + seg.value, 0)
+    return { segments, centerLabel: grandTotal.toLocaleString(), grandTotal }
+  }, [practices])
 
   // ── Chart 3: Practice Age Distribution ────────────────────────────────
   const ageHistogramData = useMemo(() => {
     const rows: Array<{ year: number; ownership: string }> = []
-
     for (const p of practices) {
       const yr = p.year_established != null ? Number(p.year_established) : NaN
       if (isNaN(yr) || yr < 1900 || yr > 2030) continue
-
-      const status = (p.ownership_status ?? 'unknown').trim().toLowerCase()
-      const ownership = STATUS_MAP[status] ?? 'Unknown'
+      const ec = (p.entity_classification ?? '').trim().toLowerCase()
+      const ownership = getEntityClassificationLabel(ec || 'unknown')
       rows.push({ year: yr, ownership })
     }
-
     return rows
   }, [practices])
 
   // ── Chart 4: Top DSOs in Zone ─────────────────────────────────────────
   const topDsos = useMemo(() => {
     const counts: Record<string, number> = {}
-
     for (const p of practices) {
       const dso = p.affiliated_dso
       if (!dso || dso.trim() === '') continue
-      // FILTER OUT "General Dentistry" (franchise_name artifact per CLAUDE.md)
-      if (dso.toLowerCase() === 'general dentistry') continue
+      // Filter out taxonomy description artifacts
+      if (DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))) continue
+      // Only count practices classified as corporate
+      if (!isCorporateClassification(p.entity_classification)) continue
       counts[dso] = (counts[dso] ?? 0) + 1
     }
-
     return Object.entries(counts)
       .sort((a, b) => a[1] - b[1])
       .slice(-15)
@@ -124,8 +131,8 @@ export function MarketOverviewCharts({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         {/* 1. Consolidation by ZIP */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-          <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">Consolidation by ZIP</h3>
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">Consolidation by ZIP</h3>
           {consolidationByZip.length > 0 ? (
             <BarChart
               data={consolidationByZip}
@@ -137,42 +144,55 @@ export function MarketOverviewCharts({
                 type: 'gradient',
                 min: 0,
                 max: Math.max(...consolidationByZip.map((d) => d.value), 1),
-                colors: ['#4CAF50', '#FFC107', '#F44336'],
+                colors: ['#22C55E', '#F59E0B', '#EF4444'],
               }}
               tooltipFormat={(d) => `ZIP ${d.label}: ${d.value.toFixed(1)}%`}
             />
           ) : (
-            <p className="text-sm text-[#8892A0] text-center py-8">
+            <p className="text-sm text-[#94A3B8] text-center py-8">
               No ZIP-level consolidation data available.
             </p>
           )}
         </div>
 
         {/* 2. Ownership Breakdown Donut */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-          <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">Ownership Breakdown</h3>
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">Ownership Breakdown</h3>
           <DonutChart
             segments={donutData.segments}
             centerLabel={donutData.centerLabel}
             height={420}
             tooltipFormat={(d) =>
               `${d.label}: ${d.value.toLocaleString()} practices (${
-                (d.value / Math.max(kpis.indep_cnt + kpis.dso_cnt + kpis.pe_cnt + kpis.unk_cnt, 1) * 100).toFixed(1)
+                ((d.value / Math.max(donutData.grandTotal, 1)) * 100).toFixed(1)
               }%)`
             }
           />
         </div>
 
         {/* 3. Practice Age Distribution */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-          <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">Practice Age Distribution</h3>
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">Practice Age Distribution</h3>
           {ageHistogramData.length > 0 ? (
             <HistogramChart
               data={ageHistogramData}
               xField="year"
               colorField="ownership"
-              colorMap={OWNERSHIP_COLORS}
-              categoryOrder={['Independent', 'DSO-Affiliated', 'PE-Backed', 'Unknown']}
+              colorMap={EC_HISTOGRAM_COLORS}
+              categoryOrder={[
+                'Solo Established',
+                'Solo New',
+                'Solo Inactive',
+                'Solo High Volume',
+                'Family Practice',
+                'Small Group',
+                'Large Group',
+                'DSO Regional',
+                'DSO National',
+                'Specialist',
+                'Non-Clinical',
+                'Unknown',
+              ]}
               xAxisLabel="Year Established"
               yAxisLabel="Practices"
               height={420}
@@ -180,22 +200,22 @@ export function MarketOverviewCharts({
               verticalLines={[
                 {
                   x: 1995,
-                  color: '#FF3D00',
+                  color: '#EF4444',
                   dash: true,
                   label: 'Retirement Risk Zone',
                 },
               ]}
             />
           ) : (
-            <p className="text-sm text-[#8892A0] text-center py-8">
+            <p className="text-sm text-[#94A3B8] text-center py-8">
               No year-established data available for practice age chart.
             </p>
           )}
         </div>
 
         {/* 4. Top DSOs in Zone */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-          <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">Top DSOs in Zone</h3>
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">Top DSOs in Zone</h3>
           {topDsos.length > 0 ? (
             <BarChart
               data={topDsos}
@@ -206,7 +226,7 @@ export function MarketOverviewCharts({
               tooltipFormat={(d) => `${d.label}: ${d.value} practices`}
             />
           ) : (
-            <p className="text-sm text-[#8892A0] text-center py-8">
+            <p className="text-sm text-[#94A3B8] text-center py-8">
               No DSO-affiliated practices found in this zone.
             </p>
           )}

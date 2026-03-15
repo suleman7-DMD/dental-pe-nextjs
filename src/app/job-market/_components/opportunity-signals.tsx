@@ -6,7 +6,10 @@ import { KpiCard } from '@/components/data-display/kpi-card'
 import { DataTable } from '@/components/data-display/data-table'
 import { ScatterChart } from '@/components/charts/scatter-chart'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatStatus } from '@/lib/utils/formatting'
+import { isIndependentClassification, isCorporateClassification } from '@/lib/constants/entity-classifications'
+import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
+import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
+import { formatStatusLabel } from '@/lib/utils/formatting'
 import { createBrowserClient } from '@/lib/supabase/client'
 
 import type { Practice } from '@/lib/types'
@@ -32,26 +35,6 @@ interface PracticeChange {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Status colors for scatter
-// ────────────────────────────────────────────────────────────────────────────
-
-const SCATTER_COLORS: Record<string, string> = {
-  independent: '#4CAF50',
-  likely_independent: '#4CAF50',
-  dso_affiliated: '#FFB74D',
-  pe_backed: '#F44336',
-  unknown: '#78909C',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  independent: 'Independent',
-  likely_independent: 'Likely Independent',
-  dso_affiliated: 'DSO Affiliated',
-  pe_backed: 'PE-Backed',
-  unknown: 'Unknown',
-}
-
-// ────────────────────────────────────────────────────────────────────────────
 // Component
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -65,13 +48,11 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
   const retirementData = useMemo(() => {
     return practices.filter((p) => {
       const yr = p.year_established != null ? Number(p.year_established) : NaN
-      const status = (p.ownership_status ?? 'unknown').trim().toLowerCase()
-      return (
-        !isNaN(yr) &&
-        yr > 0 &&
-        yr <= currentYear - 30 &&
-        (status === 'independent' || status === 'likely_independent')
-      )
+      const isIndep = isIndependentClassification(p.entity_classification) ||
+        (!p.entity_classification && ['independent', 'likely_independent'].includes(
+          (p.ownership_status ?? 'unknown').trim().toLowerCase()
+        ))
+      return !isNaN(yr) && yr > 0 && yr <= currentYear - 30 && isIndep
     }).map((p) => ({
       ...p,
       practice_age: currentYear - Number(p.year_established),
@@ -126,13 +107,13 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
           Number(p.employee_count) > 0
       )
       .map((p) => {
-        const status = (p.ownership_status ?? 'unknown').trim().toLowerCase()
+        const ec = (p.entity_classification ?? '').trim().toLowerCase() || 'unknown'
         return {
           x: Number(p.buyability_score),
           y: Number(p.employee_count),
           label: p.practice_name ?? 'Unknown',
-          group: STATUS_LABELS[status] ?? 'Unknown',
-          color: SCATTER_COLORS[status] ?? SCATTER_COLORS.unknown,
+          group: getEntityClassificationLabel(ec),
+          color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#64748B',
           tooltip: `${p.practice_name ?? 'Unknown'}\n${p.city ?? ''}\nBuyability: ${Number(p.buyability_score).toFixed(0)}`,
         }
       })
@@ -227,7 +208,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
       />
 
       <Tabs defaultValue="retirement" className="mt-4">
-        <TabsList className="bg-[#141922] border border-[#1E2A3A]">
+        <TabsList className="bg-[#0F1629] border border-[#1E293B]">
           <TabsTrigger value="retirement">Retirement Risk</TabsTrigger>
           <TabsTrigger value="buyability">High Buyability</TabsTrigger>
           <TabsTrigger value="changes">Recent Changes</TabsTrigger>
@@ -254,7 +235,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
           </div>
 
           {retirementData.length === 0 ? (
-            <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
               No independent practices with 30+ years of operation found in these ZIPs.
             </div>
           ) : (
@@ -299,7 +280,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         {/* ── High Buyability ──────────────────────────────────────────── */}
         <TabsContent value="buyability">
           {highBuyData.length === 0 ? (
-            <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
               No practices with buyability score &gt;= 60 found in these ZIPs.
             </div>
           ) : (
@@ -312,11 +293,13 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                     yAxisLabel="Employee Count"
                     height={420}
                     groups={[
-                      { label: 'Independent', color: '#4CAF50' },
-                      { label: 'Likely Independent', color: '#4CAF50' },
-                      { label: 'DSO Affiliated', color: '#FFB74D' },
-                      { label: 'PE-Backed', color: '#F44336' },
-                      { label: 'Unknown', color: '#78909C' },
+                      { label: 'Solo Established', color: '#22C55E' },
+                      { label: 'Solo High Volume', color: '#2E7D32' },
+                      { label: 'Family Practice', color: '#FF9800' },
+                      { label: 'Small Group', color: '#42A5F5' },
+                      { label: 'DSO Regional', color: '#FFA726' },
+                      { label: 'DSO National', color: '#EF4444' },
+                      { label: 'Unknown', color: '#64748B' },
                     ]}
                   />
                 </div>
@@ -335,7 +318,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                   {
                     key: 'ownership_status',
                     header: 'Status',
-                    render: (v: string) => formatStatus(v),
+                    render: (v: string) => formatStatusLabel(v),
                   },
                   {
                     key: 'buyability_score',
@@ -388,17 +371,17 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
               icon="alert-circle"
               label="Ownership Changes"
               value={changeKpis.ownChg.toLocaleString()}
-              accentColor="#F44336"
+              accentColor="#EF4444"
             />
           </div>
 
           {changesLoading ? (
-            <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
               <div className="inline-block h-4 w-4 border-2 border-[#7eb8e0] border-t-transparent rounded-full animate-spin mr-2" />
               Loading recent changes...
             </div>
           ) : changes.length === 0 ? (
-            <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
               No practice changes detected in the last 180 days for these ZIPs.
             </div>
           ) : (

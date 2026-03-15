@@ -31,9 +31,17 @@ export default async function MarketIntelPage() {
     .select('npi', { count: 'exact', head: true })
     .not('data_axle_import_date', 'is', null)
 
+  const { data: latestUpdate } = await supabase
+    .from('practices')
+    .select('updated_at')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single()
+
   const freshness = {
     totalPractices: totalPractices ?? 0,
     daEnriched: daEnriched ?? 0,
+    lastUpdated: latestUpdate?.updated_at ?? null,
   }
 
   return (

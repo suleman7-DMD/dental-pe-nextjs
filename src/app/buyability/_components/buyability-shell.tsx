@@ -5,6 +5,7 @@ import { Download, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { StatusBadge } from '@/components/data-display/status-badge'
+import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -193,22 +194,22 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
   }, [filtered])
 
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-[#4A5568]" />
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-[#475569]" />
     return sortAsc ? (
-      <ChevronUp className="h-3 w-3 text-[#0066FF]" />
+      <ChevronUp className="h-3 w-3 text-[#3B82F6]" />
     ) : (
-      <ChevronDown className="h-3 w-3 text-[#0066FF]" />
+      <ChevronDown className="h-3 w-3 text-[#3B82F6]" />
     )
   }
 
   if (analyzed.length === 0) {
     return (
-      <div className="min-h-screen bg-[#0B1121] p-6">
-        <h1 className="font-['DM_Sans'] font-bold text-2xl text-[#E8ECF1] mb-2">
+      <div className="min-h-screen bg-[#0A0F1E] p-6">
+        <h1 className="font-sans font-bold text-2xl text-[#F8FAFC] mb-2">
           Buyability Scanner
         </h1>
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-8 text-center text-[#8892A0] mt-6">
-          <p className="font-medium text-[#E8ECF1] mb-2">No analyzed practices yet.</p>
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-8 text-center text-[#94A3B8] mt-6">
+          <p className="font-medium text-[#F8FAFC] mb-2">No analyzed practices yet.</p>
           <p className="text-sm">
             Run the directory importer to load practice analysis data, or import Data Axle
             records for automated scoring.
@@ -219,14 +220,14 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1121]">
+    <div className="min-h-screen bg-[#0A0F1E]">
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="font-['DM_Sans'] font-bold text-2xl text-[#E8ECF1]">
+          <h1 className="font-sans font-bold text-2xl text-[#F8FAFC]">
             Buyability Scanner
           </h1>
-          <p className="text-[#8892A0] text-sm mt-1 max-w-3xl">
+          <p className="text-[#94A3B8] text-sm mt-1 max-w-3xl">
             Practices scored by acquisition likelihood based on hand research and directory
             analysis. Acquisition Targets are practices likely buyable. Dead Ends are locked
             (dynasty, corporate, ghost). Job Targets are places to work, not buy.
@@ -239,19 +240,19 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
             icon="target"
             label="Acquisition Targets"
             value={kpis.acq.toLocaleString()}
-            accentColor="#00C853"
+            accentColor="#22C55E"
           />
           <KpiCard
             icon="shield"
             label="Dead Ends"
             value={kpis.dead.toLocaleString()}
-            accentColor="#F44336"
+            accentColor="#EF4444"
           />
           <KpiCard
             icon="briefcase"
             label="Job Targets"
             value={kpis.job.toLocaleString()}
-            accentColor="#0066FF"
+            accentColor="#3B82F6"
           />
           <KpiCard
             icon="microscope"
@@ -271,7 +272,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="rounded-md border border-[#1E2A3A] bg-[#141922] text-[#E8ECF1] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066FF] min-w-[200px]"
+            className="rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6] min-w-[200px]"
           >
             <option value="All">All Categories</option>
             <option value="Acquisition Targets">Acquisition Targets</option>
@@ -283,7 +284,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
           <select
             value={zipFilter}
             onChange={(e) => setZipFilter(e.target.value)}
-            className="rounded-md border border-[#1E2A3A] bg-[#141922] text-[#E8ECF1] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066FF] min-w-[160px]"
+            className="rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6] min-w-[160px]"
           >
             {zipOptions.map((z) => (
               <option key={z} value={z}>
@@ -294,7 +295,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
 
           <button
             onClick={handleDownload}
-            className="ml-auto flex items-center gap-1.5 rounded-md border border-[#1E2A3A] bg-[#141922] px-3 py-2 text-sm text-[#8892A0] hover:text-[#E8ECF1] hover:border-[#2A3A4A] transition-colors"
+            className="ml-auto flex items-center gap-1.5 rounded-md border border-[#1E293B] bg-[#0F1629] px-3 py-2 text-sm text-[#94A3B8] hover:text-[#F8FAFC] hover:border-[#334155] transition-colors"
           >
             <Download className="h-4 w-4" />
             CSV
@@ -302,13 +303,13 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
         </div>
 
         {/* Data Table */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] overflow-hidden">
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#1E2A3A] text-[#8892A0]">
+                <tr className="border-b border-[#1E293B] text-[#94A3B8]">
                   <th
-                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#E8ECF1]"
+                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#F8FAFC]"
                     onClick={() => handleSort('practice_name')}
                   >
                     <span className="flex items-center gap-1">
@@ -317,7 +318,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                   </th>
                   <th className="text-left px-4 py-2.5 font-medium text-xs">Address</th>
                   <th
-                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#E8ECF1]"
+                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#F8FAFC]"
                     onClick={() => handleSort('city')}
                   >
                     <span className="flex items-center gap-1">
@@ -325,7 +326,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     </span>
                   </th>
                   <th
-                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#E8ECF1]"
+                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#F8FAFC]"
                     onClick={() => handleSort('zip')}
                   >
                     <span className="flex items-center gap-1">
@@ -333,8 +334,9 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     </span>
                   </th>
                   <th className="text-left px-4 py-2.5 font-medium text-xs">Status</th>
+                  <th className="text-left px-4 py-2.5 font-medium text-xs">Classification</th>
                   <th
-                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#E8ECF1]"
+                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#F8FAFC]"
                     onClick={() => handleSort('buyability_score')}
                   >
                     <span className="flex items-center gap-1">
@@ -343,7 +345,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                   </th>
                   <th className="text-left px-4 py-2.5 font-medium text-xs">Confidence</th>
                   <th
-                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#E8ECF1]"
+                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#F8FAFC]"
                     onClick={() => handleSort('year_established')}
                   >
                     <span className="flex items-center gap-1">
@@ -351,7 +353,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     </span>
                   </th>
                   <th
-                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#E8ECF1]"
+                    className="text-left px-4 py-2.5 font-medium text-xs cursor-pointer hover:text-[#F8FAFC]"
                     onClick={() => handleSort('employee_count')}
                   >
                     <span className="flex items-center gap-1">
@@ -364,7 +366,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
               <tbody>
                 {filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-8 text-center text-[#8892A0]">
+                    <td colSpan={11} className="px-4 py-8 text-center text-[#94A3B8]">
                       No practices match the selected filters.
                     </td>
                   </tr>
@@ -372,34 +374,37 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                   filtered.map((p, idx) => (
                     <tr
                       key={p.npi ?? idx}
-                      className="border-b border-[#1E2A3A]/50 hover:bg-[#1E2A3A]/20 transition-colors"
+                      className="border-b border-[#1E293B]/50 hover:bg-[#1E293B]/20 transition-colors"
                     >
-                      <td className="px-4 py-2.5 text-[#E8ECF1] max-w-[200px] truncate">
+                      <td className="px-4 py-2.5 text-[#F8FAFC] max-w-[200px] truncate">
                         {p.practice_name ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#8892A0] max-w-[180px] truncate text-xs">
+                      <td className="px-4 py-2.5 text-[#94A3B8] max-w-[180px] truncate text-xs">
                         {p.address ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#8892A0]">{p.city ?? '--'}</td>
-                      <td className="px-4 py-2.5 text-[#8892A0] font-mono text-xs">
+                      <td className="px-4 py-2.5 text-[#94A3B8]">{p.city ?? '--'}</td>
+                      <td className="px-4 py-2.5 text-[#94A3B8] font-mono text-xs">
                         {p.zip ?? '--'}
                       </td>
                       <td className="px-4 py-2.5">
                         <StatusBadge status={p.ownership_status} />
                       </td>
-                      <td className="px-4 py-2.5 text-[#E8ECF1] font-mono font-bold tabular-nums">
+                      <td className="px-4 py-2.5 text-xs text-[#94A3B8]">
+                          {getEntityClassificationLabel(p.entity_classification)}
+                        </td>
+                      <td className="px-4 py-2.5 text-[#F8FAFC] font-mono font-bold tabular-nums">
                         {p.buyability_score ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#FFB300] text-xs">
+                      <td className="px-4 py-2.5 text-[#F59E0B] text-xs">
                         {p.confidenceStars}
                       </td>
-                      <td className="px-4 py-2.5 text-[#8892A0] font-mono text-xs">
+                      <td className="px-4 py-2.5 text-[#94A3B8] font-mono text-xs">
                         {p.year_established ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#8892A0] font-mono text-xs">
+                      <td className="px-4 py-2.5 text-[#94A3B8] font-mono text-xs">
                         {p.employee_count ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#8892A0] max-w-[200px] truncate text-xs">
+                      <td className="px-4 py-2.5 text-[#94A3B8] max-w-[200px] truncate text-xs">
                         {p.verdict}
                       </td>
                     </tr>
@@ -408,7 +413,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
               </tbody>
             </table>
           </div>
-          <div className="px-4 py-2 border-t border-[#1E2A3A] text-xs text-[#8892A0]">
+          <div className="px-4 py-2 border-t border-[#1E293B] text-xs text-[#94A3B8]">
             Showing {filtered.length.toLocaleString()} of {analyzed.length.toLocaleString()} practices
           </div>
         </div>

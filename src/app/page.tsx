@@ -59,7 +59,7 @@ export default async function HomePage() {
   } catch (error) {
     console.error('HomePage error:', error)
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0B1121] text-white">
+      <div className="flex items-center justify-center min-h-screen bg-[#0A0F1E] text-white">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Loading...</h1>
           <p className="text-gray-400">Data is being fetched. Please refresh in a moment.</p>

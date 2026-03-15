@@ -202,14 +202,14 @@ export function HistogramChart({
             <ReferenceLine
               key={`vl-${i}`}
               x={vl.x}
-              stroke={vl.color ?? "#FF3D00"}
+              stroke={vl.color ?? "#EF4444"}
               strokeDasharray={vl.dash ? "6 3" : undefined}
               label={
                 vl.label
                   ? {
                       value: vl.label,
                       position: "top",
-                      fill: vl.color ?? "#FF3D00",
+                      fill: vl.color ?? "#EF4444",
                       fontSize: 10,
                     }
                   : undefined

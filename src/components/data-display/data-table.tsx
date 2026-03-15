@@ -59,22 +59,38 @@ function toColumnDefs<T extends Record<string, any>>(
     cell: col.render
       ? ({ row, getValue }) => {
           const val = getValue();
-          const rowResult = col.render!(row.original);
-          // If render was expecting a primitive (e.g., number) and got an object,
-          // try passing the cell value instead.
-          if (rowResult === "[object Object]" || rowResult === "NaN") {
-            return col.render!(val);
+          // Try with cell value first (what render functions expect)
+          try {
+            const cellResult = col.render!(val);
+            // If result is a plain object (not React element), extract .label or stringify
+            if (
+              cellResult !== null &&
+              cellResult !== undefined &&
+              typeof cellResult === "object" &&
+              !React.isValidElement(cellResult)
+            ) {
+              if ("label" in cellResult) return String(cellResult.label);
+              return JSON.stringify(cellResult);
+            }
+            return cellResult ?? (val == null ? "\u2014" : String(val));
+          } catch {
+            // Fallback: try with full row (some render functions may expect it)
+            try {
+              const rowResult = col.render!(row.original);
+              if (
+                rowResult !== null &&
+                rowResult !== undefined &&
+                typeof rowResult === "object" &&
+                !React.isValidElement(rowResult)
+              ) {
+                if ("label" in rowResult) return String(rowResult.label);
+                return JSON.stringify(rowResult);
+              }
+              return rowResult ?? (val == null ? "\u2014" : String(val));
+            } catch {
+              return val == null ? "\u2014" : String(val);
+            }
           }
-          // If result is a plain object (not React element), extract .label or stringify
-          if (
-            rowResult !== null &&
-            typeof rowResult === "object" &&
-            !React.isValidElement(rowResult)
-          ) {
-            if ("label" in rowResult) return String(rowResult.label);
-            return JSON.stringify(rowResult);
-          }
-          return rowResult;
         }
       : ({ getValue }) => {
           const v = getValue();
@@ -185,7 +201,7 @@ export function DataTable<T extends Record<string, any>>({
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="pl-9 bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                className="pl-9 bg-[#0D1220] border-[#1E293B] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#3B82F6] focus:ring-0"
               />
             </div>
           )}
@@ -209,18 +225,18 @@ export function DataTable<T extends Record<string, any>>({
       )}
 
       {/* Table */}
-      <div className="rounded-lg border border-[var(--border)] overflow-hidden">
+      <div className="rounded-lg border border-[#1E293B] overflow-hidden">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className="border-[var(--border)] bg-[var(--bg-surface)] hover:bg-[var(--bg-surface)]"
+                className="border-[var(--border)] bg-[#0F1629] hover:bg-[#0F1629]"
               >
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="text-[var(--text-secondary)] text-xs font-semibold uppercase tracking-wider"
+                    className="sticky top-0 z-10 bg-[#0F1629] text-[11px] font-medium uppercase tracking-wider text-[#64748B]"
                   >
                     {header.isPlaceholder ? null : (
                       <div
@@ -255,7 +271,7 @@ export function DataTable<T extends Record<string, any>>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center text-sm text-[var(--text-muted)]"
+                  className="h-24 text-center text-[13px] text-[#475569]"
                 >
                   {emptyMessage}
                 </TableCell>
@@ -272,14 +288,15 @@ export function DataTable<T extends Record<string, any>>({
                   }
                   onClick={() => onRowClick?.(row.original)}
                   className={cn(
-                    "border-[var(--border)] hover:bg-[var(--bg-card-hover)] transition-colors",
+                    "border-[var(--border)] hover:bg-[#1A2035] transition-colors",
+                    idx % 2 === 0 ? "bg-[#0A0F1E]" : "bg-[#0D1220]",
                     onRowClick && "cursor-pointer"
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="text-sm text-[var(--text-primary)]"
+                      className="text-[13px] text-[#CBD5E1]"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
@@ -297,7 +314,7 @@ export function DataTable<T extends Record<string, any>>({
       {/* Pagination */}
       {pagination && pageCount > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[var(--text-muted)]">
+          <span className="text-[11px] text-[#64748B]">
             Page {currentPage} of {pageCount}
           </span>
           <div className="flex items-center gap-1">
@@ -306,7 +323,7 @@ export function DataTable<T extends Record<string, any>>({
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="h-8 w-8 p-0 bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-secondary)]"
+              className="h-8 w-8 p-0 bg-[#0D1220] border-[#1E293B] text-[#64748B] hover:bg-[#1A2035] hover:text-[#CBD5E1] disabled:opacity-30"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -315,7 +332,7 @@ export function DataTable<T extends Record<string, any>>({
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="h-8 w-8 p-0 bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-secondary)]"
+              className="h-8 w-8 p-0 bg-[#0D1220] border-[#1E293B] text-[#64748B] hover:bg-[#1A2035] hover:text-[#CBD5E1] disabled:opacity-30"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

@@ -121,15 +121,15 @@ export function DealFlowShell({
   const hasFilters = startDate || endDate || selectedTypes.length > 0 || selectedSponsors.length > 0 || selectedPlatforms.length > 0 || selectedStates.length > 0 || selectedSpecialties.length > 0 || selectedSources.length > 0
 
   return (
-    <div className="min-h-screen bg-[#0B0E11] text-[#E8ECF1] font-sans">
+    <div className="min-h-screen bg-[#0A0F1E] text-[#F8FAFC] font-sans">
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dental PE Consolidation Intelligence</h1>
-          <p className="text-[#8892A0] mt-1 text-sm">
+          <p className="text-[#94A3B8] mt-1 text-sm">
             Real-time tracking of private equity activity in U.S. dentistry
           </p>
-          <p className="text-[#566070] text-xs mt-0.5">
+          <p className="text-[#64748B] text-xs mt-0.5">
             {totalCount.toLocaleString()} deals | {sourceCount} sources | Filtered view
           </p>
         </div>
@@ -195,7 +195,7 @@ export function DealFlowShell({
           {hasFilters && (
             <button
               onClick={handleReset}
-              className="self-end px-3 py-1.5 rounded-md text-[0.78rem] text-[#FF3D00] hover:bg-[#FF3D00]/10 transition-colors"
+              className="self-end px-3 py-1.5 rounded-md text-[0.78rem] text-[#EF4444] hover:bg-[#EF4444]/10 transition-colors"
             >
               Reset
             </button>
@@ -203,7 +203,7 @@ export function DealFlowShell({
         </FilterBar>
 
         {filteredDeals.length === 0 ? (
-          <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-8 text-center text-[#8892A0] text-sm">
+          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-8 text-center text-[#94A3B8] text-sm">
             No deals match current filters. Adjust the filters above or run the scrapers to ingest new data.
           </div>
         ) : (

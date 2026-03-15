@@ -40,19 +40,19 @@ export function GroupedBarChart({
 }: GroupedBarChartProps) {
   if (data.length === 0) {
     return (
-      <div className={`flex items-center justify-center text-[#8892A0] text-sm ${className ?? ''}`} style={{ height }}>
+      <div className={`flex items-center justify-center text-[#94A3B8] text-sm ${className ?? ''}`} style={{ height }}>
         No data available
       </div>
     )
   }
 
-  const axisStyle = { fontSize: 11, fill: '#8892A0' }
-  const gridColor = '#1E2A3A'
+  const axisStyle = { fontSize: 11, fill: '#94A3B8' }
+  const gridColor = '#1E293B'
 
   return (
     <div className={className}>
       {title && (
-        <h3 className="text-sm font-semibold text-[#E8ECF1] mb-2">{title}</h3>
+        <h3 className="text-sm font-semibold text-[#F8FAFC] mb-2">{title}</h3>
       )}
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -62,18 +62,18 @@ export function GroupedBarChart({
               dataKey={xKey}
               tick={axisStyle}
               axisLine={{ stroke: gridColor }}
-              label={xLabel ? { value: xLabel, position: 'insideBottom', offset: -2, fill: '#8892A0', fontSize: 11 } : undefined}
+              label={xLabel ? { value: xLabel, position: 'insideBottom', offset: -2, fill: '#94A3B8', fontSize: 11 } : undefined}
             />
             <YAxis
               tick={axisStyle}
               axisLine={{ stroke: gridColor }}
-              label={yLabel ? { value: yLabel, angle: -90, position: 'insideLeft', fill: '#8892A0', fontSize: 11 } : undefined}
+              label={yLabel ? { value: yLabel, angle: -90, position: 'insideLeft', fill: '#94A3B8', fontSize: 11 } : undefined}
             />
             <Tooltip
-              contentStyle={{ backgroundColor: '#1A2332', border: '1px solid #2A3A4A', borderRadius: 8, fontSize: 12, color: '#E8ECF1' }}
+              contentStyle={{ backgroundColor: '#0F1629', border: '1px solid #1E293B', borderRadius: 8, fontSize: 12, color: '#F8FAFC' }}
               cursor={{ fill: 'rgba(255,255,255,0.03)' }}
             />
-            <Legend wrapperStyle={{ color: '#8892A0', fontSize: 11 }} iconType="rect" />
+            <Legend wrapperStyle={{ color: '#94A3B8', fontSize: 11 }} iconType="rect" />
             {series.map((s, i) => (
               <Bar
                 key={s.key}

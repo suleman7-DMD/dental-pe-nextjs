@@ -106,33 +106,48 @@ export async function getPracticeStats(
   consolidatedPct: string;
   independentPct: string;
 }> {
+  // Total practices
   const { count: total } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true });
 
-  const { count: independent } = await supabase
+  // Corporate by entity_classification (primary)
+  const { count: corporateByEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .in("ownership_status", ["independent", "likely_independent"]);
+    .in("entity_classification", ["dso_regional", "dso_national"]);
 
-  const { count: dso } = await supabase
+  // Corporate by ownership_status where entity_classification is missing (fallback)
+  const { count: dsoByStatus } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .eq("ownership_status", "dso_affiliated");
+    .in("ownership_status", ["dso_affiliated", "pe_backed"])
+    .is("entity_classification", null);
 
-  const { count: pe } = await supabase
+  // Independent by entity_classification (primary)
+  const { count: independentByEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .eq("ownership_status", "pe_backed");
+    .in("entity_classification", [
+      "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
+      "family_practice", "small_group", "large_group", "specialist", "non_clinical"
+    ]);
+
+  // Independent by ownership_status where entity_classification is missing (fallback)
+  const { count: independentByStatus } = await supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .in("ownership_status", ["independent", "likely_independent"])
+    .is("entity_classification", null);
 
   const t = total ?? 0;
-  const consolidated = (dso ?? 0) + (pe ?? 0);
-  const ind = independent ?? 0;
+  const consolidated = (corporateByEC ?? 0) + (dsoByStatus ?? 0);
+  const independent = (independentByEC ?? 0) + (independentByStatus ?? 0);
 
   return {
     totalPractices: t,
     consolidatedPct: t > 0 ? ((consolidated / t) * 100).toFixed(1) : "0.0",
-    independentPct: t > 0 ? ((ind / t) * 100).toFixed(1) : "0.0",
+    independentPct: t > 0 ? ((independent / t) * 100).toFixed(1) : "0.0",
   };
 }
 

@@ -5,7 +5,9 @@ import { SectionHeader } from '@/components/data-display/section-header'
 import { BarChart } from '@/components/charts/bar-chart'
 import { DataTable } from '@/components/data-display/data-table'
 
-import type { Practice } from '@/lib/types'
+import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
+import { getEntityClassificationLabel, isCorporateClassification, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
+import type { Practice, ZipScore } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -15,47 +17,30 @@ import type { ZipStats } from './job-market-shell'
 interface OwnershipLandscapeProps {
   practices: Practice[]
   zipStats: ZipStats[]
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Status labels and colors
-// ────────────────────────────────────────────────────────────────────────────
-
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  independent: { label: 'Independent', color: '#66BB6A' },
-  likely_independent: { label: 'Likely Independent', color: '#81C784' },
-  dso_affiliated: { label: 'DSO Affiliated', color: '#FFB74D' },
-  pe_backed: { label: 'PE-Backed', color: '#EF5350' },
-  unknown: { label: 'Unknown', color: '#78909C' },
+  zipScores: ZipScore[]
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Component
 // ────────────────────────────────────────────────────────────────────────────
 
-export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapeProps) {
+export function OwnershipLandscape({ practices, zipStats, zipScores }: OwnershipLandscapeProps) {
   if (practices.length === 0) return null
 
   // ── Ownership Status Bar Chart ────────────────────────────────────────
   const ownershipData = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const p of practices) {
-      const status = (p.ownership_status ?? 'unknown').trim().toLowerCase()
-      counts[status] = (counts[status] ?? 0) + 1
+      const ec = (p.entity_classification ?? '').trim().toLowerCase() || 'unknown'
+      counts[ec] = (counts[ec] ?? 0) + 1
     }
 
     return Object.entries(counts)
-      .map(([status, count]) => {
-        const cfg = STATUS_CONFIG[status] ?? {
-          label: status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-          color: '#78909C',
-        }
-        return {
-          label: cfg.label,
-          value: count,
-          color: cfg.color,
-        }
-      })
+      .map(([ec, count]) => ({
+        label: getEntityClassificationLabel(ec),
+        value: count,
+        color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#64748B',
+      }))
       .sort((a, b) => b.value - a.value)
   }, [practices])
 
@@ -85,8 +70,8 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
     for (const p of practices) {
       const dso = p.affiliated_dso
       if (!dso || dso.trim() === '') continue
-      // Filter out "General Dentistry" artifact
-      if (dso.toLowerCase() === 'general dentistry') continue
+      if (DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))) continue
+      if (!isCorporateClassification(p.entity_classification)) continue
       counts[dso] = (counts[dso] ?? 0) + 1
     }
 
@@ -98,18 +83,17 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
 
   // ── DSO Penetration by ZIP ────────────────────────────────────────────
   const dsoPenetration = useMemo(() => {
-    if (zipStats.length === 0) return []
-
-    return [...zipStats]
-      .filter((zs) => zs.consolidation_pct_of_total != null)
-      .sort((a, b) => a.consolidation_pct_of_total - b.consolidation_pct_of_total)
+    if (!zipScores || zipScores.length === 0) return []
+    return [...zipScores]
+      .filter((zs) => zs.corporate_share_pct != null)
+      .sort((a, b) => (a.corporate_share_pct ?? 0) - (b.corporate_share_pct ?? 0))
       .map((zs) => ({
         zip: zs.zip_code,
-        city: zs.city || '--',
-        practices: zs.total_practices,
-        consolidation_pct: zs.consolidation_pct_of_total,
+        city: '--',
+        practices: zs.total_gp_locations ?? 0,
+        corporate_share_pct: (zs.corporate_share_pct ?? 0) * 100,
       }))
-  }, [zipStats])
+  }, [zipScores])
 
   return (
     <div>
@@ -120,7 +104,7 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
 
       <div className="mt-4 space-y-6">
         {/* Ownership Status Bar */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
           <BarChart
             data={ownershipData}
             orientation="horizontal"
@@ -132,8 +116,8 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
 
         {/* Practice Size Distribution */}
         {sizeData && (
-          <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-            <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">
+          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+            <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
               Practice Size Distribution
             </h3>
             <BarChart
@@ -149,8 +133,8 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
 
         {/* Top DSOs Table */}
         {topDsos.length > 0 && (
-          <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-            <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">
+          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+            <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
               Top DSOs in Zone
             </h3>
             <DataTable
@@ -170,8 +154,8 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
 
         {/* DSO Penetration by ZIP */}
         {dsoPenetration.length > 0 && (
-          <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-            <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">
+          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+            <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
               DSO Penetration by ZIP
             </h3>
             <DataTable
@@ -185,8 +169,8 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
                   render: (v: number | null) => v != null ? v.toLocaleString() : '--',
                 },
                 {
-                  key: 'consolidation_pct',
-                  header: 'Known Consolidation %',
+                  key: 'corporate_share_pct',
+                  header: 'Corporate Share %',
                   render: (v: number | null) => v != null ? `${Number(v).toFixed(1)}%` : '--',
                 },
               ]}

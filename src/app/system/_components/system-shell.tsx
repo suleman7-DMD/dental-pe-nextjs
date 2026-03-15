@@ -23,14 +23,14 @@ interface SystemShellProps {
 
 export function SystemShell({ initialSources, initialCompleteness }: SystemShellProps) {
   return (
-    <div className="min-h-screen bg-[#0B1121]">
+    <div className="min-h-screen bg-[#0A0F1E]">
       <div className="px-6 py-6 space-y-8">
         {/* Header */}
         <div>
-          <h1 className="font-['DM_Sans'] font-bold text-2xl text-[#E8ECF1]">
+          <h1 className="font-sans font-bold text-2xl text-[#F8FAFC]">
             System Health
           </h1>
-          <p className="text-[#8892A0] text-sm mt-1 max-w-3xl">
+          <p className="text-[#94A3B8] text-sm mt-1 max-w-3xl">
             Monitor data freshness, run diagnostics, and manually add data. Green = data is fresh
             (updated within 7 days). Yellow = stale (7-30 days). Red = outdated (30+ days).
           </p>

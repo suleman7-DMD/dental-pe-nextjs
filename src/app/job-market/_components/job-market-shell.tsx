@@ -13,6 +13,7 @@ import { OpportunitySignals } from './opportunity-signals'
 import { OwnershipLandscape } from './ownership-landscape'
 import { MarketAnalytics } from './market-analytics'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
+import { isIndependentClassification, isCorporateClassification, classifyPractice } from '@/lib/constants/entity-classifications'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
 import { Hospital, CircleCheck, BarChart3, Target, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
@@ -30,6 +31,7 @@ interface JobMarketShellProps {
   freshness: {
     totalPractices: number
     daEnriched: number
+    lastUpdated: string | null
   }
 }
 
@@ -86,18 +88,11 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
 
     for (const p of pList) {
       if (!city && p.city) city = p.city
-      // Use entity_classification for corporate detection
-      const ec = ((p as unknown as Record<string, unknown>).entity_classification as string ?? '').trim().toLowerCase()
-      const isCorporateByEC = ec === 'dso_regional' || ec === 'dso_national'
-      const s = cleanStatus(p.ownership_status)
-      if (isCorporateByEC) {
+      const category = classifyPractice(p.entity_classification, p.ownership_status)
+      if (category === 'corporate') {
         dso_affiliated_count++
-      } else if (s === 'independent' || s === 'likely_independent') {
+      } else if (category === 'independent' || category === 'specialist' || category === 'non_clinical') {
         independent_count++
-      } else if (s === 'dso_affiliated') {
-        dso_affiliated_count++
-      } else if (s === 'pe_backed') {
-        pe_backed_count++
       } else {
         unknown_count++
       }
@@ -219,40 +214,21 @@ export function JobMarketShell({
       loc.commutable_zips.includes(zs.zip_code)
     )
 
-    let total_p: number
-    let indep_cnt: number
-    let pe_cnt: number
-    let dso_cnt: number
-    let unk_cnt: number
+    // Always compute ownership counts from practices using entity_classification
+    const total_p = practices.length
+    let indep_cnt = 0
+    let pe_cnt = 0
+    let dso_cnt = 0
+    let unk_cnt = 0
 
-    if (filteredZs.length > 0 && filteredZs[0]?.total_practices != null) {
-      total_p = filteredZs.reduce((s, z) => s + (z.total_practices ?? 0), 0)
-      indep_cnt = filteredZs.reduce((s, z) => s + (z.independent_count ?? 0), 0)
-      pe_cnt = filteredZs.reduce((s, z) => s + (z.pe_backed_count ?? 0), 0)
-      dso_cnt = filteredZs.reduce((s, z) => s + (z.dso_affiliated_count ?? 0), 0)
-      unk_cnt = filteredZs.reduce((s, z) => s + (z.unknown_count ?? 0), 0)
-    } else {
-      total_p = practices.length
-      indep_cnt = 0
-      pe_cnt = 0
-      dso_cnt = 0
-      unk_cnt = 0
-      for (const p of practices) {
-        // Use entity_classification to detect corporate (more accurate than ownership_status)
-        const ec = ((p as unknown as Record<string, unknown>).entity_classification as string ?? '').trim().toLowerCase()
-        const isCorporateByEC = ec === 'dso_regional' || ec === 'dso_national'
-        const s = cleanStatus(p.ownership_status)
-        if (isCorporateByEC) {
-          dso_cnt++
-        } else if (s === 'independent' || s === 'likely_independent') {
-          indep_cnt++
-        } else if (s === 'pe_backed') {
-          pe_cnt++
-        } else if (s === 'dso_affiliated') {
-          dso_cnt++
-        } else {
-          unk_cnt++
-        }
+    for (const p of practices) {
+      const category = classifyPractice(p.entity_classification, p.ownership_status)
+      if (category === 'corporate') {
+        dso_cnt++
+      } else if (category === 'independent' || category === 'specialist' || category === 'non_clinical') {
+        indep_cnt++
+      } else {
+        unk_cnt++
       }
     }
 
@@ -278,12 +254,9 @@ export function JobMarketShell({
     const currentYear = new Date().getFullYear()
     const retirement_risk = practices.filter((p) => {
       const yr = p.year_established != null ? Number(p.year_established) : NaN
-      const s = cleanStatus(p.ownership_status)
-      return (
-        !isNaN(yr) &&
-        yr <= currentYear - 30 &&
-        (s === 'independent' || s === 'likely_independent')
-      )
+      const isIndep = isIndependentClassification(p.entity_classification) ||
+        (!p.entity_classification && ['independent', 'likely_independent'].includes(cleanStatus(p.ownership_status)))
+      return !isNaN(yr) && yr <= currentYear - 30 && isIndep
     }).length
 
     // Density
@@ -342,16 +315,16 @@ export function JobMarketShell({
   // ── Render ────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#0B1121]">
+    <div className="min-h-screen bg-[#0A0F1E]">
       <StickySectionNav sections={SECTIONS} />
 
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="font-['DM_Sans'] font-bold text-2xl text-[#E8ECF1]">
+          <h1 className="font-sans font-bold text-2xl text-[#F8FAFC]">
             Job Market Intelligence
           </h1>
-          <p className="text-[#8892A0] text-sm mt-1 max-w-3xl">
+          <p className="text-[#94A3B8] text-sm mt-1 max-w-3xl">
             Evaluate dental practice landscapes near your planned living locations --
             where are independent practices, and where is consolidation squeezing out opportunity?
           </p>
@@ -361,6 +334,7 @@ export function JobMarketShell({
         <DataFreshnessBar
           totalPractices={freshness.totalPractices}
           daEnriched={freshness.daEnriched}
+          lastUpdated={freshness.lastUpdated}
         />
 
         {/* Living Location Selector */}
@@ -377,7 +351,7 @@ export function JobMarketShell({
         )}
 
         {practices.length === 0 && !loading ? (
-          <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+          <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
             No practices found for this zone.
           </div>
         ) : (
@@ -395,13 +369,13 @@ export function JobMarketShell({
                   icon={<CircleCheck className="h-5 w-5" />}
                   label="Independent %"
                   value={kpis.indep_pct}
-                  accentColor="#4CAF50"
+                  accentColor="#22C55E"
                 />
                 <KpiCard
                   icon={<BarChart3 className="h-5 w-5" />}
                   label="Known Consolidated %"
                   value={kpis.consol_pct}
-                  accentColor="#F44336"
+                  accentColor="#EF4444"
                 />
                 <KpiCard
                   icon={<Target className="h-5 w-5" />}
@@ -417,7 +391,7 @@ export function JobMarketShell({
                   icon={<Clock className="h-5 w-5" />}
                   label="Retirement Risk"
                   value={kpis.retirement_risk.toLocaleString()}
-                  accentColor="#FF3D00"
+                  accentColor="#EF4444"
                 />
               </div>
 
@@ -429,7 +403,7 @@ export function JobMarketShell({
                     label="Avg Dental Density"
                     value={kpis.avgDldVal ? `${kpis.avgDldVal}/10k` : '--'}
                   />
-                  <p className="text-xs text-[#8892A0] mt-1 px-1">
+                  <p className="text-xs text-[#94A3B8] mt-1 px-1">
                     GP offices per 10k residents. National avg ~6.1. Lower = less competition.
                   </p>
                 </div>
@@ -450,7 +424,7 @@ export function JobMarketShell({
                         : undefined
                     }
                   />
-                  <p className="text-xs text-[#8892A0] mt-1 px-1">
+                  <p className="text-xs text-[#94A3B8] mt-1 px-1">
                     % of GP offices that are independently owned solos -- potential acquisition targets.
                   </p>
                 </div>
@@ -460,7 +434,7 @@ export function JobMarketShell({
                     label="High-Volume Solos"
                     value={kpis.highVolCount.toLocaleString()}
                   />
-                  <p className="text-xs text-[#8892A0] mt-1 px-1">
+                  <p className="text-xs text-[#94A3B8] mt-1 px-1">
                     Solo practices with 5+ employees or $800k+ revenue. Likely need associate help.
                   </p>
                 </div>
@@ -468,7 +442,7 @@ export function JobMarketShell({
 
               {/* Unknown ownership warning */}
               {kpis.unk_pct > 30 && (
-                <p className="text-xs text-[#FFB300] mt-3 flex items-start gap-1">
+                <p className="text-xs text-[#F59E0B] mt-3 flex items-start gap-1">
                   <span className="shrink-0">Warning:</span>
                   <span>
                     {kpis.unk_pct.toFixed(0)}% of practices have unknown ownership (
@@ -524,6 +498,7 @@ export function JobMarketShell({
               <OwnershipLandscape
                 practices={practices}
                 zipStats={zipStats}
+                zipScores={zipScores}
               />
             </section>
 

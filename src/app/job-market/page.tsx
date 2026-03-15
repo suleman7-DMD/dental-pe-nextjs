@@ -30,9 +30,17 @@ export default async function JobMarketPage() {
     .select('*', { count: 'exact', head: true })
     .like('import_batch_id', 'DA_%')
 
+  const { data: latestUpdate } = await supabase
+    .from('practices')
+    .select('updated_at')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .single()
+
   const freshness = {
     totalPractices: totalCount ?? 0,
     daEnriched: daCount ?? 0,
+    lastUpdated: latestUpdate?.updated_at ?? null,
   }
 
   // Get the default location's ZIP list for initial data load

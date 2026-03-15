@@ -64,7 +64,7 @@ export function DealVolumeTimeline({ deals }: DealVolumeTimelineProps) {
     const seriesConfig = sortedTypes.map(t => ({
       key: t,
       label: formatDealType(t),
-      color: DEAL_TYPE_COLORS[t] ?? '#566070',
+      color: DEAL_TYPE_COLORS[t] ?? '#64748B',
     }))
 
     return { chartData: raw, series: seriesConfig }
@@ -76,7 +76,7 @@ export function DealVolumeTimeline({ deals }: DealVolumeTimelineProps) {
         title="Deal Volume Over Time"
         helpText="Monthly count of dental PE deals, stacked by type. Buyout = full acquisition. Add-on = bolt-on to existing platform. The white dashed line shows the 6-month rolling average trend. A rising trend means PE firms are accelerating acquisitions."
       />
-      <div className="mt-4 rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
+      <div className="mt-4 rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
         <StackedBarChart
           data={chartData}
           xKey="month"

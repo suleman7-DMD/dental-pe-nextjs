@@ -6,6 +6,7 @@ import { SectionHeader } from '@/components/data-display/section-header'
 import { StickySectionNav } from '@/components/layout/sticky-section-nav'
 import { createBrowserClient } from '@/lib/supabase/client'
 import { formatPct, formatNumber } from '@/lib/utils'
+import { formatRelativeTime } from '@/lib/utils/formatting'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 import type { ADABenchmark } from '@/lib/supabase/queries/ada-benchmarks'
@@ -24,6 +25,7 @@ interface MarketIntelShellProps {
   freshness: {
     totalPractices: number
     daEnriched: number
+    lastUpdated: string | null
   }
 }
 
@@ -87,14 +89,14 @@ export function MarketIntelShell({
   }, [zipScores])
 
   return (
-    <div className="min-h-screen bg-[#0B0E11] text-[#E8ECF1] font-sans">
+    <div className="min-h-screen bg-[#0A0F1E] text-[#F8FAFC] font-sans">
       <StickySectionNav sections={NAV_ITEMS} />
 
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page header */}
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Market Intelligence</h1>
-          <p className="text-[#8892A0] mt-1 text-sm">
+          <p className="text-[#94A3B8] mt-1 text-sm">
             Drill into your watched neighborhoods to see who owns what, which practices are
             independent, and where consolidation is happening.
           </p>
@@ -103,22 +105,28 @@ export function MarketIntelShell({
         {/* Data freshness bar */}
         <div className="rounded-lg border border-[#1a3a5c] bg-gradient-to-r from-[#0a1628] to-[#0d2137] px-5 py-3 flex items-center justify-between flex-wrap gap-2">
           <span className="text-[#7eb8e0] text-[0.82rem] font-medium">
-            <strong className="text-[#e8ecf1]">{freshness.totalPractices.toLocaleString()}</strong>{' '}
+            <strong className="text-[#F8FAFC]">{freshness.totalPractices.toLocaleString()}</strong>{' '}
             practices tracked &nbsp;&middot;&nbsp;{' '}
-            <strong className="text-[#e8ecf1]">{freshness.daEnriched.toLocaleString()}</strong>{' '}
+            <strong className="text-[#F8FAFC]">{freshness.daEnriched.toLocaleString()}</strong>{' '}
             Data Axle enriched
+            {freshness.lastUpdated && (
+              <>
+                {' '}&nbsp;&middot;&nbsp;{' '}
+                Updated {formatRelativeTime(freshness.lastUpdated)}
+              </>
+            )}
           </span>
         </div>
 
         {/* Metro area selector */}
         <div className="flex items-center gap-3">
-          <label className="text-[0.78rem] text-[#8892A0] uppercase tracking-wider font-medium">
+          <label className="text-[0.78rem] text-[#94A3B8] uppercase tracking-wider font-medium">
             Metro Area
           </label>
           <select
             value={selectedMetro}
             onChange={e => setSelectedMetro(e.target.value)}
-            className="px-3 py-2 rounded-md border border-[#1E2A3A] bg-[#141922] text-[0.82rem] text-[#E8ECF1] focus:outline-none focus:border-[#0066FF] transition-colors"
+            className="px-3 py-2 rounded-md border border-[#1E293B] bg-[#0F1629] text-[0.82rem] text-[#F8FAFC] focus:outline-none focus:border-[#3B82F6] transition-colors"
           >
             {allMetros.map(m => (
               <option key={m} value={m}>
@@ -144,7 +152,7 @@ export function MarketIntelShell({
                 />
                 <KpiCard label="Unclassified" value={formatPct(kpis.unkPct)} />
               </div>
-              <p className="text-[#566070] text-xs mt-2">
+              <p className="text-[#64748B] text-xs mt-2">
                 Ownership breakdown of {kpis.totalP.toLocaleString()} practices:{' '}
                 Known Consolidated {kpis.consolPct.toFixed(1)}% (DSO: {kpis.dsoCount.toLocaleString()} + PE:{' '}
                 {kpis.peCount.toLocaleString()}) | Independent {kpis.indepPct.toFixed(1)}% (
@@ -154,7 +162,7 @@ export function MarketIntelShell({
               </p>
             </>
           ) : (
-            <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0] text-sm">
+            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8] text-sm">
               No consolidation scores calculated yet. Run the merge_and_score pipeline to generate
               ZIP-level scores.
             </div>

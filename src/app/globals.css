@@ -49,56 +49,56 @@
 }
 
 :root {
-  /* Dark-first design system */
-  --bg-primary: #0B1121;
-  --bg-card: #141922;
-  --bg-card-hover: #1A2332;
-  --bg-surface: #0D1B2A;
-  --border: #1E2A3A;
-  --border-hover: #2A3A4A;
-  --accent-blue: #0066FF;
-  --accent-green: #00C853;
-  --accent-red: #FF3D00;
-  --accent-amber: #FFB300;
-  --accent-purple: #9C27B0;
-  --accent-cyan: #00BCD4;
-  --text-primary: #E8ECF1;
-  --text-secondary: #8892A0;
-  --text-muted: #566070;
+  /* Vercel Dashboard x Bloomberg Terminal — dark-first design system */
+  --bg-surface: #0A0F1E;
+  --bg-card: #0F1629;
+  --bg-card-hover: #1A2035;
+  --bg-primary: #0A0F1E;
+  --border: #1E293B;
+  --border-hover: #334155;
+  --accent-blue: #3B82F6;
+  --accent-green: #22C55E;
+  --accent-red: #EF4444;
+  --accent-amber: #F59E0B;
+  --accent-purple: #A855F7;
+  --accent-cyan: #06B6D4;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
 
   /* shadcn overrides for dark theme */
-  --background: #0B1121;
-  --foreground: #E8ECF1;
-  --card: #141922;
-  --card-foreground: #E8ECF1;
-  --popover: #1A2332;
-  --popover-foreground: #E8ECF1;
-  --primary: #0066FF;
+  --background: #0A0F1E;
+  --foreground: #F8FAFC;
+  --card: #0F1629;
+  --card-foreground: #F8FAFC;
+  --popover: #1A2035;
+  --popover-foreground: #F8FAFC;
+  --primary: #3B82F6;
   --primary-foreground: #FFFFFF;
-  --secondary: #1A2332;
-  --secondary-foreground: #E8ECF1;
-  --muted: #1E2A3A;
-  --muted-foreground: #8892A0;
-  --accent: #1A2332;
-  --accent-foreground: #E8ECF1;
-  --destructive: #FF3D00;
-  --border: #1E2A3A;
-  --input: #1E2A3A;
-  --ring: #0066FF;
-  --chart-1: #0066FF;
-  --chart-2: #00C853;
-  --chart-3: #FFB300;
-  --chart-4: #9C27B0;
-  --chart-5: #00BCD4;
+  --secondary: #1A2035;
+  --secondary-foreground: #F8FAFC;
+  --muted: #1E293B;
+  --muted-foreground: #94A3B8;
+  --accent: #1A2035;
+  --accent-foreground: #F8FAFC;
+  --destructive: #EF4444;
+  --border: #1E293B;
+  --input: #1E293B;
+  --ring: #3B82F6;
+  --chart-1: #3B82F6;
+  --chart-2: #22C55E;
+  --chart-3: #F59E0B;
+  --chart-4: #A855F7;
+  --chart-5: #06B6D4;
   --radius: 0.625rem;
-  --sidebar: #0D1117;
-  --sidebar-foreground: #E8ECF1;
-  --sidebar-primary: #0066FF;
+  --sidebar: #060B18;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #3B82F6;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #141922;
-  --sidebar-accent-foreground: #E8ECF1;
-  --sidebar-border: #1E2A3A;
-  --sidebar-ring: #0066FF;
+  --sidebar-accent: #0F1629;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #1E293B;
+  --sidebar-ring: #3B82F6;
 }
 
 @layer base {
@@ -121,20 +121,20 @@
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: #1E2A3A #0B1121;
+    scrollbar-color: #1E293B #0A0F1E;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   .scrollbar-thin::-webkit-scrollbar-track {
-    background: #0B1121;
+    background: #0A0F1E;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #1E2A3A;
+    background: #1E293B;
     border-radius: 3px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #2A3A4A;
+    background: #334155;
   }
 }

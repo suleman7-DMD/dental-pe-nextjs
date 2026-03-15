@@ -55,8 +55,8 @@ export function PlatformProfile({ platforms }: PlatformProfileProps) {
   // Generate a color for each state
   const STATE_COLORS = useMemo(() => {
     const palette = [
-      '#0066FF', '#00C853', '#AA00FF', '#FF6D00', '#00BCD4',
-      '#F44336', '#FFB300', '#78909C', '#7C4DFF', '#E91E63',
+      '#3B82F6', '#22C55E', '#A855F7', '#F59E0B', '#06B6D4',
+      '#EF4444', '#F59E0B', '#64748B', '#7C4DFF', '#E91E63',
       '#009688', '#FF5722', '#3F51B5', '#8BC34A', '#795548',
     ]
     const map: Record<string, string> = {}
@@ -68,7 +68,7 @@ export function PlatformProfile({ platforms }: PlatformProfileProps) {
 
   if (platforms.length === 0) {
     return (
-      <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+      <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
         No platform data available.
       </div>
     )
@@ -80,7 +80,7 @@ export function PlatformProfile({ platforms }: PlatformProfileProps) {
       <select
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
-        className="rounded-md border border-[#1E2A3A] bg-[#141922] text-[#E8ECF1] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066FF] min-w-[300px]"
+        className="rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6] min-w-[300px]"
       >
         {platforms.map((p) => (
           <option key={p} value={p}>
@@ -106,13 +106,13 @@ export function PlatformProfile({ platforms }: PlatformProfileProps) {
 
           {/* Timeline scatter by state */}
           {timelineData.length > 0 && (
-            <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-              <h3 className="text-sm font-medium text-[#E8ECF1] mb-3">Deal Timeline by State</h3>
+            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+              <h3 className="text-sm font-medium text-[#F8FAFC] mb-3">Deal Timeline by State</h3>
 
               {/* Legend */}
               <div className="flex flex-wrap gap-3 mb-4">
                 {uniqueStates.map((s) => (
-                  <span key={s} className="flex items-center gap-1.5 text-xs text-[#8892A0]">
+                  <span key={s} className="flex items-center gap-1.5 text-xs text-[#94A3B8]">
                     <span
                       className="inline-block h-2.5 w-2.5 rounded-full"
                       style={{ backgroundColor: STATE_COLORS[s] }}
@@ -123,7 +123,7 @@ export function PlatformProfile({ platforms }: PlatformProfileProps) {
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[600px] h-[300px] relative border border-[#1E2A3A] rounded">
+                <div className="min-w-[600px] h-[300px] relative border border-[#1E293B] rounded">
                   {(() => {
                     const dates = timelineData.map((d) => new Date(d.date).getTime())
                     const minDate = Math.min(...dates)
@@ -158,14 +158,14 @@ export function PlatformProfile({ platforms }: PlatformProfileProps) {
 
           {/* All deals table */}
           {deals.length > 0 && (
-            <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] overflow-hidden">
-              <div className="px-4 py-3 border-b border-[#1E2A3A]">
-                <h3 className="text-sm font-medium text-[#E8ECF1]">All Deals</h3>
+            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#1E293B]">
+                <h3 className="text-sm font-medium text-[#F8FAFC]">All Deals</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-[#1E2A3A] text-[#8892A0]">
+                    <tr className="border-b border-[#1E293B] text-[#94A3B8]">
                       <th className="text-left px-4 py-2 font-medium text-xs">Date</th>
                       <th className="text-left px-4 py-2 font-medium text-xs">Target</th>
                       <th className="text-left px-4 py-2 font-medium text-xs">State</th>
@@ -177,17 +177,17 @@ export function PlatformProfile({ platforms }: PlatformProfileProps) {
                     {deals.map((d, idx) => (
                       <tr
                         key={d.id ?? idx}
-                        className="border-b border-[#1E2A3A]/50 hover:bg-[#1E2A3A]/20"
+                        className="border-b border-[#1E293B]/50 hover:bg-[#1E293B]/20"
                       >
-                        <td className="px-4 py-2 text-[#8892A0] font-mono text-xs">
+                        <td className="px-4 py-2 text-[#94A3B8] font-mono text-xs">
                           {d.deal_date ?? '--'}
                         </td>
-                        <td className="px-4 py-2 text-[#E8ECF1]">{d.target_name ?? '--'}</td>
-                        <td className="px-4 py-2 text-[#8892A0] font-mono">
+                        <td className="px-4 py-2 text-[#F8FAFC]">{d.target_name ?? '--'}</td>
+                        <td className="px-4 py-2 text-[#94A3B8] font-mono">
                           {d.target_state ?? '--'}
                         </td>
-                        <td className="px-4 py-2 text-[#8892A0]">{d.deal_type ?? '--'}</td>
-                        <td className="px-4 py-2 text-[#8892A0]">{d.specialty ?? '--'}</td>
+                        <td className="px-4 py-2 text-[#94A3B8]">{d.deal_type ?? '--'}</td>
+                        <td className="px-4 py-2 text-[#94A3B8]">{d.specialty ?? '--'}</td>
                       </tr>
                     ))}
                   </tbody>

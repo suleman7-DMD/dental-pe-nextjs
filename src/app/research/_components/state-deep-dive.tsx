@@ -70,7 +70,7 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
 
   if (states.length === 0) {
     return (
-      <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+      <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
         No state data available.
       </div>
     )
@@ -82,7 +82,7 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
       <select
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
-        className="rounded-md border border-[#1E2A3A] bg-[#141922] text-[#E8ECF1] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066FF] min-w-[200px]"
+        className="rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6] min-w-[200px]"
       >
         {states.map((s) => (
           <option key={s} value={s}>
@@ -108,21 +108,21 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
 
           {/* Deals by quarter - bar chart */}
           {quarterData.length > 0 && (
-            <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-              <h3 className="text-sm font-medium text-[#E8ECF1] mb-4">Deals by Quarter</h3>
+            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+              <h3 className="text-sm font-medium text-[#F8FAFC] mb-4">Deals by Quarter</h3>
               <div className="space-y-2">
                 {quarterData.map((q) => (
                   <div key={q.quarter} className="flex items-center gap-3">
-                    <span className="text-xs text-[#8892A0] w-20 font-mono shrink-0">
+                    <span className="text-xs text-[#94A3B8] w-20 font-mono shrink-0">
                       {q.quarter}
                     </span>
-                    <div className="flex-1 h-6 bg-[#1E2A3A]/50 rounded overflow-hidden">
+                    <div className="flex-1 h-6 bg-[#1E293B]/50 rounded overflow-hidden">
                       <div
-                        className="h-full bg-[#0066FF] rounded transition-all"
+                        className="h-full bg-[#3B82F6] rounded transition-all"
                         style={{ width: `${(q.count / maxQuarterCount) * 100}%` }}
                       />
                     </div>
-                    <span className="text-xs text-[#E8ECF1] font-mono w-8 text-right">
+                    <span className="text-xs text-[#F8FAFC] font-mono w-8 text-right">
                       {q.count}
                     </span>
                   </div>
@@ -133,23 +133,23 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
 
           {/* Top 10 platforms - horizontal bar chart */}
           {topPlatforms.length > 0 && (
-            <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-              <h3 className="text-sm font-medium text-[#E8ECF1] mb-4">
+            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+              <h3 className="text-sm font-medium text-[#F8FAFC] mb-4">
                 Top 10 Platforms in {selected}
               </h3>
               <div className="space-y-2">
                 {topPlatforms.map((p) => (
                   <div key={p.platform} className="flex items-center gap-3">
-                    <span className="text-xs text-[#8892A0] w-40 truncate shrink-0" title={p.platform}>
+                    <span className="text-xs text-[#94A3B8] w-40 truncate shrink-0" title={p.platform}>
                       {p.platform}
                     </span>
-                    <div className="flex-1 h-6 bg-[#1E2A3A]/50 rounded overflow-hidden">
+                    <div className="flex-1 h-6 bg-[#1E293B]/50 rounded overflow-hidden">
                       <div
-                        className="h-full bg-[#00C853] rounded transition-all"
+                        className="h-full bg-[#22C55E] rounded transition-all"
                         style={{ width: `${(p.count / maxPlatformCount) * 100}%` }}
                       />
                     </div>
-                    <span className="text-xs text-[#E8ECF1] font-mono w-8 text-right">
+                    <span className="text-xs text-[#F8FAFC] font-mono w-8 text-right">
                       {p.count}
                     </span>
                   </div>

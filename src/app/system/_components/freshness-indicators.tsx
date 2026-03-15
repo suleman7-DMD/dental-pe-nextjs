@@ -17,23 +17,23 @@ export function FreshnessIndicators({ sources }: FreshnessIndicatorsProps) {
     nppes?.daysSinceUpdate != null && nppes.daysSinceUpdate > 365
 
   return (
-    <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4 space-y-3">
+    <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4 space-y-3">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <span className="text-xs text-[#8892A0] uppercase tracking-wide">Demographics (NPPES)</span>
-          <p className="text-sm text-[#E8ECF1] mt-1 font-mono">
+          <span className="text-xs text-[#94A3B8] uppercase tracking-wide">Demographics (NPPES)</span>
+          <p className="text-sm text-[#F8FAFC] mt-1 font-mono">
             {nppes?.lastUpdated ?? '--'}
           </p>
         </div>
         <div>
-          <span className="text-xs text-[#8892A0] uppercase tracking-wide">DSO Locations (ADSO)</span>
-          <p className="text-sm text-[#E8ECF1] mt-1 font-mono">
+          <span className="text-xs text-[#94A3B8] uppercase tracking-wide">DSO Locations (ADSO)</span>
+          <p className="text-sm text-[#F8FAFC] mt-1 font-mono">
             {adso?.lastUpdated ?? '--'}
           </p>
         </div>
         <div>
-          <span className="text-xs text-[#8892A0] uppercase tracking-wide">ADA Benchmarks</span>
-          <p className="text-sm text-[#E8ECF1] mt-1 font-mono">
+          <span className="text-xs text-[#94A3B8] uppercase tracking-wide">ADA Benchmarks</span>
+          <p className="text-sm text-[#F8FAFC] mt-1 font-mono">
             {ada?.lastUpdated ?? '--'}
           </p>
         </div>

@@ -108,7 +108,7 @@ export function RecentChanges({ zipList }: RecentChangesProps) {
       render: (row: Record<string, unknown>) => {
         const v = row.old_value as string | null
         return v ? (
-          <span className="text-[#FF3D00]">{v}</span>
+          <span className="text-[#EF4444]">{v}</span>
         ) : '\u2014'
       },
     },
@@ -118,7 +118,7 @@ export function RecentChanges({ zipList }: RecentChangesProps) {
       render: (row: Record<string, unknown>) => {
         const v = row.new_value as string | null
         return v ? (
-          <span className="text-[#00C853]">{v}</span>
+          <span className="text-[#22C55E]">{v}</span>
         ) : '\u2014'
       },
     },
@@ -133,7 +133,7 @@ export function RecentChanges({ zipList }: RecentChangesProps) {
       />
       <div className="mt-4">
         {loading ? (
-          <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0] text-sm animate-pulse">
+          <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8] text-sm animate-pulse">
             Loading practice changes...
           </div>
         ) : (

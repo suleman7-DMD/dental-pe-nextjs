@@ -39,11 +39,11 @@ interface MapPractice {
 // ────────────────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, [number, number, number, number]> = {
-  independent: [76, 175, 80, 220],
-  likely_independent: [76, 175, 80, 220],
-  dso_affiliated: [255, 183, 77, 220],
-  pe_backed: [244, 67, 54, 220],
-  unknown: [120, 144, 156, 100],
+  independent: [34, 197, 94, 180],
+  likely_independent: [34, 197, 94, 180],
+  dso_affiliated: [239, 68, 68, 200],
+  pe_backed: [239, 68, 68, 200],
+  unknown: [100, 116, 139, 80],
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -55,21 +55,19 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const INDEPENDENT_COLOR_RANGE = [
-  [200, 230, 201],
-  [165, 214, 167],
-  [102, 187, 106],
-  [76, 175, 80],
-  [56, 142, 60],
-  [27, 94, 32],
+  [187, 247, 208],
+  [74, 222, 128],
+  [34, 197, 94],
+  [22, 163, 74],
+  [21, 128, 61],
 ]
 
 const CONSOLIDATED_COLOR_RANGE = [
-  [255, 224, 178],
-  [255, 183, 77],
-  [255, 152, 0],
-  [244, 67, 54],
-  [211, 47, 47],
-  [183, 28, 28],
+  [254, 202, 202],
+  [252, 165, 165],
+  [248, 113, 113],
+  [239, 68, 68],
+  [220, 38, 38],
 ]
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -82,6 +80,14 @@ function hashNpi(npi: string): number {
     h = ((h << 5) - h + npi.charCodeAt(i)) | 0
   }
   return Math.abs(h) % 4294967296 // 2^32
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Helpers — compute approximate alpha (halved) for dot colors
+// ────────────────────────────────────────────────────────────────────────────
+
+function getApproxColor(color: [number, number, number, number]): [number, number, number, number] {
+  return [color[0], color[1], color[2], Math.round(color[3] * 0.5)]
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -143,6 +149,7 @@ function PracticeMapInner({
               r: d.color[0],
               g: d.color[1],
               b: d.color[2],
+              a: d.color[3],
               approx: d.is_approximate ? 1 : 0,
             },
           })),
@@ -173,15 +180,15 @@ function PracticeMapInner({
             'circle-opacity': [
               'case',
               ['==', ['get', 'approx'], 1],
-              showIndividual ? 0.55 : 0.4,    // Approximate (ZIP centroid) — slightly transparent
-              showIndividual ? 0.9 : 0.7,     // Precise (Data Axle coords) — full opacity
+              showIndividual ? 0.45 : 0.35,    // Approximate — 50% opacity reduction
+              showIndividual ? 0.9 : 0.7,       // Precise (Data Axle coords)
             ],
             'circle-stroke-width': showIndividual ? 0.5 : 0,
             'circle-stroke-color': 'rgba(255,255,255,0.3)',
           },
         })
 
-        // Popup on hover
+        // Popup on hover — dark panel styling
         const popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: false,
@@ -197,13 +204,13 @@ function PracticeMapInner({
           popup
             .setLngLat(coords)
             .setHTML(
-              `<div style="font-family:system-ui;font-size:12px;line-height:1.5">
-                <strong>${props.name}</strong><br/>
-                <span style="color:#666">${props.address}</span><br/>
-                <span style="color:#666">${props.city_zip}</span><br/>
-                Status: <strong>${props.status_label}</strong><br/>
-                DSO: ${props.dso}<br/>
-                Employees: ${props.employees} | Est: ${props.year}
+              `<div style="font-family:system-ui;font-size:12px;line-height:1.5;background:#0F1629;color:#F8FAFC;border:1px solid #1E293B;border-radius:8px;padding:10px 14px;margin:-10px -14px">
+                <strong style="color:#F8FAFC">${props.name}</strong><br/>
+                <span style="color:#94A3B8">${props.address}</span><br/>
+                <span style="color:#94A3B8">${props.city_zip}</span><br/>
+                <span style="color:#94A3B8">Status:</span> <strong style="color:#F8FAFC">${props.status_label}</strong><br/>
+                <span style="color:#94A3B8">DSO:</span> <span style="color:#F8FAFC">${props.dso}</span><br/>
+                <span style="color:#94A3B8">Employees:</span> <span style="color:#F8FAFC">${props.employees}</span> <span style="color:#94A3B8">| Est:</span> <span style="color:#F8FAFC">${props.year}</span>
               </div>`
             )
             .addTo(map)
@@ -227,7 +234,7 @@ function PracticeMapInner({
   return (
     <div
       ref={mapRef}
-      className="w-full rounded-xl border border-[var(--border)] overflow-hidden"
+      className="w-full rounded-lg border border-[#1E293B] overflow-hidden"
       style={{ height: 620 }}
     />
   )
@@ -287,6 +294,9 @@ export function PracticeDensityMap({
       const emp = p.employee_count != null ? Number(p.employee_count) : 0
       const empClamped = Math.min(Math.max(emp || 1, 1), 50)
 
+      const baseColor = STATUS_COLORS[status_clean] ?? STATUS_COLORS.unknown
+      const dotColor = is_approximate ? getApproxColor(baseColor) : baseColor
+
       results.push({
         map_lat: lat,
         map_lon: lon,
@@ -302,7 +312,7 @@ export function PracticeDensityMap({
           p.year_established != null && Number(p.year_established) > 0
             ? Math.floor(Number(p.year_established)).toString()
             : '--',
-        color: STATUS_COLORS[status_clean] ?? STATUS_COLORS.unknown,
+        color: dotColor,
         radius: 40 + (empClamped / 50) * 40,
       })
     }
@@ -353,7 +363,7 @@ export function PracticeDensityMap({
       })
     }
 
-    // Layer 2: Consolidated hex density (red/orange)
+    // Layer 2: Consolidated hex density (red)
     if (consolidatedData.length > 0) {
       result.push({
         type: 'HexagonLayer',
@@ -393,20 +403,20 @@ export function PracticeDensityMap({
   const tooltip = showIndividual
     ? {
         html: `
-          <div style="font-family:DM Sans,sans-serif;padding:4px 0">
-            <b style="font-size:13px;color:#e8ecf1">{practice_name}</b><br/>
-            <span style="font-size:11px;color:#90a4ae">{address}</span><br/>
-            <span style="font-size:11px;color:#90a4ae">{city_zip}</span><br/>
-            <span style="font-size:11px">Status: <b>{status_label}</b></span><br/>
-            <span style="font-size:11px">DSO: {dso}</span><br/>
-            <span style="font-size:11px">Employees: {employees}</span><br/>
-            <span style="font-size:11px">Established: {year}</span>
+          <div style="font-family:Inter,sans-serif;padding:4px 0">
+            <b style="font-size:13px;color:#F8FAFC">{practice_name}</b><br/>
+            <span style="font-size:11px;color:#94A3B8">{address}</span><br/>
+            <span style="font-size:11px;color:#94A3B8">{city_zip}</span><br/>
+            <span style="font-size:11px;color:#94A3B8">Status:</span> <b style="color:#F8FAFC">{status_label}</b><br/>
+            <span style="font-size:11px;color:#94A3B8">DSO:</span> <span style="color:#F8FAFC">{dso}</span><br/>
+            <span style="font-size:11px;color:#94A3B8">Employees:</span> <span style="color:#F8FAFC">{employees}</span><br/>
+            <span style="font-size:11px;color:#94A3B8">Established:</span> <span style="color:#F8FAFC">{year}</span>
           </div>`,
         style: {
-          backgroundColor: 'rgba(13,27,42,0.95)',
-          color: '#e8ecf1',
-          border: '1px solid #1a3a5c',
-          borderRadius: '6px',
+          backgroundColor: '#0F1629',
+          color: '#F8FAFC',
+          border: '1px solid #1E293B',
+          borderRadius: '8px',
           padding: '8px 12px',
         },
       }
@@ -416,32 +426,32 @@ export function PracticeDensityMap({
     <div>
       <SectionHeader
         title="Practice Density Map"
-        helpText="Hexagonal density shows practice concentration. Green = independent clusters. Red/orange = consolidated (DSO/PE) clusters. Overlap = competitive markets. Toggle individual dots for detail."
+        helpText="Hexagonal density shows practice concentration. Green = independent clusters. Red = consolidated (DSO/PE) clusters. Overlap = competitive markets. Toggle individual dots for detail."
       />
 
       {geocoded.length === 0 ? (
-        <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+        <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
           No geocodable practices found.
         </div>
       ) : (
         <>
           {/* Controls */}
           <div className="flex items-center gap-6 mb-3">
-            <label className="flex items-center gap-2 text-sm text-[#E8ECF1] cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-[#F8FAFC] cursor-pointer">
               <input
                 type="checkbox"
                 checked={showIndividual}
                 onChange={(e) => setShowIndividual(e.target.checked)}
-                className="rounded border-[#1E2A3A] bg-[#141922] text-[#0066FF] focus:ring-[#0066FF]"
+                className="rounded border-[#1E293B] bg-[#0F1629] text-[#3B82F6] focus:ring-[#3B82F6]"
               />
               Show individual practices
             </label>
-            <label className="flex items-center gap-2 text-sm text-[#E8ECF1] cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-[#F8FAFC] cursor-pointer">
               <input
                 type="checkbox"
                 checked={hideUnknown}
                 onChange={(e) => setHideUnknown(e.target.checked)}
-                className="rounded border-[#1E2A3A] bg-[#141922] text-[#0066FF] focus:ring-[#0066FF]"
+                className="rounded border-[#1E293B] bg-[#0F1629] text-[#3B82F6] focus:ring-[#3B82F6]"
               />
               Hide unknown practices
             </label>
@@ -457,29 +467,29 @@ export function PracticeDensityMap({
 
           {/* Legend */}
           <div className="flex flex-wrap gap-6 mt-2 mb-1">
-            <span className="flex items-center gap-1.5 text-[13px] text-[#E8ECF1]">
+            <span className="flex items-center gap-1.5 text-[13px] text-[#F8FAFC]">
               <span
                 className="inline-block w-3.5 h-3.5 rounded-sm"
                 style={{
-                  background: 'linear-gradient(90deg, #C8E6C9, #1B5E20)',
+                  background: 'linear-gradient(90deg, #BBF7D0, #15803D)',
                 }}
               />
               Independent density
             </span>
-            <span className="flex items-center gap-1.5 text-[13px] text-[#E8ECF1]">
+            <span className="flex items-center gap-1.5 text-[13px] text-[#F8FAFC]">
               <span
                 className="inline-block w-3.5 h-3.5 rounded-sm"
                 style={{
-                  background: 'linear-gradient(90deg, #FFE0B2, #B71C1C)',
+                  background: 'linear-gradient(90deg, #FECACA, #DC2626)',
                 }}
               />
               Consolidated density (DSO + PE)
             </span>
-            <span className="text-[13px] text-[#90A4AE]">Overlap = competitive market</span>
+            <span className="text-[13px] text-[#94A3B8]">Overlap = competitive market</span>
           </div>
 
           {/* Summary counts */}
-          <p className="text-xs text-[#8892A0] mt-1">
+          <p className="text-xs text-[#94A3B8] mt-1">
             Showing {geocoded.length.toLocaleString()} practices (
             {independentData.length.toLocaleString()} independent,{' '}
             {consolidatedData.length.toLocaleString()} consolidated,{' '}

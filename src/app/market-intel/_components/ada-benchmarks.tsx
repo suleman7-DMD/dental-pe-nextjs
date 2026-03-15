@@ -36,7 +36,7 @@ export function ADABenchmarks({ data }: ADABenchmarksProps) {
   const ilChart = useMemo(() => transformForChart(ilData), [ilData])
   const maChart = useMemo(() => transformForChart(maData), [maData])
 
-  const yearColors = ['#0066FF', '#00C853', '#FFB300', '#9C27B0']
+  const yearColors = ['#3B82F6', '#22C55E', '#F59E0B', '#A855F7']
 
   return (
     <div>
@@ -47,7 +47,7 @@ export function ADABenchmarks({ data }: ADABenchmarksProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
         {/* Illinois */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
           {ilData.length > 0 ? (
             <GroupedBarChart
               data={ilChart.chartData}
@@ -62,14 +62,14 @@ export function ADABenchmarks({ data }: ADABenchmarksProps) {
               height={320}
             />
           ) : (
-            <div className="flex items-center justify-center h-[320px] text-[#8892A0] text-sm">
+            <div className="flex items-center justify-center h-[320px] text-[#94A3B8] text-sm">
               No ADA HPI data for Illinois
             </div>
           )}
         </div>
 
         {/* Massachusetts */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
           {maData.length > 0 ? (
             <GroupedBarChart
               data={maChart.chartData}
@@ -84,7 +84,7 @@ export function ADABenchmarks({ data }: ADABenchmarksProps) {
               height={320}
             />
           ) : (
-            <div className="flex items-center justify-center h-[320px] text-[#8892A0] text-sm">
+            <div className="flex items-center justify-center h-[320px] text-[#94A3B8] text-sm">
               No ADA HPI data for Massachusetts
             </div>
           )}

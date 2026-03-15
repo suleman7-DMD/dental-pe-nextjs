@@ -58,9 +58,9 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
         return {
           label: zs.city ? `${zs.zip_code} (${zs.city})` : zs.zip_code,
           segments: [
-            { key: 'Independent', value: Math.round(independentPct * 10) / 10, color: '#4CAF50' },
-            { key: 'Consolidated', value: Math.round(consolidatedPct * 10) / 10, color: '#F44336' },
-            { key: 'Unknown', value: Math.round(unknownPct * 10) / 10, color: '#78909C' },
+            { key: 'Independent', value: Math.round(independentPct * 10) / 10, color: '#22C55E' },
+            { key: 'Consolidated', value: Math.round(consolidatedPct * 10) / 10, color: '#EF4444' },
+            { key: 'Unknown', value: Math.round(unknownPct * 10) / 10, color: '#64748B' },
           ],
         }
       })
@@ -132,8 +132,8 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
 
       <div className="mt-4 space-y-6">
         {/* Dentist Density by ZIP */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-          <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
             Dentist Density by ZIP -- Top 25
           </h3>
           <BarChart
@@ -148,8 +148,8 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
         </div>
 
         {/* Consolidation Breakdown by ZIP */}
-        <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-          <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">
+        <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
             Consolidation Breakdown by ZIP -- Top 25
           </h3>
           <StackedBarChart
@@ -158,27 +158,27 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
             height={Math.max(400, consolidationData.length * 22)}
             xAxisLabel="Percentage of Practices"
             legendItems={[
-              { key: 'Independent', color: '#4CAF50' },
-              { key: 'Consolidated', color: '#F44336' },
-              { key: 'Unknown', color: '#78909C' },
+              { key: 'Independent', color: '#22C55E' },
+              { key: 'Consolidated', color: '#EF4444' },
+              { key: 'Unknown', color: '#64748B' },
             ]}
           />
         </div>
 
         {/* Competitive Landscape */}
         <div>
-          <h3 className="text-sm font-semibold text-[#E8ECF1] mb-3">
+          <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3">
             Competitive Landscape
           </h3>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* DSO Market Share */}
-            <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-              <h4 className="text-xs font-semibold text-[#8892A0] uppercase tracking-wider mb-3">
+            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+              <h4 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider mb-3">
                 DSO Market Share
               </h4>
               {dsoMarketShare.length === 0 ? (
-                <p className="text-sm text-[#8892A0] text-center py-4">
+                <p className="text-sm text-[#94A3B8] text-center py-4">
                   No DSO-affiliated practices found.
                 </p>
               ) : (
@@ -208,12 +208,12 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
             </div>
 
             {/* PE Sponsors Active */}
-            <div className="rounded-[10px] border border-[#1E2A3A] bg-[#141922] p-4">
-              <h4 className="text-xs font-semibold text-[#8892A0] uppercase tracking-wider mb-3">
+            <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4">
+              <h4 className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider mb-3">
                 PE Sponsors Active
               </h4>
               {peSponsors.length === 0 ? (
-                <p className="text-sm text-[#8892A0] text-center py-4">
+                <p className="text-sm text-[#94A3B8] text-center py-4">
                   No PE-backed practices found.
                 </p>
               ) : (

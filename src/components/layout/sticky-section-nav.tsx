@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useSectionObserver } from "@/lib/hooks/use-section-observer";
 
 interface StickySectionNavProps {
-  sections: { id: string; label: string }[];
+  sections: Array<{ id: string; label: string }>;
 }
 
 export function StickySectionNav({ sections }: StickySectionNavProps) {
@@ -12,30 +12,36 @@ export function StickySectionNav({ sections }: StickySectionNavProps) {
   const activeId = useSectionObserver(sectionIds);
 
   const handleClick = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
-    <div className="sticky top-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-sm border-b border-[var(--border)] py-2 px-1">
-      <div className="flex gap-1 overflow-x-auto scrollbar-thin">
+    <nav className="sticky top-0 z-20 h-10 bg-[#0A0F1E] border-b border-[#1E293B] px-6 flex items-center">
+      <div className="flex gap-6 overflow-x-auto scrollbar-thin">
         {sections.map((section) => (
           <button
             key={section.id}
             onClick={() => handleClick(section.id)}
             className={cn(
-              "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200",
+              "relative whitespace-nowrap pb-[9px] pt-[11px] text-xs font-medium transition-colors duration-200",
               activeId === section.id
-                ? "bg-[var(--accent-blue)] text-white"
-                : "bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]"
+                ? "text-[#F8FAFC]"
+                : "text-[#64748B] hover:text-[#94A3B8]"
             )}
           >
             {section.label}
+            {/* Active underline indicator */}
+            <span
+              className={cn(
+                "absolute bottom-0 left-0 right-0 h-[2px] rounded-full transition-all duration-200",
+                activeId === section.id
+                  ? "bg-[#3B82F6] opacity-100"
+                  : "bg-transparent opacity-0"
+              )}
+            />
           </button>
         ))}
       </div>
-    </div>
+    </nav>
   );
 }

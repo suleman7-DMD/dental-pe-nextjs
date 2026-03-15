@@ -1,5 +1,6 @@
 'use client'
 
+import React from 'react'
 import { useState, useMemo, useCallback } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { SearchInput } from '@/components/filters/search-input'
@@ -10,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { PracticeDetailDrawer } from './practice-detail-drawer'
 import { exportToCsv } from '@/lib/utils/csv-export'
-import { formatStatus } from '@/lib/utils/formatting'
+import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
+import { formatStatusLabel } from '@/lib/utils/formatting'
 
 import type { Practice } from '@/lib/types'
 
@@ -88,6 +90,23 @@ function classificationLabel(ec: unknown): string {
   return ec.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
 }
 
+/** Compute data quality stars string for a practice */
+function computeDataQuality(p: Practice): string {
+  const isDA = (p.import_batch_id ?? '').startsWith('DA_')
+  const hasEC = !!p.entity_classification && p.entity_classification.trim() !== ''
+  if (isDA) return '\u2605\u2605\u2605'
+  if (hasEC) return '\u2605\u2605'
+  return '\u2605'
+}
+
+/** Render gold-colored confidence stars */
+function renderDataQualityStars(v: string): React.ReactElement {
+  return React.createElement('span', {
+    style: { color: '#F59E0B', letterSpacing: '1px' },
+    title: v === '\u2605\u2605\u2605' ? 'Data Axle enriched' : v === '\u2605\u2605' ? 'Entity classified' : 'NPPES only',
+  }, v || '\u2605')
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Table columns
 // ────────────────────────────────────────────────────────────────────────────
@@ -105,6 +124,7 @@ const EMPLOYMENT_COLUMNS = [
   },
   { key: 'affiliated_dso', header: 'DSO', render: (v: string | null) => v || '--' },
   { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
+  { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 const OWNERSHIP_COLUMNS = [
@@ -132,6 +152,7 @@ const OWNERSHIP_COLUMNS = [
     header: 'Classification',
     render: (v: string) => classificationLabel(v),
   },
+  { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 const ENRICHED_COLUMNS = [
@@ -140,9 +161,9 @@ const ENRICHED_COLUMNS = [
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   {
-    key: 'ownership_status',
-    header: 'Status',
-    render: (v: string) => formatStatus(v),
+    key: 'entity_classification',
+    header: 'Classification',
+    render: (v: string) => classificationLabel(v),
   },
   { key: 'affiliated_dso', header: 'DSO', render: (v: string | null) => v || '--' },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
@@ -164,6 +185,7 @@ const ENRICHED_COLUMNS = [
   },
   { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
   { key: 'website', header: 'Website', render: (v: string | null) => v || '--' },
+  { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 const ALL_COLUMNS = [
@@ -171,9 +193,9 @@ const ALL_COLUMNS = [
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   {
-    key: 'ownership_status',
-    header: 'Status',
-    render: (v: string) => formatStatus(v),
+    key: 'entity_classification',
+    header: 'Classification',
+    render: (v: string) => classificationLabel(v),
   },
   { key: 'affiliated_dso', header: 'DSO', render: (v: string | null) => v || '--' },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
@@ -188,6 +210,7 @@ const ALL_COLUMNS = [
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
   { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
+  { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -209,11 +232,11 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   )
   const enrichmentPct = totalPractices > 0 ? (enrichedCount / totalPractices) * 100 : 0
 
-  // Get unique status values for filter
-  const statusOptions = useMemo(() => {
+  // Get unique classification values for filter
+  const classificationOptions = useMemo(() => {
     const set = new Set<string>()
     for (const p of practices) {
-      set.add((p.ownership_status ?? 'unknown').trim().toLowerCase())
+      set.add((p.entity_classification ?? '').trim().toLowerCase() || 'unknown')
     }
     return Array.from(set).sort()
   }, [practices])
@@ -227,10 +250,10 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       result = result.filter((p) => matchesSearch(p, searchTerm))
     }
 
-    // Status filter
+    // Classification filter
     if (selectedStatuses.length > 0) {
       result = result.filter((p) =>
-        selectedStatuses.includes((p.ownership_status ?? 'unknown').trim().toLowerCase())
+        selectedStatuses.includes((p.entity_classification ?? '').trim().toLowerCase() || 'unknown')
       )
     }
 
@@ -246,7 +269,11 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     // Sort
     result = sortPractices(result, sortBy)
 
-    return result
+    // Add data quality stars
+    return result.map(p => ({
+      ...p,
+      data_quality: computeDataQuality(p),
+    }))
   }, [practices, searchTerm, selectedStatuses, selectedSources, sortBy])
 
   const filteredEnriched = useMemo(
@@ -357,9 +384,9 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <FilterGroup label="Ownership Status">
+          <FilterGroup label="Classification">
             <MultiSelect
-              options={statusOptions}
+              options={classificationOptions}
               selected={selectedStatuses}
               onChange={setSelectedStatuses}
               placeholder="All Statuses"
@@ -374,14 +401,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
             />
           </FilterGroup>
           <div>
-            <label className="text-xs font-medium text-[#8892A0] block mb-1">Sort by</label>
+            <label className="text-xs font-medium text-[#94A3B8] block mb-1">Sort by</label>
             <select
               value={sortBy}
               onChange={(e) => {
                 setSortBy(e.target.value as SortOption)
                 setPage(1)
               }}
-              className="w-full rounded-md border border-[#1E2A3A] bg-[#141922] text-[#E8ECF1] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0066FF]"
+              className="w-full rounded-md border border-[#1E293B] bg-[#0F1629] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -402,7 +429,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
       {/* Tabs */}
       <Tabs defaultValue="employment" className="mt-4">
-        <TabsList className="bg-[#141922] border border-[#1E2A3A]">
+        <TabsList className="bg-[#0F1629] border border-[#1E293B]">
           <TabsTrigger value="employment">Employment Opportunities</TabsTrigger>
           <TabsTrigger value="ownership">Ownership Pipeline</TabsTrigger>
           <TabsTrigger value="enriched">Enriched Practices (Data Axle)</TabsTrigger>
@@ -410,14 +437,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         </TabsList>
 
         <TabsContent value="employment">
-          <p className="text-sm text-[#8892A0] mb-2">
+          <p className="text-sm text-[#94A3B8] mb-2">
             Practices with high patient volume that are likely hiring associates.
           </p>
           {lowEnrichmentNote && (
-            <p className="text-xs text-[#FFB300] mb-2">Warning: {lowEnrichmentNote}</p>
+            <p className="text-xs text-[#F59E0B] mb-2">Warning: {lowEnrichmentNote}</p>
           )}
           {employmentPractices.length === 0 ? (
-            <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
               No practices matching employment opportunity criteria in the current filters.
             </div>
           ) : (
@@ -428,7 +455,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
                 onRowClick={handleRowClick}
                 rowKey="npi"
               />
-              <p className="text-xs text-[#8892A0] mt-2">
+              <p className="text-xs text-[#94A3B8] mt-2">
                 {employmentPractices.length} practices match employment criteria
               </p>
               <Pagination
@@ -442,14 +469,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         </TabsContent>
 
         <TabsContent value="ownership">
-          <p className="text-sm text-[#8892A0] mb-2">
+          <p className="text-sm text-[#94A3B8] mb-2">
             Independent practices with indicators suggesting the owner may be approaching transition.
           </p>
           {lowEnrichmentNote && (
-            <p className="text-xs text-[#FFB300] mb-2">Warning: {lowEnrichmentNote}</p>
+            <p className="text-xs text-[#F59E0B] mb-2">Warning: {lowEnrichmentNote}</p>
           )}
           {ownershipPractices.length === 0 ? (
-            <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
               No practices matching ownership pipeline criteria in the current filters.
             </div>
           ) : (
@@ -460,7 +487,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
                 onRowClick={handleRowClick}
                 rowKey="npi"
               />
-              <p className="text-xs text-[#8892A0] mt-2">
+              <p className="text-xs text-[#94A3B8] mt-2">
                 {ownershipPractices.length} practices match ownership pipeline criteria
               </p>
               <Pagination
@@ -475,7 +502,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
         <TabsContent value="enriched">
           {enrichedPractices.length === 0 ? (
-            <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
               No Data Axle-enriched practices match the current filters.
             </div>
           ) : (
@@ -504,7 +531,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
         <TabsContent value="all">
           {filtered.length === 0 ? (
-            <div className="rounded-lg border border-[#1E2A3A] bg-[#141922] p-6 text-center text-[#8892A0]">
+            <div className="rounded-lg border border-[#1E293B] bg-[#0F1629] p-6 text-center text-[#94A3B8]">
               No practices match the current filters.
             </div>
           ) : (
@@ -536,7 +563,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       <div className="mt-4">
         <button
           onClick={handleDownloadCsv}
-          className="inline-flex items-center gap-2 rounded-md border border-[#1E2A3A] bg-[#141922] px-4 py-2 text-sm text-[#E8ECF1] hover:border-[#2A3A4A] hover:bg-[#1A2332] transition-colors"
+          className="inline-flex items-center gap-2 rounded-md border border-[#1E293B] bg-[#0F1629] px-4 py-2 text-sm text-[#F8FAFC] hover:border-[#334155] hover:bg-[#1A2035] transition-colors"
         >
           <DownloadIcon />
           Download filtered practices (CSV)
@@ -573,21 +600,21 @@ function Pagination({
 
   return (
     <div className="flex items-center justify-between mt-3">
-      <p className="text-xs text-[#8892A0]">
+      <p className="text-xs text-[#94A3B8]">
         Page {page} of {totalPages} ({total.toLocaleString()} total)
       </p>
       <div className="flex gap-2">
         <button
           onClick={() => onChange(Math.max(1, page - 1))}
           disabled={page <= 1}
-          className="rounded border border-[#1E2A3A] bg-[#141922] px-3 py-1 text-xs text-[#E8ECF1] disabled:opacity-40 hover:border-[#2A3A4A] transition-colors"
+          className="rounded border border-[#1E293B] bg-[#0F1629] px-3 py-1 text-xs text-[#F8FAFC] disabled:opacity-40 hover:border-[#334155] transition-colors"
         >
           Previous
         </button>
         <button
           onClick={() => onChange(Math.min(totalPages, page + 1))}
           disabled={page >= totalPages}
-          className="rounded border border-[#1E2A3A] bg-[#141922] px-3 py-1 text-xs text-[#E8ECF1] disabled:opacity-40 hover:border-[#2A3A4A] transition-colors"
+          className="rounded border border-[#1E293B] bg-[#0F1629] px-3 py-1 text-xs text-[#F8FAFC] disabled:opacity-40 hover:border-[#334155] transition-colors"
         >
           Next
         </button>
