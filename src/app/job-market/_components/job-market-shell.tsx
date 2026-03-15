@@ -1,18 +1,34 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { DataFreshnessBar } from '@/components/data-display/data-freshness-bar'
 import { LivingLocationSelector } from './living-location-selector'
-import { PracticeDensityMap } from './practice-density-map'
-import { MarketOverviewCharts } from './market-overview-charts'
-import { PracticeDirectory } from './practice-directory'
-import { OpportunitySignals } from './opportunity-signals'
-import { OwnershipLandscape } from './ownership-landscape'
-import { MarketAnalytics } from './market-analytics'
 import { SaturationTable } from './saturation-table'
 import { ADABenchmarks } from './ada-benchmarks'
+
+// Lazy-load heavy components (map, charts, large tables)
+const PracticeDensityMap = dynamic(() => import('./practice-density-map').then(m => ({ default: m.PracticeDensityMap })), {
+  loading: () => <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">Loading map...</div>,
+  ssr: false,
+})
+const MarketOverviewCharts = dynamic(() => import('./market-overview-charts').then(m => ({ default: m.MarketOverviewCharts })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
+const PracticeDirectory = dynamic(() => import('./practice-directory').then(m => ({ default: m.PracticeDirectory })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
+const OpportunitySignals = dynamic(() => import('./opportunity-signals').then(m => ({ default: m.OpportunitySignals })), {
+  loading: () => <div className="h-[200px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
+const OwnershipLandscape = dynamic(() => import('./ownership-landscape').then(m => ({ default: m.OwnershipLandscape })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
+const MarketAnalytics = dynamic(() => import('./market-analytics').then(m => ({ default: m.MarketAnalytics })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { isIndependentClassification, isCorporateClassification, classifyPractice, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
@@ -166,18 +182,28 @@ export function JobMarketShell({
         const allPractices: Practice[] = []
         const pageSize = 1000
 
+        // Only fetch essential fields (same as server-side initial fetch)
+        const practiceFields = [
+          'id', 'npi', 'practice_name', 'doing_business_as', 'city', 'state', 'zip',
+          'phone', 'website', 'entity_classification', 'ownership_status',
+          'affiliated_dso', 'buyability_score', 'classification_confidence',
+          'classification_reasoning', 'year_established', 'employee_count',
+          'estimated_revenue', 'latitude', 'longitude', 'data_axle_import_date',
+          'num_providers', 'location_type', 'taxonomy_code',
+        ].join(',')
+
         // Paginate to get ALL practices (Supabase max 1000 rows per query)
         let offset = 0
         let hasMore = true
         while (hasMore) {
           const { data } = await supabase
             .from('practices')
-            .select('*')
+            .select(practiceFields)
             .in('zip', zipList)
             .order('practice_name', { ascending: true })
             .range(offset, offset + pageSize - 1)
           if (data && data.length > 0) {
-            allPractices.push(...(data as Practice[]))
+            allPractices.push(...(data as unknown as Practice[]))
             offset += data.length
             hasMore = data.length === pageSize
           } else {

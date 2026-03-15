@@ -12,15 +12,12 @@ export const metadata = {
 export default async function IntelligencePage() {
   const supabase = await createServerClient()
 
-  const [zipIntel, practiceIntel, stats] = await Promise.all([
+  const [zipIntel, practiceIntel, stats, { count: watchedZipCount }] = await Promise.all([
     getZipIntel(supabase),
     getPracticeIntel(supabase),
     getIntelStats(supabase),
+    supabase.from('watched_zips').select('zip_code', { count: 'exact', head: true }),
   ])
-
-  const { count: watchedZipCount } = await supabase
-    .from('watched_zips')
-    .select('*', { count: 'exact', head: true })
 
   return (
     <IntelligenceShell

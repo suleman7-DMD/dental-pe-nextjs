@@ -1,10 +1,18 @@
 'use client'
 
 import { useMemo } from 'react'
+import {
+  AreaChart as RechartsAreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { DonutChart } from '@/components/charts/donut-chart'
-import { AreaChart } from '@/components/charts/area-chart'
 import { chartColorway } from '@/lib/constants/design-tokens'
+import { CHART_THEME } from '@/lib/constants/colors'
 import type { Deal } from '@/lib/supabase/queries/deals'
 
 interface SpecialtyChartsProps {
@@ -25,8 +33,8 @@ export function SpecialtyCharts({ deals }: SpecialtyChartsProps) {
       .map(([name, value]) => ({ name, value }))
   }, [deals])
 
-  // Specialty trends by quarter — top 6 specialties as separate area series
-  const { trendData, trendSeries } = useMemo(() => {
+  // Per-specialty quarterly trend data — top 6 specialties, each as a separate dataset
+  const specialtyTrends = useMemo(() => {
     const withDates = deals.filter(d => d.deal_date && d.specialty)
 
     // Find top 6 specialties
@@ -39,39 +47,34 @@ export function SpecialtyCharts({ deals }: SpecialtyChartsProps) {
       .slice(0, 6)
       .map(([name]) => name)
 
-    if (topSpecs.length === 0) {
-      return { trendData: [], trendSeries: [] }
-    }
+    if (topSpecs.length === 0) return []
 
-    // Group by quarter
-    const quarterMap = new Map<string, Record<string, number>>()
+    // Group by quarter per specialty
+    const quarterMap = new Map<string, Map<string, number>>()
     for (const d of withDates) {
       if (!topSpecs.includes(d.specialty!)) continue
       const date = new Date(d.deal_date!)
       const q = `${date.getFullYear()}-Q${Math.ceil((date.getMonth() + 1) / 3)}`
       if (!quarterMap.has(q)) {
-        quarterMap.set(q, {})
+        quarterMap.set(q, new Map())
       }
       const qr = quarterMap.get(q)!
-      qr[d.specialty!] = (qr[d.specialty!] ?? 0) + 1
+      qr.set(d.specialty!, (qr.get(d.specialty!) ?? 0) + 1)
     }
 
     const quarters = [...quarterMap.keys()].sort()
-    const data = quarters.map(q => {
-      const row: Record<string, unknown> = { quarter: q }
-      for (const spec of topSpecs) {
-        row[spec] = quarterMap.get(q)?.[spec] ?? 0
+
+    return topSpecs.map((spec, i) => {
+      const data = quarters.map(q => ({
+        quarter: q,
+        count: quarterMap.get(q)?.get(spec) ?? 0,
+      }))
+      return {
+        name: spec,
+        color: chartColorway[i % chartColorway.length],
+        data,
       }
-      return row
     })
-
-    const series = topSpecs.map((spec, i) => ({
-      key: spec,
-      label: spec,
-      color: chartColorway[i % chartColorway.length],
-    }))
-
-    return { trendData: data, trendSeries: series }
   }, [deals])
 
   return (
@@ -84,7 +87,7 @@ export function SpecialtyCharts({ deals }: SpecialtyChartsProps) {
         />
         <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           {donutData.length > 0 ? (
-            <DonutChart data={donutData} height={350} />
+            <DonutChart data={donutData} height={350} showLabels />
           ) : (
             <div className="flex items-center justify-center h-[350px] text-[#6B6B60] text-sm">
               No specialty data available
@@ -93,21 +96,65 @@ export function SpecialtyCharts({ deals }: SpecialtyChartsProps) {
         </div>
       </div>
 
-      {/* Specialty trends */}
+      {/* Specialty trends — 3x2 faceted grid */}
       <div>
         <SectionHeader
           title="Specialty Trends"
-          helpText="How each specialty's deal volume is changing over time (by quarter). Rising areas show where PE firms are expanding focus."
+          helpText="Each specialty's quarterly deal volume shown individually. Compare how PE focus areas are evolving over time."
         />
         <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-          {trendData.length > 0 ? (
-            <AreaChart
-              data={trendData}
-              xKey="quarter"
-              series={trendSeries}
-              height={350}
-              stacked
-            />
+          {specialtyTrends.length > 0 ? (
+            <div className="grid grid-cols-3 gap-3">
+              {specialtyTrends.map((spec) => (
+                <div key={spec.name} className="flex flex-col">
+                  <span className="text-[11px] font-medium text-[#6B6B60] uppercase tracking-wider mb-1 truncate" title={spec.name}>
+                    {spec.name}
+                  </span>
+                  <div style={{ width: '100%', height: 130 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsAreaChart
+                        data={spec.data}
+                        margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                      >
+                        <XAxis
+                          dataKey="quarter"
+                          tick={false}
+                          axisLine={{ stroke: CHART_THEME.gridColor }}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          tick={{ fill: CHART_THEME.textColor, fontSize: 9 }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={30}
+                          allowDecimals={false}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: CHART_THEME.tooltipBg,
+                            border: `1px solid ${CHART_THEME.tooltipBorder}`,
+                            borderRadius: '6px',
+                            color: CHART_THEME.tooltipText,
+                            fontSize: '11px',
+                            padding: '4px 8px',
+                          }}
+                          labelStyle={{ fontSize: '10px', color: CHART_THEME.textColor }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="count"
+                          name={spec.name}
+                          stroke={spec.color}
+                          fill={spec.color}
+                          fillOpacity={0.2}
+                          strokeWidth={1.5}
+                        />
+                      </RechartsAreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="flex items-center justify-center h-[350px] text-[#6B6B60] text-sm">
               No specialty trend data available

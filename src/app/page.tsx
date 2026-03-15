@@ -51,46 +51,47 @@ export default async function HomePage() {
         getRecentDeals(supabase, 10).catch(() => []),
       ])
 
-    // Phase 2: fetch secondary metrics sequentially (avoids concurrency issues)
-    const retirementRisk = await getRetirementRiskCount(supabase).catch((err) => {
-      console.error('[HomePage] retirementRisk error:', err)
-      return 0
-    })
+    // Phase 2: fetch ALL secondary metrics in parallel
+    const [retirementRisk, acquisitionTargets, enrichedCount, recentChanges, latestDealResult] =
+      await Promise.all([
+        getRetirementRiskCount(supabase).catch((err) => {
+          console.error('[HomePage] retirementRisk error:', err)
+          return 0
+        }),
+        getAcquisitionTargetCount(supabase).catch((err) => {
+          console.error('[HomePage] acquisitionTargets error:', err)
+          return 0
+        }),
+        (async () => {
+          try {
+            const { count, error } = await supabase
+              .from('practices')
+              .select('npi', { count: 'exact', head: true })
+              .not('data_axle_import_date', 'is', null)
+            if (error) console.error('[HomePage] enrichedCount error:', error)
+            return count ?? 0
+          } catch {
+            return 0
+          }
+        })(),
+        getRecentChanges(supabase, undefined, 90)
+          .then((changes) => changes.slice(0, 8))
+          .catch((err) => {
+            console.error('[HomePage] recentChanges error:', err)
+            return [] as import('@/lib/types').PracticeChange[]
+          }),
+        (async () => {
+          const { data } = await supabase
+            .from('deals')
+            .select('created_at')
+            .order('created_at', { ascending: false })
+            .limit(1)
+          return data as { created_at: string }[] | null
+        })(),
+      ])
 
-    const acquisitionTargets = await getAcquisitionTargetCount(supabase).catch((err) => {
-      console.error('[HomePage] acquisitionTargets error:', err)
-      return 0
-    })
-
-    // Data Axle enrichment count
-    let enrichedCount = 0
-    try {
-      const { count, error } = await supabase
-        .from('practices')
-        .select('*', { count: 'exact', head: true })
-        .not('data_axle_import_date', 'is', null)
-      if (error) console.error('[HomePage] enrichedCount error:', error)
-      else enrichedCount = count ?? 0
-    } catch (err) {
-      console.error('[HomePage] enrichedCount exception:', err)
-    }
-
-    // Fetch recent practice changes (no ZIP filter, last 90 days, limit 8)
-    const recentChanges = await getRecentChanges(supabase, undefined, 90)
-      .then((changes) => changes.slice(0, 8))
-      .catch((err) => {
-        console.error('[HomePage] recentChanges error:', err)
-        return []
-      })
-
-    const { data: latestDeal } = await supabase
-      .from('deals')
-      .select('created_at')
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    const lastPipelineRun = latestDeal?.[0]?.created_at
-      ? String(latestDeal[0].created_at).slice(0, 10)
+    const lastPipelineRun = latestDealResult?.[0]?.created_at
+      ? String(latestDealResult[0].created_at).slice(0, 10)
       : null
 
     const summary: HomeSummary = {

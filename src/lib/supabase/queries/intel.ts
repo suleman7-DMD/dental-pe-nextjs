@@ -68,26 +68,20 @@ export async function getPracticeIntelByNpi(
 export async function getIntelStats(
   supabase: SupabaseClient
 ): Promise<IntelStats> {
-  // Total ZIPs researched
-  const { count: zipCount } = await supabase
-    .from("zip_qualitative_intel")
-    .select("*", { count: "exact", head: true });
-
-  // Total practices researched
-  const { count: practiceCount } = await supabase
-    .from("practice_intel")
-    .select("*", { count: "exact", head: true });
-
-  // Average cost across both tables
-  const { data: zipCosts } = await supabase
-    .from("zip_qualitative_intel")
-    .select("cost_usd")
-    .not("cost_usd", "is", null);
-
-  const { data: practiceCosts } = await supabase
-    .from("practice_intel")
-    .select("cost_usd")
-    .not("cost_usd", "is", null);
+  // Run all queries in parallel for speed
+  const [
+    { count: zipCount },
+    { count: practiceCount },
+    { data: zipCosts },
+    { data: practiceCosts },
+    { count: highReadiness },
+  ] = await Promise.all([
+    supabase.from("zip_qualitative_intel").select("zip_code", { count: "exact", head: true }),
+    supabase.from("practice_intel").select("npi", { count: "exact", head: true }),
+    supabase.from("zip_qualitative_intel").select("cost_usd").not("cost_usd", "is", null),
+    supabase.from("practice_intel").select("cost_usd").not("cost_usd", "is", null),
+    supabase.from("practice_intel").select("npi", { count: "exact", head: true }).eq("acquisition_readiness", "high"),
+  ]);
 
   const allCosts = [
     ...((zipCosts ?? []) as { cost_usd: number }[]),
@@ -97,12 +91,6 @@ export async function getIntelStats(
     allCosts.length > 0
       ? allCosts.reduce((sum, r) => sum + r.cost_usd, 0) / allCosts.length
       : null;
-
-  // High readiness count
-  const { count: highReadiness } = await supabase
-    .from("practice_intel")
-    .select("*", { count: "exact", head: true })
-    .eq("acquisition_readiness", "high");
 
   return {
     totalZipsResearched: zipCount ?? 0,

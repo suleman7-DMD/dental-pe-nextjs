@@ -1,16 +1,28 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { FilterBar, FilterGroup, MultiSelect } from '@/components/filters/filter-bar'
 import { DateRangePicker } from '@/components/filters/date-range-picker'
 import type { Deal } from '@/lib/supabase/queries/deals'
 import { DealKpis } from './deal-kpis'
-import { DealVolumeTimeline } from './deal-volume-timeline'
-import { SponsorPlatformCharts } from './sponsor-platform-charts'
-import { StateChoropleth } from './state-choropleth'
-import { SpecialtyCharts } from './specialty-charts'
 import { DealsTable } from './deals-table'
+
+// Lazy-load chart-heavy components (only loaded when their tab is active)
+const DealVolumeTimeline = dynamic(() => import('./deal-volume-timeline').then(m => ({ default: m.DealVolumeTimeline })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
+const SponsorPlatformCharts = dynamic(() => import('./sponsor-platform-charts').then(m => ({ default: m.SponsorPlatformCharts })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
+const StateChoropleth = dynamic(() => import('./state-choropleth').then(m => ({ default: m.StateChoropleth })), {
+  loading: () => <div className="h-[400px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">Loading map...</div>,
+  ssr: false,
+})
+const SpecialtyCharts = dynamic(() => import('./specialty-charts').then(m => ({ default: m.SpecialtyCharts })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
 
 const TABS = [
   { key: 'overview', label: 'Overview' },

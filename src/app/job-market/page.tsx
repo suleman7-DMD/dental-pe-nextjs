@@ -15,29 +15,18 @@ export const metadata = {
 export default async function JobMarketPage() {
   const supabase = await createServerClient()
 
-  // Fetch zip_scores and watched_zips server-side for initial render
-  const [zipScores, watchedZips, adaBenchmarks] = await Promise.all([
+  // Fetch ALL server-side data in a single parallel batch
+  const [
+    zipScores, watchedZips, adaBenchmarks,
+    { count: totalCount }, { count: daCount }, { data: latestUpdate },
+  ] = await Promise.all([
     getZipScores(supabase),
     getWatchedZips(supabase),
     getADABenchmarks(supabase),
+    supabase.from('practices').select('npi', { count: 'exact', head: true }),
+    supabase.from('practices').select('npi', { count: 'exact', head: true }).not('data_axle_import_date', 'is', null),
+    supabase.from('practices').select('updated_at').order('updated_at', { ascending: false }).limit(1).single(),
   ])
-
-  // Pre-fetch data freshness stats
-  const { count: totalCount } = await supabase
-    .from('practices')
-    .select('*', { count: 'exact', head: true })
-
-  const { count: daCount } = await supabase
-    .from('practices')
-    .select('*', { count: 'exact', head: true })
-    .not('data_axle_import_date', 'is', null)
-
-  const { data: latestUpdate } = await supabase
-    .from('practices')
-    .select('updated_at')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .single()
 
   const freshness = {
     totalPractices: totalCount ?? 0,

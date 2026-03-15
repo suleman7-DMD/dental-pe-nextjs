@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { SectionHeader } from '@/components/data-display/section-header'
@@ -12,10 +13,19 @@ import {
 } from '@/lib/constants/entity-classifications'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
-import { ConsolidationMap } from './consolidation-map'
-import { ZipScoreTable } from './zip-score-table'
-import { CityPracticeTree } from './city-practice-tree'
 import { DSOPenetrationTable } from './dso-penetration-table'
+
+// Lazy-load heavy components (maps, large tables with sub-queries)
+const ConsolidationMap = dynamic(() => import('./consolidation-map').then(m => ({ default: m.ConsolidationMap })), {
+  loading: () => <div className="h-[400px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">Loading map...</div>,
+  ssr: false,
+})
+const ZipScoreTable = dynamic(() => import('./zip-score-table').then(m => ({ default: m.ZipScoreTable })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
+const CityPracticeTree = dynamic(() => import('./city-practice-tree').then(m => ({ default: m.CityPracticeTree })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
 
 interface MarketIntelShellProps {
   initialZipScores: ZipScore[]

@@ -243,7 +243,7 @@ export async function getRecentDeals(
 ): Promise<Deal[]> {
   const { data, error } = await supabase
     .from("deals")
-    .select("*")
+    .select("id, deal_date, platform_company, pe_sponsor, target_name, target_city, target_state, target_zip, deal_type, deal_size_mm, ebitda_multiple, specialty, num_locations, source, source_url, notes, created_at, updated_at")
     .order("deal_date", { ascending: false })
     .limit(limit);
 

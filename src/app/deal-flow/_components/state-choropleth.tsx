@@ -88,10 +88,11 @@ export function StateChoropleth({ deals }: StateChoroplethProps) {
             ],
             0
           ],
-          0, '#FFF8E1',
-          Math.max(1, maxDeals * 0.25), '#F9C74F',
-          Math.max(2, maxDeals * 0.5), '#D4920B',
-          Math.max(3, maxDeals), '#8B5E00',
+          0, '#f7fbff',
+          Math.max(1, maxDeals * 0.25), '#c6dbef',
+          Math.max(2, maxDeals * 0.5), '#6baed6',
+          Math.max(3, maxDeals * 0.75), '#2171b5',
+          Math.max(4, maxDeals), '#084594',
         ]
 
         map.addLayer({

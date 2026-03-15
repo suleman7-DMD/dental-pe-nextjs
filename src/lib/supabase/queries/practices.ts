@@ -70,70 +70,49 @@ export async function getPracticeCountsByStatus(
 ): Promise<Record<string, number>> {
   // Use entity_classification as PRIMARY field for ownership counts,
   // with ownership_status as fallback only when entity_classification is null.
-  const counts: Record<string, number> = {};
 
-  // Independent by entity_classification (7 types)
-  let indepQ = supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true })
+  // Build all queries first, then run in parallel
+  let indepQ = supabase.from("practices").select("npi", { count: "exact", head: true })
     .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS]);
-  if (zips && zips.length > 0) indepQ = indepQ.in("zip", zips);
-  const { count: indepByEC } = await indepQ;
-
-  // Independent by ownership_status fallback (entity_classification is null)
-  let indepFallbackQ = supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true })
-    .is("entity_classification", null)
-    .in("ownership_status", ["independent", "likely_independent"]);
-  if (zips && zips.length > 0) indepFallbackQ = indepFallbackQ.in("zip", zips);
-  const { count: indepByOS } = await indepFallbackQ;
-
-  counts["independent"] = (indepByEC ?? 0) + (indepByOS ?? 0);
-
-  // Corporate by entity_classification
-  let corpQ = supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true })
+  let indepFallbackQ = supabase.from("practices").select("npi", { count: "exact", head: true })
+    .is("entity_classification", null).in("ownership_status", ["independent", "likely_independent"]);
+  let corpQ = supabase.from("practices").select("npi", { count: "exact", head: true })
     .in("entity_classification", ["dso_regional", "dso_national"]);
-  if (zips && zips.length > 0) corpQ = corpQ.in("zip", zips);
-  const { count: corpByEC } = await corpQ;
-
-  // Corporate by ownership_status fallback (entity_classification is null)
-  let corpFallbackQ = supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true })
-    .is("entity_classification", null)
-    .in("ownership_status", ["dso_affiliated", "pe_backed"]);
-  if (zips && zips.length > 0) corpFallbackQ = corpFallbackQ.in("zip", zips);
-  const { count: corpByOS } = await corpFallbackQ;
-
-  counts["dso_affiliated"] = (corpByEC ?? 0) + (corpByOS ?? 0);
-
-  // Specialist by entity_classification
-  let specQ = supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true })
+  let corpFallbackQ = supabase.from("practices").select("npi", { count: "exact", head: true })
+    .is("entity_classification", null).in("ownership_status", ["dso_affiliated", "pe_backed"]);
+  let specQ = supabase.from("practices").select("npi", { count: "exact", head: true })
     .eq("entity_classification", "specialist");
-  if (zips && zips.length > 0) specQ = specQ.in("zip", zips);
-  const { count: specCount } = await specQ;
-  if (specCount && specCount > 0) counts["specialist"] = specCount;
-
-  // Non-clinical by entity_classification
-  let ncQ = supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true })
+  let ncQ = supabase.from("practices").select("npi", { count: "exact", head: true })
     .eq("entity_classification", "non_clinical");
-  if (zips && zips.length > 0) ncQ = ncQ.in("zip", zips);
-  const { count: ncCount } = await ncQ;
-  if (ncCount && ncCount > 0) counts["non_clinical"] = ncCount;
+  let totalQ = supabase.from("practices").select("npi", { count: "exact", head: true });
 
-  // Total for unknown calculation
-  let totalQ = supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true });
-  if (zips && zips.length > 0) totalQ = totalQ.in("zip", zips);
-  const { count: total } = await totalQ;
+  // Apply ZIP filter if provided
+  if (zips && zips.length > 0) {
+    indepQ = indepQ.in("zip", zips);
+    indepFallbackQ = indepFallbackQ.in("zip", zips);
+    corpQ = corpQ.in("zip", zips);
+    corpFallbackQ = corpFallbackQ.in("zip", zips);
+    specQ = specQ.in("zip", zips);
+    ncQ = ncQ.in("zip", zips);
+    totalQ = totalQ.in("zip", zips);
+  }
+
+  // Run ALL count queries in parallel
+  const [
+    { count: indepByEC },
+    { count: indepByOS },
+    { count: corpByEC },
+    { count: corpByOS },
+    { count: specCount },
+    { count: ncCount },
+    { count: total },
+  ] = await Promise.all([indepQ, indepFallbackQ, corpQ, corpFallbackQ, specQ, ncQ, totalQ]);
+
+  const counts: Record<string, number> = {};
+  counts["independent"] = (indepByEC ?? 0) + (indepByOS ?? 0);
+  counts["dso_affiliated"] = (corpByEC ?? 0) + (corpByOS ?? 0);
+  if (specCount && specCount > 0) counts["specialist"] = specCount;
+  if (ncCount && ncCount > 0) counts["non_clinical"] = ncCount;
 
   const known = (counts["independent"] ?? 0) + (counts["dso_affiliated"] ?? 0)
     + (counts["specialist"] ?? 0) + (counts["non_clinical"] ?? 0);
@@ -160,7 +139,7 @@ export async function getPracticesWithCoords(
       const to = from + pageSize - 1;
       const { data, error } = await supabase
         .from("practices")
-        .select("*")
+        .select("npi, practice_name, doing_business_as, city, state, zip, phone, website, entity_classification, ownership_status, affiliated_dso, buyability_score, classification_confidence, year_established, employee_count, estimated_revenue, latitude, longitude, num_providers, taxonomy_code, data_axle_import_date")
         .in("zip", zipChunk)
         .not("latitude", "is", null)
         .not("longitude", "is", null)
@@ -376,13 +355,21 @@ export async function getBuyabilityPractices(
   supabase: SupabaseClient,
   limit = 500
 ): Promise<Practice[]> {
+  const buyabilityFields = [
+    'npi', 'practice_name', 'doing_business_as', 'city', 'state', 'zip',
+    'phone', 'website', 'entity_classification', 'ownership_status',
+    'affiliated_dso', 'buyability_score', 'classification_confidence',
+    'classification_reasoning', 'year_established', 'employee_count',
+    'estimated_revenue', 'num_providers', 'taxonomy_code',
+  ].join(',')
+
   const { data, error } = await supabase
     .from("practices")
-    .select("*")
+    .select(buyabilityFields)
     .not("buyability_score", "is", null)
     .order("buyability_score", { ascending: false })
     .limit(limit);
 
   if (error) throw error;
-  return (data as Practice[]) ?? [];
+  return (data as unknown as Practice[]) ?? [];
 }
