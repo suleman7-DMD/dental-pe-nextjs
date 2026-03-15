@@ -9,6 +9,7 @@ import {
   Target,
   Briefcase,
   Microscope,
+  Brain,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -37,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Buyability", href: "/buyability", icon: Target },
   { label: "Job Market", href: "/job-market", icon: Briefcase },
   { label: "Research", href: "/research", icon: Microscope },
+  { label: "Intelligence", href: "/intelligence", icon: Brain },
   { label: "System", href: "/system", icon: Settings },
 ];
 
