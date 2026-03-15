@@ -194,7 +194,7 @@ export async function getPracticeStats(
     .in("zip", watchedZips)
     .in("entity_classification", [
       "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
-      "family_practice", "small_group", "large_group", "specialist", "non_clinical"
+      "family_practice", "small_group", "large_group"
     ]);
 
   // Independent by ownership_status where entity_classification is missing (fallback)
@@ -233,7 +233,7 @@ export async function getRetirementRiskCount(
       "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
       "family_practice", "small_group", "large_group"
     ])
-    .lt("year_established", 1995);
+    .lt("year_established", new Date().getFullYear() - 30);
 
   if (error) throw error;
   return count ?? 0;
