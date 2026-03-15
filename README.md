@@ -2,7 +2,9 @@
 
 A market intelligence dashboard tracking private equity consolidation in US dentistry. Built with Next.js 16, Supabase, and deployed on Vercel.
 
-Monitors 400,962 dental practices across 290 markets, 2,500+ PE deals, and provides acquisition risk scoring, market saturation analysis, and career opportunity intelligence.
+**Live:** https://dental-pe-nextjs.vercel.app
+
+Monitors **400,962 dental practices** across **290 markets**, **2,512 PE deals**, and provides acquisition risk scoring, market saturation analysis, and career opportunity intelligence for the Chicagoland and Boston metro areas.
 
 ## Stack
 
@@ -19,37 +21,48 @@ Monitors 400,962 dental practices across 290 markets, 2,500+ PE deals, and provi
 
 | Route | Page | Description |
 |-------|------|-------------|
-| `/` | Home | Navigation hub with key stats and recent deals |
-| `/deal-flow` | Deal Flow | PE deal tracking — timeline, sponsors, platforms, state map, deal table |
-| `/market-intel` | Market Intel | ZIP-level consolidation — saturation metrics, ownership maps, practice changes |
-| `/buyability` | Buyability | Acquisition target scoring — searchable practice list with confidence ratings |
-| `/job-market` | Job Market | Career opportunity finder — density maps, practice directory, retirement risk signals |
-| `/research` | Research | Deep dives — sponsor profiles, platform profiles, state analysis, SQL explorer |
-| `/system` | System | Pipeline health — data freshness, completeness, logs, manual entry forms |
+| `/` | **Home** | 8 KPI cards (deals, sponsors, practices, corporate %, retirement risk, YTD), 6 navigation cards, recent deals, data freshness |
+| `/deal-flow` | **Deal Flow** | 2,512 PE deals — timeline, top sponsors/platforms, state choropleth, searchable table with CSV |
+| `/market-intel` | **Market Intel** | Tiered consolidation analysis (high-confidence ~2.3% vs all-signals ~9.9%), saturation metrics, ZIP scores, city practice tree, consolidation map, ADA benchmarks |
+| `/buyability` | **Buyability** | Data-driven acquisition scoring — 4 category KPIs (Acquisition Targets, Dead Ends, Job Targets, Specialists), 25-row paginated table with filters |
+| `/job-market` | **Job Market** | Career opportunity finder — living location selector, density maps, practice directory with 4 tabs, retirement risk signals, DSO penetration |
+| `/research` | **Research** | Deep dives — PE sponsor profiles, platform profiles, state analysis, SQL explorer with presets |
+| `/system` | **System** | Pipeline health — data source coverage, freshness timestamps, completeness bars, pipeline logs, manual entry forms |
 
-## Data Sources
+## Key Data
 
 | Source | Records | What It Provides |
 |--------|---------|-----------------|
-| NPPES (CMS) | 400k+ practices | Federal dental provider registry — NPI, name, address, taxonomy |
+| NPPES (CMS) | 400,962 practices | Federal dental provider registry — NPI, name, address, taxonomy |
 | Data Axle | 2,992 enriched | Revenue, employees, year established, lat/lon, parent company, EIN |
 | PESP | ~1,200 deals | PE deal announcements from activist research org |
 | GDN | ~800 deals | DSO deal roundups from industry publication |
 | PitchBook | ~500 deals | PE deal data from financial research platform |
 | ADSO | 408 locations | DSO office locations scraped from member websites |
-| ADA HPI | 918 benchmarks | State-level DSO affiliation rates by career stage |
+| ADA HPI | 918 benchmarks | State-level DSO affiliation rates by career stage (2022-2024) |
 | Census ACS | 279 ZIPs | Population and median household income by ZIP |
 
-## Entity Classification System
+## Entity Classification
 
 11-type classification system for dental practices (replaces legacy 3-value `ownership_status`):
 
-**Solo Practices:** solo_established, solo_new, solo_inactive, solo_high_volume
-**Group Practices:** family_practice, small_group, large_group
-**Corporate:** dso_regional, dso_national
-**Other:** specialist, non_clinical
+| Category | Types | Count (watched ZIPs) |
+|----------|-------|---------------------|
+| **Solo** | solo_established, solo_new, solo_inactive, solo_high_volume | 4,908 |
+| **Group** | family_practice, small_group, large_group | 5,364 |
+| **Corporate** | dso_regional, dso_national | 1,392 |
+| **Other** | specialist, non_clinical | 2,363 |
 
-Assigned by the DSO classifier using provider count, last name matching, taxonomy codes, corporate signals (parent company, EIN clustering, franchise field), and Data Axle enrichment data.
+### Tiered Consolidation
+
+Analysis on 2026-03-15 revealed that **92% of dso_regional** classifications were triggered by shared phone numbers alone — a weak signal that often just means multiple dentists at the same address, not a DSO.
+
+| Tier | Count | % of 14,027 | Signal |
+|------|-------|-------------|--------|
+| **High-confidence corporate** | 328 | **2.3%** | Real DSO brands + EIN clusters + DSO specialists |
+| **Including phone signals** | 1,392 | **9.9%** | Adds 1,091 practices sharing a phone # |
+
+The dashboard shows both tiers: primary KPI at 2.3%, secondary note at 9.9% with explanation. Phone-only dso_regional practices are queued for reclassification back to small_group/large_group.
 
 ## Market Metrics
 
@@ -58,10 +71,11 @@ Assigned by the DSO classifier using provider count, last name matching, taxonom
 - **Corporate Share:** % of GP offices classified as dso_regional or dso_national
 - **Market Type:** 9 classifications (e.g., corporate_dominant, growing_undersupplied, balanced_mixed)
 - **Buyability Score:** 0-100 acquisition likelihood per practice
+- **Retirement Risk:** 226 independent practices established before 1995
 
-## Primary Metro Coverage
+## Metro Coverage
 
-**Chicagoland** (268 ZIPs across 7 sub-zones): West Loop/South Loop, Woodridge, Bolingbrook, Naperville, Schaumburg, Joliet, Aurora
+**Chicagoland** (269 ZIPs across 7 sub-zones): West Loop/South Loop, Woodridge, Bolingbrook, Naperville, Schaumburg, Joliet, Aurora
 **Boston Metro** (21 ZIPs)
 
 ## Setup
@@ -94,32 +108,32 @@ npm run build   # TypeScript check + production build
 npm start       # Production server
 ```
 
-Push to `main` → Vercel auto-deploys.
+Push to `main` → Vercel auto-deploys in ~90s.
 
 ## Data Pipeline
 
 The Python scraper pipeline (separate repo: `dental-pe-tracker/scrapers/`) populates Supabase:
 
-1. **Weekly cron** (Sunday 8am): Scrape PESP, GDN → Classify DSOs → Score ZIPs → Sync to Supabase
+1. **Weekly cron** (Sunday 8am): Scrape PESP, GDN → Import PitchBook → Scrape ADSO → Download ADA HPI → Classify DSOs → Score ZIPs → Sync to Supabase
 2. **Monthly** (first Sunday 6am): Download NPPES federal provider data updates
 3. **Manual**: Data Axle CSV imports, PitchBook deal imports
 
-Sync uses incremental strategies — only changed rows are pushed to Supabase.
+All queries paginated — Supabase's 1000-row default limit is handled throughout. Sync uses incremental strategies — only changed rows are pushed to Supabase.
 
 ## Project Structure
 
 ```
 src/
 ├── app/                    # Next.js App Router pages
-│   ├── api/                # Route handlers (deals, practices, sql-explorer)
-│   ├── deal-flow/          # Deal tracking page + components
-│   ├── market-intel/       # Market analysis page + components
-│   ├── buyability/         # Acquisition scoring page + components
-│   ├── job-market/         # Career opportunities page + components (most complex)
-│   ├── research/           # Deep dive page + components
-│   └── system/             # System health page + components
+│   ├── api/                # Route handlers (deals, practices, sql-explorer, watched-zips)
+│   ├── deal-flow/          # Deal tracking page + 6 components
+│   ├── market-intel/       # Market analysis page + 6 components
+│   ├── buyability/         # Acquisition scoring page + shell
+│   ├── job-market/         # Career opportunities page + 9 components (most complex)
+│   ├── research/           # Deep dive page + 4 components
+│   └── system/             # System health page + 5 components
 ├── components/
-│   ├── charts/             # Recharts wrappers (bar, donut, scatter, histogram, etc.)
+│   ├── charts/             # 8 Recharts wrappers (bar, donut, scatter, histogram, etc.)
 │   ├── data-display/       # DataTable, KpiCard, StatusBadge, ConfidenceStars
 │   ├── filters/            # FilterBar, MultiSelect, DateRangePicker, SearchInput
 │   ├── layout/             # Sidebar, StickySectionNav
@@ -128,8 +142,8 @@ src/
 ├── lib/
 │   ├── constants/          # Entity classifications, colors, design tokens, locations
 │   ├── hooks/              # useSidebar, useUrlFilters, useSectionObserver
-│   ├── supabase/           # Client setup + query functions (deals, practices, zips, etc.)
-│   ├── types/              # TypeScript interfaces
+│   ├── supabase/           # Client setup + query functions (all paginated)
+│   ├── types/              # TypeScript interfaces (ZipScore: 40+ fields)
 │   └── utils/              # Formatting, scoring, CSV export
 └── providers/              # React Query + Sidebar context providers
 ```
