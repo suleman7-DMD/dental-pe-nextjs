@@ -10,7 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts'
-import { chartColorway } from '@/lib/constants/design-tokens'
+import { CHART_THEME, CHART_COLORWAY } from '@/lib/constants/colors'
 
 interface GroupedBarChartProps {
   data: Array<Record<string, unknown>>
@@ -40,19 +40,19 @@ export function GroupedBarChart({
 }: GroupedBarChartProps) {
   if (data.length === 0) {
     return (
-      <div className={`flex items-center justify-center text-[#94A3B8] text-sm ${className ?? ''}`} style={{ height }}>
+      <div className={`flex items-center justify-center text-[#9C9C90] text-sm ${className ?? ''}`} style={{ height }}>
         No data available
       </div>
     )
   }
 
-  const axisStyle = { fontSize: 11, fill: '#94A3B8' }
-  const gridColor = '#1E293B'
+  const axisStyle = { fontSize: 11, fill: CHART_THEME.textColor }
+  const gridColor = CHART_THEME.gridColor
 
   return (
     <div className={className}>
       {title && (
-        <h3 className="text-sm font-semibold text-[#F8FAFC] mb-2">{title}</h3>
+        <h3 className="text-sm font-semibold text-[#1A1A1A] mb-2">{title}</h3>
       )}
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -62,24 +62,24 @@ export function GroupedBarChart({
               dataKey={xKey}
               tick={axisStyle}
               axisLine={{ stroke: gridColor }}
-              label={xLabel ? { value: xLabel, position: 'insideBottom', offset: -2, fill: '#94A3B8', fontSize: 11 } : undefined}
+              label={xLabel ? { value: xLabel, position: 'insideBottom', offset: -2, fill: CHART_THEME.textColor, fontSize: 11 } : undefined}
             />
             <YAxis
               tick={axisStyle}
               axisLine={{ stroke: gridColor }}
-              label={yLabel ? { value: yLabel, angle: -90, position: 'insideLeft', fill: '#94A3B8', fontSize: 11 } : undefined}
+              label={yLabel ? { value: yLabel, angle: -90, position: 'insideLeft', fill: CHART_THEME.textColor, fontSize: 11 } : undefined}
             />
             <Tooltip
-              contentStyle={{ backgroundColor: '#0F1629', border: '1px solid #1E293B', borderRadius: 8, fontSize: 12, color: '#F8FAFC' }}
-              cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+              contentStyle={{ backgroundColor: CHART_THEME.tooltipBg, border: `1px solid ${CHART_THEME.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: CHART_THEME.tooltipText }}
+              cursor={{ fill: 'rgba(0,0,0,0.05)' }}
             />
-            <Legend wrapperStyle={{ color: '#94A3B8', fontSize: 11 }} iconType="rect" />
+            <Legend wrapperStyle={{ color: CHART_THEME.textColor, fontSize: 11 }} iconType="rect" />
             {series.map((s, i) => (
               <Bar
                 key={s.key}
                 dataKey={s.key}
                 name={s.label}
-                fill={s.color ?? chartColorway[i % chartColorway.length]}
+                fill={s.color ?? CHART_COLORWAY[i % CHART_COLORWAY.length]}
                 radius={[4, 4, 0, 0]}
               />
             ))}

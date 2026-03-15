@@ -1,29 +1,29 @@
 function SkeletonKpiCard() {
   return (
-    <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4 animate-pulse">
-      <div className="h-4 w-16 rounded bg-[#1E293B] mb-3" />
-      <div className="h-8 w-24 rounded bg-[#1E293B] mb-2" />
-      <div className="h-3 w-20 rounded bg-[#1E293B]" />
+    <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4 animate-pulse">
+      <div className="h-4 w-16 rounded bg-[#F7F7F4] mb-3" />
+      <div className="h-8 w-24 rounded bg-[#F7F7F4] mb-2" />
+      <div className="h-3 w-20 rounded bg-[#F7F7F4]" />
     </div>
   )
 }
 
 function SkeletonChart() {
   return (
-    <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4 animate-pulse">
-      <div className="h-4 w-32 rounded bg-[#1E293B] mb-4" />
-      <div className="h-[300px] w-full rounded bg-[#1E293B]" />
+    <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4 animate-pulse">
+      <div className="h-4 w-32 rounded bg-[#F7F7F4] mb-4" />
+      <div className="h-[300px] w-full rounded bg-[#F7F7F4]" />
     </div>
   )
 }
 
 function SkeletonTable() {
   return (
-    <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] p-4 animate-pulse">
-      <div className="h-4 w-48 rounded bg-[#1E293B] mb-4" />
+    <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4 animate-pulse">
+      <div className="h-4 w-48 rounded bg-[#F7F7F4] mb-4" />
       <div className="space-y-2">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-8 w-full rounded bg-[#1E293B]" />
+          <div key={i} className="h-8 w-full rounded bg-[#F7F7F4]" />
         ))}
       </div>
     </div>
@@ -32,18 +32,18 @@ function SkeletonTable() {
 
 export default function MarketIntelLoading() {
   return (
-    <div className="min-h-screen bg-[#0A0F1E] p-6 space-y-6">
+    <div className="min-h-screen bg-[#FAFAF7] p-6 space-y-6">
       {/* Page title */}
       <div className="animate-pulse">
-        <div className="h-8 w-72 rounded bg-[#1E293B] mb-2" />
-        <div className="h-4 w-[500px] rounded bg-[#1E293B]" />
+        <div className="h-8 w-72 rounded bg-[#F7F7F4] mb-2" />
+        <div className="h-4 w-[500px] rounded bg-[#F7F7F4]" />
       </div>
 
       {/* Data freshness bar */}
-      <div className="h-12 w-full rounded-lg bg-[#0F1629] border border-[#1E293B] animate-pulse" />
+      <div className="h-12 w-full rounded-lg bg-[#FFFFFF] border border-[#E8E5DE] animate-pulse" />
 
       {/* Metro selector */}
-      <div className="h-10 w-56 rounded bg-[#1E293B] animate-pulse" />
+      <div className="h-10 w-56 rounded bg-[#F7F7F4] animate-pulse" />
 
       {/* KPI cards */}
       <div className="grid grid-cols-4 gap-4">
@@ -59,9 +59,9 @@ export default function MarketIntelLoading() {
       </div>
 
       {/* Map */}
-      <div className="rounded-[10px] border border-[#1E293B] bg-[#0F1629] animate-pulse">
-        <div className="h-4 w-48 rounded bg-[#1E293B] m-4" />
-        <div className="h-[500px] w-full rounded bg-[#1E293B]" />
+      <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] animate-pulse">
+        <div className="h-4 w-48 rounded bg-[#F7F7F4] m-4" />
+        <div className="h-[500px] w-full rounded bg-[#F7F7F4]" />
       </div>
 
       {/* ZIP Score Table */}

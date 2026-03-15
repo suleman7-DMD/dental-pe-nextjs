@@ -56,7 +56,7 @@ export function StackedBarChart({
   series,
   lineKey,
   lineLabel,
-  lineColor = "#ffffff",
+  lineColor = "#1A1A1A",
   yLabel,
   xAxisLabel,
   orientation,
@@ -195,7 +195,7 @@ export function StackedBarChart({
               color: CHART_THEME.tooltipText,
               fontSize: "12px",
             }}
-            cursor={{ fill: "rgba(255,255,255,0.05)" }}
+            cursor={{ fill: "rgba(0,0,0,0.05)" }}
           />
           {showLegend && (
             <Legend

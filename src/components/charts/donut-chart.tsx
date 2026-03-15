@@ -60,7 +60,7 @@ export function DonutChart({
           <div
             className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
           >
-            <span className="text-lg font-bold text-[var(--text-primary,#F8FAFC)]">
+            <span className="text-lg font-bold text-[var(--text-primary,#1A1A1A)]">
               {centerLabel}
             </span>
           </div>

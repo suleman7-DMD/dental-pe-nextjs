@@ -1,100 +1,100 @@
 /**
  * Color constants for the design system.
  * Maps ownership statuses, deal types, entity classifications to colors.
- * Updated to "Vercel Dashboard x Bloomberg Terminal" palette.
+ * Updated to light theme with warm neutrals and goldenrod accent.
  */
 
 // ---- Deal type colors ----
 export const DEAL_TYPE_COLORS: Record<string, string> = {
-  buyout: "#3B82F6",
-  "add-on": "#22C55E",
-  recapitalization: "#F59E0B",
-  growth: "#A855F7",
-  de_novo: "#06B6D4",
-  partnership: "#7C3AED",
-  other: "#64748B",
+  buyout: "#2563EB",
+  "add-on": "#2D8B4E",
+  recapitalization: "#D4920B",
+  growth: "#7C3AED",
+  de_novo: "#0D9488",
+  partnership: "#6366F1",
+  other: "#9C9C90",
 };
 
 // ---- Ownership status colors ----
 export const OWNERSHIP_STATUS_COLORS: Record<string, string> = {
-  independent: "#22C55E",
-  likely_independent: "#22C55E",
-  dso_affiliated: "#F59E0B",
-  pe_backed: "#EF4444",
-  unknown: "#64748B",
+  independent: "#2563EB",
+  likely_independent: "#2563EB",
+  dso_affiliated: "#D4920B",
+  pe_backed: "#C23B3B",
+  unknown: "#9C9C90",
 };
 
 // ---- Entity classification colors ----
 export const ENTITY_CLASSIFICATION_COLORS: Record<string, string> = {
-  solo_established: "#22C55E",    // green
-  solo_new: "#4ADE80",            // light green
-  solo_inactive: "#64748B",       // gray
-  solo_high_volume: "#16A34A",    // dark green
-  family_practice: "#F59E0B",     // amber
-  small_group: "#3B82F6",         // blue
-  large_group: "#2563EB",         // darker blue
-  dso_regional: "#FB923C",        // orange
-  dso_national: "#EF4444",        // red
-  specialist: "#A855F7",          // purple
-  non_clinical: "#64748B",        // gray
-  unknown: "#475569",             // dim gray
+  solo_established: "#2D8B4E",    // green
+  solo_new: "#059669",            // medium green
+  solo_inactive: "#9C9C90",       // gray
+  solo_high_volume: "#166534",    // dark green
+  family_practice: "#D4920B",     // amber
+  small_group: "#2563EB",         // blue
+  large_group: "#1D4ED8",         // darker blue
+  dso_regional: "#EA580C",        // orange
+  dso_national: "#C23B3B",        // red
+  specialist: "#7C3AED",          // purple
+  non_clinical: "#9C9C90",        // gray
+  unknown: "#B0B0A4",             // dim gray
 };
 
 // ---- Chart colorway ----
 export const CHART_COLORWAY = [
-  "#3B82F6",
-  "#22C55E",
-  "#F59E0B",
-  "#A855F7",
-  "#06B6D4",
-  "#EF4444",
+  "#2563EB",
+  "#2D8B4E",
+  "#D4920B",
   "#7C3AED",
-  "#EA580C",
-  "#22D3EE",
-  "#A3E635",
+  "#0D9488",
+  "#C23B3B",
+  "#6366F1",
+  "#C2410C",
+  "#0D9488",
+  "#65A30D",
 ];
 
 // ---- Accent colors (from CSS vars) ----
 export const ACCENTS = {
-  blue: "#3B82F6",
-  green: "#22C55E",
-  red: "#EF4444",
-  amber: "#F59E0B",
-  purple: "#A855F7",
-  cyan: "#06B6D4",
+  blue: "#B8860B",
+  green: "#2D8B4E",
+  red: "#C23B3B",
+  amber: "#D4920B",
+  purple: "#7C3AED",
+  cyan: "#0D9488",
 } as const;
 
 // ---- Theme colors (for Recharts) ----
 export const CHART_THEME = {
   background: "transparent",
-  gridColor: "#1E293B",
-  textColor: "#94A3B8",
-  tooltipBg: "#0F1629",
-  tooltipBorder: "#1E293B",
-  tooltipText: "#F8FAFC",
+  gridColor: "#E8E5DE",
+  textColor: "#6B6B60",
+  tooltipBg: "#FFFFFF",
+  tooltipBorder: "#E8E5DE",
+  tooltipText: "#1A1A1A",
 } as const;
 
 // ---- Market type colors ----
 export const MARKET_TYPE_COLORS: Record<string, string> = {
-  low_resident_commercial: "#EF4444",
+  low_resident_commercial: "#C23B3B",
   high_saturation_corporate: "#DC2626",
-  corporate_dominant: "#F97316",
-  family_concentrated: "#F59E0B",
-  low_density_high_income: "#22C55E",
-  low_density_independent: "#4ADE80",
-  growing_undersupplied: "#38BDF8",
-  balanced_mixed: "#3B82F6",
-  mixed: "#64748B",
+  corporate_dominant: "#EA580C",
+  family_concentrated: "#D4920B",
+  low_density_high_income: "#2D8B4E",
+  low_density_independent: "#059669",
+  growing_undersupplied: "#0284C7",
+  balanced_mixed: "#2563EB",
+  mixed: "#9C9C90",
 };
 
 // ---- Confidence colors ----
 export const CONFIDENCE_COLORS: Record<string, string> = {
-  high: "#22C55E",
-  confirmed: "#22C55E",
-  medium: "#F59E0B",
-  provisional: "#F59E0B",
-  low: "#EF4444",
-  insufficient_data: "#EF4444",
+  high: "#2D8B4E",
+  confirmed: "#2D8B4E",
+  medium: "#D4920B",
+  provisional: "#D4920B",
+  low: "#C23B3B",
+  insufficient_data: "#C23B3B",
 };
 
 // ---- US States list ----

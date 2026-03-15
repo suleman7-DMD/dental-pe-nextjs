@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  BarChart3,
-  Map,
+  TrendingUp,
+  MapPin,
   Target,
   Briefcase,
-  Microscope,
+  Search,
   Brain,
   Settings,
   ChevronLeft,
@@ -31,15 +31,40 @@ interface NavItem {
   icon: React.ElementType;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Home", href: "/", icon: LayoutDashboard },
-  { label: "Deal Flow", href: "/deal-flow", icon: BarChart3 },
-  { label: "Market Intel", href: "/market-intel", icon: Map },
-  { label: "Buyability", href: "/buyability", icon: Target },
-  { label: "Job Market", href: "/job-market", icon: Briefcase },
-  { label: "Research", href: "/research", icon: Microscope },
-  { label: "Intelligence", href: "/intelligence", icon: Brain },
-  { label: "System", href: "/system", icon: Settings },
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const NAV_SECTIONS: NavSection[] = [
+  {
+    title: "OVERVIEW",
+    items: [
+      { label: "Dashboard", href: "/", icon: LayoutDashboard },
+    ],
+  },
+  {
+    title: "MARKETS",
+    items: [
+      { label: "Job Market", href: "/job-market", icon: Briefcase },
+      { label: "Market Intel", href: "/market-intel", icon: MapPin },
+      { label: "Buyability", href: "/buyability", icon: Target },
+    ],
+  },
+  {
+    title: "ANALYSIS",
+    items: [
+      { label: "Deal Flow", href: "/deal-flow", icon: TrendingUp },
+      { label: "Research", href: "/research", icon: Search },
+      { label: "Intelligence", href: "/intelligence", icon: Brain },
+    ],
+  },
+  {
+    title: "ADMIN",
+    items: [
+      { label: "System", href: "/system", icon: Settings },
+    ],
+  },
 ];
 
 function NavLink({
@@ -63,19 +88,19 @@ function NavLink({
         "group relative flex items-center gap-3 rounded-md text-[13px] font-medium transition-all duration-150",
         "py-[10px] px-4",
         isActive
-          ? "text-[#F8FAFC] bg-[rgba(59,130,246,0.1)]"
-          : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[rgba(255,255,255,0.03)]",
+          ? "text-[#F5F5F0] bg-[rgba(184,134,11,0.1)]"
+          : "text-[#F5F5F0]/60 hover:text-[#F5F5F0]/80 hover:bg-[#363636]",
         collapsed && "justify-center px-0"
       )}
     >
       {/* Active indicator — left border */}
       {isActive && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[2px] rounded-r-full bg-[#3B82F6]" />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[#B8860B]" />
       )}
       <Icon
         className={cn(
           "h-[18px] w-[18px] shrink-0 transition-colors duration-150",
-          isActive ? "text-[#F8FAFC]" : "text-[#94A3B8] group-hover:text-[#F8FAFC]"
+          isActive ? "text-[#F5F5F0]" : "text-[#F5F5F0]/60 group-hover:text-[#F5F5F0]/80"
         )}
       />
       {!collapsed && <span>{item.label}</span>}
@@ -106,7 +131,7 @@ function SidebarContent({
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col bg-[#060B18]">
+    <div className="flex h-full flex-col bg-[#2C2C2C]">
       {/* Logo area */}
       <div
         className={cn(
@@ -116,16 +141,16 @@ function SidebarContent({
       >
         {collapsed ? (
           /* Collapsed: DP monogram */
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#3B82F6]/15 border border-[#3B82F6]/20">
-            <span className="text-[13px] font-bold text-[#3B82F6]">DP</span>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#B8860B]/15 border border-[#B8860B]/20">
+            <span className="text-[13px] font-bold text-[#B8860B]">DP</span>
           </div>
         ) : (
           /* Expanded: Dental PE / INTELLIGENCE */
           <div className="flex flex-col">
-            <span className="text-[18px] font-bold leading-tight text-[#F8FAFC]" style={{ fontFamily: 'var(--font-sans), Inter, sans-serif' }}>
+            <span className="text-[18px] font-bold leading-tight text-[#F5F5F0]" style={{ fontFamily: 'var(--font-sans), Inter, sans-serif' }}>
               Dental PE
             </span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#3B82F6]">
+            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#B8860B]">
               Intelligence
             </span>
           </div>
@@ -136,22 +161,37 @@ function SidebarContent({
       <div className="mx-3 h-px bg-white/[0.06]" />
 
       {/* Navigation */}
-      <nav className="flex-1 flex flex-col gap-[2px] px-2 py-3">
-        {NAV_ITEMS.map((item) => {
-          const isActive =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
-          return (
-            <NavLink
-              key={item.href}
-              item={item}
-              isActive={isActive}
-              collapsed={collapsed}
-              onClick={onNavClick}
-            />
-          );
-        })}
+      <nav className="flex-1 flex flex-col gap-[2px] px-2 py-3 overflow-y-auto">
+        {NAV_SECTIONS.map((section, sectionIdx) => (
+          <div key={section.title} className={cn(sectionIdx > 0 && "mt-3")}>
+            {/* Section label */}
+            {!collapsed && (
+              <div className="px-4 pb-1 pt-1">
+                <span className="text-[10px] font-medium uppercase tracking-widest text-[#F5F5F0]/40">
+                  {section.title}
+                </span>
+              </div>
+            )}
+            {collapsed && sectionIdx > 0 && (
+              <div className="mx-3 mb-1 h-px bg-white/[0.06]" />
+            )}
+            {section.items.map((item) => {
+              const isActive =
+                item.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(item.href);
+              return (
+                <NavLink
+                  key={item.href}
+                  item={item}
+                  isActive={isActive}
+                  collapsed={collapsed}
+                  onClick={onNavClick}
+                />
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* Bottom section */}
@@ -171,7 +211,7 @@ function SidebarContent({
             <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22C55E]" />
           </span>
           {!collapsed && (
-            <span className="text-[11px] font-medium text-[#94A3B8]">
+            <span className="text-[11px] font-medium text-[#F5F5F0]/60">
               System Online
             </span>
           )}
@@ -202,8 +242,8 @@ export function Sidebar() {
             className={cn(
               "flex items-center justify-center",
               "h-9 w-full",
-              "bg-[#060B18] border-t border-white/[0.06]",
-              "text-[#94A3B8] hover:text-[#F8FAFC]",
+              "bg-[#2C2C2C] border-t border-white/[0.06]",
+              "text-[#F5F5F0]/60 hover:text-[#F5F5F0]",
               "transition-colors duration-150"
             )}
           >
@@ -224,7 +264,7 @@ export function Sidebar() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="fixed left-3 top-3 z-50 bg-[#060B18] border border-white/[0.08] text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#060B18]/90"
+                className="fixed left-3 top-3 z-50 bg-[#2C2C2C] border border-white/[0.08] text-[#F5F5F0]/60 hover:text-[#F5F5F0] hover:bg-[#363636]"
               />
             }
           >
@@ -232,7 +272,7 @@ export function Sidebar() {
           </SheetTrigger>
           <SheetContent
             side="left"
-            className="w-[220px] p-0 bg-[#060B18] border-white/[0.06]"
+            className="w-[220px] p-0 bg-[#2C2C2C] border-white/[0.06]"
             showCloseButton={false}
           >
             <SidebarContent collapsed={false} />

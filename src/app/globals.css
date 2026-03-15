@@ -49,56 +49,78 @@
 }
 
 :root {
-  /* Vercel Dashboard x Bloomberg Terminal — dark-first design system */
-  --bg-surface: #0A0F1E;
-  --bg-card: #0F1629;
-  --bg-card-hover: #1A2035;
-  --bg-primary: #0A0F1E;
-  --border: #1E293B;
-  --border-hover: #334155;
-  --accent-blue: #3B82F6;
-  --accent-green: #22C55E;
-  --accent-red: #EF4444;
-  --accent-amber: #F59E0B;
-  --accent-purple: #A855F7;
-  --accent-cyan: #06B6D4;
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
+  /* Light theme design system */
+  --bg-surface: #FAFAF7;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F7F7F4;
+  --bg-primary: #FAFAF7;
+  --border: #E8E5DE;
+  --border-hover: #D4D0C8;
+  --accent-blue: #B8860B;
+  --accent-green: #2D8B4E;
+  --accent-red: #C23B3B;
+  --accent-amber: #D4920B;
+  --accent-purple: #7C3AED;
+  --accent-cyan: #0D9488;
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B6B60;
+  --text-muted: #9C9C90;
 
-  /* shadcn overrides for dark theme */
-  --background: #0A0F1E;
-  --foreground: #F8FAFC;
-  --card: #0F1629;
-  --card-foreground: #F8FAFC;
-  --popover: #1A2035;
-  --popover-foreground: #F8FAFC;
-  --primary: #3B82F6;
+  /* shadcn overrides for light theme */
+  --background: #FAFAF7;
+  --foreground: #1A1A1A;
+  --card: #FFFFFF;
+  --card-foreground: #1A1A1A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1A1A;
+  --primary: #B8860B;
   --primary-foreground: #FFFFFF;
-  --secondary: #1A2035;
-  --secondary-foreground: #F8FAFC;
-  --muted: #1E293B;
-  --muted-foreground: #94A3B8;
-  --accent: #1A2035;
-  --accent-foreground: #F8FAFC;
-  --destructive: #EF4444;
-  --border: #1E293B;
-  --input: #1E293B;
-  --ring: #3B82F6;
-  --chart-1: #3B82F6;
-  --chart-2: #22C55E;
-  --chart-3: #F59E0B;
-  --chart-4: #A855F7;
-  --chart-5: #06B6D4;
+  --secondary: #F5F5F0;
+  --secondary-foreground: #1A1A1A;
+  --muted: #F5F5F0;
+  --muted-foreground: #6B6B60;
+  --accent: #F7F7F4;
+  --accent-foreground: #1A1A1A;
+  --destructive: #C23B3B;
+  --destructive-foreground: #FFFFFF;
+  --input: #E8E5DE;
+  --ring: #B8860B;
+  --chart-1: #2563EB;
+  --chart-2: #7C3AED;
+  --chart-3: #0D9488;
+  --chart-4: #D4920B;
+  --chart-5: #C23B3B;
   --radius: 0.625rem;
-  --sidebar: #060B18;
-  --sidebar-foreground: #F8FAFC;
-  --sidebar-primary: #3B82F6;
+  --sidebar-background: #2C2C2C;
+  --sidebar: #2C2C2C;
+  --sidebar-foreground: #F5F5F0;
+  --sidebar-primary: #B8860B;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #0F1629;
-  --sidebar-accent-foreground: #F8FAFC;
-  --sidebar-border: #1E293B;
-  --sidebar-ring: #3B82F6;
+  --sidebar-accent: #B8860B;
+  --sidebar-accent-foreground: #F5F5F0;
+  --sidebar-border: #E8E5DE;
+  --sidebar-ring: #B8860B;
+
+  /* Semantic data colors */
+  --data-green: #2D8B4E;
+  --data-red: #C23B3B;
+  --data-amber: #D4920B;
+  --data-blue: #2563EB;
+  --data-purple: #7C3AED;
+  --data-teal: #0D9488;
+
+  /* Entity status colors */
+  --status-corporate: #C23B3B;
+  --status-independent: #2563EB;
+  --status-specialist: #0D9488;
+  --status-group: #6366F1;
+  --status-risk: #DC2626;
+  --status-opportunity: #2D8B4E;
+
+  /* Chart palette */
+  --chart-6: #6366F1;
+  --chart-7: #059669;
+  --chart-8: #8B7355;
 }
 
 @layer base {
@@ -121,20 +143,20 @@
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: #1E293B #0A0F1E;
+    scrollbar-color: #D4D0C8 #FAFAF7;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   .scrollbar-thin::-webkit-scrollbar-track {
-    background: #0A0F1E;
+    background: #FAFAF7;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #1E293B;
+    background: #E8E5DE;
     border-radius: 3px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #334155;
+    background: #D4D0C8;
   }
 }

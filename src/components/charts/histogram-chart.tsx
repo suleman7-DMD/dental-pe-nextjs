@@ -165,7 +165,7 @@ export function HistogramChart({
               color: CHART_THEME.tooltipText,
               fontSize: "12px",
             }}
-            cursor={{ fill: "rgba(255,255,255,0.05)" }}
+            cursor={{ fill: "rgba(0,0,0,0.05)" }}
           />
 
           {isStacked
@@ -202,14 +202,14 @@ export function HistogramChart({
             <ReferenceLine
               key={`vl-${i}`}
               x={vl.x}
-              stroke={vl.color ?? "#EF4444"}
+              stroke={vl.color ?? "#C23B3B"}
               strokeDasharray={vl.dash ? "6 3" : undefined}
               label={
                 vl.label
                   ? {
                       value: vl.label,
                       position: "top",
-                      fill: vl.color ?? "#EF4444",
+                      fill: vl.color ?? "#C23B3B",
                       fontSize: 10,
                     }
                   : undefined

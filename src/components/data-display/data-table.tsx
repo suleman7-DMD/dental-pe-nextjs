@@ -205,17 +205,17 @@ export function DataTable<T extends Record<string, any>>({
         <div className="flex items-center gap-3">
           {searchable && (
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9C90]" />
               <Input
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="pl-9 bg-[#0D1220] border-[#1E293B] text-[#F8FAFC] placeholder:text-[#475569] focus:border-[#3B82F6] focus:ring-0"
+                className="pl-9 bg-[#FFFFFF] border-[#E8E5DE] text-[#1A1A1A] placeholder:text-[#B5B5A8] focus:border-[#B8860B] focus:ring-0"
               />
             </div>
           )}
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-[var(--text-muted)]">
+            <span className="text-xs text-[#9C9C90]">
               {filteredRowCount} rows
             </span>
             {handleCSVDownload && (
@@ -223,7 +223,7 @@ export function DataTable<T extends Record<string, any>>({
                 variant="outline"
                 size="sm"
                 onClick={handleCSVDownload}
-                className="gap-1.5 text-xs bg-[var(--bg-card)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)]"
+                className="gap-1.5 text-xs bg-[#FFFFFF] border-[#E8E5DE] text-[#6B6B60] hover:bg-[#F7F7F4]"
               >
                 <Download className="h-3.5 w-3.5" />
                 CSV
@@ -234,25 +234,25 @@ export function DataTable<T extends Record<string, any>>({
       )}
 
       {/* Table */}
-      <div className="rounded-lg border border-[#1E293B] overflow-hidden">
+      <div className="rounded-lg border border-[#E8E5DE] overflow-hidden">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className="border-[var(--border)] bg-[#0D1424] hover:bg-[#0D1424]"
+                className="border-[#E8E5DE] bg-[#F5F5F0] hover:bg-[#F5F5F0]"
               >
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="sticky top-0 z-10 bg-[#0D1424] text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8] border-b-2 border-[#1E293B]"
+                    className="sticky top-0 z-10 bg-[#F5F5F0] text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90] border-b-2 border-[#E8E5DE]"
                   >
                     {header.isPlaceholder ? null : (
                       <div
                         className={cn(
                           "flex items-center gap-1",
                           header.column.getCanSort() &&
-                            "cursor-pointer select-none hover:text-[var(--text-primary)]"
+                            "cursor-pointer select-none hover:text-[#1A1A1A]"
                         )}
                         onClick={header.column.getToggleSortingHandler()}
                       >
@@ -262,11 +262,11 @@ export function DataTable<T extends Record<string, any>>({
                         )}
                         {header.column.getCanSort() &&
                           (header.column.getIsSorted() === "asc" ? (
-                            <ArrowUp className="h-3 w-3" />
+                            <ArrowUp className="h-3 w-3 text-[#B8860B]" />
                           ) : header.column.getIsSorted() === "desc" ? (
-                            <ArrowDown className="h-3 w-3" />
+                            <ArrowDown className="h-3 w-3 text-[#B8860B]" />
                           ) : (
-                            <ArrowUpDown className="h-3 w-3 opacity-40" />
+                            <ArrowUpDown className="h-3 w-3 text-[#9C9C90] opacity-40" />
                           ))}
                       </div>
                     )}
@@ -280,7 +280,7 @@ export function DataTable<T extends Record<string, any>>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center text-[13px] text-[#475569]"
+                  className="h-24 text-center text-[13px] text-[#9C9C90]"
                 >
                   {emptyMessage}
                 </TableCell>
@@ -297,15 +297,14 @@ export function DataTable<T extends Record<string, any>>({
                   }
                   onClick={() => onRowClick?.(row.original)}
                   className={cn(
-                    "border-[var(--border)] hover:bg-[#1A2035] transition-colors",
-                    idx % 2 === 0 ? "bg-[#0A0F1E]" : "bg-[#0F1629]",
+                    "border-b border-[#E8E5DE] hover:bg-[#F7F7F4] transition-colors",
                     onRowClick && "cursor-pointer"
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="text-[13px] text-[#CBD5E1]"
+                      className="text-[13px] text-[#3D3D35]"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
@@ -323,7 +322,7 @@ export function DataTable<T extends Record<string, any>>({
       {/* Pagination */}
       {pagination && pageCount > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-[#64748B]">
+          <span className="text-[11px] text-[#9C9C90]">
             Page {currentPage} of {pageCount}
           </span>
           <div className="flex items-center gap-1">
@@ -332,7 +331,7 @@ export function DataTable<T extends Record<string, any>>({
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="h-8 w-8 p-0 bg-[#0D1220] border-[#1E293B] text-[#64748B] hover:bg-[#1A2035] hover:text-[#CBD5E1] disabled:opacity-30"
+              className="h-8 w-8 p-0 bg-[#FFFFFF] border-[#E8E5DE] text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -341,7 +340,7 @@ export function DataTable<T extends Record<string, any>>({
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="h-8 w-8 p-0 bg-[#0D1220] border-[#1E293B] text-[#64748B] hover:bg-[#1A2035] hover:text-[#CBD5E1] disabled:opacity-30"
+              className="h-8 w-8 p-0 bg-[#FFFFFF] border-[#E8E5DE] text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

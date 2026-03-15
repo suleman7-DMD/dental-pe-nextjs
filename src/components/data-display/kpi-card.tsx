@@ -48,8 +48,8 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        "group relative rounded-lg border border-[#1E293B] bg-[#0F1629] p-4",
-        "transition-all duration-200 hover:border-[#334155] hover:-translate-y-[1px]",
+        "group relative rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-4 px-5",
+        "transition-all duration-200 hover:border-[#D4D0C8] hover:-translate-y-[1px]",
         className
       )}
       style={{
@@ -57,7 +57,7 @@ export function KpiCard({
           ? {
               borderLeftWidth: "3px",
               borderLeftColor: accentColor,
-              backgroundColor: `color-mix(in srgb, ${accentColor} 4%, #0F1629)`,
+              backgroundColor: `color-mix(in srgb, ${accentColor} 4%, #FFFFFF)`,
             }
           : {}),
       }}
@@ -66,7 +66,7 @@ export function KpiCard({
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div
-            className="text-[#64748B]"
+            className="text-[#6B6B60]"
             style={accentColor ? { color: accentColor } : undefined}
           >
             {typeof icon === "string" ? (
@@ -81,20 +81,20 @@ export function KpiCard({
                 delay={200}
                 render={
                   <span className="cursor-help">
-                    <HelpCircle className="h-3 w-3 text-[#475569]" />
+                    <HelpCircle className="h-3 w-3 text-[#B5B5A8]" />
                   </span>
                 }
               />
               <TooltipContent
                 side="top"
-                className="max-w-[260px] bg-[#1E293B] border-[#334155] text-[#F8FAFC] text-xs"
+                className="max-w-[260px] bg-[#FFFFFF] border-[#D4D0C8] text-[#1A1A1A] text-xs shadow-md"
               >
                 {tooltip}
               </TooltipContent>
             </Tooltip>
           )}
         </div>
-        <span className="text-[11px] font-medium uppercase tracking-wider text-[#94A3B8]">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-[#6B6B60]">
           {label}
         </span>
       </div>
@@ -102,16 +102,16 @@ export function KpiCard({
       {/* Value */}
       <div className="flex items-baseline gap-1.5">
         <span
-          className="text-[32px] font-bold font-mono leading-none tracking-tight"
+          className="text-[28px] font-bold font-mono leading-none tracking-tight"
           style={{
-            color: accentColor ?? "#F8FAFC",
+            color: accentColor ?? "#1A1A1A",
             fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
           }}
         >
           {value}
         </span>
         {suffix && (
-          <span className="text-xs text-[#94A3B8] font-mono">{suffix}</span>
+          <span className="text-xs text-[#6B6B60] font-mono">{suffix}</span>
         )}
       </div>
 
@@ -123,18 +123,19 @@ export function KpiCard({
         <div className="mt-2 flex items-center gap-1 text-[11px]">
           {normalizedDelta.value != null && (
             <span
-              className={
+              className={cn(
+                "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5",
                 normalizedDelta.value >= 0
-                  ? "text-[#22C55E]"
-                  : "text-[#EF4444]"
-              }
+                  ? "bg-[#2D8B4E]/10 text-[#2D8B4E]"
+                  : "bg-[#C23B3B]/10 text-[#C23B3B]"
+              )}
             >
               {normalizedDelta.value >= 0 ? "\u2191" : "\u2193"}{" "}
               {Math.abs(normalizedDelta.value)}
             </span>
           )}
           {normalizedDelta.label && (
-            <span className="text-[#64748B]">{normalizedDelta.label}</span>
+            <span className="text-[#9C9C90]">{normalizedDelta.label}</span>
           )}
         </div>
       )}

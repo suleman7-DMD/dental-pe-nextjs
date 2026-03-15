@@ -46,7 +46,7 @@ interface FilterGroupProps {
 export function FilterGroup({ label, children, className }: FilterGroupProps) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <span className="text-[0.7rem] font-medium uppercase tracking-wider text-[var(--text-muted,#94A3B8)]">
+      <span className="text-[0.7rem] font-medium uppercase tracking-wider text-[var(--text-muted,#9C9C90)]">
         {label}
       </span>
       {children}
@@ -107,8 +107,8 @@ export function MultiSelect({
         onClick={() => setOpen(!open)}
         className={cn(
           "flex w-full items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-left text-sm",
-          "border-[var(--border,#1E293B)] bg-[var(--bg-card,#0F1629)] text-[var(--text-primary,#F8FAFC)]",
-          "hover:border-[var(--border-hover,#2A3A4E)] transition-colors"
+          "border-[var(--border,#E8E5DE)] bg-[var(--bg-card,#FFFFFF)] text-[var(--text-primary,#1A1A1A)]",
+          "hover:border-[var(--border-hover,#D4D0C8)] transition-colors"
         )}
       >
         <span className="truncate">{displayText}</span>
@@ -122,31 +122,31 @@ export function MultiSelect({
             e.stopPropagation();
             onChange([]);
           }}
-          className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent,#EF4444)] text-white"
+          className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent,#C23B3B)] text-white"
         >
           <X className="h-2.5 w-2.5" />
         </button>
       )}
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 max-h-60 w-full min-w-[180px] overflow-auto rounded-md border border-[var(--border,#1E293B)] bg-[var(--bg-card,#0F1629)] py-1 shadow-lg">
+        <div className="absolute left-0 top-full z-50 mt-1 max-h-60 w-full min-w-[180px] overflow-auto rounded-md border border-[var(--border,#E8E5DE)] bg-[var(--bg-card,#FFFFFF)] py-1 shadow-lg">
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-[var(--text-muted,#94A3B8)]">
+            <div className="px-3 py-2 text-xs text-[var(--text-muted,#9C9C90)]">
               No options
             </div>
           ) : (
             options.map((opt) => (
               <label
                 key={opt}
-                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-[var(--bg-hover,#1E293B)] transition-colors"
+                className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm hover:bg-[var(--bg-hover,#F7F7F4)] transition-colors"
               >
                 <input
                   type="checkbox"
                   checked={selected.includes(opt)}
                   onChange={() => toggle(opt)}
-                  className="h-3.5 w-3.5 rounded border-[var(--border,#1E293B)] accent-[var(--accent,#4FC3F7)]"
+                  className="h-3.5 w-3.5 rounded border-[var(--border,#E8E5DE)] accent-[var(--accent,#B8860B)]"
                 />
-                <span className="truncate text-[var(--text-primary,#F8FAFC)]">
+                <span className="truncate text-[var(--text-primary,#1A1A1A)]">
                   {opt}
                 </span>
               </label>

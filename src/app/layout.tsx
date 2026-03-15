@@ -39,9 +39,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
-        className={`${dmSans.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased`}
+        className={`${dmSans.variable} ${inter.variable} ${jetbrainsMono.variable} antialiased bg-[#FAFAF7]`}
       >
         <QueryProvider>
           <SidebarProvider>

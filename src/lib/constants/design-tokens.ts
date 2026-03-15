@@ -1,48 +1,48 @@
 /**
- * Design system tokens — "Vercel Dashboard x Bloomberg Terminal" spec.
+ * Design system tokens — light theme with warm neutrals and goldenrod accent.
  * Used across all dashboard pages for consistent styling.
  */
 
 // Background hierarchy
 export const BACKGROUNDS = {
-  deepest: '#0A0F1E',
-  card: '#0F1629',
-  elevated: '#1A2035',
-  sidebar: '#060B18',
+  deepest: '#FAFAF7',
+  card: '#FFFFFF',
+  elevated: '#F7F7F4',
+  sidebar: '#2C2C2C',
 } as const;
 
 // Border hierarchy
 export const BORDERS = {
-  subtle: '#1E293B',
-  emphasis: '#334155',
+  subtle: '#E8E5DE',
+  emphasis: '#D4D0C8',
 } as const;
 
 // Text hierarchy
 export const TEXT = {
-  primary: '#F8FAFC',
-  secondary: '#94A3B8',
-  muted: '#64748B',
-  dimmed: '#475569',
+  primary: '#1A1A1A',
+  secondary: '#6B6B60',
+  muted: '#9C9C90',
+  dimmed: '#B0B0A4',
 } as const;
 
 // Semantic colors — use EVERYWHERE
 export const SEMANTIC = {
-  green: '#22C55E',
-  red: '#EF4444',
-  amber: '#F59E0B',
-  purple: '#A855F7',
-  blue: '#3B82F6',
-  gray: '#64748B',
+  green: '#2D8B4E',
+  red: '#C23B3B',
+  amber: '#D4920B',
+  purple: '#7C3AED',
+  blue: '#B8860B',
+  gray: '#9C9C90',
 } as const;
 
 // Semantic background tints (10% opacity for badges/backgrounds)
 export const SEMANTIC_BG = {
-  green: 'rgba(34, 197, 94, 0.1)',
-  red: 'rgba(239, 68, 68, 0.1)',
-  amber: 'rgba(245, 158, 11, 0.1)',
-  purple: 'rgba(168, 85, 247, 0.1)',
-  blue: 'rgba(59, 130, 246, 0.1)',
-  gray: 'rgba(100, 116, 139, 0.1)',
+  green: 'rgba(45, 139, 78, 0.1)',
+  red: 'rgba(194, 59, 59, 0.1)',
+  amber: 'rgba(212, 146, 11, 0.1)',
+  purple: 'rgba(124, 58, 237, 0.1)',
+  blue: 'rgba(184, 134, 11, 0.1)',
+  gray: 'rgba(156, 156, 144, 0.1)',
 } as const;
 
 // Legacy-compatible alias — maps old `colors.x` paths to new tokens
@@ -62,7 +62,7 @@ export const colors = {
     red: SEMANTIC.red,
     amber: SEMANTIC.amber,
     purple: SEMANTIC.purple,
-    cyan: '#06B6D4',
+    cyan: '#0D9488',
   },
   text: {
     primary: TEXT.primary,
@@ -70,21 +70,21 @@ export const colors = {
     muted: TEXT.muted,
   },
   status: {
-    independent: SEMANTIC.green,
+    independent: '#2563EB',
     dso_affiliated: SEMANTIC.amber,
     pe_backed: SEMANTIC.red,
     unknown: TEXT.muted,
   },
   saturation: {
-    greenBg: '#166534',
-    yellowBg: '#A16207',
-    redBg: '#991B1B',
+    greenBg: '#2D8B4E',
+    yellowBg: '#D4920B',
+    redBg: '#C23B3B',
   },
 } as const
 
 export const chartColorway = [
-  SEMANTIC.blue, SEMANTIC.green, SEMANTIC.amber, SEMANTIC.purple, '#06B6D4',
-  SEMANTIC.red, '#7C3AED', '#EA580C', '#22D3EE', '#A3E635',
+  '#2563EB', SEMANTIC.green, SEMANTIC.amber, SEMANTIC.purple, '#0D9488',
+  SEMANTIC.red, '#7C3AED', '#C2410C', '#0D9488', '#65A30D',
 ]
 
 export type OwnershipStatus = 'independent' | 'likely_independent' | 'dso_affiliated' | 'pe_backed' | 'unknown'
