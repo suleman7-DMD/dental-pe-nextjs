@@ -6,6 +6,8 @@ import { BarChart } from '@/components/charts/bar-chart'
 import { StackedBarChart } from '@/components/charts/stacked-bar-chart'
 import { DataTable } from '@/components/data-display/data-table'
 
+import { isCorporateClassification, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
+
 import type { Practice } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
 
@@ -74,8 +76,10 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
     for (const p of practices) {
       const dso = p.affiliated_dso
       if (!dso || dso.trim() === '') continue
-      // Filter out "General Dentistry" artifact
-      if (dso.toLowerCase() === 'general dentistry') continue
+      // Filter out taxonomy description artifacts
+      if (DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))) continue
+      // Only count practices classified as corporate
+      if (!isCorporateClassification(p.entity_classification)) continue
 
       if (!dsoCounts[dso]) dsoCounts[dso] = { locations: 0, zips: new Set() }
       dsoCounts[dso].locations++

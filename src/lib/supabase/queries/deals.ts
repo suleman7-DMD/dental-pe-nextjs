@@ -52,13 +52,33 @@ export async function getDealStats(
   supabase: SupabaseClient
 ): Promise<DealStats> {
   // Fetch all deals (needed for deal-flow page + aggregation)
-  const { data: allDeals, count: totalDeals } = await supabase
-    .from("deals")
-    .select("*", { count: "exact" })
-    .order("deal_date", { ascending: false });
+  // Supabase default limit is 1000 rows — paginate to get all 2,500+
+  const allDeals: Deal[] = [];
+  const pageSize = 1000;
+  let page = 0;
+  let totalDeals = 0;
 
-  const deals = (allDeals as Deal[]) ?? [];
-  const total = totalDeals ?? deals.length;
+  while (true) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, count, error } = await supabase
+      .from("deals")
+      .select("*", { count: "exact" })
+      .order("deal_date", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+    if (page === 0) totalDeals = count ?? 0;
+
+    const batch = (data as Deal[]) ?? [];
+    allDeals.push(...batch);
+
+    if (batch.length < pageSize) break;
+    page++;
+  }
+
+  const deals = allDeals;
+  const total = totalDeals || deals.length;
 
   // Deals by type
   const byType: Record<string, number> = {};
@@ -149,13 +169,29 @@ export async function getTopSponsors(
   supabase: SupabaseClient,
   limit = 15
 ): Promise<{ name: string; deal_count: number }[]> {
-  const { data } = await supabase
-    .from("deals")
-    .select("pe_sponsor")
-    .not("pe_sponsor", "is", null);
+  // Paginate to get all sponsors (2,500+ deals exceeds default 1000 row limit)
+  const allRows: { pe_sponsor: string }[] = [];
+  const pageSize = 1000;
+  let page = 0;
+
+  while (true) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from("deals")
+      .select("pe_sponsor")
+      .not("pe_sponsor", "is", null)
+      .range(from, to);
+
+    if (error) throw error;
+    const batch = (data ?? []) as { pe_sponsor: string }[];
+    allRows.push(...batch);
+    if (batch.length < pageSize) break;
+    page++;
+  }
 
   const counts: Record<string, number> = {};
-  (data ?? []).forEach((row: { pe_sponsor: string }) => {
+  allRows.forEach((row) => {
     counts[row.pe_sponsor] = (counts[row.pe_sponsor] ?? 0) + 1;
   });
 
@@ -169,12 +205,28 @@ export async function getTopPlatforms(
   supabase: SupabaseClient,
   limit = 15
 ): Promise<{ name: string; deal_count: number }[]> {
-  const { data } = await supabase
-    .from("deals")
-    .select("platform_company");
+  // Paginate to get all platforms (2,500+ deals exceeds default 1000 row limit)
+  const allRows: { platform_company: string }[] = [];
+  const pageSize = 1000;
+  let page = 0;
+
+  while (true) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await supabase
+      .from("deals")
+      .select("platform_company")
+      .range(from, to);
+
+    if (error) throw error;
+    const batch = (data ?? []) as { platform_company: string }[];
+    allRows.push(...batch);
+    if (batch.length < pageSize) break;
+    page++;
+  }
 
   const counts: Record<string, number> = {};
-  (data ?? []).forEach((row: { platform_company: string }) => {
+  allRows.forEach((row) => {
     counts[row.platform_company] =
       (counts[row.platform_company] ?? 0) + 1;
   });
@@ -200,23 +252,44 @@ export async function getRecentDeals(
 }
 
 /**
+ * Paginated helper to fetch all rows of a single column from deals table.
+ */
+async function fetchAllDealColumn<T extends Record<string, unknown>>(
+  supabase: SupabaseClient,
+  column: string,
+  notNull = true
+): Promise<T[]> {
+  const allRows: T[] = [];
+  const pageSize = 1000;
+  let page = 0;
+
+  while (true) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    let q = supabase.from("deals").select(column);
+    if (notNull) q = q.not(column, "is", null);
+    q = q.range(from, to);
+    const { data, error } = await q;
+    if (error) throw error;
+    const batch = (data ?? []) as unknown as T[];
+    allRows.push(...batch);
+    if (batch.length < pageSize) break;
+    page++;
+  }
+  return allRows;
+}
+
+/**
  * Return sorted list of distinct PE sponsor names.
  */
 export async function getDistinctSponsors(
   supabase: SupabaseClient
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("deals")
-    .select("pe_sponsor")
-    .not("pe_sponsor", "is", null);
-
-  if (error) throw error;
+  const rows = await fetchAllDealColumn<{ pe_sponsor: string | null }>(
+    supabase, "pe_sponsor"
+  );
   const unique = Array.from(
-    new Set(
-      (data ?? [])
-        .map((r: { pe_sponsor: string | null }) => r.pe_sponsor)
-        .filter(Boolean) as string[]
-    )
+    new Set(rows.map((r) => r.pe_sponsor).filter(Boolean) as string[])
   ).sort();
   return unique;
 }
@@ -227,18 +300,11 @@ export async function getDistinctSponsors(
 export async function getDistinctPlatforms(
   supabase: SupabaseClient
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("deals")
-    .select("platform_company")
-    .not("platform_company", "is", null);
-
-  if (error) throw error;
+  const rows = await fetchAllDealColumn<{ platform_company: string | null }>(
+    supabase, "platform_company"
+  );
   const unique = Array.from(
-    new Set(
-      (data ?? [])
-        .map((r: { platform_company: string | null }) => r.platform_company)
-        .filter(Boolean) as string[]
-    )
+    new Set(rows.map((r) => r.platform_company).filter(Boolean) as string[])
   ).sort();
   return unique;
 }
@@ -249,18 +315,11 @@ export async function getDistinctPlatforms(
 export async function getDistinctStates(
   supabase: SupabaseClient
 ): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("deals")
-    .select("target_state")
-    .not("target_state", "is", null);
-
-  if (error) throw error;
+  const rows = await fetchAllDealColumn<{ target_state: string | null }>(
+    supabase, "target_state"
+  );
   const unique = Array.from(
-    new Set(
-      (data ?? [])
-        .map((r: { target_state: string | null }) => r.target_state)
-        .filter(Boolean) as string[]
-    )
+    new Set(rows.map((r) => r.target_state).filter(Boolean) as string[])
   ).sort();
   return unique;
 }

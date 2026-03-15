@@ -90,10 +90,48 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
     setLoading(false)
   }, [zipList, loaded, loading])
 
+  // Build zip_code -> ZipScore lookup for initial totals before practices are loaded
+  const zipScoreMap = useMemo(() => {
+    const map = new Map<string, ZipScore>()
+    for (const zs of zipScores) {
+      map.set(zs.zip_code, zs)
+    }
+    return map
+  }, [zipScores])
+
   // Compute city-level stats
+  // Before practices are loaded, use zip_scores for totals (avoids "0 practices" bug).
+  // After practices are loaded, use practice-level computation for accuracy.
   const cityGroups = useMemo((): CityGroup[] => {
     return sortedCityNames.map(cityName => {
       const zips = cityZips[cityName]
+
+      if (!loaded) {
+        // Use zip_scores data for initial totals
+        let total = 0
+        let independent = 0
+        let dso = 0
+        let pe = 0
+        for (const zip of zips) {
+          const zs = zipScoreMap.get(zip)
+          if (zs) {
+            total += zs.total_practices ?? 0
+            independent += zs.independent_count ?? 0
+            dso += zs.dso_affiliated_count ?? 0
+            pe += zs.pe_backed_count ?? 0
+          }
+        }
+        return {
+          cityName,
+          zips: [...zips].sort(),
+          total,
+          independent,
+          dso,
+          pe,
+        }
+      }
+
+      // Practices have been loaded — use practice-level computation
       const cityPractices = practices.filter(p => p.zip && zips.includes(p.zip))
       return {
         cityName,
@@ -113,7 +151,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
         }).length,
       }
     })
-  }, [sortedCityNames, cityZips, practices])
+  }, [sortedCityNames, cityZips, practices, loaded, zipScoreMap])
 
   const toggleCity = useCallback(
     (city: string) => {
@@ -223,8 +261,12 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                         const zipIsExpanded = expandedZips.has(zip)
                         const zipScore = zipScores.find(z => z.zip_code === zip)
                         const scoreTag = zipScore?.opportunity_score != null
-                          ? ` | Score: ${zipScore.opportunity_score.toFixed(0)}`
+                          ? ` | Score: ${zipScore.opportunity_score}`
                           : ''
+                        // Use zip_scores count before practices are loaded
+                        const zipPracticeCount = loaded
+                          ? zipPractices.length
+                          : (zipScore?.total_practices ?? 0)
 
                         return (
                           <div key={zip} className="border-t border-[#1E293B]/50">
@@ -242,7 +284,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                               </svg>
                               <span className="text-[0.82rem] text-[#F8FAFC]">{zip}</span>
                               <span className="text-xs text-[#94A3B8]">
-                                {zipPractices.length} practices{scoreTag}
+                                {zipPracticeCount} practices{scoreTag}
                               </span>
                             </button>
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { MapPin } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { createBrowserClient } from '@/lib/supabase/client'
 import type { Deal } from '@/lib/types'
@@ -100,7 +101,7 @@ export function StateDeepDive({ states }: StateDeepDiveProps) {
         <>
           {/* KPI */}
           <KpiCard
-            icon="map"
+            icon={<MapPin className="h-4 w-4" />}
             label={`${selected} Deals`}
             value={deals.length.toLocaleString()}
             suffix="total deals in state"

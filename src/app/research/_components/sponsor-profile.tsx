@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { Building2 } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { createBrowserClient } from '@/lib/supabase/client'
 import type { Deal } from '@/lib/types'
@@ -104,7 +105,7 @@ export function SponsorProfile({ sponsors }: SponsorProfileProps) {
       ) : (
         <>
           {/* KPI */}
-          <KpiCard icon="building" label={selected} value={deals.length.toLocaleString()} suffix="total deals" />
+          <KpiCard icon={<Building2 className="h-4 w-4" />} label={selected} value={deals.length.toLocaleString()} suffix="total deals" />
 
           {/* Timeline */}
           {timelineData.length > 0 && (

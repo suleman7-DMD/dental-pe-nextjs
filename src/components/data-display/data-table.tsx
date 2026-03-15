@@ -59,34 +59,29 @@ function toColumnDefs<T extends Record<string, any>>(
     cell: col.render
       ? ({ row, getValue }) => {
           const val = getValue();
-          // Try with cell value first (what render functions expect)
-          try {
-            const cellResult = col.render!(val);
-            // If result is a plain object (not React element), extract .label or stringify
-            if (
-              cellResult !== null &&
-              cellResult !== undefined &&
-              typeof cellResult === "object" &&
-              !React.isValidElement(cellResult)
-            ) {
-              if ("label" in cellResult) return String(cellResult.label);
-              return JSON.stringify(cellResult);
+
+          // Helper: sanitize render output
+          const sanitize = (result: unknown): React.ReactNode => {
+            if (result === null || result === undefined) {
+              return val == null ? "\u2014" : String(val);
             }
-            return cellResult ?? (val == null ? "\u2014" : String(val));
+            if (typeof result === "object" && !React.isValidElement(result)) {
+              if ("label" in (result as Record<string, unknown>))
+                return String((result as Record<string, unknown>).label);
+              return JSON.stringify(result);
+            }
+            return result as React.ReactNode;
+          };
+
+          // Try with full row first (most render functions expect the row object)
+          try {
+            const rowResult = col.render!(row.original);
+            return sanitize(rowResult);
           } catch {
-            // Fallback: try with full row (some render functions may expect it)
+            // Fallback: try with cell value (some render functions may just format the value)
             try {
-              const rowResult = col.render!(row.original);
-              if (
-                rowResult !== null &&
-                rowResult !== undefined &&
-                typeof rowResult === "object" &&
-                !React.isValidElement(rowResult)
-              ) {
-                if ("label" in rowResult) return String(rowResult.label);
-                return JSON.stringify(rowResult);
-              }
-              return rowResult ?? (val == null ? "\u2014" : String(val));
+              const cellResult = col.render!(val);
+              return sanitize(cellResult);
             } catch {
               return val == null ? "\u2014" : String(val);
             }

@@ -78,21 +78,44 @@ export interface ZipScore {
   id: number
   zip_code: string
   city: string | null
+  state: string | null
+  metro_area: string | null
   total_practices: number | null
   independent_count: number | null
   dso_affiliated_count: number | null
   pe_backed_count: number | null
   unknown_count: number | null
+  institutional_count: number | null
+  raw_npi_count: number | null
+  classified_count: number | null
   consolidation_score?: number | null
+  consolidation_pct: number | null
+  consolidation_pct_of_total: number | null
+  independent_pct_of_total: number | null
+  pe_penetration_pct: number | null
+  pct_unknown: number | null
+  recent_changes_90d: number | null
+  state_deal_count_12m: number | null
+  score_date: string | null
+  opportunity_score: number | null
+  data_confidence: string | null
+  consolidated_count: number | null
+  unclassified_pct: number | null
   total_gp_locations: number | null
   total_specialist_locations: number | null
   dld_gp_per_10k: number | null
+  dld_total_per_10k: number | null
   buyable_practice_ratio: number | null
+  buyable_practice_count: number | null
   corporate_share_pct: number | null
+  corporate_location_count: number | null
+  family_practice_count: number | null
   people_per_gp_door: number | null
+  specialist_density_flag: boolean | null
   market_type: string | null
   metrics_confidence: string | null
   market_type_confidence: string | null
+  entity_classification_coverage_pct: number | null
   data_axle_enrichment_pct: number | null
 }
 

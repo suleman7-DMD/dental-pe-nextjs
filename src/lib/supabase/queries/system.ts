@@ -71,17 +71,37 @@ export async function getDataFreshness(
 export async function getSourceCoverage(
   supabase: SupabaseClient
 ): Promise<Record<string, number>> {
-  const { data, error } = await supabase
-    .from("practices")
-    .select("data_source");
-
-  if (error) throw error;
-
+  // Count practices per data_source using separate count queries
+  // (avoids fetching 400k+ rows which exceeds Supabase's default 1000 row limit)
+  const knownSources = ["nppes", "data_axle", "manual", "unknown"];
   const counts: Record<string, number> = {};
-  (data ?? []).forEach((row: { data_source: string | null }) => {
-    const src = row.data_source ?? "unknown";
-    counts[src] = (counts[src] ?? 0) + 1;
-  });
+
+  // Get total count first
+  const { count: total } = await supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true });
+
+  // Count each known source
+  for (const src of knownSources) {
+    if (src === "unknown") continue; // handle below
+    const { count } = await supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .eq("data_source", src);
+    if (count && count > 0) counts[src] = count;
+  }
+
+  // Count nulls as unknown
+  const { count: nullCount } = await supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .is("data_source", null);
+
+  // Calculate any remaining sources not in knownSources
+  const knownTotal = Object.values(counts).reduce((a, b) => a + b, 0) + (nullCount ?? 0);
+  const remaining = (total ?? 0) - knownTotal;
+  if (remaining > 0) counts["other"] = remaining;
+  if ((nullCount ?? 0) > 0) counts["unknown"] = nullCount ?? 0;
 
   return counts;
 }

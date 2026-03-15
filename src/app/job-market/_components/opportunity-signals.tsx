@@ -6,10 +6,9 @@ import { KpiCard } from '@/components/data-display/kpi-card'
 import { DataTable } from '@/components/data-display/data-table'
 import { ScatterChart } from '@/components/charts/scatter-chart'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { isIndependentClassification, isCorporateClassification } from '@/lib/constants/entity-classifications'
+import { isIndependentClassification, getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
 import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
-import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
-import { formatStatusLabel } from '@/lib/utils/formatting'
+
 import { createBrowserClient } from '@/lib/supabase/client'
 import { Clock, Calendar, Target, RefreshCw, Pencil, MapPin, AlertCircle } from 'lucide-react'
 
@@ -317,9 +316,9 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                     render: (v: string) => (v ?? '').toString().slice(0, 5),
                   },
                   {
-                    key: 'ownership_status',
-                    header: 'Status',
-                    render: (v: string) => formatStatusLabel(v),
+                    key: 'entity_classification',
+                    header: 'Classification',
+                    render: (v: string | null) => getEntityClassificationLabel(v),
                   },
                   {
                     key: 'buyability_score',

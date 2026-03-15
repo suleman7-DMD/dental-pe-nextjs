@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Download, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
+import { Download, ArrowUpDown, ChevronDown, ChevronUp, Target, ShieldOff, Briefcase, Microscope } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { StatusBadge } from '@/components/data-display/status-badge'
@@ -237,25 +237,25 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <KpiCard
-            icon="target"
+            icon={<Target className="h-4 w-4" />}
             label="Acquisition Targets"
             value={kpis.acq.toLocaleString()}
             accentColor="#22C55E"
           />
           <KpiCard
-            icon="shield"
+            icon={<ShieldOff className="h-4 w-4" />}
             label="Dead Ends"
             value={kpis.dead.toLocaleString()}
             accentColor="#EF4444"
           />
           <KpiCard
-            icon="briefcase"
+            icon={<Briefcase className="h-4 w-4" />}
             label="Job Targets"
             value={kpis.job.toLocaleString()}
             accentColor="#3B82F6"
           />
           <KpiCard
-            icon="microscope"
+            icon={<Microscope className="h-4 w-4" />}
             label="Specialists"
             value={kpis.spec.toLocaleString()}
             accentColor="#7C4DFF"

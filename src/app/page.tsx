@@ -4,6 +4,7 @@ import { getPracticeStats, getRetirementRiskCount, getAcquisitionTargetCount } f
 import { getWatchedZipCount } from '@/lib/supabase/queries/watched-zips'
 import { HomeShell } from './_components/home-shell'
 import type { HomeSummary } from '@/lib/types'
+import type { DealStats } from '@/lib/supabase/types'
 
 export const dynamic = 'force-dynamic'
 export const metadata = {
@@ -24,7 +25,7 @@ export default async function HomePage() {
       acquisitionTargets,
       recentDeals,
     ] = await Promise.all([
-      getDealStats(supabase).catch(() => ({ totalDeals: 0, ytdDeals: 0, activeSponsors: 0, activePlatforms: 0, avgDealSize: null, totalStates: 0, sponsorList: [], platformList: [], stateList: [] })),
+      getDealStats(supabase).catch(() => ({ total_deals: 0, by_deal_type: {}, by_state: {}, avg_deal_size_mm: null, avg_ebitda_multiple: null, unique_pe_sponsors: 0, deals: [], distinctSponsors: [], distinctPlatforms: [], distinctStates: [], distinctSpecialties: [], distinctSources: [], distinctTypes: [], totalDeals: 0, ytdDeals: 0, activeSponsors: 0 } as DealStats)),
       getPracticeStats(supabase).catch(() => ({ totalPractices: 0, consolidatedPct: '--', independentPct: '--' })),
       getWatchedZipCount(supabase).catch(() => 0),
       getRetirementRiskCount(supabase).catch(() => 0),

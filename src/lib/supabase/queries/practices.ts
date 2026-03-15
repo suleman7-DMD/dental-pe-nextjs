@@ -63,20 +63,39 @@ export async function getPracticeCountsByStatus(
   supabase: SupabaseClient,
   zips?: string[]
 ): Promise<Record<string, number>> {
-  let q = supabase.from("practices").select("ownership_status");
+  // Use count queries per status to avoid fetching all rows
+  // (practices table has 400k+ rows, exceeds Supabase default 1000 limit)
+  const statuses = ["independent", "likely_independent", "dso_affiliated", "pe_backed", "unknown"];
+  const counts: Record<string, number> = {};
 
-  if (zips && zips.length > 0) {
-    q = q.in("zip", zips);
+  for (const status of statuses) {
+    let q = supabase
+      .from("practices")
+      .select("*", { count: "exact", head: true })
+      .eq("ownership_status", status);
+
+    if (zips && zips.length > 0) {
+      q = q.in("zip", zips);
+    }
+
+    const { count } = await q;
+    if (count && count > 0) counts[status] = count;
   }
 
-  const { data, error } = await q;
-  if (error) throw error;
+  // Count null ownership_status as unknown
+  let nullQ = supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .is("ownership_status", null);
 
-  const counts: Record<string, number> = {};
-  (data ?? []).forEach((row: { ownership_status: string | null }) => {
-    const status = row.ownership_status ?? "unknown";
-    counts[status] = (counts[status] ?? 0) + 1;
-  });
+  if (zips && zips.length > 0) {
+    nullQ = nullQ.in("zip", zips);
+  }
+
+  const { count: nullCount } = await nullQ;
+  if (nullCount && nullCount > 0) {
+    counts["unknown"] = (counts["unknown"] ?? 0) + nullCount;
+  }
 
   return counts;
 }
@@ -85,15 +104,35 @@ export async function getPracticesWithCoords(
   supabase: SupabaseClient,
   zips: string[]
 ): Promise<Practice[]> {
-  const { data, error } = await supabase
-    .from("practices")
-    .select("*")
-    .in("zip", zips)
-    .not("latitude", "is", null)
-    .not("longitude", "is", null);
+  // Paginate to handle large ZIP sets (could exceed 1000 row default limit)
+  const allPractices: Practice[] = [];
+  const pageSize = 1000;
+  const chunkSize = 100;
 
-  if (error) throw error;
-  return (data as Practice[]) ?? [];
+  for (let i = 0; i < zips.length; i += chunkSize) {
+    const zipChunk = zips.slice(i, i + chunkSize);
+    let page = 0;
+
+    while (true) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      const { data, error } = await supabase
+        .from("practices")
+        .select("*")
+        .in("zip", zipChunk)
+        .not("latitude", "is", null)
+        .not("longitude", "is", null)
+        .range(from, to);
+
+      if (error) throw error;
+      const batch = (data as Practice[]) ?? [];
+      allPractices.push(...batch);
+      if (batch.length < pageSize) break;
+      page++;
+    }
+  }
+
+  return allPractices;
 }
 
 /**
@@ -184,7 +223,8 @@ export async function getPracticeStats(
 export async function getRetirementRiskCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  const cutoffYear = new Date().getFullYear() - 30;
+  // Ground truth: independent practices with year_established < 1995
+  const cutoffYear = 1995;
 
   // Count globally (year_established only exists for Data Axle enriched practices,
   // which are mostly in watched ZIPs anyway)
@@ -197,7 +237,7 @@ export async function getRetirementRiskCount(
       "family_practice", "small_group", "large_group"
     ])
     .not("year_established", "is", null)
-    .lte("year_established", cutoffYear);
+    .lt("year_established", cutoffYear);
 
   // Fallback: by ownership_status where entity_classification is missing
   const { count: byStatus } = await supabase
@@ -206,7 +246,7 @@ export async function getRetirementRiskCount(
     .in("ownership_status", ["independent", "likely_independent"])
     .is("entity_classification", null)
     .not("year_established", "is", null)
-    .lte("year_established", cutoffYear);
+    .lt("year_established", cutoffYear);
 
   return (byEC ?? 0) + (byStatus ?? 0);
 }
@@ -219,10 +259,11 @@ export async function getAcquisitionTargetCount(
   supabase: SupabaseClient
 ): Promise<number> {
   // Count by entity_classification (primary) — independent solo/group practices with high buyability
+  // Ground truth: 34 targets at buyability_score >= 50
   const { count: byEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .gte("buyability_score", 60)
+    .gte("buyability_score", 50)
     .in("entity_classification", [
       "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
       "family_practice", "small_group", "large_group"
@@ -232,7 +273,7 @@ export async function getAcquisitionTargetCount(
   const { count: byStatus } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .gte("buyability_score", 60)
+    .gte("buyability_score", 50)
     .is("entity_classification", null)
     .in("ownership_status", ["independent", "likely_independent", "unknown"]);
 

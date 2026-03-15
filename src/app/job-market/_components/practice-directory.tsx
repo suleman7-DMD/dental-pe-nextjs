@@ -293,12 +293,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
   const ownershipPractices = useMemo(() => {
     return filtered.filter((p) => {
-      const ec = p.entity_classification
-      const status = (p.ownership_status ?? 'unknown').trim().toLowerCase()
-      return (
-        (ec === 'solo_established' || ec === 'solo_high_volume' || ec === 'solo_inactive') &&
-        (status === 'independent' || status === 'likely_independent')
-      )
+      const ec = (p.entity_classification ?? '').trim().toLowerCase()
+      return ec === 'solo_established' || ec === 'solo_high_volume' || ec === 'solo_inactive'
     }).sort((a, b) => (Number(b.buyability_score) || 0) - (Number(a.buyability_score) || 0))
   }, [filtered])
 
@@ -331,7 +327,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       'address',
       'city',
       'zip',
-      'ownership_status',
+      'entity_classification',
       'affiliated_dso',
       'employee_count',
       'estimated_revenue',
@@ -347,7 +343,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       address: 'Address',
       city: 'City',
       zip: 'ZIP',
-      ownership_status: 'Status',
+      entity_classification: 'Classification',
       affiliated_dso: 'DSO',
       employee_count: 'Employees',
       estimated_revenue: 'Revenue',

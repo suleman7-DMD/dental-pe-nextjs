@@ -46,10 +46,12 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       const indepPct = total > 0 ? (indep / total) * 100 : 0
       const unkPct = total > 0 ? (unk / total) * 100 : 0
 
-      // Opportunity score: higher = more independent, lower consolidation
-      const oppScore = total > 0
-        ? Math.round(indepPct - consolPct + (z.buyable_practice_ratio != null ? z.buyable_practice_ratio * 50 : 0))
-        : 0
+      // Opportunity score: use DB value when available, otherwise compute locally
+      const oppScore = z.opportunity_score != null
+        ? z.opportunity_score
+        : total > 0
+          ? Math.round(indepPct - consolPct + (z.buyable_practice_ratio != null ? z.buyable_practice_ratio * 50 : 0))
+          : 0
 
       return {
         zip_code: z.zip_code,
@@ -100,36 +102,36 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       key: 'consolidation_pct',
       header: 'Known Consol. %',
       align: 'right' as const,
-      render: (row: Record<string, unknown>) => {
-        const v = row.consolidation_pct as number
-        return `${v.toFixed(1)}%`
+      render: (v: unknown) => {
+        const num = typeof v === 'number' ? v : (v as Record<string, unknown>)?.consolidation_pct as number | undefined
+        return num != null ? `${num.toFixed(1)}%` : '\u2014'
       },
     },
     {
       key: 'independent_pct',
       header: 'Indep. %',
       align: 'right' as const,
-      render: (row: Record<string, unknown>) => {
-        const v = row.independent_pct as number
-        return `${v.toFixed(1)}%`
+      render: (v: unknown) => {
+        const num = typeof v === 'number' ? v : (v as Record<string, unknown>)?.independent_pct as number | undefined
+        return num != null ? `${num.toFixed(1)}%` : '\u2014'
       },
     },
     {
       key: 'unknown_pct',
       header: '% Unknown',
       align: 'right' as const,
-      render: (row: Record<string, unknown>) => {
-        const v = row.unknown_pct as number
-        return `${v.toFixed(1)}%`
+      render: (v: unknown) => {
+        const num = typeof v === 'number' ? v : (v as Record<string, unknown>)?.unknown_pct as number | undefined
+        return num != null ? `${num.toFixed(1)}%` : '\u2014'
       },
     },
     {
       key: 'confidence',
       header: 'Confidence',
-      render: (row: Record<string, unknown>) => {
-        const v = row.confidence as string
-        if (!v) return '\u2014'
-        return v.charAt(0).toUpperCase() + v.slice(1)
+      render: (v: unknown) => {
+        const str = typeof v === 'string' ? v : (v as Record<string, unknown>)?.confidence as string | undefined
+        if (!str) return '\u2014'
+        return str.charAt(0).toUpperCase() + str.slice(1)
       },
     },
     {
