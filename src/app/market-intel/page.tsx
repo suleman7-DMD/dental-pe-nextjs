@@ -86,11 +86,40 @@ export default async function MarketIntelPage() {
     .in('ownership_status', ['independent', 'likely_independent'])
     .is('entity_classification', null)
 
+  // High-confidence corporate: dso_national with real brands (exclude taxonomy leaks)
+  const taxonomyLeaks = ['General Dentistry', 'Oral Surgery', 'Orthodontics', 'Periodontics', 'Endodontics', 'Pediatric Dentistry', 'Prosthodontics', 'Dental Hygiene']
+  const { count: dsoNationalReal } = await supabase
+    .from('practices')
+    .select('*', { count: 'exact', head: true })
+    .in('zip', allWatchedZipCodes)
+    .eq('entity_classification', 'dso_national')
+    .not('affiliated_dso', 'in', `(${taxonomyLeaks.join(',')})`)
+
+  // High-confidence corporate: dso_regional with EIN or brand signals (not phone-only)
+  const { count: dsoRegionalStrong } = await supabase
+    .from('practices')
+    .select('*', { count: 'exact', head: true })
+    .in('zip', allWatchedZipCodes)
+    .eq('entity_classification', 'dso_regional')
+    .or('classification_reasoning.ilike.%EIN=%,classification_reasoning.ilike.%generic brand%,classification_reasoning.ilike.%parent_company%,classification_reasoning.ilike.%franchise%,classification_reasoning.ilike.%branch%')
+
+  // DSO-owned specialists (entity_classification=specialist but ownership=corporate)
+  const { count: dsoSpecialists } = await supabase
+    .from('practices')
+    .select('*', { count: 'exact', head: true })
+    .in('zip', allWatchedZipCodes)
+    .eq('entity_classification', 'specialist')
+    .in('ownership_status', ['dso_affiliated', 'pe_backed'])
+
+  const highConfCorporate = (dsoNationalReal ?? 0) + (dsoRegionalStrong ?? 0) + (dsoSpecialists ?? 0)
+  const allCorporate = (corporateByEC ?? 0) + (corporateByStatus ?? 0)
+
   const classificationCounts = {
     total: watchedTotal ?? 0,
-    corporate: (corporateByEC ?? 0) + (corporateByStatus ?? 0),
+    corporate: allCorporate,
+    corporateHighConf: highConfCorporate,
     independent: (independentByEC ?? 0) + (independentByStatus ?? 0),
-    unknown: (watchedTotal ?? 0) - (corporateByEC ?? 0) - (corporateByStatus ?? 0) - (independentByEC ?? 0) - (independentByStatus ?? 0),
+    unknown: (watchedTotal ?? 0) - allCorporate - (independentByEC ?? 0) - (independentByStatus ?? 0),
   }
 
   return (

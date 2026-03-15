@@ -172,22 +172,32 @@ export async function getPracticeStats(
     .select("*", { count: "exact", head: true })
     .in("zip", watchedZips);
 
-  // Corporate by entity_classification (primary) — in watched ZIPs
-  const { count: corporateByEC } = await supabase
+  // High-confidence corporate: dso_national with real brands (exclude taxonomy leaks)
+  const taxonomyLeaks = ["General Dentistry", "Oral Surgery", "Orthodontics", "Periodontics", "Endodontics", "Pediatric Dentistry", "Prosthodontics", "Dental Hygiene"];
+  const { count: dsoNationalReal } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
     .in("zip", watchedZips)
-    .in("entity_classification", ["dso_regional", "dso_national"]);
+    .eq("entity_classification", "dso_national")
+    .not("affiliated_dso", "in", `(${taxonomyLeaks.join(",")})`);
 
-  // Corporate by ownership_status where entity_classification is missing (fallback)
-  const { count: dsoByStatus } = await supabase
+  // High-confidence corporate: dso_regional with strong signals (EIN, brand, parent, franchise)
+  const { count: dsoRegionalStrong } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
     .in("zip", watchedZips)
-    .in("ownership_status", ["dso_affiliated", "pe_backed"])
-    .is("entity_classification", null);
+    .eq("entity_classification", "dso_regional")
+    .or("classification_reasoning.ilike.%EIN=%,classification_reasoning.ilike.%generic brand%,classification_reasoning.ilike.%parent_company%,classification_reasoning.ilike.%franchise%,classification_reasoning.ilike.%branch%");
 
-  // Independent by entity_classification (primary)
+  // DSO-owned specialists
+  const { count: dsoSpecialists } = await supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .in("zip", watchedZips)
+    .eq("entity_classification", "specialist")
+    .in("ownership_status", ["dso_affiliated", "pe_backed"]);
+
+  // Independent by entity_classification
   const { count: independentByEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
@@ -197,21 +207,13 @@ export async function getPracticeStats(
       "family_practice", "small_group", "large_group"
     ]);
 
-  // Independent by ownership_status where entity_classification is missing (fallback)
-  const { count: independentByStatus } = await supabase
-    .from("practices")
-    .select("*", { count: "exact", head: true })
-    .in("zip", watchedZips)
-    .in("ownership_status", ["independent", "likely_independent"])
-    .is("entity_classification", null);
-
   const t = total ?? 0;
-  const consolidated = (corporateByEC ?? 0) + (dsoByStatus ?? 0);
-  const independent = (independentByEC ?? 0) + (independentByStatus ?? 0);
+  const highConfCorporate = (dsoNationalReal ?? 0) + (dsoRegionalStrong ?? 0) + (dsoSpecialists ?? 0);
+  const independent = independentByEC ?? 0;
 
   return {
     totalPractices: globalTotal ?? 0,
-    consolidatedPct: t > 0 ? ((consolidated / t) * 100).toFixed(1) + "%" : "0.0%",
+    consolidatedPct: t > 0 ? ((highConfCorporate / t) * 100).toFixed(1) + "%" : "0.0%",
     independentPct: t > 0 ? ((independent / t) * 100).toFixed(1) + "%" : "0.0%",
   };
 }

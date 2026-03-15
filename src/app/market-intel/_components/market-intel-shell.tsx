@@ -1,10 +1,9 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { StickySectionNav } from '@/components/layout/sticky-section-nav'
-import { createBrowserClient } from '@/lib/supabase/client'
 import { formatPct, formatNumber } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils/formatting'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
@@ -30,6 +29,7 @@ interface MarketIntelShellProps {
   classificationCounts: {
     total: number
     corporate: number
+    corporateHighConf: number
     independent: number
     unknown: number
   }
@@ -69,59 +69,49 @@ export function MarketIntelShell({
 
   const zipList = useMemo(() => watchedZips.map(z => z.zip_code), [watchedZips])
 
-  // Compute KPI values using entity_classification-based counts (CLAUDE.md rule)
-  // When a metro filter is applied, fall back to zip_scores for that metro;
-  // otherwise use the server-side computed classificationCounts.
+  // Compute KPI values
   const kpis = useMemo(() => {
     if (selectedMetro === 'All Watched ZIPs') {
-      // Use server-side entity_classification counts (accurate)
-      const { total, corporate, independent, unknown } = classificationCounts
+      const { total, corporate, corporateHighConf, independent, unknown } = classificationCounts
       if (total === 0) return null
+      const highConfPct = (corporateHighConf / total) * 100
+      const allSignalsPct = (corporate / total) * 100
       return {
         totalP: total,
-        dsoCount: corporate,
-        peCount: 0,
+        corporateHighConf,
+        corporateAll: corporate,
         indepCount: independent,
         unkCount: unknown,
-        consolPct: (corporate / total) * 100,
+        highConfPct,
+        allSignalsPct,
         indepPct: (independent / total) * 100,
         unkPct: (unknown / total) * 100,
       }
     }
 
-    // For filtered metro, use zip_scores corporate_share_pct (entity_classification based)
+    // For filtered metro, use zip_scores
     if (zipScores.length === 0) return null
-
     const totalP = zipScores.reduce((sum, z) => sum + (z.total_practices ?? 0), 0)
-
-    // Estimate corporate count from corporate_share_pct * total_gp_locations
     let corporateCount = 0
-    let gpTotal = 0
     for (const z of zipScores) {
       if (z.corporate_share_pct != null && z.total_gp_locations != null) {
         corporateCount += Math.round(z.corporate_share_pct * z.total_gp_locations)
-        gpTotal += z.total_gp_locations
       }
     }
-
-    // If we have saturation data, use the ratio for a better estimate against total_practices
-    const consolPct = totalP > 0 ? (corporateCount / totalP) * 100 : 0
-
-    // Independent = total - corporate - unknown (rough estimate from zip_scores)
     const unkCount = zipScores.reduce((sum, z) => sum + (z.unknown_count ?? 0), 0)
     const indepCount = totalP - corporateCount - unkCount
-    const indepPct = totalP > 0 ? (indepCount / totalP) * 100 : 0
-    const unkPct = totalP > 0 ? (unkCount / totalP) * 100 : 100
+    const allSignalsPct = totalP > 0 ? (corporateCount / totalP) * 100 : 0
 
     return {
       totalP,
-      dsoCount: corporateCount,
-      peCount: 0,
+      corporateHighConf: 0, // not available per-metro yet
+      corporateAll: corporateCount,
       indepCount: Math.max(0, indepCount),
       unkCount,
-      consolPct,
-      indepPct,
-      unkPct,
+      highConfPct: 0,
+      allSignalsPct,
+      indepPct: totalP > 0 ? (indepCount / totalP) * 100 : 0,
+      unkPct: totalP > 0 ? (unkCount / totalP) * 100 : 100,
     }
   }, [zipScores, selectedMetro, classificationCounts])
 
@@ -180,22 +170,56 @@ export function MarketIntelShell({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <KpiCard label="Total Practices" value={formatNumber(kpis.totalP)} />
                 <KpiCard
-                  label="Known Consolidated (of total)"
-                  value={formatPct(kpis.consolPct)}
+                  label="Known Corporate"
+                  value={formatPct(kpis.highConfPct)}
+                  tooltip={`High-confidence: ${kpis.corporateHighConf.toLocaleString()} practices (DSO brands + EIN clusters). Including shared-phone signals: ${formatPct(kpis.allSignalsPct)} (${kpis.corporateAll.toLocaleString()}).`}
+                  accentColor="#EF4444"
                 />
                 <KpiCard
                   label="Independent (of total)"
                   value={formatPct(kpis.indepPct)}
                 />
-                <KpiCard label="Unclassified" value={formatPct(kpis.unkPct)} />
+                <KpiCard label="Specialist + Other" value={formatPct(kpis.unkPct)} />
               </div>
+
+              {/* Tiered consolidation detail */}
+              <div className="mt-3 rounded-lg border border-[#1E293B] bg-[#0F1629]/60 px-4 py-3 space-y-1.5">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#EF4444]" />
+                    <span className="text-xs text-[#F8FAFC] font-medium">
+                      Known Corporate (high confidence):
+                    </span>
+                    <span className="text-xs font-mono font-bold text-[#EF4444]">
+                      {formatPct(kpis.highConfPct)} ({kpis.corporateHighConf.toLocaleString()})
+                    </span>
+                  </div>
+                  <span className="text-[#334155]">|</span>
+                  <span className="text-[10px] text-[#94A3B8]">
+                    Real DSO brands + EIN-verified corporate entities + DSO-owned specialists
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#F59E0B]" />
+                    <span className="text-xs text-[#F8FAFC] font-medium">
+                      Incl. shared-phone signals:
+                    </span>
+                    <span className="text-xs font-mono font-bold text-[#F59E0B]">
+                      {formatPct(kpis.allSignalsPct)} ({kpis.corporateAll.toLocaleString()})
+                    </span>
+                  </div>
+                  <span className="text-[#334155]">|</span>
+                  <span className="text-[10px] text-[#94A3B8]">
+                    Adds practices sharing a phone # with others (weaker signal, may be group practices)
+                  </span>
+                </div>
+              </div>
+
               <p className="text-[#64748B] text-xs mt-2">
-                Ownership breakdown of {kpis.totalP.toLocaleString()} practices:{' '}
-                Known Consolidated {kpis.consolPct.toFixed(1)}% (DSO: {kpis.dsoCount.toLocaleString()} + PE:{' '}
-                {kpis.peCount.toLocaleString()}) | Independent {kpis.indepPct.toFixed(1)}% (
-                {kpis.indepCount.toLocaleString()}) | Unclassified {kpis.unkPct.toFixed(1)}% (
-                {kpis.unkCount.toLocaleString()}). All percentages use total practices as
-                denominator.
+                {kpis.totalP.toLocaleString()} practices: Independent {kpis.indepPct.toFixed(1)}% ({kpis.indepCount.toLocaleString()}) |
+                Specialist/Other {kpis.unkPct.toFixed(1)}% ({kpis.unkCount.toLocaleString()}).
+                All percentages use total practices as denominator.
               </p>
             </>
           ) : (

@@ -262,8 +262,9 @@ export function HomeShell({ summary, acquisitionTargets }: HomeShellProps) {
           />
           <KpiCard
             icon={<BarChart3 className="h-4 w-4" />}
-            label="Known Consolidated"
+            label="Known Corporate"
             value={summary.consolidatedPct}
+            tooltip="High-confidence corporate rate in watched ZIPs (DSO brands + EIN-verified entities). See Market Intel for full tiered breakdown."
             accentColor="#EF4444"
           />
           <KpiCard
