@@ -60,11 +60,12 @@ function toColumnDefs<T extends Record<string, any>>(
       ? ({ row, getValue }) => {
           const val = getValue();
 
-          // Helper: sanitize render output
+          // Helper: sanitize render output — prevents objects from reaching React
           const sanitize = (result: unknown): React.ReactNode => {
             if (result === null || result === undefined) {
               return val == null ? "\u2014" : String(val);
             }
+            // Catch plain objects that would crash React (error #31)
             if (typeof result === "object" && !React.isValidElement(result)) {
               if ("label" in (result as Record<string, unknown>))
                 return String((result as Record<string, unknown>).label);
@@ -73,15 +74,28 @@ function toColumnDefs<T extends Record<string, any>>(
             return result as React.ReactNode;
           };
 
-          // Try with full row first (most render functions expect the row object)
+          // Strategy: try cell value first (safe for render functions that
+          // wrap value in JSX like <span>{val}</span>). If the render function
+          // expects the full row object and throws, fall back to row.original.
           try {
-            const rowResult = col.render!(row.original);
-            return sanitize(rowResult);
+            const cellResult = col.render!(val);
+            const sanitized = sanitize(cellResult);
+            // If render returned fallback "—" but the cell value is non-null,
+            // the render function likely expected the full row — retry with row.original
+            if (sanitized === "\u2014" && val != null) {
+              try {
+                const rowResult = col.render!(row.original);
+                return sanitize(rowResult);
+              } catch {
+                return sanitized;
+              }
+            }
+            return sanitized;
           } catch {
-            // Fallback: try with cell value (some render functions may just format the value)
+            // Render threw with cell value — try with full row object
             try {
-              const cellResult = col.render!(val);
-              return sanitize(cellResult);
+              const rowResult = col.render!(row.original);
+              return sanitize(rowResult);
             } catch {
               return val == null ? "\u2014" : String(val);
             }
