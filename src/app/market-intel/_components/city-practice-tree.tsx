@@ -54,23 +54,35 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
 
   const sortedCityNames = useMemo(() => Object.keys(cityZips).sort(), [cityZips])
 
-  // Lazy load practices on first expand
+  // Lazy load practices on first expand — paginate to avoid Supabase 1000-row limit
   const loadPractices = useCallback(async () => {
     if (loaded || loading || zipList.length === 0) return
     setLoading(true)
 
     const supabase = createBrowserClient()
-    const chunkSize = 500
+    const chunkSize = 100
+    const pageSize = 1000
     const all: Practice[] = []
 
     for (let i = 0; i < zipList.length; i += chunkSize) {
       const chunk = zipList.slice(i, i + chunkSize)
-      const { data } = await supabase
-        .from('practices')
-        .select('npi, practice_name, entity_type, ownership_status, entity_classification, affiliated_dso, affiliated_pe_sponsor, zip')
-        .in('zip', chunk)
+      let offset = 0
+      let hasMore = true
+      while (hasMore) {
+        const { data } = await supabase
+          .from('practices')
+          .select('npi, practice_name, entity_type, ownership_status, entity_classification, affiliated_dso, affiliated_pe_sponsor, zip')
+          .in('zip', chunk)
+          .range(offset, offset + pageSize - 1)
 
-      if (data) all.push(...(data as Practice[]))
+        if (data && data.length > 0) {
+          all.push(...(data as Practice[]))
+          offset += data.length
+          hasMore = data.length === pageSize
+        } else {
+          hasMore = false
+        }
+      }
     }
 
     setPractices(all)

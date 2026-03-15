@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { DataTable } from '@/components/data-display/data-table'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
@@ -8,8 +9,64 @@ interface ZipScoreTableProps {
   zipScores: ZipScore[]
 }
 
+interface ZipScoreRow {
+  zip_code: string
+  city: string
+  total_practices: number
+  independent_count: number
+  dso_count: number
+  pe_count: number
+  unknown_count: number
+  consolidation_pct: number
+  independent_pct: number
+  unknown_pct: number
+  confidence: string
+  opportunity_score: number
+}
+
 export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
   if (zipScores.length === 0) return null
+
+  // Compute derived fields from zip_scores data
+  const rows = useMemo((): ZipScoreRow[] => {
+    return zipScores.map(z => {
+      const total = z.total_practices ?? 0
+      const dso = z.dso_affiliated_count ?? 0
+      const pe = z.pe_backed_count ?? 0
+      const indep = z.independent_count ?? 0
+      const unk = z.unknown_count ?? 0
+
+      // Use corporate_share_pct if available (entity_classification-based, more accurate)
+      const corporateFromSaturation = z.corporate_share_pct != null && z.total_gp_locations != null
+        ? Math.round(z.corporate_share_pct * z.total_gp_locations)
+        : null
+
+      const consolidatedCount = corporateFromSaturation ?? (dso + pe)
+      const consolPct = total > 0 ? (consolidatedCount / total) * 100 : 0
+      const indepPct = total > 0 ? (indep / total) * 100 : 0
+      const unkPct = total > 0 ? (unk / total) * 100 : 0
+
+      // Opportunity score: higher = more independent, lower consolidation
+      const oppScore = total > 0
+        ? Math.round(indepPct - consolPct + (z.buyable_practice_ratio != null ? z.buyable_practice_ratio * 50 : 0))
+        : 0
+
+      return {
+        zip_code: z.zip_code,
+        city: z.city ?? '\u2014',
+        total_practices: total,
+        independent_count: indep,
+        dso_count: dso,
+        pe_count: pe,
+        unknown_count: unk,
+        consolidation_pct: consolPct,
+        independent_pct: indepPct,
+        unknown_pct: unkPct,
+        confidence: z.metrics_confidence ?? '',
+        opportunity_score: oppScore,
+      }
+    })
+  }, [zipScores])
 
   const columns = [
     { key: 'zip_code', header: 'ZIP' },
@@ -25,12 +82,12 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       align: 'right' as const,
     },
     {
-      key: 'dso_affiliated_count',
+      key: 'dso_count',
       header: 'DSO',
       align: 'right' as const,
     },
     {
-      key: 'pe_backed_count',
+      key: 'pe_count',
       header: 'PE',
       align: 'right' as const,
     },
@@ -40,40 +97,37 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       align: 'right' as const,
     },
     {
-      key: 'consolidation_pct_of_total',
+      key: 'consolidation_pct',
       header: 'Known Consol. %',
       align: 'right' as const,
       render: (row: Record<string, unknown>) => {
-        const v = row.consolidation_pct_of_total as number | null
-        if (v == null) return '\u2014'
+        const v = row.consolidation_pct as number
         return `${v.toFixed(1)}%`
       },
     },
     {
-      key: 'independent_pct_of_total',
+      key: 'independent_pct',
       header: 'Indep. %',
       align: 'right' as const,
       render: (row: Record<string, unknown>) => {
-        const v = row.independent_pct_of_total as number | null
-        if (v == null) return '\u2014'
+        const v = row.independent_pct as number
         return `${v.toFixed(1)}%`
       },
     },
     {
-      key: 'pct_unknown',
+      key: 'unknown_pct',
       header: '% Unknown',
       align: 'right' as const,
       render: (row: Record<string, unknown>) => {
-        const v = row.pct_unknown as number | null
-        if (v == null) return '\u2014'
+        const v = row.unknown_pct as number
         return `${v.toFixed(1)}%`
       },
     },
     {
-      key: 'data_confidence',
+      key: 'confidence',
       header: 'Confidence',
       render: (row: Record<string, unknown>) => {
-        const v = row.data_confidence as string | null
+        const v = row.confidence as string
         if (!v) return '\u2014'
         return v.charAt(0).toUpperCase() + v.slice(1)
       },
@@ -82,11 +136,6 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       key: 'opportunity_score',
       header: 'Opp. Score',
       align: 'right' as const,
-      render: (row: Record<string, unknown>) => {
-        const v = row.opportunity_score as number | null
-        if (v == null) return '\u2014'
-        return v.toFixed(0)
-      },
     },
   ]
 
@@ -98,7 +147,7 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       />
       <div className="mt-4">
         <DataTable
-          data={zipScores as unknown as Record<string, unknown>[]}
+          data={rows as unknown as Record<string, unknown>[]}
           columns={columns}
           defaultSort="opportunity_score"
           defaultSortDir="desc"

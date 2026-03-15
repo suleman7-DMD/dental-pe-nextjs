@@ -172,8 +172,8 @@ export async function getPracticeStats(
 
   return {
     totalPractices: globalTotal ?? 0,
-    consolidatedPct: t > 0 ? ((consolidated / t) * 100).toFixed(1) : "0.0",
-    independentPct: t > 0 ? ((independent / t) * 100).toFixed(1) : "0.0",
+    consolidatedPct: t > 0 ? ((consolidated / t) * 100).toFixed(1) + "%" : "0.0%",
+    independentPct: t > 0 ? ((independent / t) * 100).toFixed(1) + "%" : "0.0%",
   };
 }
 
@@ -186,28 +186,26 @@ export async function getRetirementRiskCount(
 ): Promise<number> {
   const cutoffYear = new Date().getFullYear() - 30;
 
-  // Get watched ZIP codes
-  const { data: watchedZipRows } = await supabase
-    .from("watched_zips")
-    .select("zip_code");
-  const watchedZips = (watchedZipRows ?? []).map((z: { zip_code: string }) => z.zip_code);
-  if (watchedZips.length === 0) return 0;
-
-  // By entity_classification (solo practices, 30+ years)
+  // Count globally (year_established only exists for Data Axle enriched practices,
+  // which are mostly in watched ZIPs anyway)
+  // Use all independent classifications
   const { count: byEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .in("zip", watchedZips)
-    .in("entity_classification", ["solo_established", "solo_inactive", "solo_high_volume"])
+    .in("entity_classification", [
+      "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
+      "family_practice", "small_group", "large_group"
+    ])
+    .not("year_established", "is", null)
     .lte("year_established", cutoffYear);
 
   // Fallback: by ownership_status where entity_classification is missing
   const { count: byStatus } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .in("zip", watchedZips)
     .in("ownership_status", ["independent", "likely_independent"])
     .is("entity_classification", null)
+    .not("year_established", "is", null)
     .lte("year_established", cutoffYear);
 
   return (byEC ?? 0) + (byStatus ?? 0);
@@ -220,14 +218,25 @@ export async function getRetirementRiskCount(
 export async function getAcquisitionTargetCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  const { count, error } = await supabase
+  // Count by entity_classification (primary) — independent solo/group practices with high buyability
+  const { count: byEC } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
     .gte("buyability_score", 60)
+    .in("entity_classification", [
+      "solo_established", "solo_new", "solo_inactive", "solo_high_volume",
+      "family_practice", "small_group", "large_group"
+    ]);
+
+  // Fallback: by ownership_status where entity_classification is missing
+  const { count: byStatus } = await supabase
+    .from("practices")
+    .select("*", { count: "exact", head: true })
+    .gte("buyability_score", 60)
+    .is("entity_classification", null)
     .in("ownership_status", ["independent", "likely_independent", "unknown"]);
 
-  if (error) throw error;
-  return count ?? 0;
+  return (byEC ?? 0) + (byStatus ?? 0);
 }
 
 /**

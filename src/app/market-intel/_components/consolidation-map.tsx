@@ -53,17 +53,28 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
       .map(zs => {
         const coords = ZIP_CENTROIDS[zs.zip_code]
         if (!coords) return null
-        const consolPct = zs.consolidation_pct_of_total ?? 0
-        const pctUnknown = zs.pct_unknown ?? 100
+
+        const total = zs.total_practices ?? 0
+        const dso = zs.dso_affiliated_count ?? 0
+        const pe = zs.pe_backed_count ?? 0
+        const unk = zs.unknown_count ?? 0
+
+        // Use corporate_share_pct from saturation metrics if available (entity_classification based)
+        const corporateFromSaturation = zs.corporate_share_pct != null && zs.total_gp_locations != null
+          ? Math.round(zs.corporate_share_pct * zs.total_gp_locations)
+          : null
+        const consolCount = corporateFromSaturation ?? (dso + pe)
+        const consolPct = total > 0 ? (consolCount / total) * 100 : 0
+        const pctUnknown = total > 0 ? (unk / total) * 100 : 100
+
         const opacity = pctUnknown < 50 ? 0.9 : 0.5
-        const confidence = zs.data_confidence
-          ? zs.data_confidence.charAt(0).toUpperCase() + zs.data_confidence.slice(1)
+        const confidence = zs.metrics_confidence
+          ? zs.metrics_confidence.charAt(0).toUpperCase() + zs.metrics_confidence.slice(1)
           : pctUnknown < 30
             ? 'High'
             : pctUnknown < 60
               ? 'Medium'
               : 'Low'
-        const consolCount = (zs.dso_affiliated_count ?? 0) + (zs.pe_backed_count ?? 0)
 
         return {
           zip: zs.zip_code,
@@ -274,7 +285,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
           <div
             ref={mapRef}
             className="w-full rounded-xl border border-[var(--border)] overflow-hidden"
-            style={{ height: 620 }}
+            style={{ height: 620, boxShadow: '0 0 40px rgba(59, 130, 246, 0.08), 0 4px 24px rgba(0, 0, 0, 0.3)' }}
           />
 
           {/* Legend */}

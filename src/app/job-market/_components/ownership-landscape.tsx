@@ -7,7 +7,7 @@ import { DataTable } from '@/components/data-display/data-table'
 
 import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
 import { getEntityClassificationLabel, isCorporateClassification, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
-import type { Practice, ZipScore } from '@/lib/types'
+import type { Practice, ZipScore, WatchedZip } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -18,13 +18,14 @@ interface OwnershipLandscapeProps {
   practices: Practice[]
   zipStats: ZipStats[]
   zipScores: ZipScore[]
+  watchedZips: WatchedZip[]
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Component
 // ────────────────────────────────────────────────────────────────────────────
 
-export function OwnershipLandscape({ practices, zipStats, zipScores }: OwnershipLandscapeProps) {
+export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips }: OwnershipLandscapeProps) {
   if (practices.length === 0) return null
 
   // ── Ownership Status Bar Chart ────────────────────────────────────────
@@ -82,18 +83,26 @@ export function OwnershipLandscape({ practices, zipStats, zipScores }: Ownership
   }, [practices])
 
   // ── DSO Penetration by ZIP ────────────────────────────────────────────
+  const wzCityMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const wz of watchedZips) {
+      if (wz.city) map.set(wz.zip_code, wz.city)
+    }
+    return map
+  }, [watchedZips])
+
   const dsoPenetration = useMemo(() => {
     if (!zipScores || zipScores.length === 0) return []
     return [...zipScores]
-      .filter((zs) => zs.corporate_share_pct != null)
-      .sort((a, b) => (a.corporate_share_pct ?? 0) - (b.corporate_share_pct ?? 0))
+      .filter((zs) => zs.corporate_share_pct != null && zs.corporate_share_pct > 0)
+      .sort((a, b) => (b.corporate_share_pct ?? 0) - (a.corporate_share_pct ?? 0))
       .map((zs) => ({
         zip: zs.zip_code,
-        city: '--',
+        city: wzCityMap.get(zs.zip_code) ?? zs.city ?? '--',
         practices: zs.total_gp_locations ?? 0,
         corporate_share_pct: (zs.corporate_share_pct ?? 0) * 100,
       }))
-  }, [zipScores])
+  }, [zipScores, wzCityMap])
 
   return (
     <div>

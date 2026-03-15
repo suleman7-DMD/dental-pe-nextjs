@@ -231,12 +231,12 @@ export function DataTable<T extends Record<string, any>>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className="border-[var(--border)] bg-[#0F1629] hover:bg-[#0F1629]"
+                className="border-[var(--border)] bg-[#0D1424] hover:bg-[#0D1424]"
               >
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="sticky top-0 z-10 bg-[#0F1629] text-[11px] font-medium uppercase tracking-wider text-[#64748B]"
+                    className="sticky top-0 z-10 bg-[#0D1424] text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8] border-b-2 border-[#1E293B]"
                   >
                     {header.isPlaceholder ? null : (
                       <div
@@ -289,7 +289,7 @@ export function DataTable<T extends Record<string, any>>({
                   onClick={() => onRowClick?.(row.original)}
                   className={cn(
                     "border-[var(--border)] hover:bg-[#1A2035] transition-colors",
-                    idx % 2 === 0 ? "bg-[#0A0F1E]" : "bg-[#0D1220]",
+                    idx % 2 === 0 ? "bg-[#0A0F1E]" : "bg-[#0F1629]",
                     onRowClick && "cursor-pointer"
                   )}
                 >

@@ -77,6 +77,7 @@ export interface WatchedZip {
 export interface ZipScore {
   id: number
   zip_code: string
+  city: string | null
   total_practices: number | null
   independent_count: number | null
   dso_affiliated_count: number | null

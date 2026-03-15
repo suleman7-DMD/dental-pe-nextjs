@@ -1,8 +1,9 @@
 import type { Practice } from "@/lib/supabase/types";
+import { isIndependentClassification, isCorporateClassification } from "@/lib/constants/entity-classifications";
 
 /**
  * Compute job opportunity score for a practice (0-100).
- * Ported from dashboard/app.py compute_job_opportunity_score().
+ * Uses entity_classification with ownership_status fallback.
  *
  * Scoring factors:
  * - Independent status: +30
@@ -33,12 +34,22 @@ export function computeJobOpportunityScore(
   const practice = input;
   let score = 0;
 
-  // Ownership status
-  const status = (practice.ownership_status ?? "unknown").trim().toLowerCase();
-  if (status === "independent" || status === "likely_independent") {
-    score += 30;
-  } else if (status === "unknown" || status === "") {
-    score += 10;
+  // Ownership status — use entity_classification with ownership_status fallback
+  const ec = (practice.entity_classification ?? "").trim().toLowerCase();
+  if (ec) {
+    if (isIndependentClassification(ec)) {
+      score += 30;
+    } else if (!isCorporateClassification(ec) && ec !== "specialist" && ec !== "non_clinical") {
+      score += 10; // unknown/unrecognized
+    }
+  } else {
+    // Fallback to ownership_status
+    const status = (practice.ownership_status ?? "unknown").trim().toLowerCase();
+    if (status === "independent" || status === "likely_independent") {
+      score += 30;
+    } else if (status === "unknown" || status === "") {
+      score += 10;
+    }
   }
 
   // Buyability score
@@ -67,11 +78,16 @@ export function computeJobOpportunityScore(
 
 /**
  * Determine retirement risk for a practice.
- * Independent + established 30+ years ago.
+ * Independent (by entity_classification or ownership_status fallback) + established 30+ years ago.
  */
 export function isRetirementRisk(practice: Practice): boolean {
-  const status = (practice.ownership_status ?? "unknown").trim().toLowerCase();
-  if (status !== "independent" && status !== "likely_independent") return false;
+  const ec = (practice.entity_classification ?? "").trim().toLowerCase();
+  if (ec) {
+    if (!isIndependentClassification(ec)) return false;
+  } else {
+    const status = (practice.ownership_status ?? "unknown").trim().toLowerCase();
+    if (status !== "independent" && status !== "likely_independent") return false;
+  }
 
   const yr = practice.year_established;
   if (!yr) return false;

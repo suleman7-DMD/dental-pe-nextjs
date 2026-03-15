@@ -28,7 +28,7 @@ export default async function JobMarketPage() {
   const { count: daCount } = await supabase
     .from('practices')
     .select('*', { count: 'exact', head: true })
-    .like('import_batch_id', 'DA_%')
+    .not('data_axle_import_date', 'is', null)
 
   const { data: latestUpdate } = await supabase
     .from('practices')

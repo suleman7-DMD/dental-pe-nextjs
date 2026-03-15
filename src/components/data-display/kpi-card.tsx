@@ -49,11 +49,15 @@ export function KpiCard({
         "transition-all duration-200 hover:border-[#334155] hover:-translate-y-[1px]",
         className
       )}
-      style={
-        accentColor
-          ? { borderLeftWidth: "2px", borderLeftColor: accentColor }
-          : undefined
-      }
+      style={{
+        ...(accentColor
+          ? {
+              borderLeftWidth: "3px",
+              borderLeftColor: accentColor,
+              backgroundColor: `color-mix(in srgb, ${accentColor} 4%, #0F1629)`,
+            }
+          : {}),
+      }}
     >
       {/* Top row: icon + label */}
       <div className="flex items-center justify-between mb-3">
@@ -95,10 +99,10 @@ export function KpiCard({
       {/* Value */}
       <div className="flex items-baseline gap-1.5">
         <span
-          className="text-[28px] font-bold font-mono leading-none"
+          className="text-[32px] font-bold font-mono leading-none tracking-tight"
           style={{
             color: accentColor ?? "#F8FAFC",
-            fontFamily: "var(--font-mono, monospace)",
+            fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)",
           }}
         >
           {value}

@@ -27,6 +27,12 @@ interface MarketIntelShellProps {
     daEnriched: number
     lastUpdated: string | null
   }
+  classificationCounts: {
+    total: number
+    corporate: number
+    independent: number
+    unknown: number
+  }
 }
 
 const NAV_ITEMS = [
@@ -45,6 +51,7 @@ export function MarketIntelShell({
   metroAreas,
   adaBenchmarks,
   freshness,
+  classificationCounts,
 }: MarketIntelShellProps) {
   const [selectedMetro, setSelectedMetro] = useState<string>('All Watched ZIPs')
   const allMetros = useMemo(() => ['All Watched ZIPs', ...metroAreas], [metroAreas])
@@ -62,31 +69,61 @@ export function MarketIntelShell({
 
   const zipList = useMemo(() => watchedZips.map(z => z.zip_code), [watchedZips])
 
-  // Compute KPI values — using total as denominator (CLAUDE.md rule)
+  // Compute KPI values using entity_classification-based counts (CLAUDE.md rule)
+  // When a metro filter is applied, fall back to zip_scores for that metro;
+  // otherwise use the server-side computed classificationCounts.
   const kpis = useMemo(() => {
+    if (selectedMetro === 'All Watched ZIPs') {
+      // Use server-side entity_classification counts (accurate)
+      const { total, corporate, independent, unknown } = classificationCounts
+      if (total === 0) return null
+      return {
+        totalP: total,
+        dsoCount: corporate,
+        peCount: 0,
+        indepCount: independent,
+        unkCount: unknown,
+        consolPct: (corporate / total) * 100,
+        indepPct: (independent / total) * 100,
+        unkPct: (unknown / total) * 100,
+      }
+    }
+
+    // For filtered metro, use zip_scores corporate_share_pct (entity_classification based)
     if (zipScores.length === 0) return null
 
     const totalP = zipScores.reduce((sum, z) => sum + (z.total_practices ?? 0), 0)
-    const peCount = zipScores.reduce((sum, z) => sum + (z.pe_backed_count ?? 0), 0)
-    const dsoCount = zipScores.reduce((sum, z) => sum + (z.dso_affiliated_count ?? 0), 0)
-    const indepCount = zipScores.reduce((sum, z) => sum + (z.independent_count ?? 0), 0)
-    const unkCount = zipScores.reduce((sum, z) => sum + (z.unknown_count ?? 0), 0)
 
-    const consolPct = totalP > 0 ? ((peCount + dsoCount) / totalP) * 100 : 0
+    // Estimate corporate count from corporate_share_pct * total_gp_locations
+    let corporateCount = 0
+    let gpTotal = 0
+    for (const z of zipScores) {
+      if (z.corporate_share_pct != null && z.total_gp_locations != null) {
+        corporateCount += Math.round(z.corporate_share_pct * z.total_gp_locations)
+        gpTotal += z.total_gp_locations
+      }
+    }
+
+    // If we have saturation data, use the ratio for a better estimate against total_practices
+    const consolPct = totalP > 0 ? (corporateCount / totalP) * 100 : 0
+
+    // Independent = total - corporate - unknown (rough estimate from zip_scores)
+    const unkCount = zipScores.reduce((sum, z) => sum + (z.unknown_count ?? 0), 0)
+    const indepCount = totalP - corporateCount - unkCount
     const indepPct = totalP > 0 ? (indepCount / totalP) * 100 : 0
     const unkPct = totalP > 0 ? (unkCount / totalP) * 100 : 100
 
     return {
       totalP,
-      peCount,
-      dsoCount,
-      indepCount,
+      dsoCount: corporateCount,
+      peCount: 0,
+      indepCount: Math.max(0, indepCount),
       unkCount,
       consolPct,
       indepPct,
       unkPct,
     }
-  }, [zipScores])
+  }, [zipScores, selectedMetro, classificationCounts])
 
   return (
     <div className="min-h-screen bg-[#0A0F1E] text-[#F8FAFC] font-sans">

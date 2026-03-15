@@ -10,6 +10,11 @@ import {
   Settings,
   ArrowRight,
   Activity,
+  TrendingUp,
+  Hospital,
+  MapPin,
+  Clock,
+  Zap,
 } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import type { HomeSummary } from '@/lib/types'
@@ -235,46 +240,46 @@ export function HomeShell({ summary, acquisitionTargets }: HomeShellProps) {
         {/* KPI Row — 4 columns max */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-3">
           <KpiCard
-            icon="bar-chart"
+            icon={<BarChart3 className="h-4 w-4" />}
             label="Total Deals"
             value={summary.totalDeals.toLocaleString()}
           />
           <KpiCard
-            icon="trending-up"
+            icon={<TrendingUp className="h-4 w-4" />}
             label="Active PE Sponsors"
             value={summary.activeSponsors.toLocaleString()}
             accentColor="#3B82F6"
           />
           <KpiCard
-            icon="hospital"
+            icon={<Hospital className="h-4 w-4" />}
             label="Practices Tracked"
             value={summary.totalPractices.toLocaleString()}
           />
           <KpiCard
-            icon="map-pin"
+            icon={<MapPin className="h-4 w-4" />}
             label="Watched ZIPs"
             value={summary.watchedZips.toLocaleString()}
           />
           <KpiCard
-            icon="bar-chart"
+            icon={<BarChart3 className="h-4 w-4" />}
             label="Known Consolidated"
             value={summary.consolidatedPct}
             accentColor="#EF4444"
           />
           <KpiCard
-            icon="clock"
+            icon={<Clock className="h-4 w-4" />}
             label="Retirement Risk"
             value={summary.retirementRisk.toLocaleString()}
             accentColor="#F59E0B"
           />
           <KpiCard
-            icon="zap"
+            icon={<Zap className="h-4 w-4" />}
             label="Deals YTD"
             value={summary.ytdDeals.toLocaleString()}
             accentColor="#22C55E"
           />
           <KpiCard
-            icon="activity"
+            icon={<Activity className="h-4 w-4" />}
             label="Data Freshness"
             value={summary.lastPipelineRun ?? '--'}
           />

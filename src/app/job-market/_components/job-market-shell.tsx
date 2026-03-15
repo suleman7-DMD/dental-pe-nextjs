@@ -499,6 +499,7 @@ export function JobMarketShell({
                 practices={practices}
                 zipStats={zipStats}
                 zipScores={zipScores}
+                watchedZips={initialWatchedZips}
               />
             </section>
 

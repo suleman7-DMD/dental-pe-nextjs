@@ -235,7 +235,7 @@ function PracticeMapInner({
     <div
       ref={mapRef}
       className="w-full rounded-lg border border-[#1E293B] overflow-hidden"
-      style={{ height: 620 }}
+      style={{ height: 620, boxShadow: '0 0 40px rgba(59, 130, 246, 0.08), 0 4px 24px rgba(0, 0, 0, 0.3)' }}
     />
   )
 }

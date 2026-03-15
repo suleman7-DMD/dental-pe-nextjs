@@ -11,6 +11,7 @@ import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
 import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
 import { formatStatusLabel } from '@/lib/utils/formatting'
 import { createBrowserClient } from '@/lib/supabase/client'
+import { Clock, Calendar, Target, RefreshCw, Pencil, MapPin, AlertCircle } from 'lucide-react'
 
 import type { Practice } from '@/lib/types'
 
@@ -218,17 +219,17 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         <TabsContent value="retirement">
           <div className="grid grid-cols-3 gap-4 mb-4">
             <KpiCard
-              icon="clock"
+              icon={<Clock className="h-4 w-4" />}
               label="At-Risk Practices"
               value={retireKpis.count.toLocaleString()}
             />
             <KpiCard
-              icon="calendar"
+              icon={<Calendar className="h-4 w-4" />}
               label="Avg Practice Age"
               value={retireKpis.avgAge}
             />
             <KpiCard
-              icon="target"
+              icon={<Target className="h-4 w-4" />}
               label="Avg Buyability"
               value={retireKpis.avgBuy}
             />
@@ -353,22 +354,22 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         <TabsContent value="changes">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <KpiCard
-              icon="refresh"
+              icon={<RefreshCw className="h-4 w-4" />}
               label="Total Changes"
               value={changeKpis.total.toLocaleString()}
             />
             <KpiCard
-              icon="edit"
+              icon={<Pencil className="h-4 w-4" />}
               label="Name Changes"
               value={changeKpis.nameChg.toLocaleString()}
             />
             <KpiCard
-              icon="map-pin"
+              icon={<MapPin className="h-4 w-4" />}
               label="Address Changes"
               value={changeKpis.addrChg.toLocaleString()}
             />
             <KpiCard
-              icon="alert-circle"
+              icon={<AlertCircle className="h-4 w-4" />}
               label="Ownership Changes"
               value={changeKpis.ownChg.toLocaleString()}
               accentColor="#EF4444"
