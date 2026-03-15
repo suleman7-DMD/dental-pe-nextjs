@@ -9,15 +9,28 @@ export interface ADABenchmark {
 }
 
 export async function getADABenchmarks(supabase: SupabaseClient): Promise<ADABenchmark[]> {
-  const { data, error } = await supabase
-    .from('ada_hpi_benchmarks')
-    .select('*')
-    .order('state', { ascending: true })
+  // Paginate to handle 918+ rows (approaching Supabase 1000-row default limit)
+  const allRows: ADABenchmark[] = []
+  const pageSize = 1000
+  let offset = 0
 
-  if (error) {
-    console.error('Error fetching ADA benchmarks:', error)
-    return []
+  while (true) {
+    const { data, error } = await supabase
+      .from('ada_hpi_benchmarks')
+      .select('*')
+      .order('state', { ascending: true })
+      .range(offset, offset + pageSize - 1)
+
+    if (error) {
+      console.error('Error fetching ADA benchmarks:', error)
+      return allRows
+    }
+
+    const batch = (data ?? []) as ADABenchmark[]
+    allRows.push(...batch)
+    if (batch.length < pageSize) break
+    offset += batch.length
   }
 
-  return (data ?? []) as ADABenchmark[]
+  return allRows
 }

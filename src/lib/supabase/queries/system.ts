@@ -30,7 +30,7 @@ export async function getDataFreshness(
   const { count: enrichedCount } = await supabase
     .from("practices")
     .select("*", { count: "exact", head: true })
-    .like("import_batch_id", "DA_%");
+    .not("data_axle_import_date", "is", null);
 
   // Total deals
   const { count: totalDeals } = await supabase

@@ -267,6 +267,7 @@ function UpdatePracticeForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ownership_status: formData.get('ownership_status') || 'unknown',
+          entity_classification: formData.get('entity_classification') || null,
           affiliated_dso: (formData.get('affiliated_dso') as string)?.trim() || null,
           affiliated_pe_sponsor: (formData.get('affiliated_pe_sponsor') as string)?.trim() || null,
           notes: (formData.get('notes') as string)?.trim() || 'Manual update',
@@ -337,6 +338,23 @@ function UpdatePracticeForm() {
           >
             {['independent', 'dso_affiliated', 'pe_backed', 'unknown'].map((s) => (
               <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs text-[#94A3B8] mb-1 block">Entity Classification</label>
+          <select
+            name="entity_classification"
+            className="w-full rounded-md border border-[#1E293B] bg-[#0A0F1E] text-[#F8FAFC] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+          >
+            <option value="">-- Keep Current --</option>
+            {[
+              'solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume',
+              'family_practice', 'small_group', 'large_group',
+              'dso_regional', 'dso_national', 'specialist', 'non_clinical'
+            ].map((ec) => (
+              <option key={ec} value={ec}>{ec.replace(/_/g, ' ')}</option>
             ))}
           </select>
         </div>

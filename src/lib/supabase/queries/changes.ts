@@ -14,14 +14,33 @@ export async function getRecentChanges(
   // Supabase doesn't support cross-table filtering directly in the REST API,
   // so we fetch practice NPIs in the given ZIPs first, then filter changes.
   if (zipCodes && zipCodes.length > 0) {
-    const { data: practiceRows } = await supabase
-      .from("practices")
-      .select("npi")
-      .in("zip", zipCodes);
+    // Paginate NPI query to avoid Supabase 1000-row default limit
+    // (watched ZIPs contain 14k+ practices)
+    const chunkSize = 100;
+    const pageSize = 1000;
+    const allNpis: string[] = [];
 
-    const npis = (practiceRows ?? []).map(
-      (r: { npi: string }) => r.npi
-    );
+    for (let i = 0; i < zipCodes.length; i += chunkSize) {
+      const zipChunk = zipCodes.slice(i, i + chunkSize);
+      let offset = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const { data: batch } = await supabase
+          .from("practices")
+          .select("npi")
+          .in("zip", zipChunk)
+          .range(offset, offset + pageSize - 1);
+        if (batch && batch.length > 0) {
+          allNpis.push(...batch.map((r: { npi: string }) => r.npi));
+          offset += batch.length;
+          hasMore = batch.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+    }
+
+    const npis = allNpis;
 
     if (npis.length === 0) return [];
 

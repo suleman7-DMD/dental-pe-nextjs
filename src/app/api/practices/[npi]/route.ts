@@ -42,6 +42,9 @@ export async function PATCH(
     if (body.affiliated_pe_sponsor !== undefined) {
       updates.affiliated_pe_sponsor = body.affiliated_pe_sponsor
     }
+    if (body.entity_classification !== undefined) {
+      updates.entity_classification = body.entity_classification
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No fields to update.' }, { status: 400 })

@@ -68,14 +68,14 @@ export default async function MarketIntelPage() {
     .in('ownership_status', ['dso_affiliated', 'pe_backed'])
     .is('entity_classification', null)
 
-  // Independent by entity_classification (primary)
+  // Independent by entity_classification (primary) — 7 types per isIndependentClassification()
   const { count: independentByEC } = await supabase
     .from('practices')
     .select('*', { count: 'exact', head: true })
     .in('zip', allWatchedZipCodes)
     .in('entity_classification', [
       'solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume',
-      'family_practice', 'small_group', 'large_group', 'specialist', 'non_clinical'
+      'family_practice', 'small_group', 'large_group'
     ])
 
   // Independent by ownership_status fallback

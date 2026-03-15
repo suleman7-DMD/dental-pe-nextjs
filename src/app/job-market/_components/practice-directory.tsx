@@ -42,7 +42,7 @@ const PAGE_SIZE = 100
 // ────────────────────────────────────────────────────────────────────────────
 
 function isDataAxle(p: Practice): boolean {
-  return (p.import_batch_id ?? '').startsWith('DA_')
+  return p.data_axle_import_date != null && p.data_axle_import_date !== ''
 }
 
 function matchesSearch(p: Practice, term: string): boolean {
@@ -92,7 +92,7 @@ function classificationLabel(ec: unknown): string {
 
 /** Compute data quality stars string for a practice */
 function computeDataQuality(p: Practice): string {
-  const isDA = (p.import_batch_id ?? '').startsWith('DA_')
+  const isDA = p.data_axle_import_date != null && p.data_axle_import_date !== ''
   const hasEC = !!p.entity_classification && p.entity_classification.trim() !== ''
   if (isDA) return '\u2605\u2605\u2605'
   if (hasEC) return '\u2605\u2605'

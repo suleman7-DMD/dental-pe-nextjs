@@ -223,7 +223,7 @@ export async function getPracticeStats(
 export async function getRetirementRiskCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  // Independent practices established before 1995 (30+ years).
+  // Independent practices established 30+ years ago.
   // year_established only exists on Data Axle enriched practices,
   // which all have entity_classification set — no fallback needed.
   const { count, error } = await supabase

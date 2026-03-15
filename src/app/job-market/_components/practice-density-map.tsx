@@ -257,8 +257,9 @@ export function PracticeDensityMap({
       // dso_regional/dso_national from classifier are more accurate than ownership_status
       const ec = (p.entity_classification ?? '').trim().toLowerCase()
       const isCorporateByEC = ec === 'dso_regional' || ec === 'dso_national'
+      const isIndependentByEC = ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group'].includes(ec)
       const rawStatus = (p.ownership_status ?? 'unknown').trim().toLowerCase()
-      const status_clean = isCorporateByEC ? 'dso_affiliated' : rawStatus
+      const status_clean = isCorporateByEC ? 'dso_affiliated' : isIndependentByEC ? 'independent' : rawStatus
       if (hideUnknown && status_clean === 'unknown') continue
 
       let lat: number | null = null
