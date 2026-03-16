@@ -131,11 +131,13 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
   )
 
   // ── Recent Changes ────────────────────────────────────────────────────
+  // Fetch practice_changes globally and filter client-side by NPI set.
+  // This avoids 24+ sequential batched NPI queries.
   useEffect(() => {
     let cancelled = false
 
     async function fetchChanges() {
-      if (zipList.length === 0) return
+      if (zipList.length === 0 || practices.length === 0) return
       setChangesLoading(true)
 
       try {
@@ -144,43 +146,43 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         cutoffDate.setDate(cutoffDate.getDate() - 180)
         const cutoff = cutoffDate.toISOString().slice(0, 10)
 
-        // Fetch changes with practice join
-        // Supabase doesn't support arbitrary JOINs, so we fetch changes
-        // and match with practices client-side, or use an RPC/view.
-        // For simplicity, fetch changes where npi is in our practice set.
-        const npiSet = new Set(practices.map((p) => p.npi))
+        // Build NPI->practice lookup from loaded practices
+        const practiceMap = new Map(practices.map((p) => [p.npi, p]))
 
-        // Batch fetch to avoid URL length limits
-        const batchSize = 500
+        // Fetch all recent changes (paginated) and filter client-side
         const allChanges: PracticeChange[] = []
-        const npiArr = Array.from(npiSet)
+        const pageSize = 1000
+        let offset = 0
+        let hasMore = true
 
-        for (let i = 0; i < npiArr.length; i += batchSize) {
-          if (cancelled) return
-          const batch = npiArr.slice(i, i + batchSize)
+        while (hasMore && !cancelled) {
           const { data } = await supabase
             .from('practice_changes')
             .select('change_date, field_changed, old_value, new_value, change_type, npi')
-            .in('npi', batch)
             .gte('change_date', cutoff)
             .order('change_date', { ascending: false })
+            .range(offset, offset + pageSize - 1)
 
-          if (data) {
-            // Enrich with practice info
-            const practiceMap = new Map(practices.map((p) => [p.npi, p]))
+          if (data && data.length > 0) {
             for (const row of data) {
               const practice = practiceMap.get(row.npi)
-              allChanges.push({
-                change_date: row.change_date,
-                practice_name: practice?.practice_name ?? 'Unknown',
-                city: practice?.city ?? '',
-                zip: (practice?.zip ?? '').toString().slice(0, 5),
-                field_changed: row.field_changed,
-                old_value: row.old_value,
-                new_value: row.new_value,
-                change_type: row.change_type,
-              })
+              if (practice) {
+                allChanges.push({
+                  change_date: row.change_date,
+                  practice_name: practice.practice_name ?? 'Unknown',
+                  city: practice.city ?? '',
+                  zip: (practice.zip ?? '').toString().slice(0, 5),
+                  field_changed: row.field_changed,
+                  old_value: row.old_value,
+                  new_value: row.new_value,
+                  change_type: row.change_type,
+                })
+              }
             }
+            offset += data.length
+            hasMore = data.length === pageSize
+          } else {
+            hasMore = false
           }
         }
 

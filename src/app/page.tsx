@@ -18,8 +18,11 @@ export default async function HomePage() {
   try {
     const supabase = await createServerClient()
 
-    // Phase 1: fetch core data in parallel
-    const [dealStats, practiceStats, watchedZips, recentDeals] =
+    // Phase 1: fetch deals + lightweight queries in parallel
+    // NOTE: getPracticeStats runs separately to avoid concurrent DB overload.
+    // Running 10+ count queries on a 400k-row table simultaneously causes
+    // Supabase Postgres statement_timeout (error 57014).
+    const [dealStats, watchedZips, recentDeals] =
       await Promise.all([
         getDealStats(supabase).catch(
           () =>
@@ -42,17 +45,28 @@ export default async function HomePage() {
               activeSponsors: 0,
             }) as DealStats
         ),
-        getPracticeStats(supabase).catch(() => ({
-          totalPractices: 0,
-          consolidatedPct: '--',
-          independentPct: '--',
-        })),
         getWatchedZipCount(supabase).catch(() => 0),
         getRecentDeals(supabase, 10).catch(() => []),
       ])
 
-    // Phase 2: fetch ALL secondary metrics in parallel
-    const [retirementRisk, acquisitionTargets, enrichedCount, recentChanges, latestDealResult] =
+    // Phase 2: practice stats (internally batched to avoid statement_timeout)
+    const practiceStats = await getPracticeStats(supabase).catch((err) => {
+      console.error('[HomePage] getPracticeStats error:', err)
+      return {
+        totalPractices: 0,
+        total: 0,
+        corporate: 0,
+        corporateHighConf: 0,
+        independent: 0,
+        unknown: 0,
+        enriched: 0,
+        consolidatedPct: '--',
+        independentPct: '--',
+      }
+    })
+
+    // Phase 3: secondary metrics (lightweight, each does 1-2 queries)
+    const [retirementRisk, acquisitionTargets, recentChanges, latestDealResult] =
       await Promise.all([
         getRetirementRiskCount(supabase).catch((err) => {
           console.error('[HomePage] retirementRisk error:', err)
@@ -62,18 +76,6 @@ export default async function HomePage() {
           console.error('[HomePage] acquisitionTargets error:', err)
           return 0
         }),
-        (async () => {
-          try {
-            const { count, error } = await supabase
-              .from('practices')
-              .select('npi', { count: 'exact', head: true })
-              .not('data_axle_import_date', 'is', null)
-            if (error) console.error('[HomePage] enrichedCount error:', error)
-            return count ?? 0
-          } catch {
-            return 0
-          }
-        })(),
         getRecentChanges(supabase, undefined, 90)
           .then((changes) => changes.slice(0, 8))
           .catch((err) => {
@@ -93,6 +95,9 @@ export default async function HomePage() {
     const lastPipelineRun = latestDealResult?.[0]?.created_at
       ? String(latestDealResult[0].created_at).slice(0, 10)
       : null
+
+    // Use enrichedCount from practiceStats (already fetched there) to avoid duplicate query
+    const enrichedCount = 'enriched' in practiceStats ? (practiceStats as { enriched: number }).enriched : 0
 
     const summary: HomeSummary = {
       totalDeals: dealStats.totalDeals,

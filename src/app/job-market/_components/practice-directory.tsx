@@ -14,8 +14,6 @@ import { Download } from 'lucide-react'
 import { exportToCsv } from '@/lib/utils/csv-export'
 import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
 import { formatStatusLabel } from '@/lib/utils/formatting'
-import { computeJobOpportunityScore } from '@/lib/utils/scoring'
-
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -235,12 +233,6 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     setSelectedStatuses([])
     setSelectedSources(['All'])
   }, [practices.length])
-
-  // Compute job_opp_score on allPractices so drawer lookups have scores
-  const scoredAllPractices = useMemo(
-    () => computeJobOpportunityScore(allPractices),
-    [allPractices]
-  )
 
   const totalPractices = practices.length
   const enrichedCount = useMemo(
@@ -586,7 +578,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       {/* Practice Detail Drawer */}
       <PracticeDetailDrawer
         practice={selectedPractice}
-        allPractices={scoredAllPractices}
+        allPractices={allPractices}
         onClose={() => setSelectedPractice(null)}
       />
     </div>

@@ -13,22 +13,22 @@ import { isIndependentClassification, isCorporateClassification } from "@/lib/co
  * - Established >= 2021: +15, 2016-2020: +8
  */
 /**
- * Overload: accepts array of practices and returns them with job_opportunity_score attached.
+ * Overload: accepts array of practices and returns them with job_opp_score attached.
  */
 export function computeJobOpportunityScore(
   practices: Practice[]
-): (Practice & { job_opportunity_score: number })[];
+): (Practice & { job_opp_score: number })[];
 /**
  * Overload: accepts a single practice and returns the score.
  */
 export function computeJobOpportunityScore(practice: Practice): number;
 export function computeJobOpportunityScore(
   input: Practice | Practice[]
-): number | (Practice & { job_opportunity_score: number })[] {
+): number | (Practice & { job_opp_score: number })[] {
   if (Array.isArray(input)) {
     return input.map((p) => ({
       ...p,
-      job_opportunity_score: computeJobOpportunityScore(p),
+      job_opp_score: computeJobOpportunityScore(p),
     }));
   }
   const practice = input;

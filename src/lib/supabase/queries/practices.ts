@@ -157,33 +157,52 @@ export async function getPracticesWithCoords(
 }
 
 /**
+ * Safe count query helper: awaits a Supabase count query and returns the count,
+ * logging any errors. Returns null on failure instead of silently swallowing errors.
+ */
+async function safeCount(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  query: PromiseLike<{ count: number | null; error: any }>,
+  label: string
+): Promise<number | null> {
+  const result = await query;
+  if (result.error) {
+    console.error(`[getPracticeStats] ${label} error:`, result.error.message ?? result.error, `(code: ${result.error.code ?? 'unknown'})`);
+    return null;
+  }
+  return result.count;
+}
+
+/**
  * Aggregate practice statistics for watched ZIPs with tiered consolidation.
  * Returns full PracticeStats including high-confidence corporate count,
  * all-signals corporate count, independent count, unknown count, and enriched count.
  * Also returns global total for the "Practices Tracked" KPI.
+ *
+ * Queries are batched sequentially to avoid overwhelming Supabase Postgres
+ * with too many concurrent count queries (which causes statement_timeout 57014).
  */
 export async function getPracticeStats(
   supabase: SupabaseClient
 ): Promise<PracticeStats> {
-  // ── Phase 1: Global counts (parallel) ─────────────────────────────────
-  const [
-    { count: globalTotal },
-    { data: watchedZipRows },
-    { count: enrichedCount },
-  ] = await Promise.all([
-    supabase.from("practices").select("npi", { count: "exact", head: true }),
-    supabase.from("watched_zips").select("zip_code"),
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .not("data_axle_import_date", "is", null),
-  ]);
+  // ── Phase 1: Get watched ZIPs first (lightweight query) ────────────────
+  const { data: watchedZipRows, error: zipError } = await supabase
+    .from("watched_zips")
+    .select("zip_code");
+
+  if (zipError) {
+    console.error("[getPracticeStats] watched_zips error:", zipError.message);
+  }
 
   const watchedZips = (watchedZipRows ?? []).map(
     (z: { zip_code: string }) => z.zip_code
   );
 
   if (watchedZips.length === 0) {
+    // Still try to get global total for display
+    const { count: globalTotal } = await supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true });
     return {
       totalPractices: globalTotal ?? 0,
       total: 0,
@@ -191,78 +210,105 @@ export async function getPracticeStats(
       corporateHighConf: 0,
       independent: 0,
       unknown: 0,
-      enriched: enrichedCount ?? 0,
+      enriched: 0,
       consolidatedPct: "--",
       independentPct: "--",
     };
   }
 
-  // ── Phase 2: Watched-ZIP scoped counts (parallel) ─────────────────────
-  const [
-    { count: watchedTotal },
-    { count: allDsoRegional },
-    { count: allDsoNational },
-    { count: dsoNationalReal },
-    { count: dsoRegionalStrong },
-    { count: dsoSpecialists },
-    { count: independentByEC },
-  ] = await Promise.all([
-    // Total in watched ZIPs
+  // ── Phase 2: Batch A — fast queries with narrow filters (3 concurrent) ─
+  const [allDsoRegional, allDsoNational, dsoSpecialists] = await Promise.all([
+    safeCount(
+      supabase
+        .from("practices")
+        .select("npi", { count: "exact", head: true })
+        .in("zip", watchedZips)
+        .eq("entity_classification", "dso_regional"),
+      "allDsoRegional"
+    ),
+    safeCount(
+      supabase
+        .from("practices")
+        .select("npi", { count: "exact", head: true })
+        .in("zip", watchedZips)
+        .eq("entity_classification", "dso_national"),
+      "allDsoNational"
+    ),
+    safeCount(
+      supabase
+        .from("practices")
+        .select("npi", { count: "exact", head: true })
+        .in("zip", watchedZips)
+        .eq("entity_classification", "specialist")
+        .in("ownership_status", ["dso_affiliated", "pe_backed"]),
+      "dsoSpecialists"
+    ),
+  ]);
+
+  // ── Phase 3: Batch B — more narrow filters (2 concurrent) ──────────────
+  const [dsoNationalReal, dsoRegionalStrong] = await Promise.all([
+    safeCount(
+      supabase
+        .from("practices")
+        .select("npi", { count: "exact", head: true })
+        .in("zip", watchedZips)
+        .eq("entity_classification", "dso_national")
+        .not(
+          "affiliated_dso",
+          "in",
+          `(${DSO_NATIONAL_TAXONOMY_LEAKS.join(",")})`
+        ),
+      "dsoNationalReal"
+    ),
+    safeCount(
+      supabase
+        .from("practices")
+        .select("npi", { count: "exact", head: true })
+        .in("zip", watchedZips)
+        .eq("entity_classification", "dso_regional")
+        .or(DSO_REGIONAL_STRONG_SIGNAL_FILTER),
+      "dsoRegionalStrong"
+    ),
+  ]);
+
+  // ── Phase 4: Expensive broad scans — run sequentially to avoid ─────────
+  // Supabase Postgres statement_timeout (error 57014). These queries scan
+  // large portions of the 400k-row practices table and timeout when
+  // competing for DB resources with concurrent queries.
+  const watchedTotal = await safeCount(
     supabase
       .from("practices")
       .select("npi", { count: "exact", head: true })
       .in("zip", watchedZips),
+    "watchedTotal"
+  );
 
-    // All dso_regional
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .in("zip", watchedZips)
-      .eq("entity_classification", "dso_regional"),
-
-    // All dso_national
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .in("zip", watchedZips)
-      .eq("entity_classification", "dso_national"),
-
-    // High-conf dso_national: real brands (exclude taxonomy leaks)
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .in("zip", watchedZips)
-      .eq("entity_classification", "dso_national")
-      .not(
-        "affiliated_dso",
-        "in",
-        `(${DSO_NATIONAL_TAXONOMY_LEAKS.join(",")})`
-      ),
-
-    // High-conf dso_regional: strong signals (EIN, generic brand, parent, franchise, branch)
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .in("zip", watchedZips)
-      .eq("entity_classification", "dso_regional")
-      .or(DSO_REGIONAL_STRONG_SIGNAL_FILTER),
-
-    // DSO-owned specialists
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .in("zip", watchedZips)
-      .eq("entity_classification", "specialist")
-      .in("ownership_status", ["dso_affiliated", "pe_backed"]),
-
-    // Independent by entity_classification (7 types)
+  const independentByEC = await safeCount(
     supabase
       .from("practices")
       .select("npi", { count: "exact", head: true })
       .in("zip", watchedZips)
       .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS]),
-  ]);
+    "independentByEC"
+  );
 
+  const globalTotal = await safeCount(
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true }),
+    "globalTotal"
+  );
+
+  // Enriched count (scans 400k rows on data_axle_import_date) — run last
+  const enrichedCount = await safeCount(
+    supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .not("data_axle_import_date", "is", null),
+    "enrichedCount"
+  );
+
+  // ── Compute derived stats ──────────────────────────────────────────────
   const t = watchedTotal ?? 0;
   const corporate = (allDsoRegional ?? 0) + (allDsoNational ?? 0);
   const highConfCorporate =
@@ -270,12 +316,21 @@ export async function getPracticeStats(
   const independent = independentByEC ?? 0;
   // "Unknown" = total - corporate - independent.
   // This remainder includes specialist, non_clinical, and any truly unclassified.
-  // All watched ZIP practices have entity_classification set per CLAUDE.md,
-  // so this is primarily specialist + non_clinical practices.
   const unknownCount = Math.max(0, t - corporate - independent);
 
+  // If globalTotal timed out, fall back to watchedTotal so KPI isn't 0
+  const effectiveGlobalTotal = globalTotal ?? t;
+
+  // Log if any critical counts failed
+  if (watchedTotal === null || independentByEC === null || globalTotal === null) {
+    console.warn(
+      `[getPracticeStats] Some counts returned null (possible statement_timeout). ` +
+      `globalTotal=${globalTotal}, watchedTotal=${watchedTotal}, independent=${independentByEC}`
+    );
+  }
+
   return {
-    totalPractices: globalTotal ?? 0,
+    totalPractices: effectiveGlobalTotal,
     total: t,
     corporate,
     corporateHighConf: highConfCorporate,
