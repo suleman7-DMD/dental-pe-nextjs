@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react'
 import dynamic from 'next/dynamic'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { DataFreshnessBar } from '@/components/data-display/data-freshness-bar'
 import { LivingLocationSelector } from './living-location-selector'
@@ -159,9 +159,9 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
 
 // Shared field list for practice queries
 const PRACTICE_FIELDS = [
-  'id', 'npi', 'practice_name', 'doing_business_as', 'city', 'state', 'zip',
+  'id', 'npi', 'practice_name', 'doing_business_as', 'address', 'city', 'state', 'zip',
   'phone', 'website', 'entity_classification', 'ownership_status',
-  'affiliated_dso', 'buyability_score', 'classification_confidence',
+  'affiliated_dso', 'affiliated_pe_sponsor', 'buyability_score', 'classification_confidence',
   'classification_reasoning', 'year_established', 'employee_count',
   'estimated_revenue', 'latitude', 'longitude', 'data_axle_import_date',
   'num_providers', 'location_type', 'taxonomy_code',
@@ -171,7 +171,7 @@ const PRACTICE_FIELDS = [
 // Component
 // ────────────────────────────────────────────────────────────────────────────
 
-export function JobMarketShell({
+function JobMarketShellInner({
   initialZipScores,
   initialWatchedZips,
   freshness,
@@ -181,6 +181,7 @@ export function JobMarketShell({
 }: JobMarketShellProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const supabase = createBrowserClient()
 
   // Current living location from URL or default
@@ -193,11 +194,11 @@ export function JobMarketShell({
   const urlTab = searchParams.get('tab')
   const activeTab: TabId = TABS.some(t => t.id === urlTab) ? (urlTab as TabId) : 'overview'
 
-  const handleTabChange = (tab: TabId) => {
+  const handleTabChange = useCallback((tab: TabId) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', tab)
-    router.push(`?${params.toString()}`, { scroll: false })
-  }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, router, pathname])
 
   // ── State ──────────────────────────────────────────────────────────────
   // Full practice data — loaded lazily only when a data-heavy tab is active
@@ -447,11 +448,11 @@ export function JobMarketShell({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlLocation])
 
-  const handleLocationChange = (newLocation: string) => {
+  const handleLocationChange = useCallback((newLocation: string) => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('location', newLocation)
-    router.push(`?${params.toString()}`, { scroll: false })
-  }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }, [searchParams, router, pathname])
 
   // ── Compute derived stats (only when full data is loaded) ───────────
   const zipStats = useMemo(
@@ -554,249 +555,260 @@ export function JobMarketShell({
           </div>
         )}
 
-        {activeKpis.total_p === 0 && !loading ? (
-          <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-            No practices found for this zone.
+        {/* ── KPIs ──────────────────────────────────────────── */}
+        <section id="kpis">
+          {/* Row 1: 6 KPIs */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <KpiCard
+              icon={<Hospital className="h-5 w-5" />}
+              label="Total Practices"
+              value={kpiDisplay.total_p.toLocaleString()}
+            />
+            <KpiCard
+              icon={<CircleCheck className="h-5 w-5" />}
+              label="Independent %"
+              value={kpiDisplay.indep_pct}
+              accentColor="#2D8B4E"
+            />
+            <KpiCard
+              icon={<BarChart3 className="h-5 w-5" />}
+              label="High-Confidence Corporate"
+              value={kpiDisplay.highConf_pct}
+              accentColor="#2D8B4E"
+              tooltip={`High-confidence includes practices with DSO brand matches, shared EIN, or corporate parent signals. All-signals adds ${(kpiDisplay.allSignalsCorporate - kpiDisplay.highConfCorporate).toLocaleString()} practices detected only by shared phone numbers (a weaker signal). Industry estimates from ADA HPI suggest actual consolidation is 25-35%, as stealth acquisitions keep the original practice name.`}
+              subtitle={
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D4920B]" />
+                    <span className="text-[10px] text-[#D4920B] font-mono font-medium">
+                      All detected signals: {kpiDisplay.allSignals_pct}
+                    </span>
+                  </div>
+                  <p className="text-[9px] text-[#9C9C90] leading-tight">
+                    Industry estimate: 25-35%
+                  </p>
+                </div>
+              }
+            />
+            <KpiCard
+              icon={<Target className="h-5 w-5" />}
+              label="Avg Buyability"
+              value={kpiDisplay.avg_buy}
+            />
+            <KpiCard
+              icon={<Users className="h-5 w-5" />}
+              label="10+ Staff"
+              value={kpiDisplay.large_count.toLocaleString()}
+            />
+            <KpiCard
+              icon={<Clock className="h-5 w-5" />}
+              label="Retirement Risk"
+              value={kpiDisplay.retirement_risk.toLocaleString()}
+              accentColor="#C23B3B"
+            />
           </div>
-        ) : (
-          <>
-            {/* ── KPIs ──────────────────────────────────────────── */}
-            <section id="kpis">
-              {/* Row 1: 6 KPIs */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <KpiCard
-                  icon={<Hospital className="h-5 w-5" />}
-                  label="Total Practices"
-                  value={kpiDisplay.total_p.toLocaleString()}
-                />
-                <KpiCard
-                  icon={<CircleCheck className="h-5 w-5" />}
-                  label="Independent %"
-                  value={kpiDisplay.indep_pct}
-                  accentColor="#2D8B4E"
-                />
-                <KpiCard
-                  icon={<BarChart3 className="h-5 w-5" />}
-                  label="High-Confidence Corporate"
-                  value={kpiDisplay.highConf_pct}
-                  accentColor="#2D8B4E"
-                  tooltip={`High-confidence includes practices with DSO brand matches, shared EIN, or corporate parent signals. All-signals adds ${(kpiDisplay.allSignalsCorporate - kpiDisplay.highConfCorporate).toLocaleString()} practices detected only by shared phone numbers (a weaker signal). Industry estimates from ADA HPI suggest actual consolidation is 25-35%, as stealth acquisitions keep the original practice name.`}
-                  subtitle={
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D4920B]" />
-                        <span className="text-[10px] text-[#D4920B] font-mono font-medium">
-                          All detected signals: {kpiDisplay.allSignals_pct}
-                        </span>
-                      </div>
-                      <p className="text-[9px] text-[#9C9C90] leading-tight">
-                        Industry estimate: 25-35%
-                      </p>
-                    </div>
-                  }
-                />
-                <KpiCard
-                  icon={<Target className="h-5 w-5" />}
-                  label="Avg Buyability"
-                  value={kpiDisplay.avg_buy}
-                />
-                <KpiCard
-                  icon={<Users className="h-5 w-5" />}
-                  label="10+ Staff"
-                  value={kpiDisplay.large_count.toLocaleString()}
-                />
-                <KpiCard
-                  icon={<Clock className="h-5 w-5" />}
-                  label="Retirement Risk"
-                  value={kpiDisplay.retirement_risk.toLocaleString()}
-                  accentColor="#C23B3B"
-                />
-              </div>
 
-              {/* Row 2: 3 KPIs with captions */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                <div>
-                  <KpiCard
-                    icon={<MapPin className="h-5 w-5" />}
-                    label="Avg Dental Density"
-                    value={kpiDisplay.avgDldVal ? `${kpiDisplay.avgDldVal}/10k` : '--'}
-                  />
-                  <p className="text-xs text-[#6B6B60] mt-1 px-1">
-                    GP offices per 10k residents. National avg ~6.1. Lower = less competition.
-                  </p>
-                </div>
-                <div>
-                  <KpiCard
-                    icon={<Store className="h-5 w-5" />}
-                    label="Buyable Practice %"
-                    value={
-                      kpiDisplay.avgBpr != null
-                        ? `${(kpiDisplay.avgBpr * 100).toFixed(0)}%`
-                        : '--'
-                    }
-                    suffix={
-                      kpiDisplay.avgBpr != null
-                        ? Array.from({ length: kpiDisplay.bprConfidence })
-                            .map(() => '\u2605')
-                            .join('')
-                        : undefined
-                    }
-                  />
-                  <p className="text-xs text-[#6B6B60] mt-1 px-1">
-                    % of GP offices that are independently owned solos -- potential acquisition targets.
-                  </p>
-                </div>
-                <div>
-                  <KpiCard
-                    icon={<Zap className="h-5 w-5" />}
-                    label="High-Volume Solos"
-                    value={kpiDisplay.highVolCount.toLocaleString()}
-                  />
-                  <p className="text-xs text-[#6B6B60] mt-1 px-1">
-                    Solo practices with 5+ employees or $800k+ revenue. Likely need associate help.
-                  </p>
-                </div>
-              </div>
-
-              {/* Unknown ownership warning */}
-              {kpiDisplay.unk_pct > 30 && (
-                <p className="text-xs text-[#D4920B] mt-3 flex items-start gap-1">
-                  <span className="shrink-0">Warning:</span>
-                  <span>
-                    {kpiDisplay.unk_pct.toFixed(0)}% of practices have unknown ownership (
-                    {kpiDisplay.unk_cnt.toLocaleString()} / {kpiDisplay.total_p.toLocaleString()}).
-                    Known independent: {kpiDisplay.indep_cnt.toLocaleString()}. Real independent count is
-                    likely higher. Add Data Axle exports to improve classification.
-                  </span>
-                </p>
-              )}
-            </section>
-
-            {/* ── Tab Navigation ────────────────────────────────── */}
-            <div className="border-b border-[#E8E5DE]">
-              <nav className="flex gap-0" aria-label="Job Market tabs">
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
-                    className={`px-5 py-2.5 text-sm font-medium transition-colors relative ${
-                      activeTab === tab.id
-                        ? 'text-[#B8860B] border-b-2 border-[#B8860B]'
-                        : 'text-[#6B6B60] hover:text-[#1A1A1A] border-b-2 border-transparent'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </nav>
+          {/* Row 2: 3 KPIs with captions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div>
+              <KpiCard
+                icon={<MapPin className="h-5 w-5" />}
+                label="Avg Dental Density"
+                value={kpiDisplay.avgDldVal ? `${kpiDisplay.avgDldVal}/10k` : '--'}
+              />
+              <p className="text-xs text-[#6B6B60] mt-1 px-1">
+                GP offices per 10k residents. National avg ~6.1. Lower = less competition.
+              </p>
             </div>
+            <div>
+              <KpiCard
+                icon={<Store className="h-5 w-5" />}
+                label="Buyable Practice %"
+                value={
+                  kpiDisplay.avgBpr != null
+                    ? `${(kpiDisplay.avgBpr * 100).toFixed(0)}%`
+                    : '--'
+                }
+                suffix={
+                  kpiDisplay.avgBpr != null
+                    ? Array.from({ length: kpiDisplay.bprConfidence })
+                        .map(() => '\u2605')
+                        .join('')
+                    : undefined
+                }
+              />
+              <p className="text-xs text-[#6B6B60] mt-1 px-1">
+                % of GP offices that are independently owned solos -- potential acquisition targets.
+              </p>
+            </div>
+            <div>
+              <KpiCard
+                icon={<Zap className="h-5 w-5" />}
+                label="High-Volume Solos"
+                value={kpiDisplay.highVolCount.toLocaleString()}
+              />
+              <p className="text-xs text-[#6B6B60] mt-1 px-1">
+                Solo practices with 5+ employees or $800k+ revenue. Likely need associate help.
+              </p>
+            </div>
+          </div>
 
-            {/* ── Tab Content ───────────────────────────────────── */}
+          {/* Unknown ownership warning */}
+          {kpiDisplay.unk_pct > 30 && kpiDisplay.total_p > 0 && (
+            <p className="text-xs text-[#D4920B] mt-3 flex items-start gap-1">
+              <span className="shrink-0">Warning:</span>
+              <span>
+                {kpiDisplay.unk_pct.toFixed(0)}% of practices have unknown ownership (
+                {kpiDisplay.unk_cnt.toLocaleString()} / {kpiDisplay.total_p.toLocaleString()}).
+                Known independent: {kpiDisplay.indep_cnt.toLocaleString()}. Real independent count is
+                likely higher. Add Data Axle exports to improve classification.
+              </span>
+            </p>
+          )}
+        </section>
 
-            {/* Overview Tab — uses zipScores (already loaded), no full practice data required */}
-            {activeTab === 'overview' && (
-              <div key="overview" className="space-y-6">
-                <SaturationTable
+        {/* ── Tab Navigation ────────────────────────────────── */}
+        <div className="border-b border-[#E8E5DE]">
+          <nav className="flex gap-0" aria-label="Job Market tabs">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`px-5 py-2.5 text-sm font-medium transition-colors relative ${
+                  activeTab === tab.id
+                    ? 'text-[#B8860B] border-b-2 border-[#B8860B]'
+                    : 'text-[#6B6B60] hover:text-[#1A1A1A] border-b-2 border-transparent'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* ── Tab Content ───────────────────────────────────── */}
+
+        {/* Overview Tab -- uses zipScores (already loaded), no full practice data required */}
+        {activeTab === 'overview' && (
+          <div key="overview" className="space-y-6">
+            <SaturationTable
+              zipScores={zipScores}
+              watchedZips={initialWatchedZips}
+            />
+            <SaturationMap
+              zipScores={zipScores}
+              watchedZips={initialWatchedZips}
+              centerLat={loc.center_lat}
+              centerLon={loc.center_lon}
+            />
+            {adaBenchmarks && adaBenchmarks.length > 0 && (
+              <ADABenchmarks data={adaBenchmarks} />
+            )}
+            {practices ? (
+              <OpportunitySignals
+                practices={practicesWithScore}
+                zipList={loc.commutable_zips}
+              />
+            ) : (
+              <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center">
+                <button
+                  onClick={() => fetchFullPractices(currentLocation)}
+                  disabled={loading}
+                  className="text-sm text-[#B8860B] hover:text-[#D4920B] transition-colors disabled:opacity-50"
+                >
+                  {loading ? 'Loading...' : 'Load practice data to see Opportunity Signals'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Map Tab */}
+        {activeTab === 'map' && (
+          <div key="map">
+            {practices ? (
+              <PracticeDensityMap
+                practices={practices}
+                centerLat={loc.center_lat}
+                centerLon={loc.center_lon}
+              />
+            ) : (
+              <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
+                Loading practice data...
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Directory Tab */}
+        {activeTab === 'directory' && (
+          <div key="directory">
+            {practices ? (
+              <PracticeDirectory
+                practices={practicesWithScore}
+                allPractices={practicesWithScore}
+              />
+            ) : (
+              <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
+                Loading practice data...
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Analytics Tab */}
+        {activeTab === 'analytics' && (
+          <div key="analytics" className="space-y-6">
+            {practices ? (
+              <>
+                <MarketOverviewCharts
+                  practices={practices}
+                  zipStats={zipStats}
+                  kpis={{
+                    indep_cnt: activeKpis.indep_cnt,
+                    dso_cnt: activeKpis.dso_cnt,
+                    pe_cnt: activeKpis.pe_cnt,
+                    unk_cnt: activeKpis.unk_cnt,
+                  }}
+                />
+                <OwnershipLandscape
+                  practices={practices}
+                  zipStats={zipStats}
                   zipScores={zipScores}
                   watchedZips={initialWatchedZips}
                 />
-                <SaturationMap
-                  zipScores={zipScores}
-                  watchedZips={initialWatchedZips}
-                  centerLat={loc.center_lat}
-                  centerLon={loc.center_lon}
+                <MarketAnalytics
+                  practices={practices}
+                  zipStats={zipStats}
                 />
-                {adaBenchmarks && adaBenchmarks.length > 0 && (
-                  <ADABenchmarks data={adaBenchmarks} />
-                )}
-                {practices ? (
-                  <OpportunitySignals
-                    practices={practicesWithScore}
-                    zipList={loc.commutable_zips}
-                  />
-                ) : (
-                  <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center">
-                    <button
-                      onClick={() => fetchFullPractices(currentLocation)}
-                      disabled={loading}
-                      className="text-sm text-[#B8860B] hover:text-[#D4920B] transition-colors disabled:opacity-50"
-                    >
-                      {loading ? 'Loading...' : 'Load practice data to see Opportunity Signals'}
-                    </button>
-                  </div>
-                )}
+              </>
+            ) : (
+              <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
+                Loading practice data...
               </div>
             )}
-
-            {/* Map Tab */}
-            {activeTab === 'map' && (
-              <div key="map">
-                {practices ? (
-                  <PracticeDensityMap
-                    practices={practices}
-                    centerLat={loc.center_lat}
-                    centerLon={loc.center_lon}
-                  />
-                ) : (
-                  <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
-                    Loading practice data...
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Directory Tab */}
-            {activeTab === 'directory' && (
-              <div key="directory">
-                {practices ? (
-                  <PracticeDirectory
-                    practices={practicesWithScore}
-                    allPractices={practicesWithScore}
-                  />
-                ) : (
-                  <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
-                    Loading practice data...
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Analytics Tab */}
-            {activeTab === 'analytics' && (
-              <div key="analytics" className="space-y-6">
-                {practices ? (
-                  <>
-                    <MarketOverviewCharts
-                      practices={practices}
-                      zipStats={zipStats}
-                      kpis={{
-                        indep_cnt: activeKpis.indep_cnt,
-                        dso_cnt: activeKpis.dso_cnt,
-                        pe_cnt: activeKpis.pe_cnt,
-                        unk_cnt: activeKpis.unk_cnt,
-                      }}
-                    />
-                    <OwnershipLandscape
-                      practices={practices}
-                      zipStats={zipStats}
-                      zipScores={zipScores}
-                      watchedZips={initialWatchedZips}
-                    />
-                    <MarketAnalytics
-                      practices={practices}
-                      zipStats={zipStats}
-                    />
-                  </>
-                ) : (
-                  <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
-                    Loading practice data...
-                  </div>
-                )}
-              </div>
-            )}
-          </>
+          </div>
         )}
       </div>
     </div>
+  )
+}
+
+export function JobMarketShell(props: JobMarketShellProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#FAFAF7]">
+          <div className="px-6 py-6 space-y-6">
+            <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">
+              Job Market Intelligence
+            </h1>
+            <p className="text-[#6B6B60] text-sm mt-1">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <JobMarketShellInner {...props} />
+    </Suspense>
   )
 }
