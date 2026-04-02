@@ -18,15 +18,21 @@ export default async function SystemPage() {
     getCompletenessMetrics(supabase),
   ])
 
-  // Transform Record<string, number> to SourceCoverage[]
+  // Transform Record<string, SourceCoverageDetail> to SourceCoverage[]
   const sources: SourceCoverage[] = Object.entries(sourcesRaw).map(
-    ([source, records]) => ({
-      source,
-      records,
-      dateRange: '',
-      lastUpdated: '',
-      daysSinceUpdate: 0,
-    })
+    ([source, detail]) => {
+      const lastUpdated = detail.lastUpdated || '';
+      const daysSinceUpdate = lastUpdated
+        ? Math.floor((Date.now() - new Date(lastUpdated).getTime()) / 86400000)
+        : 0;
+      return {
+        source,
+        records: detail.count,
+        dateRange: '',
+        lastUpdated,
+        daysSinceUpdate,
+      };
+    }
   )
 
   return (

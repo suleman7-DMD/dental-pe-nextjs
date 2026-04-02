@@ -77,17 +77,24 @@ export async function getDataFreshness(
   };
 }
 
+export interface SourceCoverageDetail {
+  count: number;
+  lastUpdated: string;
+}
+
 export async function getSourceCoverage(
   supabase: SupabaseClient
-): Promise<Record<string, number>> {
-  // Count practices per data_source using parallel count queries
-  // (avoids fetching 400k+ rows which exceeds Supabase's default 1000 row limit)
+): Promise<Record<string, SourceCoverageDetail>> {
+  // Count practices per data_source + get freshness timestamps
   const [
     { count: total },
     { count: nppesCount },
     { count: dataAxleCount },
     { count: manualCount },
     { count: nullCount },
+    { data: nppesLatest },
+    { data: dataAxleLatest },
+    { data: manualLatest },
   ] = await Promise.all([
     supabase
       .from("practices")
@@ -108,20 +115,44 @@ export async function getSourceCoverage(
       .from("practices")
       .select("npi", { count: "exact", head: true })
       .is("data_source", null),
+    // Get most recent updated_at per source for freshness
+    supabase
+      .from("practices")
+      .select("updated_at")
+      .eq("data_source", "nppes")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single(),
+    supabase
+      .from("practices")
+      .select("updated_at")
+      .eq("data_source", "data_axle")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single(),
+    supabase
+      .from("practices")
+      .select("updated_at")
+      .eq("data_source", "manual")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single(),
   ]);
 
-  const counts: Record<string, number> = {};
-  if ((nppesCount ?? 0) > 0) counts["nppes"] = nppesCount ?? 0;
-  if ((dataAxleCount ?? 0) > 0) counts["data_axle"] = dataAxleCount ?? 0;
-  if ((manualCount ?? 0) > 0) counts["manual"] = manualCount ?? 0;
+  const result: Record<string, SourceCoverageDetail> = {};
+  if ((nppesCount ?? 0) > 0)
+    result["nppes"] = { count: nppesCount ?? 0, lastUpdated: nppesLatest?.updated_at ?? "" };
+  if ((dataAxleCount ?? 0) > 0)
+    result["data_axle"] = { count: dataAxleCount ?? 0, lastUpdated: dataAxleLatest?.updated_at ?? "" };
+  if ((manualCount ?? 0) > 0)
+    result["manual"] = { count: manualCount ?? 0, lastUpdated: manualLatest?.updated_at ?? "" };
 
-  // Calculate any remaining sources not in knownSources
-  const knownTotal = Object.values(counts).reduce((a, b) => a + b, 0) + (nullCount ?? 0);
+  const knownTotal = Object.values(result).reduce((a, b) => a + b.count, 0) + (nullCount ?? 0);
   const remaining = (total ?? 0) - knownTotal;
-  if (remaining > 0) counts["other"] = remaining;
-  if ((nullCount ?? 0) > 0) counts["unknown"] = nullCount ?? 0;
+  if (remaining > 0) result["other"] = { count: remaining, lastUpdated: "" };
+  if ((nullCount ?? 0) > 0) result["unknown"] = { count: nullCount ?? 0, lastUpdated: "" };
 
-  return counts;
+  return result;
 }
 
 /**
