@@ -56,11 +56,15 @@ export function formatDate(
 ): string {
   if (!value) return "--";
   try {
+    // Date-only strings (YYYY-MM-DD) are parsed as UTC by JS.
+    // Use UTC display to avoid timezone shift (Mar 1 → Feb 28 in EST).
     const d = new Date(value);
-    return d.toLocaleDateString(
-      "en-US",
-      options ?? { year: "numeric", month: "short", day: "numeric" }
-    );
+    const opts = options ?? { year: "numeric", month: "short", day: "numeric" };
+    const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value.trim());
+    return d.toLocaleDateString("en-US", {
+      ...opts,
+      ...(isDateOnly ? { timeZone: "UTC" } : {}),
+    });
   } catch {
     return value;
   }

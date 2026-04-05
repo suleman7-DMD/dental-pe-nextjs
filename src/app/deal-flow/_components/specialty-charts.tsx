@@ -114,7 +114,7 @@ export function SpecialtyCharts({ deals }: SpecialtyChartsProps) {
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsAreaChart
                         data={spec.data}
-                        margin={{ top: 4, right: 4, left: -20, bottom: 0 }}
+                        margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
                       >
                         <XAxis
                           dataKey="quarter"
