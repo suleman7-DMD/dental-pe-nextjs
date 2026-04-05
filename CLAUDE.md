@@ -70,8 +70,8 @@ Key tables (mirrored from Python pipeline's SQLite via `sync_to_supabase.py`):
 - **platforms**: 69 known DSO platform profiles.
 
 ### Current Data Stats
-- 400,962 practices (14,027 in watched ZIPs, all with entity_classification)
-- 2,512 deals (105 YTD 2026)
+- 401,645 practices (14,045 in watched ZIPs, all with entity_classification)
+- 3,215 deals (164 YTD 2026, coverage Oct 2020 – Mar 2026)
 - 2,992 Data Axle enriched practices (with lat/lon, revenue, employees, year established)
 - 290 scored ZIPs (279 with saturation metrics)
 - 226 retirement risk practices (independent, established before 1995, in watched ZIPs)
@@ -220,6 +220,11 @@ Practices are categorized from entity_classification + buyability_score (NOT fro
 - Never use classified_count as denominator for headline KPIs — that inflates numbers
 - Labels must say "Known Corporate" not just "Consolidated"
 - Show signal quality breakdown (high-confidence vs phone-only)
+
+### Date Display Safety
+- `formatDate()` in `lib/utils/formatting.ts` MUST use `timeZone: "UTC"` for date-only strings (`YYYY-MM-DD`). Without it, `new Date("2026-03-01")` in EST shows as "Feb 28" (off-by-one).
+- The regex `/^\d{4}-\d{2}-\d{2}$/` detects date-only strings. If Supabase ever returns timestamps, update the regex.
+- Recharts small sparkline charts: never use negative left margins (e.g., `left: -20`) — clips Y-axis tick labels into garbled characters. Use `left: 0` minimum.
 
 ### Rendering Safety
 - DataTable render functions must return primitive values (string | number | null), never objects
