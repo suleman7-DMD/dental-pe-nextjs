@@ -51,6 +51,14 @@ export default async function MarketIntelPage() {
     supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('entity_classification', 'specialist').in('ownership_status', ['dso_affiliated', 'pe_backed']),
   ])
 
+  // FIX 4: Per-entity-classification counts for Ownership tab
+  const ecValues = ['solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group','dso_regional','dso_national','specialist','non_clinical'] as const
+  const ecCountResults = await Promise.all(
+    ecValues.map(ec => supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('entity_classification', ec))
+  )
+  const entityCounts: Record<string, number> = {}
+  ecValues.forEach((ec, i) => { entityCounts[ec] = ecCountResults[i].count ?? 0 })
+
   const freshness = {
     totalPractices: totalPractices ?? 0,
     daEnriched: daEnriched ?? 0,
@@ -76,6 +84,7 @@ export default async function MarketIntelPage() {
       adaBenchmarks={adaBenchmarks}
       freshness={freshness}
       classificationCounts={classificationCounts}
+      entityCounts={entityCounts}
     />
   )
 }

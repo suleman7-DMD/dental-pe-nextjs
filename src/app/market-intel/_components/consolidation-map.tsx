@@ -5,6 +5,11 @@ import { SectionHeader } from '@/components/data-display/section-header'
 import { ZIP_CENTROIDS, METRO_CENTERS } from '@/lib/constants/zip-centroids'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 
+/** Escape HTML special characters to prevent XSS in map tooltip .setHTML() */
+function escapeHtml(s: unknown): string {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 interface ConsolidationMapProps {
   zipScores: ZipScore[]
   selectedMetro: string
@@ -241,15 +246,15 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
             .setLngLat(coords)
             .setHTML(
               `<div style="font-family:system-ui;font-size:12px;line-height:1.5">
-                <strong style="font-size:14px">${props.city}</strong>
-                <span style="color:#90a4ae"> &middot; ${props.zip}</span><br/>
-                <span style="color:#333"><strong>${props.total}</strong> practices (deduplicated)</span><br/>
-                <span style="color:#2E7D32">&blacktriangleright; ${props.independent} independent</span> |
-                <span style="color:#E65100">${props.consolCount} consolidated (DSO+PE)</span><br/>
-                <span style="color:${consolPctVal > 20 ? '#D32F2F' : '#388E3C'}">
+                <strong style="font-size:14px">${escapeHtml(props.city)}</strong>
+                <span style="color:#90a4ae"> &middot; ${escapeHtml(props.zip)}</span><br/>
+                <span style="color:#333"><strong>${escapeHtml(props.total)}</strong> practices (deduplicated)</span><br/>
+                <span style="color:#2E7D32">&blacktriangleright; ${escapeHtml(props.independent)} independent</span> |
+                <span style="color:#E65100">${escapeHtml(props.consolCount)} consolidated (DSO+PE)</span><br/>
+                <span style="color:${consolPctVal >= 30 ? '#C23B3B' : consolPctVal >= 15 ? '#D4920B' : '#2D8B4E'}">
                   Consolidation: ${consolPctVal.toFixed(1)}% of total
                 </span><br/>
-                <span style="color:#78909c;font-size:10px">Data confidence: ${props.confidence}</span>
+                <span style="color:#78909c;font-size:10px">Data confidence: ${escapeHtml(props.confidence)}</span>
               </div>`
             )
             .addTo(map)

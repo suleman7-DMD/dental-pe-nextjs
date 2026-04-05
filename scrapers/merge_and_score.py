@@ -352,7 +352,8 @@ def compute_saturation_metrics(session, zip_code, population, mhi=None, pop_grow
             'family_practice_count': 0, 'specialist_density_flag': False,
             'entity_classification_coverage_pct': 0.0,
             'data_axle_enrichment_pct': 0.0,
-            'metrics_confidence': 'low', 'warnings': [],
+            'metrics_confidence': 'low', 'corporate_highconf_count': 0,
+            'warnings': [],
         }
 
     # Group by normalized address (same normalization as entity classification)
@@ -413,6 +414,33 @@ def compute_saturation_metrics(session, zip_code, population, mhi=None, pop_grow
         if any(p.entity_classification in CORPORATE_TYPES for p in pracs)
     )
     corporate_share = (corporate_count / total_gp) if total_gp > 0 else 0.0
+
+    # High-confidence corporate: real DSO brands + EIN-verified dso_regional + DSO-owned specialists
+    TAXONOMY_LEAKS = {'General Dentistry', 'Oral Surgery', 'Orthodontics', 'Periodontics',
+                      'Endodontics', 'Pediatric Dentistry', 'Prosthodontics', 'Dental Hygiene'}
+    STRONG_REASONING = {'EIN=', 'generic brand', 'parent_company', 'franchise', 'branch'}
+
+    def _is_highconf_corporate(p):
+        ec = p.entity_classification
+        if ec == 'dso_national' and (p.affiliated_dso or '') not in TAXONOMY_LEAKS:
+            return True
+        if ec == 'dso_regional':
+            reasoning = (p.classification_reasoning or '').lower()
+            if any(sig in reasoning for sig in STRONG_REASONING):
+                return True
+        if ec == 'specialist' and p.ownership_status in ('dso_affiliated', 'pe_backed'):
+            return True
+        return False
+
+    highconf_gp = sum(
+        1 for _, pracs in gp_locations
+        if any(_is_highconf_corporate(p) for p in pracs)
+    )
+    highconf_spec = sum(
+        1 for _, pracs in spec_locations
+        if any(_is_highconf_corporate(p) for p in pracs)
+    )
+    corporate_highconf_count = highconf_gp + highconf_spec
 
     # Family practice locations
     family_count = sum(
@@ -482,6 +510,7 @@ def compute_saturation_metrics(session, zip_code, population, mhi=None, pop_grow
         'entity_classification_coverage_pct': round(coverage_pct, 1),
         'data_axle_enrichment_pct': round(enrichment_pct, 1),
         'metrics_confidence': confidence,
+        'corporate_highconf_count': corporate_highconf_count,
         'warnings': warnings,
     }
 

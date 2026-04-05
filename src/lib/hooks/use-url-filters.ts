@@ -25,7 +25,7 @@ export function useUrlFilters() {
     (key: string): string[] => {
       const raw = searchParams.get(key);
       if (!raw) return [];
-      return raw.split(",").filter(Boolean);
+      return raw.split(",").map(s => s.trim()).filter(Boolean);
     },
     [searchParams]
   );

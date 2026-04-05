@@ -191,11 +191,49 @@ export function DataTable<T extends Record<string, any>>({
     () =>
       resolvedCsvName
         ? () => {
-            const rows = table.getFilteredRowModel().rows.map((r) => r.original);
-            exportToCSV(rows, resolvedCsvName);
+            const simpleMode = isSimpleColumns(rawColumns);
+            const simpleCols = simpleMode ? (rawColumns as SimpleColumn<T>[]) : null;
+            const filteredRows = table.getFilteredRowModel().rows;
+
+            const formattedRows = filteredRows.map((r) => {
+              const out: Record<string, unknown> = {};
+              if (simpleCols) {
+                for (const col of simpleCols) {
+                  const raw = r.original[col.key as keyof T];
+                  if (col.render) {
+                    try {
+                      const rendered = col.render(raw);
+                      // If render returned an object with a label, use that
+                      if (rendered != null && typeof rendered === "object" && !React.isValidElement(rendered)) {
+                        out[col.header] = "label" in rendered ? String(rendered.label) : String(raw ?? "");
+                      } else if (React.isValidElement(rendered)) {
+                        // React element — fall back to raw value
+                        out[col.header] = raw ?? "";
+                      } else {
+                        out[col.header] = rendered ?? raw ?? "";
+                      }
+                    } catch {
+                      out[col.header] = raw ?? "";
+                    }
+                  } else {
+                    out[col.header] = raw ?? "";
+                  }
+                }
+              } else {
+                // Tanstack ColumnDef — use raw values with column headers
+                for (const col of columns) {
+                  const key = (col as { accessorKey?: string }).accessorKey ?? col.id ?? "";
+                  const header = typeof col.header === "string" ? col.header : key;
+                  out[header] = r.original[key as keyof T] ?? "";
+                }
+              }
+              return out;
+            });
+
+            exportToCSV(formattedRows, resolvedCsvName);
           }
         : undefined,
-    [resolvedCsvName, table]
+    [resolvedCsvName, table, rawColumns, columns]
   );
 
   return (

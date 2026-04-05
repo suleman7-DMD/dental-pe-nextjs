@@ -130,6 +130,7 @@ export interface ZipScore {
   // Market classification
   market_type: string | null;
   market_type_confidence: string | null;
+  corporate_highconf_count: number | null;
   // Compatibility with lib/types ZipScore
   consolidation_score?: number | null;
 }

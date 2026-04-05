@@ -285,6 +285,7 @@ class ZipScore(Base):
     # Market classification
     market_type = Column(Text, nullable=True)
     market_type_confidence = Column(Text, nullable=True)
+    corporate_highconf_count = Column(Integer, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("zip_code", "score_date", name="uq_zip_score_date"),
