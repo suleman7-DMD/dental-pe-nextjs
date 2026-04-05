@@ -44,6 +44,7 @@ interface MarketIntelShellProps {
     independent: number
     unknown: number
   }
+  entityCounts: Record<string, number>
 }
 
 const TABS = [
@@ -60,6 +61,7 @@ function MarketIntelShellInner({
   metroAreas,
   freshness,
   classificationCounts,
+  entityCounts,
 }: MarketIntelShellProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -128,36 +130,35 @@ function MarketIntelShellInner({
         corporateCount += (z.dso_affiliated_count ?? 0) + (z.pe_backed_count ?? 0)
       }
     }
-    const specialistCount = zipScores.reduce((sum, z) => sum + (z.total_specialist_locations ?? 0), 0)
-    const indepCount = Math.max(0, totalP - corporateCount - specialistCount)
+    const indepCount = zipScores.reduce((sum, z) => sum + (z.independent_count ?? 0), 0)
+    const unkCount = Math.max(0, totalP - corporateCount - indepCount)
     const allSignalsPct = totalP > 0 ? (corporateCount / totalP) * 100 : 0
+    const corporateHighConf = zipScores.reduce((sum, z) => sum + (z.corporate_highconf_count ?? 0), 0)
+    const highConfPct = totalP > 0 ? (corporateHighConf / totalP) * 100 : 0
 
     return {
       totalP,
-      corporateHighConf: 0,
+      corporateHighConf,
       corporateAll: corporateCount,
       indepCount,
-      unkCount: specialistCount,
-      highConfPct: 0,
+      unkCount,
+      highConfPct,
       allSignalsPct,
       indepPct: totalP > 0 ? (indepCount / totalP) * 100 : 0,
-      unkPct: totalP > 0 ? (specialistCount / totalP) * 100 : 0,
+      unkPct: totalP > 0 ? (unkCount / totalP) * 100 : 0,
     }
   }, [zipScores, selectedMetro, classificationCounts])
 
   // Compute entity classification breakdown for Ownership tab
   const ecBreakdown = useMemo(() => {
-    if (zipScores.length === 0) return []
-    // We can derive a rough breakdown from zip_scores data
-    // For each entity classification, sum from zip_scores where available
-    // This is a simplified view; full accuracy requires practice-level data
     return ENTITY_CLASSIFICATIONS.map(ec => ({
       value: ec.value,
       label: ec.label,
       description: ec.description,
       category: ec.category,
+      count: entityCounts[ec.value] ?? 0,
     }))
-  }, [zipScores])
+  }, [entityCounts])
 
   return (
     <div className="min-h-screen bg-[#FAFAF7] text-[#1A1A1A] font-sans">
@@ -360,7 +361,7 @@ function MarketIntelShellInner({
                           {categoryLabels[category]}
                         </h3>
                         <span className="text-xs text-[#6B6B60]">
-                          ({classifications.length} type{classifications.length > 1 ? 's' : ''})
+                          ({classifications.reduce((s, c) => s + c.count, 0).toLocaleString()} practices)
                         </span>
                       </div>
                       <div className="divide-y divide-[#E8E5DE]">
@@ -369,10 +370,13 @@ function MarketIntelShellInner({
                             <code className="text-xs font-mono bg-[#F7F7F4] px-2 py-0.5 rounded text-[#6B6B60] whitespace-nowrap mt-0.5">
                               {ec.value}
                             </code>
-                            <div>
+                            <div className="flex-1">
                               <div className="text-sm font-medium text-[#1A1A1A]">{ec.label}</div>
                               <div className="text-xs text-[#6B6B60] mt-0.5">{ec.description}</div>
                             </div>
+                            <span className="text-sm font-mono font-semibold text-[#3D3D35] whitespace-nowrap mt-0.5">
+                              {ec.count.toLocaleString()}
+                            </span>
                           </div>
                         ))}
                       </div>

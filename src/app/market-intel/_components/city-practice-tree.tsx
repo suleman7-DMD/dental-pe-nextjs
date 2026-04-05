@@ -154,6 +154,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
           return p.ownership_status === 'independent' || p.ownership_status === 'likely_independent'
         }).length,
         dso: cityPractices.filter(p => {
+          if (p.ownership_status === 'pe_backed') return false  // PE takes priority
           if (p.entity_classification) return isCorporateClassification(p.entity_classification)
           return p.ownership_status === 'dso_affiliated'
         }).length,

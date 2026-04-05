@@ -118,6 +118,7 @@ export interface ZipScore {
   market_type_confidence: string | null
   entity_classification_coverage_pct: number | null
   data_axle_enrichment_pct: number | null
+  corporate_highconf_count: number | null
 }
 
 export interface PracticeChange {
