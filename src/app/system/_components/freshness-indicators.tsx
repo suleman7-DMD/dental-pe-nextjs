@@ -8,9 +8,9 @@ interface FreshnessIndicatorsProps {
 }
 
 export function FreshnessIndicators({ sources }: FreshnessIndicatorsProps) {
-  const nppes = sources.find((s) => s.source === 'NPPES')
-  const adso = sources.find((s) => s.source === 'ADSO Scraper')
-  const ada = sources.find((s) => s.source === 'ADA HPI')
+  const nppes = sources.find((s) => s.source.toLowerCase() === 'nppes')
+  const adso = sources.find((s) => s.source.toLowerCase() === 'data_axle' || s.source === 'ADSO Scraper')
+  const ada = sources.find((s) => s.source.toLowerCase() === 'manual' || s.source === 'ADA HPI')
 
   // Check for stale demographics (>365 days)
   const demographicsStale =
