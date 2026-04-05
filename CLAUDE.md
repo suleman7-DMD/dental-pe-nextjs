@@ -62,7 +62,7 @@ Key tables (mirrored from Python pipeline's SQLite via `sync_to_supabase.py`):
 - **practices**: 400,962 rows. NPI (PK), practice_name, doing_business_as, address, city, state, zip, phone, entity_type, taxonomy_code, ownership_status, entity_classification, classification_reasoning, affiliated_dso, affiliated_pe_sponsor, buyability_score, classification_confidence, data_source, latitude, longitude, parent_company, ein, franchise_name, website, year_established, employee_count, estimated_revenue, num_providers, location_type, data_axle_import_date
 - **deals**: 2,512 rows. PE dental deals from PESP, GDN, PitchBook
 - **practice_changes**: 5,100+ rows. Change log for name/address/ownership changes (acquisition detection).
-- **zip_scores**: 290 rows. Per-ZIP consolidation stats with 40+ columns including saturation metrics (dld_gp_per_10k, buyable_practice_ratio, corporate_share_pct, market_type, metrics_confidence, opportunity_score, etc.)
+- **zip_scores**: 290 rows. Per-ZIP consolidation stats with 40+ columns including saturation metrics (dld_gp_per_10k, buyable_practice_ratio, corporate_share_pct, corporate_highconf_count, market_type, metrics_confidence, opportunity_score, etc.)
 - **watched_zips**: 290 ZIPs (269 Chicagoland + 21 Boston). Includes population, median_household_income.
 - **dso_locations**: 408 scraped DSO office locations from ADSO websites.
 - **ada_hpi_benchmarks**: 918 rows. State-level DSO affiliation rates by career stage (2022-2024).
@@ -93,7 +93,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token
 |-------|------|---------------|
 | `/` | **Home** | 8 KPI cards (deals, sponsors, practices, ZIPs, corporate %, retirement risk, YTD deals, freshness), 6 nav cards, recent deals table, data freshness bar |
 | `/deal-flow` | **Deal Flow** | 2,512 PE deals — KPIs, monthly stacked bar timeline, top 15 sponsors/platforms, state choropleth, searchable deals table with CSV. All queries paginated (no 1000-row truncation). |
-| `/market-intel` | **Market Intel** | Tiered consolidation KPIs (high-confidence corporate ~2.3% vs all-signals ~9.9%), saturation table, consolidation map, ZIP score table, city practice tree with pre-loaded counts, recent changes, ADA benchmarks |
+| `/market-intel` | **Market Intel** | Tiered consolidation KPIs (high-confidence corporate ~2.3% vs all-signals ~9.9%), DSO penetration table, consolidation map, ZIP score table, city practice tree with pre-loaded counts, ownership breakdown with per-classification counts |
 | `/buyability` | **Buyability** | Data-driven KPIs (Acquisition Targets, Dead Ends, Job Targets, Specialists computed from entity_classification + buyability_score), 25-row paginated table with category badges, color-coded by category |
 | `/job-market` | **Job Market** | Living location selector, 9 KPI cards with **tiered consolidation display** (high-confidence 1.9% + all-signals 9.9% + industry estimate), pydeck density map, market overview (donut, bar, histogram, top DSOs), paginated practice directory with 4 tabs, opportunity signals, ownership landscape, market analytics |
 | `/research` | **Research** | 4 tabs — PE sponsor profiles, platform profiles, state deep dive, SQL explorer with preset queries |
@@ -224,6 +224,7 @@ Practices are categorized from entity_classification + buyability_score (NOT fro
 ### Rendering Safety
 - DataTable render functions must return primitive values (string | number | null), never objects
 - DataTable `toColumnDefs` tries cell-value first, falls back to row.original if result is "—" for non-null values. This prevents React error #31 (objects as children) while supporting both render function signatures.
+- DataTable CSV export applies `SimpleColumn.render()` for formatted values. For tanstack `ColumnDef` columns, falls back to raw accessor values. React elements from render functions are coerced to raw values.
 - Always handle null/undefined: show "—" in muted color, never "[object Object]" or "null"
 - KPI card icons MUST be Lucide JSX components (`<BarChart3 className="h-4 w-4" />`), never strings
 
@@ -245,7 +246,7 @@ Practices are categorized from entity_classification + buyability_score (NOT fro
 |------|-----------|----------------|
 | Home | `_components/home-shell.tsx` | Nav cards, recent deals, freshness bar |
 | Deal Flow | `deal-flow/_components/deal-flow-shell.tsx` | deal-kpis, deal-volume-timeline, specialty-charts, sponsor-platform-charts, state-choropleth, deals-table |
-| Market Intel | `market-intel/_components/market-intel-shell.tsx` | consolidation-map, saturation-table, zip-score-table, city-practice-tree, recent-changes, ada-benchmarks |
+| Market Intel | `market-intel/_components/market-intel-shell.tsx` | consolidation-map, zip-score-table, city-practice-tree, dso-penetration-table |
 | Buyability | `buyability/_components/buyability-shell.tsx` | Data-driven categorization, 25-row paginated table with category badges |
 | Job Market | `job-market/_components/job-market-shell.tsx` | living-location-selector, practice-density-map, market-overview-charts, practice-directory, opportunity-signals, ownership-landscape, market-analytics, practice-detail-drawer |
 | Research | `research/_components/research-shell.tsx` | sponsor-profile, platform-profile, state-deep-dive, sql-explorer |
@@ -253,6 +254,7 @@ Practices are categorized from entity_classification + buyability_score (NOT fro
 
 ### Key Component Props
 - `MarketIntelShellProps.classificationCounts`: `{ total, corporate, corporateHighConf, independent, unknown }` — includes high-confidence tier
+- `MarketIntelShellProps.entityCounts`: `Record<string, number>` — per-entity-classification practice counts for Ownership tab (11 parallel queries)
 - `OwnershipLandscapeProps` includes `watchedZips: WatchedZip[]`
 - `KpiCardProps.icon` accepts `React.ReactNode` (Lucide JSX) — string rendering still works but is discouraged
 - `KpiCardProps.tooltip` accepts string for hover tooltip (used for tiered consolidation explanation)
@@ -284,6 +286,24 @@ Monthly NPPES refresh (first Sunday 6am): downloads federal provider data update
 | `sql-presets.ts` | "ZIP ownership" preset uses entity_classification; "High-Vol Solos" removes redundant ownership_status filter |
 | `system.ts` | "Ownership Classified" completeness metric counts entity_classification (primary) + ownership_status fallback |
 | `types.ts` + `types/index.ts` | Added `PracticeStats` interface; added `enrichedCount` to `HomeSummary` |
+
+## Bug Fixes Applied (2026-04-05 Market Intel Audit) — Do Not Regress
+
+| File | Fix |
+|------|-----|
+| `consolidation-map.tsx` | XSS: Added `escapeHtml()` on all interpolated props in `.setHTML()` tooltip |
+| `consolidation-map.tsx` | Tooltip color threshold changed from binary `>20` to 3-tier `>=30`/`>=15` matching table |
+| `data-table.tsx` | CSV export now applies `SimpleColumn.render()` functions instead of dumping raw `row.original` |
+| `city-practice-tree.tsx` | PE/DSO dedup: `pe_backed` practices excluded from DSO filter (PE takes priority) |
+| `page.tsx` (market-intel) | Added 11 parallel entity_classification count queries for Ownership tab |
+| `market-intel-shell.tsx` | Ownership tab shows per-classification practice counts; ecBreakdown includes `count` field |
+| `market-intel-shell.tsx` | Metro-filtered KPI uses `independent_count` from zip_scores (was absorbing unknown into independent) |
+| `market-intel-shell.tsx` | Metro-filtered high-conf KPI uses `corporate_highconf_count` from zip_scores (was hardcoded 0) |
+| `use-url-filters.ts` | Array filter values trimmed before filtering (`"a, b"` → `["a","b"]` not `["a"," b"]`) |
+| `database.py` | Added `corporate_highconf_count` column to ZipScore model |
+| `merge_and_score.py` | Computes high-conf corporate count (real DSO brands + EIN/strong dso_regional + DSO-owned specialists) |
+| `types/index.ts` + `supabase/types.ts` | Added `corporate_highconf_count: number \| null` to ZipScore |
+| Deleted | `market-intel/saturation-table.tsx`, `ada-benchmarks.tsx`, `recent-changes.tsx` (0 imports), `constants/metro-centers.ts` (stale, 0 imports) |
 
 ## Development
 

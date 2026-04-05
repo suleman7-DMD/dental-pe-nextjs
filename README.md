@@ -23,7 +23,7 @@ Monitors **400,962 dental practices** across **290 markets**, **2,512 PE deals**
 |-------|------|-------------|
 | `/` | **Home** | 8 KPI cards (deals, sponsors, practices, corporate %, retirement risk, YTD), 6 navigation cards, recent deals, data freshness |
 | `/deal-flow` | **Deal Flow** | 2,512 PE deals — timeline, top sponsors/platforms, state choropleth, searchable table with CSV |
-| `/market-intel` | **Market Intel** | Tiered consolidation analysis (high-confidence ~2.3% vs all-signals ~9.9%), saturation metrics, ZIP scores, city practice tree, consolidation map, ADA benchmarks |
+| `/market-intel` | **Market Intel** | Tiered consolidation analysis (high-confidence ~2.3% vs all-signals ~9.9%), DSO penetration table, ZIP scores, city practice tree, consolidation map, ownership breakdown with per-classification counts |
 | `/buyability` | **Buyability** | Data-driven acquisition scoring — 4 category KPIs (Acquisition Targets, Dead Ends, Job Targets, Specialists), 25-row paginated table with filters |
 | `/job-market` | **Job Market** | Career opportunity finder — living location selector, density maps, practice directory with 4 tabs, retirement risk signals, DSO penetration |
 | `/research` | **Research** | Deep dives — PE sponsor profiles, platform profiles, state analysis, SQL explorer with presets |
@@ -127,7 +127,7 @@ src/
 ├── app/                    # Next.js App Router pages
 │   ├── api/                # Route handlers (deals, practices, sql-explorer, watched-zips)
 │   ├── deal-flow/          # Deal tracking page + 6 components
-│   ├── market-intel/       # Market analysis page + 6 components
+│   ├── market-intel/       # Market analysis page + 4 components
 │   ├── buyability/         # Acquisition scoring page + shell
 │   ├── job-market/         # Career opportunities page + 9 components (most complex)
 │   ├── research/           # Deep dive page + 4 components
