@@ -85,7 +85,8 @@ export interface SourceCoverageDetail {
 export async function getSourceCoverage(
   supabase: SupabaseClient
 ): Promise<Record<string, SourceCoverageDetail>> {
-  // Count practices per data_source + get freshness timestamps
+  // Count practices per data_source + get freshness timestamps.
+  // Also query dso_locations (ADSO) and ada_hpi_benchmarks for their own freshness.
   const [
     { count: total },
     { count: nppesCount },
@@ -95,6 +96,8 @@ export async function getSourceCoverage(
     { data: nppesLatest },
     { data: dataAxleLatest },
     { data: manualLatest },
+    { data: adsoLatest },
+    { data: adaLatest },
   ] = await Promise.all([
     supabase
       .from("practices")
@@ -137,6 +140,21 @@ export async function getSourceCoverage(
       .order("updated_at", { ascending: false })
       .limit(1)
       .single(),
+    // DSO Locations freshness: most recent scraped_at from dso_locations table
+    supabase
+      .from("dso_locations")
+      .select("scraped_at")
+      .order("scraped_at", { ascending: false })
+      .limit(1)
+      .single(),
+    // ADA Benchmarks freshness: most recent created_at from ada_hpi_benchmarks table
+    // (updated_at is NULL for all 918 rows — only created_at is populated by ada_hpi_importer)
+    supabase
+      .from("ada_hpi_benchmarks")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single(),
   ]);
 
   const result: Record<string, SourceCoverageDetail> = {};
@@ -147,7 +165,11 @@ export async function getSourceCoverage(
   if ((manualCount ?? 0) > 0)
     result["manual"] = { count: manualCount ?? 0, lastUpdated: manualLatest?.updated_at ?? "" };
 
-  const knownTotal = Object.values(result).reduce((a, b) => a + b.count, 0) + (nullCount ?? 0);
+  // Expose ADSO Scraper and ADA HPI freshness under the keys the FreshnessIndicators component looks for
+  result["ADSO Scraper"] = { count: 0, lastUpdated: adsoLatest?.scraped_at ?? "" };
+  result["ADA HPI"] = { count: 0, lastUpdated: adaLatest?.created_at ?? "" };
+
+  const knownTotal = (nppesCount ?? 0) + (dataAxleCount ?? 0) + (manualCount ?? 0) + (nullCount ?? 0);
   const remaining = (total ?? 0) - knownTotal;
   if (remaining > 0) result["other"] = { count: remaining, lastUpdated: "" };
   if ((nullCount ?? 0) > 0) result["unknown"] = { count: nullCount ?? 0, lastUpdated: "" };
