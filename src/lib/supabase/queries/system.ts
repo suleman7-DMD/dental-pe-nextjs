@@ -93,6 +93,8 @@ export async function getSourceCoverage(
     { count: dataAxleCount },
     { count: manualCount },
     { count: nullCount },
+    { count: adsoCount },
+    { count: adaCount },
     { data: nppesLatest },
     { data: dataAxleLatest },
     { data: manualLatest },
@@ -118,6 +120,12 @@ export async function getSourceCoverage(
       .from("practices")
       .select("npi", { count: "exact", head: true })
       .is("data_source", null),
+    supabase
+      .from("dso_locations")
+      .select("*", { count: "exact", head: true }),
+    supabase
+      .from("ada_hpi_benchmarks")
+      .select("*", { count: "exact", head: true }),
     // Get most recent updated_at per source for freshness
     supabase
       .from("practices")
@@ -166,8 +174,8 @@ export async function getSourceCoverage(
     result["manual"] = { count: manualCount ?? 0, lastUpdated: manualLatest?.updated_at ?? "" };
 
   // Expose ADSO Scraper and ADA HPI freshness under the keys the FreshnessIndicators component looks for
-  result["ADSO Scraper"] = { count: 0, lastUpdated: adsoLatest?.scraped_at ?? "" };
-  result["ADA HPI"] = { count: 0, lastUpdated: adaLatest?.created_at ?? "" };
+  result["ADSO Scraper"] = { count: adsoCount ?? 0, lastUpdated: adsoLatest?.scraped_at ?? "" };
+  result["ADA HPI"] = { count: adaCount ?? 0, lastUpdated: adaLatest?.created_at ?? "" };
 
   const knownTotal = (nppesCount ?? 0) + (dataAxleCount ?? 0) + (manualCount ?? 0) + (nullCount ?? 0);
   const remaining = (total ?? 0) - knownTotal;

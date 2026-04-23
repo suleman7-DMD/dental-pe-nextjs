@@ -310,6 +310,17 @@ Monthly NPPES refresh (first Sunday 6am): downloads federal provider data update
 | `types/index.ts` + `supabase/types.ts` | Added `corporate_highconf_count: number \| null` to ZipScore |
 | Deleted | `market-intel/saturation-table.tsx`, `ada-benchmarks.tsx`, `recent-changes.tsx` (0 imports), `constants/metro-centers.ts` (stale, 0 imports) |
 
+## Bug Fixes Applied (2026-04-22 Pipeline Audit) — Do Not Regress
+
+| File | Fix |
+|------|-----|
+| `system.ts::getSourceCoverage()` | Added `dso_locations.scraped_at` query exposed under `"ADSO Scraper"` key — System page's Data Source Coverage panel previously showed "--" for ADSO |
+| `system.ts::getSourceCoverage()` | Swapped `ada_hpi_benchmarks.updated_at` → `ada_hpi_benchmarks.created_at` for "ADA HPI" key. All 918 rows have `updated_at=NULL` because `ada_hpi_importer.py` only sets `created_at`; ordering by `updated_at DESC` returned NULL → UI showed "--" |
+| `system.ts::getSourceCoverage()` | Fixed `knownTotal` to use counted scalars (nppesCount + dataAxleCount + manualCount + nullCount) instead of summing `.count` across the result map — the map got polluted with `count: 0` entries once we added freshness-only keys (ADSO Scraper, ADA HPI) |
+| `system.ts::getSourceCoverage()` | Added `dso_locations` + `ada_hpi_benchmarks` head-count queries to the Promise.all and wired `adsoCount`/`adaCount` into `result["ADSO Scraper"].count` and `result["ADA HPI"].count`. Previously hardcoded `count: 0` on those two keys, so the Data Source Coverage panel rendered 0 rows for both even though 92 DSO locations and 918 ADA benchmark rows are live |
+
+Paired with `scrapers/sync_to_supabase.py` per-row savepoint fix so deals with `uix_deal_no_dup` IntegrityError hits don't abort the whole batch transaction. Before this pair of fixes, a single duplicate in the deals sync would roll back every queued row — so recent deal scrapes never reached Supabase.
+
 ## Development
 
 ```bash
