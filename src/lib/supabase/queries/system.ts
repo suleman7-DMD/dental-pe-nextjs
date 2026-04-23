@@ -8,8 +8,23 @@ export interface SourceCoverage {
   records: number;
   dateRange: string;
   lastUpdated: string;
-  daysSinceUpdate: number;
+  daysSinceUpdate: number | null;
 }
+
+/* Per-source deal freshness — read by Deal Source Freshness panel.
+ * `null` for any timestamp means the source has never been ingested. The UI
+ * must distinguish null ("No data") from 0 ("updated today"); coercing null
+ * to 0 causes StatusDot to render green "Current" which is wrong. */
+export interface DealSourceFreshness {
+  count: number;
+  firstDealDate: string | null;
+  lastDealDate: string | null;
+  lastIngestDate: string | null;
+  daysSinceLastDeal: number | null;
+  daysSinceLastIngest: number | null;
+}
+
+export type DealSource = "GDN" | "PESP" | "PitchBook" | "Manual";
 
 export interface CompletenessMetric {
   label: string;
@@ -183,6 +198,91 @@ export async function getSourceCoverage(
   if ((nullCount ?? 0) > 0) result["unknown"] = { count: nullCount ?? 0, lastUpdated: "" };
 
   return result;
+}
+
+/**
+ * Per-source deal freshness.
+ *
+ * Returns count, last deal_date, last ingest timestamp, and derived
+ * `daysSince*` for each of GDN / PESP / PitchBook / Manual. `lastDealDate`
+ * tells you whether the SOURCE is dry (no new deals flowing upstream).
+ * `lastIngestDate` tells you whether the SCRAPER has run recently. A stale
+ * ingest timestamp with a fresh `lastDealDate` would be unusual; both stale
+ * means "nothing has happened here in a while" — the distinction is the
+ * whole point of this panel.
+ *
+ * `daysSince*` stays `null` when the underlying timestamp is null. The UI
+ * renders that as a gray "No data" dot, NOT green "Current" (status-dot.tsx
+ * handles null directly — the old bug was coercing to 0 at the page layer).
+ */
+export async function getDealSourceFreshness(
+  supabase: SupabaseClient
+): Promise<Record<DealSource, DealSourceFreshness>> {
+  const sourceKeys: Array<{ ui: DealSource; db: string }> = [
+    { ui: "GDN", db: "gdn" },
+    { ui: "PESP", db: "pesp" },
+    { ui: "PitchBook", db: "pitchbook" },
+    { ui: "Manual", db: "manual" },
+  ];
+
+  const now = Date.now();
+  const daysBetween = (iso: string | null): number | null =>
+    iso ? Math.floor((now - new Date(iso).getTime()) / 86400000) : null;
+
+  const perSource = await Promise.all(
+    sourceKeys.map(async ({ ui, db }) => {
+      const [
+        { count },
+        { data: earliestDeal },
+        { data: latestDeal },
+        { data: latestIngest },
+      ] = await Promise.all([
+        supabase
+          .from("deals")
+          .select("id", { count: "exact", head: true })
+          .eq("source", db),
+        supabase
+          .from("deals")
+          .select("deal_date")
+          .eq("source", db)
+          .order("deal_date", { ascending: true })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("deals")
+          .select("deal_date")
+          .eq("source", db)
+          .order("deal_date", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("deals")
+          .select("updated_at")
+          .eq("source", db)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      const firstDealDate = earliestDeal?.deal_date ?? null;
+      const lastDealDate = latestDeal?.deal_date ?? null;
+      const lastIngestDate = latestIngest?.updated_at ?? null;
+
+      return [
+        ui,
+        {
+          count: count ?? 0,
+          firstDealDate,
+          lastDealDate,
+          lastIngestDate,
+          daysSinceLastDeal: daysBetween(lastDealDate),
+          daysSinceLastIngest: daysBetween(lastIngestDate),
+        } satisfies DealSourceFreshness,
+      ] as const;
+    })
+  );
+
+  return Object.fromEntries(perSource) as Record<DealSource, DealSourceFreshness>;
 }
 
 /**

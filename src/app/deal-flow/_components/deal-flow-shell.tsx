@@ -41,6 +41,7 @@ interface DealFlowShellProps {
   distinctSpecialties: string[]
   distinctSources: string[]
   distinctTypes: string[]
+  lastSourceCheck: string | null
 }
 
 export function DealFlowShell({
@@ -51,6 +52,7 @@ export function DealFlowShell({
   distinctSpecialties,
   distinctSources,
   distinctTypes,
+  lastSourceCheck,
 }: DealFlowShellProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -243,6 +245,19 @@ export function DealFlowShell({
           </div>
         ) : (
           <>
+            {/* Last source check — distinguishes "source dry" from "scraper broken" */}
+            {lastSourceCheck && (
+              <div className="text-xs text-[#6B6B60]">
+                Last source check:{' '}
+                <span className="font-mono text-[#1A1A1A]">
+                  {new Date(lastSourceCheck).toISOString().slice(0, 10)}
+                </span>{' '}
+                <span className="text-[#9C9C90]">
+                  (latest ingest timestamp across GDN, PESP, PitchBook, Manual)
+                </span>
+              </div>
+            )}
+
             {/* Persistent KPI Strip */}
             <DealKpis deals={filteredDeals} />
 

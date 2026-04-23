@@ -6,7 +6,12 @@ import { FreshnessIndicators } from './freshness-indicators'
 import { CompletenessBars } from './completeness-bars'
 import { PipelineLogViewer } from './pipeline-log-viewer'
 import { ManualEntryForms } from './manual-entry-forms'
-import type { SourceCoverage, CompletenessMetric } from '@/lib/supabase/queries/system'
+import type {
+  SourceCoverage,
+  CompletenessMetric,
+  DealSource,
+  DealSourceFreshness,
+} from '@/lib/supabase/queries/system'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -15,13 +20,18 @@ import type { SourceCoverage, CompletenessMetric } from '@/lib/supabase/queries/
 interface SystemShellProps {
   initialSources: SourceCoverage[]
   initialCompleteness: CompletenessMetric[]
+  initialDealSources: Record<DealSource, DealSourceFreshness>
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Component
 // ────────────────────────────────────────────────────────────────────────────
 
-export function SystemShell({ initialSources, initialCompleteness }: SystemShellProps) {
+export function SystemShell({
+  initialSources,
+  initialCompleteness,
+  initialDealSources,
+}: SystemShellProps) {
   return (
     <div className="min-h-screen bg-[#FAFAF7]">
       <div className="px-6 py-6 space-y-8">
@@ -51,7 +61,7 @@ export function SystemShell({ initialSources, initialCompleteness }: SystemShell
             title="Data Freshness Timestamps"
             description="When each major data source was last imported or refreshed."
           />
-          <FreshnessIndicators sources={initialSources} />
+          <FreshnessIndicators sources={initialSources} dealSources={initialDealSources} />
         </section>
 
         {/* Data Completeness */}
