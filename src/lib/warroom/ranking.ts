@@ -738,7 +738,7 @@ export function rankTargets(
         score: round1(score),
         rank: 0,
         tier,
-        flagCount: flags.length,
+        flagCount: flags.filter((flag) => flag.endsWith("_flag")).length,
         flags,
         components,
         headline: buildHeadline(practice, ownership, flags, score),
