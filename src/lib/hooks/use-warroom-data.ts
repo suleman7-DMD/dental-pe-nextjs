@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, type UseQueryOptions, type UseQueryResult } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, type UseQueryOptions, type UseQueryResult } from "@tanstack/react-query";
 import { getSupabaseBrowserClient } from "../supabase/client";
 import { getSitrepBundle, type SitrepLoadOptions } from "../warroom/data";
 import {
@@ -107,6 +107,7 @@ export function useWarroomData(options: UseWarroomDataOptions = {}): UseWarroomD
     gcTime: options.gcTime ?? 30 * 60 * 1000,
     enabled: options.enabled ?? true,
     retry: 1,
+    placeholderData: keepPreviousData,
   };
 
   if (options.initialData) {
