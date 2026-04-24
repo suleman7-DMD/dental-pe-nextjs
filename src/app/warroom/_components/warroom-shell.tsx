@@ -140,6 +140,31 @@ function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)))
 }
 
+const ERROR_PATTERNS: Array<{ test: RegExp; message: string }> = [
+  {
+    test: /network|fetch|failed to fetch|cors|abort|timeout|timed out|offline|dns/i,
+    message:
+      "Unable to reach the data service. Check your connection and retry.",
+  },
+  {
+    test: /permission denied|not authorized|rls|row[- ]level security|forbidden|jwt/i,
+    message:
+      "Access denied. Your session may have expired — refresh to sign in again.",
+  },
+  {
+    test: /rate limit|too many requests|429/i,
+    message: "The service is throttling requests. Please wait a moment and retry.",
+  },
+]
+
+function sanitizeErrorMessage(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  for (const { test, message } of ERROR_PATTERNS) {
+    if (test.test(raw)) return message
+  }
+  return "Unable to load Warroom data. Retry or refresh the page."
+}
+
 function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellProps) {
   const {
     state,
@@ -488,8 +513,21 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   )
   const briefingItems = effectiveBundle?.briefing ?? []
   const dataHealth = effectiveBundle?.dataHealth
-  const combinedError =
+  const rawErrorMessage =
     (error instanceof Error ? error.message : null) ?? initialBundleError ?? null
+
+  useEffect(() => {
+    if (error) {
+      console.error("[warroom] data load error:", error)
+    } else if (initialBundleError) {
+      console.error("[warroom] initial bundle error:", initialBundleError)
+    }
+  }, [error, initialBundleError])
+
+  const combinedError = useMemo(
+    () => sanitizeErrorMessage(rawErrorMessage),
+    [rawErrorMessage]
+  )
 
   const visibleTargets = useMemo(() => {
     const minTier = activeIntent?.filter.minTier
