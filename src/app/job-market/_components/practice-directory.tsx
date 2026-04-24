@@ -26,6 +26,7 @@ interface PracticeDirectoryProps {
 }
 
 type SortOption = 'job_score' | 'buyability' | 'employees' | 'year_est' | 'name'
+type PracticeWithJobScore = Practice & { job_opp_score?: number | null }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'job_score', label: 'Job Opp Score \u2193' },
@@ -62,7 +63,9 @@ function sortPractices(list: Practice[], sortBy: SortOption): Practice[] {
   switch (sortBy) {
     case 'job_score':
       return sorted.sort(
-        (a, b) => ((b as any).job_opp_score ?? 0) - ((a as any).job_opp_score ?? 0)
+        (a, b) =>
+          ((b as PracticeWithJobScore).job_opp_score ?? 0) -
+          ((a as PracticeWithJobScore).job_opp_score ?? 0)
       )
     case 'buyability':
       return sorted.sort(
@@ -627,4 +630,3 @@ function Pagination({
     </div>
   )
 }
-

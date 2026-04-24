@@ -9,34 +9,32 @@ interface ADABenchmarksProps {
   data: ADABenchmark[]
 }
 
-export function ADABenchmarks({ data }: ADABenchmarksProps) {
-  if (data.length === 0) return null
+function transformForChart(stateData: ADABenchmark[]) {
+  const years = [...new Set(stateData.map(d => String(d.data_year)))].sort()
+  const stages = [...new Set(stateData.map(d => d.career_stage))]
 
+  return {
+    years,
+    chartData: stages.map(stage => {
+      const row: Record<string, unknown> = { career_stage: stage }
+      for (const year of years) {
+        const match = stateData.find(d => d.career_stage === stage && String(d.data_year) === year)
+        row[year] = match ? match.pct_dso_affiliated : 0
+      }
+      return row
+    }),
+  }
+}
+
+export function ADABenchmarks({ data }: ADABenchmarksProps) {
   const ilData = useMemo(() => data.filter(d => d.state === 'IL'), [data])
   const maData = useMemo(() => data.filter(d => d.state === 'MA'), [data])
-
-  // Transform data for grouped bar chart: pivot by career_stage with data_year as series
-  const transformForChart = (stateData: ADABenchmark[]) => {
-    const years = [...new Set(stateData.map(d => String(d.data_year)))].sort()
-    const stages = [...new Set(stateData.map(d => d.career_stage))]
-
-    return {
-      years,
-      chartData: stages.map(stage => {
-        const row: Record<string, unknown> = { career_stage: stage }
-        for (const year of years) {
-          const match = stateData.find(d => d.career_stage === stage && String(d.data_year) === year)
-          row[year] = match ? match.pct_dso_affiliated : 0
-        }
-        return row
-      }),
-    }
-  }
-
   const ilChart = useMemo(() => transformForChart(ilData), [ilData])
   const maChart = useMemo(() => transformForChart(maData), [maData])
 
   const yearColors = ['#B8860B', '#2D8B4E', '#D4920B', '#7C3AED']
+
+  if (data.length === 0) return null
 
   return (
     <div>

@@ -25,8 +25,6 @@ interface MarketAnalyticsProps {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
-  if (zipStats.length === 0) return null
-
   // ── Dentist Density by ZIP (top 25, horizontal bar, blue) ─────────────
   const densityData = useMemo(() => {
     return [...zipStats]
@@ -126,6 +124,8 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
         total_locations: data.totalLocations,
       }))
   }, [practices])
+
+  if (zipStats.length === 0) return null
 
   return (
     <div>

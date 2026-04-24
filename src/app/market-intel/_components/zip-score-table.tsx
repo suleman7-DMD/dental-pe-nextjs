@@ -25,8 +25,6 @@ interface ZipScoreRow {
 }
 
 export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
-  if (zipScores.length === 0) return null
-
   // Compute derived fields from zip_scores data.
   // Primary data source: saturation metric columns (corporate_share_pct, total_gp_locations,
   // metrics_confidence, opportunity_score). Falls back to legacy count columns only when
@@ -89,6 +87,8 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
       }
     })
   }, [zipScores])
+
+  if (zipScores.length === 0) return null
 
   const columns = [
     { key: 'zip_code', header: 'ZIP' },

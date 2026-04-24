@@ -26,8 +26,6 @@ interface OwnershipLandscapeProps {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips }: OwnershipLandscapeProps) {
-  if (practices.length === 0) return null
-
   // ── Ownership Status Bar Chart ────────────────────────────────────────
   const ownershipData = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -103,6 +101,8 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
         corporate_share_pct: (zs.corporate_share_pct ?? 0) * 100,
       }))
   }, [zipScores, wzCityMap])
+
+  if (practices.length === 0) return null
 
   return (
     <div>

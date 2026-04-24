@@ -121,7 +121,7 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
     const total_practices = pList.length
     let independent_count = 0
     let dso_affiliated_count = 0
-    let pe_backed_count = 0
+    const pe_backed_count = 0
     let unknown_count = 0
     let city = ''
 
@@ -300,7 +300,7 @@ function JobMarketShellInner({
     const total_p = allPractices.length
     let indep_cnt = 0
     let dso_cnt = 0
-    let pe_cnt = 0
+    const pe_cnt = 0
     let unk_cnt = 0
     let dsoNationalReal = 0
     let dsoRegionalStrong = 0
