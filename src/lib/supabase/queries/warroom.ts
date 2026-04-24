@@ -19,8 +19,11 @@ import type {
   WarroomDealRecord,
   WarroomOwnershipCounts,
   WarroomPracticeRecord,
+  WarroomPracticeSignalRecord,
+  WarroomSignalCounts,
   WarroomSummary,
   WarroomZipScoreRecord,
+  WarroomZipSignalRecord,
 } from "../../warroom/signals";
 
 const PAGE_SIZE = 1000;
@@ -29,8 +32,15 @@ const NPI_FILTER_CHUNK_SIZE = 200;
 
 const PRACTICE_SELECT = "id,npi,practice_name,doing_business_as,address,city,state,zip,phone,website,entity_classification,ownership_status,affiliated_dso,affiliated_pe_sponsor,buyability_score,classification_confidence,classification_reasoning,latitude,longitude,year_established,employee_count,estimated_revenue,num_providers,location_type,data_source,data_axle_import_date,parent_company,ein,franchise_name,iusa_number,taxonomy_code,taxonomy_description,updated_at";
 const DEAL_SELECT = "id,deal_date,platform_company,pe_sponsor,target_name,target_city,target_state,target_zip,deal_type,deal_size_mm,ebitda_multiple,specialty,num_locations,source,source_url,notes,created_at,updated_at";
-const ZIP_SCORE_SELECT = "id,zip_code,city,state,metro_area,total_practices,total_gp_locations,total_specialist_locations,independent_count,dso_affiliated_count,pe_backed_count,unknown_count,consolidated_count,consolidation_pct_of_total,independent_pct_of_total,pe_penetration_pct,pct_unknown,dld_gp_per_10k,dld_total_per_10k,people_per_gp_door,buyable_practice_count,buyable_practice_ratio,corporate_location_count,corporate_share_pct,corporate_highconf_count,family_practice_count,recent_changes_90d,state_deal_count_12m,opportunity_score,market_type,metrics_confidence,market_type_confidence,entity_classification_coverage_pct,data_axle_enrichment_pct,score_date";
+const ZIP_SCORE_SELECT = "id,zip_code,city,state,metro_area,total_practices,total_gp_locations,total_specialist_locations,independent_count,dso_affiliated_count,pe_backed_count,unknown_count,consolidated_count,consolidation_pct_of_total,independent_pct_of_total,pe_penetration_pct,pct_unknown,dld_gp_per_10k,dld_total_per_10k,people_per_gp_door,buyable_practice_count,buyable_practice_ratio,corporate_location_count,corporate_share_pct,family_practice_count,recent_changes_90d,state_deal_count_12m,opportunity_score,market_type,metrics_confidence,market_type_confidence,entity_classification_coverage_pct,data_axle_enrichment_pct,score_date";
 const CHANGE_SELECT = "id,npi,change_date,field_changed,old_value,new_value,change_type,notes,created_at";
+
+const PRACTICE_SIGNAL_SELECT = "npi,practice_id,zip_code,practice_name,city,state,entity_classification,ownership_status,buyability_score,stealth_dso_flag,stealth_dso_cluster_id,stealth_dso_cluster_size,stealth_dso_zip_count,stealth_dso_basis,stealth_dso_reasoning,phantom_inventory_flag,phantom_inventory_reasoning,revenue_default_flag,revenue_default_reasoning,family_dynasty_flag,family_dynasty_reasoning,micro_cluster_flag,micro_cluster_id,micro_cluster_size,micro_cluster_reasoning,intel_quant_disagreement_flag,intel_quant_disagreement_type,intel_quant_disagreement_reasoning,retirement_combo_score,retirement_combo_flag,retirement_combo_reasoning,deal_catchment_24mo,deal_catchment_reasoning,last_change_90d_flag,last_change_date,last_change_type,last_change_reasoning,buyability_pctile_zip_class,buyability_pctile_class,retirement_pctile_zip_class,retirement_pctile_class,high_peer_buyability_flag,high_peer_retirement_flag,peer_percentile_reasoning,zip_white_space_flag,zip_compound_demand_flag,zip_contested_zone_flag,zip_ada_benchmark_gap_flag,data_limitations,created_at";
+
+const ZIP_SIGNAL_SELECT = "zip_code,city,state,metro_area,population,total_practices,total_gp_locations,total_specialist_locations,dld_gp_per_10k,people_per_gp_door,corporate_share_pct,buyable_practice_ratio,stealth_dso_practice_count,stealth_dso_cluster_count,phantom_inventory_count,phantom_inventory_pct,revenue_default_count,family_dynasty_count,micro_cluster_count,micro_cluster_practice_count,intel_quant_disagreement_count,retirement_combo_high_count,last_change_90d_count,deal_count_all_time,deal_count_24mo,deal_catchment_sum_24mo,deal_catchment_max_24mo,compound_demand_flag,compound_demand_score,compound_demand_reasoning,mirror_pair_flag,mirror_pair_count,top_mirror_zip,top_mirror_similarity,top_mirror_corporate_gap_pp,mirror_zips_json,mirror_reasoning,white_space_flag,white_space_score,white_space_reasoning,contested_zone_flag,contested_platform_count,contested_platforms_json,contested_zone_reasoning,ada_benchmark_pct,ada_benchmark_gap_pp,ada_benchmark_gap_flag,ada_benchmark_reasoning,high_peer_buyability_count,high_peer_retirement_count,data_limitations,created_at";
+
+type PracticeSignalRow = WarroomPracticeSignalRecord;
+type ZipSignalRow = WarroomZipSignalRecord;
 
 interface SupabaseRowsResult<T> {
   data: T[] | null;
@@ -55,6 +65,7 @@ interface CountFilterQuery extends CountQuery {
   not(column: string, operator: string, value: unknown): CountFilterQuery;
   gte(column: string, value: unknown): CountFilterQuery;
   lt(column: string, value: unknown): CountFilterQuery;
+  or(filterString: string): CountFilterQuery;
 }
 
 interface PaginationOptions {
@@ -631,6 +642,261 @@ function dateDaysAgo(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+export interface ScopedPracticeSignalsOptions extends PaginationOptions {
+  onlyFlagged?: boolean;
+  requireFlags?: readonly (keyof WarroomPracticeSignalRecord)[];
+  orderBy?: "retirement_combo_score" | "buyability_score" | "stealth_dso_cluster_size";
+  ascending?: boolean;
+}
+
+export async function getScopedPracticeSignals(
+  scope: WarroomScopeInput = DEFAULT_WARROOM_SCOPE,
+  options: ScopedPracticeSignalsOptions = {},
+  supabaseClient?: SupabaseClient
+): Promise<WarroomPracticeSignalRecord[]> {
+  const supabase = getClient(supabaseClient);
+  const { zipCodes } = resolveScope(scope);
+
+  const rows = await fetchRowsByZipScope(
+    zipCodes,
+    (zipChunk) => {
+      let query = supabase.from("practice_signals").select(PRACTICE_SIGNAL_SELECT);
+      if (zipChunk) query = query.in("zip_code", zipChunk);
+
+      if (options.onlyFlagged || (options.requireFlags && options.requireFlags.length > 0)) {
+        const flags = options.requireFlags ?? [
+          "stealth_dso_flag",
+          "phantom_inventory_flag",
+          "family_dynasty_flag",
+          "micro_cluster_flag",
+          "intel_quant_disagreement_flag",
+          "retirement_combo_flag",
+          "last_change_90d_flag",
+          "high_peer_buyability_flag",
+          "high_peer_retirement_flag",
+          "zip_white_space_flag",
+          "zip_compound_demand_flag",
+          "zip_contested_zone_flag",
+          "zip_ada_benchmark_gap_flag",
+        ];
+        const orClause = flags.map((flag) => `${String(flag)}.eq.true`).join(",");
+        query = query.or(orClause);
+      }
+
+      if (options.orderBy) {
+        query = query.order(options.orderBy, {
+          ascending: options.ascending ?? false,
+          nullsFirst: false,
+        });
+      } else {
+        query = query.order("zip_code", { ascending: true });
+      }
+
+      return query as unknown as RangeableQuery<PracticeSignalRow>;
+    },
+    { pageSize: options.pageSize, maxRows: options.maxRows }
+  );
+
+  return rows;
+}
+
+export async function getScopedZipSignals(
+  scope: WarroomScopeInput = DEFAULT_WARROOM_SCOPE,
+  options: PaginationOptions = {},
+  supabaseClient?: SupabaseClient
+): Promise<WarroomZipSignalRecord[]> {
+  const supabase = getClient(supabaseClient);
+  const { zipCodes } = resolveScope(scope);
+
+  const rows = await fetchRowsByZipScope(
+    zipCodes,
+    (zipChunk) => {
+      let query = supabase.from("zip_signals").select(ZIP_SIGNAL_SELECT);
+      if (zipChunk) query = query.in("zip_code", zipChunk);
+      query = query.order("zip_code", { ascending: true });
+      return query as unknown as RangeableQuery<ZipSignalRow>;
+    },
+    { pageSize: options.pageSize, maxRows: options.maxRows }
+  );
+
+  const byZip = new Map<string, WarroomZipSignalRecord>();
+  rows.forEach((row) => byZip.set(row.zip_code, row));
+  return Array.from(byZip.values()).sort((a, b) => a.zip_code.localeCompare(b.zip_code));
+}
+
+export function computeSignalCounts(
+  practiceSignals: WarroomPracticeSignalRecord[],
+  zipSignals: WarroomZipSignalRecord[]
+): WarroomSignalCounts {
+  const counts: WarroomSignalCounts = {
+    stealthDsoPractices: 0,
+    stealthDsoClusters: 0,
+    phantomInventoryPractices: 0,
+    familyDynastyPractices: 0,
+    microClusterPractices: 0,
+    microClusters: 0,
+    intelDisagreements: 0,
+    retirementComboHigh: 0,
+    recentChanges90d: 0,
+    whiteSpaceZips: 0,
+    compoundDemandZips: 0,
+    mirrorPairZips: 0,
+    contestedZips: 0,
+    adaGapZips: 0,
+    totalFlaggedPractices: 0,
+  };
+
+  const distinctStealthClusters = new Set<string>();
+  const distinctMicroClusters = new Set<string>();
+
+  practiceSignals.forEach((signal) => {
+    if (signal.stealth_dso_flag) {
+      counts.stealthDsoPractices += 1;
+      if (signal.stealth_dso_cluster_id) distinctStealthClusters.add(signal.stealth_dso_cluster_id);
+    }
+    if (signal.phantom_inventory_flag) counts.phantomInventoryPractices += 1;
+    if (signal.family_dynasty_flag) counts.familyDynastyPractices += 1;
+    if (signal.micro_cluster_flag) {
+      counts.microClusterPractices += 1;
+      if (signal.micro_cluster_id) distinctMicroClusters.add(signal.micro_cluster_id);
+    }
+    if (signal.intel_quant_disagreement_flag) counts.intelDisagreements += 1;
+    if (signal.retirement_combo_flag) counts.retirementComboHigh += 1;
+    if (signal.last_change_90d_flag) counts.recentChanges90d += 1;
+
+    const hasAnyFlag =
+      signal.stealth_dso_flag ||
+      signal.phantom_inventory_flag ||
+      signal.family_dynasty_flag ||
+      signal.micro_cluster_flag ||
+      signal.intel_quant_disagreement_flag ||
+      signal.retirement_combo_flag ||
+      signal.last_change_90d_flag ||
+      signal.high_peer_buyability_flag ||
+      signal.high_peer_retirement_flag;
+    if (hasAnyFlag) counts.totalFlaggedPractices += 1;
+  });
+
+  counts.stealthDsoClusters = distinctStealthClusters.size;
+  counts.microClusters = distinctMicroClusters.size;
+
+  zipSignals.forEach((signal) => {
+    if (signal.white_space_flag) counts.whiteSpaceZips += 1;
+    if (signal.compound_demand_flag) counts.compoundDemandZips += 1;
+    if (signal.mirror_pair_flag) counts.mirrorPairZips += 1;
+    if (signal.contested_zone_flag) counts.contestedZips += 1;
+    if (signal.ada_benchmark_gap_flag) counts.adaGapZips += 1;
+  });
+
+  return counts;
+}
+
+export interface TopPracticeSignalsResult {
+  stealthClusters: WarroomPracticeSignalRecord[];
+  phantomInventory: WarroomPracticeSignalRecord[];
+  retirementCombo: WarroomPracticeSignalRecord[];
+  intelDisagreements: WarroomPracticeSignalRecord[];
+  familyDynasties: WarroomPracticeSignalRecord[];
+  microClusters: WarroomPracticeSignalRecord[];
+}
+
+export function extractTopPracticeSignals(
+  signals: WarroomPracticeSignalRecord[],
+  limit = 8
+): TopPracticeSignalsResult {
+  return {
+    stealthClusters: signals
+      .filter((signal) => signal.stealth_dso_flag)
+      .sort((a, b) => (b.stealth_dso_cluster_size ?? 0) - (a.stealth_dso_cluster_size ?? 0))
+      .slice(0, limit),
+    phantomInventory: signals
+      .filter((signal) => signal.phantom_inventory_flag)
+      .sort((a, b) => (b.buyability_score ?? 0) - (a.buyability_score ?? 0))
+      .slice(0, limit),
+    retirementCombo: signals
+      .filter((signal) => signal.retirement_combo_flag)
+      .sort((a, b) => (b.retirement_combo_score ?? 0) - (a.retirement_combo_score ?? 0))
+      .slice(0, limit),
+    intelDisagreements: signals
+      .filter((signal) => signal.intel_quant_disagreement_flag)
+      .slice(0, limit),
+    familyDynasties: signals
+      .filter((signal) => signal.family_dynasty_flag)
+      .sort((a, b) => (b.buyability_score ?? 0) - (a.buyability_score ?? 0))
+      .slice(0, limit),
+    microClusters: signals
+      .filter((signal) => signal.micro_cluster_flag)
+      .sort((a, b) => (b.micro_cluster_size ?? 0) - (a.micro_cluster_size ?? 0))
+      .slice(0, limit),
+  };
+}
+
+async function countCorporateHighConfidence(
+  supabase: SupabaseClient,
+  zipCodes: string[] | null
+): Promise<number> {
+  const dsoNational = await countPracticeRows(supabase, zipCodes, (query) =>
+    query.eq("entity_classification", "dso_national")
+  );
+  const strongRegional = await countPracticeRows(supabase, zipCodes, (query) =>
+    query
+      .eq("entity_classification", "dso_regional")
+      .or("ein.not.is.null,parent_company.not.is.null,franchise_name.not.is.null")
+  );
+  const dsoSpecialists = await countPracticeRows(supabase, zipCodes, (query) =>
+    query
+      .eq("entity_classification", "specialist")
+      .in("ownership_status", ["dso_affiliated", "pe_backed"])
+  );
+  return dsoNational + strongRegional + dsoSpecialists;
+}
+
+async function averageScopedScores(
+  supabase: SupabaseClient,
+  zipCodes: string[] | null
+): Promise<{ avgBuyability: number | null; avgOpportunity: number | null }> {
+  const buyabilityRows = await fetchRowsByZipScope<{ buyability_score: number | null }>(
+    zipCodes,
+    (zipChunk) => {
+      let query = supabase
+        .from("practices")
+        .select("buyability_score")
+        .not("buyability_score", "is", null);
+      if (zipChunk) query = query.in("zip", zipChunk);
+      return query as unknown as RangeableQuery<{ buyability_score: number | null }>;
+    },
+    { pageSize: 1000 }
+  );
+
+  const opportunityRows = await fetchRowsByZipScope<{ opportunity_score: number | null }>(
+    zipCodes,
+    (zipChunk) => {
+      let query = supabase
+        .from("zip_scores")
+        .select("opportunity_score")
+        .not("opportunity_score", "is", null);
+      if (zipChunk) query = query.in("zip_code", zipChunk);
+      return query as unknown as RangeableQuery<{ opportunity_score: number | null }>;
+    }
+  );
+
+  const buyabilityValues = buyabilityRows
+    .map((row) => row.buyability_score)
+    .filter((value): value is number => value != null);
+  const opportunityValues = opportunityRows
+    .map((row) => row.opportunity_score)
+    .filter((value): value is number => value != null);
+
+  return {
+    avgBuyability: buyabilityValues.length
+      ? Math.round((buyabilityValues.reduce((sum, value) => sum + value, 0) / buyabilityValues.length) * 10) / 10
+      : null,
+    avgOpportunity: opportunityValues.length
+      ? Math.round((opportunityValues.reduce((sum, value) => sum + value, 0) / opportunityValues.length) * 10) / 10
+      : null,
+  };
+}
+
 export async function getWarroomSummary(
   scope: WarroomScopeInput = DEFAULT_WARROOM_SCOPE,
   supabaseClient?: SupabaseClient
@@ -643,6 +909,7 @@ export async function getWarroomSummary(
   let enrichedPractices: number;
   let acquisitionTargets: number;
   let retirementRisk: number;
+  let corporateHighConfidence: number;
 
   if (isPolygonScope) {
     const practices = await getScopedPractices(scope, {}, supabase);
@@ -653,20 +920,52 @@ export async function getWarroomSummary(
       const group = classifyPractice(practice.entity_classification, practice.ownership_status);
       return group === "independent" && (practice.year_established ?? 9999) < 1995;
     }).length;
+    corporateHighConfidence = practices.filter((practice) => {
+      if (practice.entity_classification === "dso_national") return true;
+      if (
+        practice.entity_classification === "dso_regional" &&
+        (practice.ein || practice.parent_company || practice.franchise_name)
+      ) {
+        return true;
+      }
+      if (
+        practice.entity_classification === "specialist" &&
+        (practice.ownership_status === "dso_affiliated" || practice.ownership_status === "pe_backed")
+      ) {
+        return true;
+      }
+      return false;
+    }).length;
   } else {
     ownership = await getOwnershipCountsByQuery(supabase, resolution.zipCodes);
     enrichedPractices = await countEnrichedPractices(supabase, resolution.zipCodes);
     acquisitionTargets = await countAcquisitionTargets(supabase, resolution.zipCodes);
     retirementRisk = await countRetirementRisk(supabase, resolution.zipCodes);
+    corporateHighConfidence = await countCorporateHighConfidence(supabase, resolution.zipCodes);
   }
 
-  const [dealCount, deals, zipScores, changes, changes90d] = await Promise.all([
+  const [dealCount, deals, zipScores, changes, changes90d, scoreAverages] = await Promise.all([
     countScopedDeals(supabase, resolution.zipCodes),
     getScopedDeals(scope, {}, supabase),
     getScopedZipScores(scope, {}, supabase),
     getScopedChanges(scope, {}, supabase),
     getScopedChanges(scope, { sinceDate: dateDaysAgo(90) }, supabase),
+    averageScopedScores(supabase, resolution.zipCodes),
   ]);
+
+  let signalCounts: WarroomSignalCounts | null = null;
+  try {
+    const [practiceSignals, zipSignals] = await Promise.all([
+      getScopedPracticeSignals(scope, { onlyFlagged: true }, supabase),
+      getScopedZipSignals(scope, {}, supabase),
+    ]);
+    signalCounts = computeSignalCounts(practiceSignals, zipSignals);
+  } catch (error) {
+    // Signals tables may not yet exist in Supabase (background sync in flight).
+    // Fall through with null signalCounts — UI will render "signals pending" state.
+    signalCounts = null;
+    void error;
+  }
 
   return {
     scopeKind: resolution.scope.kind,
@@ -684,6 +983,11 @@ export async function getWarroomSummary(
     averageCorporateSharePct: averageCorporateShare(zipScores),
     changeCount: changes.length,
     changeCount90d: changes90d.length,
+    signalCounts,
+    corporateHighConfidence,
+    corporateHighConfidencePct: pct(corporateHighConfidence, ownership.total),
+    avgBuyabilityScore: scoreAverages.avgBuyability,
+    avgOpportunityScore: scoreAverages.avgOpportunity,
   };
 }
 
