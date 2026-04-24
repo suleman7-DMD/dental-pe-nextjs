@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireAdminToken } from '@/lib/auth/admin-token'
 
 export async function POST(req: NextRequest) {
   try {
+    const authFailure = requireAdminToken(req)
+    if (authFailure) return authFailure
+
     const body = await req.json()
 
     const zipCode = body.zip_code?.trim()

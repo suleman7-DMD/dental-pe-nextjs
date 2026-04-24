@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { requireAdminToken } from '@/lib/auth/admin-token'
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ npi: string }> }
 ) {
   try {
+    const authFailure = requireAdminToken(req)
+    if (authFailure) return authFailure
+
     const { npi } = await params
     const body = await req.json()
 
