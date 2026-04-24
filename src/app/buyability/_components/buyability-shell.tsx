@@ -21,6 +21,7 @@ import {
   isIndependentClassification,
   isCorporateClassification,
 } from '@/lib/constants/entity-classifications'
+import { toCSVString } from '@/lib/utils/csv-export'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -212,30 +213,19 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
 
   // CSV download
   const handleDownload = useCallback(() => {
-    const headers = [
-      'Practice Name',
-      'Address',
-      'City',
-      'ZIP',
-      'Classification',
-      'Category',
-      'Buyability Score',
-      'Year Established',
-      'Employees',
-    ]
-    const rows = filtered.map((p) => [
-      p.practice_name ?? '',
-      p.address ?? '',
-      p.city ?? '',
-      p.zip ?? '',
-      getEntityClassificationLabel(p.entity_classification),
-      p.category,
-      p.buyability_score ?? '',
-      p.year_established ?? '',
-      p.employee_count ?? '',
-    ])
-    const csv = [headers.join(','), ...rows.map((r) => r.map((c) => `"${c}"`).join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const exportRows = filtered.map((p) => ({
+      'Practice Name': p.practice_name ?? '',
+      Address: p.address ?? '',
+      City: p.city ?? '',
+      ZIP: p.zip ?? '',
+      Classification: getEntityClassificationLabel(p.entity_classification),
+      Category: p.category,
+      'Buyability Score': p.buyability_score ?? '',
+      'Year Established': p.year_established ?? '',
+      Employees: p.employee_count ?? '',
+    }))
+    const csv = toCSVString(exportRows)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

@@ -46,7 +46,10 @@ function formatLocationLine(target: RankedTarget | undefined): string {
 
 function csvEscape(value: string | number | null | undefined): string {
   if (value == null) return ""
-  const str = String(value)
+  let str = String(value)
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`
+  }
   if (/[",\n]/.test(str)) return `"${str.replace(/"/g, '""')}"`
   return str
 }

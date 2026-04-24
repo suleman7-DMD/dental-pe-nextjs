@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { Play, Download, AlertTriangle } from 'lucide-react'
 import { SQL_PRESETS_ROW1, SQL_PRESETS_ROW2 } from '@/lib/constants/sql-presets'
+import { toCSVString } from '@/lib/utils/csv-export'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -79,16 +80,13 @@ export function SqlExplorer() {
 
   const handleDownload = useCallback(() => {
     if (!result) return
-    const csv = [
-      result.columns.join(','),
-      ...result.rows.map((row) =>
-        result.columns.map((col) => {
-          const val = row[col]
-          return `"${String(val ?? '').replace(/"/g, '""')}"`
-        }).join(',')
-      ),
-    ].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const exportRows = result.rows.map((row) => {
+      const obj: Record<string, unknown> = {}
+      for (const col of result.columns) obj[col] = row[col]
+      return obj
+    })
+    const csv = toCSVString(exportRows)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

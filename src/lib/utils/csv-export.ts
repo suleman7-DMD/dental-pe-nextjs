@@ -1,4 +1,21 @@
 /**
+ * Escape a single CSV cell. Defends against OWASP CSV Injection by prefixing
+ * values starting with =, +, -, @, tab, or CR with a single quote so spreadsheet
+ * apps treat them as text rather than formulas.
+ */
+function escapeCell(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  let str = String(value);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str}`;
+  }
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+/**
  * Convert an array of objects to a CSV blob and trigger download.
  */
 export function exportToCSV<T extends Record<string, unknown>>(
@@ -10,20 +27,9 @@ export function exportToCSV<T extends Record<string, unknown>>(
   const headers = Object.keys(data[0]);
 
   const csvRows = [
-    headers.join(","),
+    headers.map(escapeCell).join(","),
     ...data.map((row) =>
-      headers
-        .map((header) => {
-          const value = row[header];
-          if (value === null || value === undefined) return "";
-          const str = String(value);
-          // Escape quotes and wrap in quotes if contains comma, quote, or newline
-          if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-            return `"${str.replace(/"/g, '""')}"`;
-          }
-          return str;
-        })
-        .join(",")
+      headers.map((header) => escapeCell(row[header])).join(",")
     ),
   ];
 
@@ -39,7 +45,6 @@ export function exportToCSV<T extends Record<string, unknown>>(
   link.click();
   document.body.removeChild(link);
 
-  // Clean up
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
@@ -54,19 +59,9 @@ export function toCSVString<T extends Record<string, unknown>>(
   const headers = Object.keys(data[0]);
 
   const csvRows = [
-    headers.join(","),
+    headers.map(escapeCell).join(","),
     ...data.map((row) =>
-      headers
-        .map((header) => {
-          const value = row[header];
-          if (value === null || value === undefined) return "";
-          const str = String(value);
-          if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-            return `"${str.replace(/"/g, '""')}"`;
-          }
-          return str;
-        })
-        .join(",")
+      headers.map((header) => escapeCell(row[header])).join(",")
     ),
   ];
 
@@ -88,19 +83,9 @@ export function exportToCsv<T extends Record<string, unknown>>(
   const headers = columns.map((col) => headerMap[col] ?? col);
 
   const csvRows = [
-    headers.join(","),
+    headers.map(escapeCell).join(","),
     ...data.map((row) =>
-      columns
-        .map((col) => {
-          const value = row[col];
-          if (value === null || value === undefined) return "";
-          const str = String(value);
-          if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-            return `"${str.replace(/"/g, '""')}"`;
-          }
-          return str;
-        })
-        .join(",")
+      columns.map((col) => escapeCell(row[col])).join(",")
     ),
   ];
 

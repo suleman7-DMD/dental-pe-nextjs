@@ -2,6 +2,7 @@
 
 import { useMemo, useCallback } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
+import { toCSVString } from '@/lib/utils/csv-export'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/types'
 
@@ -106,10 +107,20 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
 
   // CSV download
   const handleDownload = useCallback(() => {
-    const headers = ['ZIP', 'Town', 'Pop', 'MHI', 'GP Offices', 'DLD-GP/10k', 'Buyable %', 'Corporate %', 'Type', 'Confidence']
-    const csvRows = rows.map(r => [r.zip, r.town, r.pop, r.mhi, r.gpOffices, r.dld, r.buyable, r.corporate, r.type, r.confidenceRaw ?? ''].join(','))
-    const csv = [headers.join(','), ...csvRows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const exportRows = rows.map((r) => ({
+      ZIP: r.zip,
+      Town: r.town,
+      Pop: r.pop,
+      MHI: r.mhi,
+      'GP Offices': r.gpOffices,
+      'DLD-GP/10k': r.dld,
+      'Buyable %': r.buyable,
+      'Corporate %': r.corporate,
+      Type: r.type,
+      Confidence: r.confidenceRaw ?? '',
+    }))
+    const csv = toCSVString(exportRows)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
