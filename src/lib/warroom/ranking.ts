@@ -488,7 +488,7 @@ function buildHeadline(
     : `${segments.join(" — ")} · ${tail}`;
 }
 
-function tierFromScore(score: number): RankedTarget["tier"] {
+export function tierFromScore(score: number): RankedTarget["tier"] {
   if (score >= 80) return "hot";
   if (score >= 60) return "warm";
   if (score >= 40) return "cool";
