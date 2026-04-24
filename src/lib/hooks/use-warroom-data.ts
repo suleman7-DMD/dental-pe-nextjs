@@ -24,6 +24,15 @@ export interface UseWarroomDataOptions {
   confidence?: "all" | "high" | "medium" | "low";
   intentFilter?: WarroomIntentFilter | null;
   initialData?: WarroomSitrepBundle;
+  /**
+   * Scope used to compute `initialData` on the server. Defaults to
+   * DEFAULT_WARROOM_SCOPE. When the client's active scope matches this, the
+   * server payload is reused; otherwise the client refetches. Pass this
+   * explicitly when the server fetches with a URL-driven scope.
+   */
+  initialDataScope?: WarroomScopeInput;
+  /** Lens used to compute `initialData` on the server. Defaults to DEFAULT_WARROOM_LENS. */
+  initialDataLens?: WarroomLens;
   enabled?: boolean;
   staleTime?: number;
   gcTime?: number;
@@ -102,8 +111,8 @@ export function useWarroomData(options: UseWarroomDataOptions = {}): UseWarroomD
 
   if (options.initialData) {
     const initialKey = buildQueryKey({
-      scope: DEFAULT_WARROOM_SCOPE,
-      lens: DEFAULT_WARROOM_LENS,
+      scope: options.initialDataScope ?? DEFAULT_WARROOM_SCOPE,
+      lens: options.initialDataLens ?? DEFAULT_WARROOM_LENS,
       rankLimit: 40,
       topSignalLimit: 8,
       excludeCorporate: false,
