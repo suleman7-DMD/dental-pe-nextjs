@@ -39,6 +39,8 @@ import {
   createEmptyFilter,
   describeFilter,
   filterHasContent,
+  intentHasFilters,
+  parseIntent,
 } from "@/lib/warroom/intent"
 import { BriefingRail } from "./briefing-rail"
 import { DossierDrawer } from "./dossier-drawer"
@@ -150,11 +152,32 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     removePin,
     reorderPins,
     clearPins,
+    setIntent,
     resetWarroomState,
   } = useWarroomState()
 
   const [intentText, setIntentText] = useState("")
   const [activeIntent, setActiveIntent] = useState<WarroomIntent | null>(null)
+  const seededIntentRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!hydrated) return
+    if (seededIntentRef.current === state.intent) return
+    seededIntentRef.current = state.intent
+
+    setIntentText(state.intent)
+
+    if (state.intent) {
+      const parsed = parseIntent(state.intent)
+      if (intentHasFilters(parsed)) {
+        setActiveIntent(parsed)
+      } else {
+        setActiveIntent(null)
+      }
+    } else {
+      setActiveIntent(null)
+    }
+  }, [hydrated, state.intent])
   const [selectedZip, setSelectedZip] = useState<string | null>(null)
   const [dossierZip, setDossierZip] = useState<string | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -236,18 +259,23 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   const handleIntentSubmit = useCallback(
     (intent: WarroomIntent) => {
       setActiveIntent(intent)
+      const committed = intent.rawText ?? ""
+      seededIntentRef.current = committed
+      setIntent(committed)
       const nextScope = intent.filter.scope as WarroomScope | null
       if (nextScope && nextScope !== state.scope) {
         setScope(nextScope)
       }
     },
-    [setScope, state.scope]
+    [setIntent, setScope, state.scope]
   )
 
   const handleIntentReset = useCallback(() => {
     setIntentText("")
     setActiveIntent(null)
-  }, [])
+    seededIntentRef.current = ""
+    setIntent("")
+  }, [setIntent])
 
   const currentHuntFilter = useMemo<WarroomIntentFilter>(
     () => activeIntent?.filter ?? createEmptyFilter(),
@@ -259,19 +287,26 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
       if (!filterHasContent(next)) {
         setActiveIntent(null)
         setIntentText("")
+        seededIntentRef.current = ""
+        setIntent("")
         return
       }
       const intent = buildIntentFromFilter(next)
+      const text = describeFilter(next)
       setActiveIntent(intent)
-      setIntentText(describeFilter(next))
+      setIntentText(text)
+      seededIntentRef.current = text
+      setIntent(text)
     },
-    []
+    [setIntent]
   )
 
   const handleHuntReset = useCallback(() => {
     setActiveIntent(null)
     setIntentText("")
-  }, [])
+    seededIntentRef.current = ""
+    setIntent("")
+  }, [setIntent])
 
   const handleModeChange = useCallback(
     (mode: WarroomMode) => {
@@ -328,7 +363,9 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
       if (isTypingTarget(event.target)) return
 
       const drawerOpen =
-        shortcutsOpen || Boolean(state.selectedEntity) || Boolean(selectedZip)
+        shortcutsOpen ||
+        Boolean(state.selectedEntity) ||
+        Boolean(dossierZip)
 
       switch (event.key) {
         case "?":
@@ -348,6 +385,11 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
           if (state.selectedEntity) {
             event.preventDefault()
             setSelectedEntity(null)
+            return
+          }
+          if (dossierZip) {
+            event.preventDefault()
+            setDossierZip(null)
             return
           }
           if (selectedZip) {
@@ -402,6 +444,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [
     addPin,
+    dossierZip,
     handleCommandShortcut,
     handleIntentReset,
     handleModeChange,
