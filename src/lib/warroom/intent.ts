@@ -72,8 +72,8 @@ const SIGNAL_SYNONYMS: Record<string, string> = {
   "white space": "zip_white_space_flag",
   "whitespace": "zip_white_space_flag",
   "compound demand": "zip_compound_demand_flag",
-  "mirror pair": "zip_mirror_pair",
-  "mirror pairs": "zip_mirror_pair",
+  "mirror pair": "zip_mirror_pair_flag",
+  "mirror pairs": "zip_mirror_pair_flag",
   "contested": "zip_contested_zone_flag",
   "contested zone": "zip_contested_zone_flag",
   "ada gap": "zip_ada_benchmark_gap_flag",
@@ -207,7 +207,7 @@ export const PRACTICE_FLAG_LABELS: Record<string, string> = {
 export const ZIP_FLAG_LABELS: Record<string, string> = {
   zip_white_space_flag: "White-Space ZIP",
   zip_compound_demand_flag: "Compound Demand",
-  zip_mirror_pair: "Mirror Pair",
+  zip_mirror_pair_flag: "Mirror Pair",
   zip_contested_zone_flag: "Contested Zone",
   zip_ada_benchmark_gap_flag: "ADA Benchmark Gap",
 };

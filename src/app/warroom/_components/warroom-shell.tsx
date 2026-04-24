@@ -129,7 +129,7 @@ function signalFiltersToFlags(signals: WarroomSignalFilter[]): string[] {
   if (signals.includes("high_peer_retirement")) flags.push("high_peer_retirement_flag")
   if (signals.includes("white_space")) flags.push("zip_white_space_flag")
   if (signals.includes("compound_demand")) flags.push("zip_compound_demand_flag")
-  if (signals.includes("mirror_pair")) flags.push("zip_mirror_pair")
+  if (signals.includes("mirror_pair")) flags.push("zip_mirror_pair_flag")
   if (signals.includes("contested_zone")) flags.push("zip_contested_zone_flag")
   if (signals.includes("ada_gap")) flags.push("zip_ada_benchmark_gap_flag")
   return flags

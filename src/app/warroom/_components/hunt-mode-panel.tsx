@@ -78,7 +78,7 @@ const PRACTICE_FLAGS_ORDER: string[] = [
 const ZIP_FLAGS_ORDER: string[] = [
   "zip_white_space_flag",
   "zip_compound_demand_flag",
-  "zip_mirror_pair",
+  "zip_mirror_pair_flag",
   "zip_contested_zone_flag",
   "zip_ada_benchmark_gap_flag",
 ]
