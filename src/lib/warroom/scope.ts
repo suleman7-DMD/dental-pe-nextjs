@@ -17,94 +17,37 @@ export interface BoundingBox {
 }
 
 export const WARROOM_SCOPE_IDS = [
+  "us",
   "chicagoland",
   "west_loop_south_loop",
   "woodridge",
   "bolingbrook",
+  "subzone_core",
+  "subzone_north",
+  "subzone_city",
+  "subzone_south",
+  "subzone_west",
+  "subzone_far_west",
+  "subzone_far_south",
 ] as const
 
 export type WarroomScope = (typeof WARROOM_SCOPE_IDS)[number]
 export type WarroomScopeId = WarroomScope
 
+export type WarroomScopeGroup = "metro" | "saved" | "subzone" | "global"
+
 export interface WarroomScopeOption {
   id: WarroomScope
   label: string
   shortLabel: string
-  livingLocationKey: keyof typeof LIVING_LOCATIONS
-  centerZip: string
+  group: WarroomScopeGroup
+  groupLabel: string
+  kind: WarroomScopeKind
+  livingLocationKey?: keyof typeof LIVING_LOCATIONS
+  subzoneKey?: ChicagolandSubzone
+  centerZip: string | null
   zipCount: number
   zipCodes: string[]
-}
-
-function zipSetScope(
-  id: WarroomScope,
-  label: keyof typeof LIVING_LOCATIONS,
-  shortLabel: string
-): WarroomScopeOption {
-  const location = LIVING_LOCATIONS[label]
-  return {
-    id,
-    label,
-    shortLabel,
-    livingLocationKey: label,
-    centerZip: location.center_zip,
-    zipCount: location.commutable_zips.length,
-    zipCodes: [...location.commutable_zips],
-  }
-}
-
-export const WARROOM_SCOPES: WarroomScopeOption[] = [
-  zipSetScope("chicagoland", "All Chicagoland", "Chicagoland"),
-  zipSetScope("west_loop_south_loop", "West Loop / South Loop", "West Loop"),
-  zipSetScope("woodridge", "Woodridge", "Woodridge"),
-  zipSetScope("bolingbrook", "Bolingbrook", "Bolingbrook"),
-]
-
-export const WARROOM_SCOPE_BY_ID: Record<WarroomScope, WarroomScopeOption> = {
-  chicagoland: WARROOM_SCOPES[0],
-  west_loop_south_loop: WARROOM_SCOPES[1],
-  woodridge: WARROOM_SCOPES[2],
-  bolingbrook: WARROOM_SCOPES[3],
-}
-
-export const DEFAULT_WARROOM_SCOPE: WarroomScope = "chicagoland"
-export const DEFAULT_WARROOM_SCOPE_ID: WarroomScopeId = DEFAULT_WARROOM_SCOPE
-
-const WARROOM_SCOPE_ID_SET: ReadonlySet<string> = new Set(WARROOM_SCOPE_IDS)
-
-export function isWarroomScope(value: unknown): value is WarroomScope {
-  return typeof value === "string" && WARROOM_SCOPE_ID_SET.has(value)
-}
-
-export const isWarroomScopeId = isWarroomScope
-
-export function getWarroomScopeOption(scope: WarroomScope) {
-  return WARROOM_SCOPE_BY_ID[scope] ?? WARROOM_SCOPE_BY_ID[DEFAULT_WARROOM_SCOPE]
-}
-
-export type GeoJsonPosition = readonly [number, number, ...number[]]
-export type GeoJsonRing = readonly GeoJsonPosition[]
-export type GeoJsonPolygonRings = readonly GeoJsonRing[]
-
-export interface GeoJsonLike {
-  type?: string
-  coordinates?: unknown
-  geometry?: unknown
-  features?: unknown
-  properties?: Record<string, unknown>
-}
-
-export type WarroomScopeValue = string | string[] | GeoJsonLike
-
-export interface WarroomDataScope {
-  kind: WarroomScopeKind
-  value?: WarroomScopeValue
-}
-
-export type WarroomScopeInput = WarroomScope | WarroomDataScope
-
-export const DEFAULT_WARROOM_DATA_SCOPE: WarroomDataScope = {
-  kind: "chicagoland",
 }
 
 const CORE_CHICAGOLAND_ZIPS = [
@@ -184,6 +127,122 @@ export const CHICAGOLAND_SUBZONE_LABELS: Record<ChicagolandSubzone, string> = {
   west: "Inner West Suburbs",
   far_west: "Far West / Fox Valley",
   far_south: "Far South / Joliet",
+}
+
+function zipSetScope(
+  id: WarroomScope,
+  label: keyof typeof LIVING_LOCATIONS,
+  shortLabel: string,
+  group: WarroomScopeGroup,
+  groupLabel: string
+): WarroomScopeOption {
+  const location = LIVING_LOCATIONS[label]
+  return {
+    id,
+    label,
+    shortLabel,
+    group,
+    groupLabel,
+    kind: id === "chicagoland" ? "chicagoland" : "saved",
+    livingLocationKey: label,
+    centerZip: location.center_zip,
+    zipCount: location.commutable_zips.length,
+    zipCodes: [...location.commutable_zips],
+  }
+}
+
+function subzoneScopeOption(
+  subzoneKey: ChicagolandSubzone,
+  shortLabel: string
+): WarroomScopeOption {
+  const zipCodes = [...CHICAGOLAND_SUBZONE_ZIPS[subzoneKey]]
+  return {
+    id: `subzone_${subzoneKey}` as WarroomScope,
+    label: CHICAGOLAND_SUBZONE_LABELS[subzoneKey],
+    shortLabel,
+    group: "subzone",
+    groupLabel: "Chicagoland subzones",
+    kind: "subzone",
+    subzoneKey,
+    centerZip: zipCodes[0] ?? null,
+    zipCount: zipCodes.length,
+    zipCodes,
+  }
+}
+
+const US_SCOPE_OPTION: WarroomScopeOption = {
+  id: "us",
+  label: "United States (all practices)",
+  shortLabel: "US",
+  group: "global",
+  groupLabel: "Global",
+  kind: "us",
+  centerZip: null,
+  zipCount: 0,
+  zipCodes: [],
+}
+
+export const WARROOM_SCOPES: WarroomScopeOption[] = [
+  US_SCOPE_OPTION,
+  zipSetScope("chicagoland", "All Chicagoland", "Chicagoland", "metro", "Metro"),
+  zipSetScope("west_loop_south_loop", "West Loop / South Loop", "West Loop", "saved", "Saved lists"),
+  zipSetScope("woodridge", "Woodridge", "Woodridge", "saved", "Saved lists"),
+  zipSetScope("bolingbrook", "Bolingbrook", "Bolingbrook", "saved", "Saved lists"),
+  subzoneScopeOption("core", "Core / DuPage"),
+  subzoneScopeOption("north", "North Shore"),
+  subzoneScopeOption("city", "Chicago City"),
+  subzoneScopeOption("south", "South Suburbs"),
+  subzoneScopeOption("west", "Inner West"),
+  subzoneScopeOption("far_west", "Fox Valley"),
+  subzoneScopeOption("far_south", "Far South / Joliet"),
+]
+
+export const WARROOM_SCOPE_BY_ID: Record<WarroomScope, WarroomScopeOption> = WARROOM_SCOPES.reduce(
+  (acc, scope) => {
+    acc[scope.id] = scope
+    return acc
+  },
+  {} as Record<WarroomScope, WarroomScopeOption>
+)
+
+export const DEFAULT_WARROOM_SCOPE: WarroomScope = "chicagoland"
+export const DEFAULT_WARROOM_SCOPE_ID: WarroomScopeId = DEFAULT_WARROOM_SCOPE
+
+const WARROOM_SCOPE_ID_SET: ReadonlySet<string> = new Set(WARROOM_SCOPE_IDS)
+
+export function isWarroomScope(value: unknown): value is WarroomScope {
+  return typeof value === "string" && WARROOM_SCOPE_ID_SET.has(value)
+}
+
+export const isWarroomScopeId = isWarroomScope
+
+export function getWarroomScopeOption(scope: WarroomScope) {
+  return WARROOM_SCOPE_BY_ID[scope] ?? WARROOM_SCOPE_BY_ID[DEFAULT_WARROOM_SCOPE]
+}
+
+export type GeoJsonPosition = readonly [number, number, ...number[]]
+export type GeoJsonRing = readonly GeoJsonPosition[]
+export type GeoJsonPolygonRings = readonly GeoJsonRing[]
+
+export interface GeoJsonLike {
+  type?: string
+  coordinates?: unknown
+  geometry?: unknown
+  features?: unknown
+  properties?: Record<string, unknown>
+}
+
+export type WarroomScopeValue = string | string[] | GeoJsonLike
+
+export interface WarroomDataScope {
+  kind: WarroomScopeKind
+  value?: WarroomScopeValue
+}
+
+export type WarroomScopeInput = WarroomScope | WarroomDataScope
+
+export const DEFAULT_WARROOM_DATA_SCOPE: WarroomDataScope = {
+  kind: "chicagoland",
 }
 
 const SUBZONE_ALIASES: Record<string, ChicagolandSubzone> = {
@@ -279,8 +338,27 @@ function getSavedZipCodes(value: WarroomScopeValue | undefined): string[] {
 export function normalizeWarroomDataScope(scope: WarroomScopeInput | undefined): WarroomDataScope {
   if (!scope) return DEFAULT_WARROOM_DATA_SCOPE
   if (typeof scope !== "string") return scope
-  if (scope === "chicagoland") return { kind: "chicagoland" }
-  return { kind: "saved", value: getWarroomScopeOption(scope).livingLocationKey }
+  const option = getWarroomScopeOption(scope)
+  switch (option.kind) {
+    case "us":
+      return { kind: "us" }
+    case "chicagoland":
+      return { kind: "chicagoland" }
+    case "subzone":
+      return option.subzoneKey
+        ? { kind: "subzone", value: option.subzoneKey }
+        : DEFAULT_WARROOM_DATA_SCOPE
+    case "saved":
+      return option.livingLocationKey
+        ? { kind: "saved", value: option.livingLocationKey }
+        : { kind: "saved", value: option.zipCodes }
+    case "zip":
+      return { kind: "zip", value: option.zipCodes }
+    case "polygon":
+      return DEFAULT_WARROOM_DATA_SCOPE
+    default:
+      return DEFAULT_WARROOM_DATA_SCOPE
+  }
 }
 
 function isPosition(value: unknown): value is GeoJsonPosition {

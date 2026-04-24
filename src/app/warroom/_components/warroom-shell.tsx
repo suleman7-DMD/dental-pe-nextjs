@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react"
-import { AlertTriangle, Command, RotateCcw, Search } from "lucide-react"
+import { AlertTriangle, Command, Keyboard, RotateCcw, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
@@ -44,12 +44,16 @@ import { BriefingRail } from "./briefing-rail"
 import { DossierDrawer } from "./dossier-drawer"
 import { HuntModePanel } from "./hunt-mode-panel"
 import { IntentBar } from "./intent-bar"
+import { InvestigateModePanel } from "./investigate-mode-panel"
+import { KeyboardShortcutsOverlay } from "./keyboard-shortcuts-overlay"
 import { LivingMap } from "./living-map"
 import { ModeSwitcher } from "./mode-switcher"
 import { PinboardTray } from "./pinboard-tray"
+import { ProfileModePanel } from "./profile-mode-panel"
 import { ScopeSelector } from "./scope-selector"
 import { SitrepKpiStrip } from "./sitrep-kpi-strip"
 import { TargetList } from "./target-list"
+import { ZipDossierDrawer } from "./zip-dossier-drawer"
 
 const TIER_RANK: Record<"hot" | "warm" | "cool" | "cold", number> = {
   hot: 3,
@@ -144,12 +148,16 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     toggleSignalFilter,
     addPin,
     removePin,
+    reorderPins,
+    clearPins,
     resetWarroomState,
   } = useWarroomState()
 
   const [intentText, setIntentText] = useState("")
   const [activeIntent, setActiveIntent] = useState<WarroomIntent | null>(null)
   const [selectedZip, setSelectedZip] = useState<string | null>(null)
+  const [dossierZip, setDossierZip] = useState<string | null>(null)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const intentInputRef = useRef<HTMLDivElement>(null)
 
   const scope = getWarroomScopeOption(state.scope)
@@ -193,6 +201,17 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     [state.filters.pins]
   )
 
+  const pinTargets = useMemo<Map<string, RankedTarget>>(() => {
+    const map = new Map<string, RankedTarget>()
+    if (!effectiveBundle) return map
+    for (const target of effectiveBundle.rankedTargets) {
+      if (pinnedNpis.has(target.npi)) {
+        map.set(target.npi, target)
+      }
+    }
+    return map
+  }, [effectiveBundle, pinnedNpis])
+
   const selectedTarget = useMemo<RankedTarget | null>(() => {
     if (!state.selectedEntity || !effectiveBundle) return null
     return (
@@ -203,10 +222,8 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   }, [effectiveBundle, state.selectedEntity])
 
   const nearbyDeals = useMemo(() => {
-    if (!selectedTarget?.zip || !effectiveBundle) return []
-    return effectiveBundle.recentDeals.filter(
-      (deal) => deal.target_zip === selectedTarget.zip
-    )
+    if (!selectedTarget || !effectiveBundle) return []
+    return effectiveBundle.recentDeals
   }, [effectiveBundle, selectedTarget])
 
   const changesForSelected = useMemo(() => {
@@ -291,16 +308,87 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   }, [])
 
   useEffect(() => {
+    function isTypingTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false
+      const tag = target.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true
+      if (target.isContentEditable) return true
+      return false
+    }
+
     function onKeyDown(event: KeyboardEvent) {
       const isMeta = event.metaKey || event.ctrlKey
       if (isMeta && event.key.toLowerCase() === "k") {
         event.preventDefault()
         handleCommandShortcut()
+        return
+      }
+
+      if (isMeta || event.altKey) return
+      if (isTypingTarget(event.target)) return
+
+      switch (event.key) {
+        case "?":
+          event.preventDefault()
+          setShortcutsOpen((prev) => !prev)
+          return
+        case "/":
+          event.preventDefault()
+          handleCommandShortcut()
+          return
+        case "Escape":
+          if (shortcutsOpen) setShortcutsOpen(false)
+          return
+        case "1":
+          event.preventDefault()
+          handleModeChange("sitrep")
+          return
+        case "2":
+          event.preventDefault()
+          handleModeChange("hunt")
+          return
+        case "3":
+          event.preventDefault()
+          handleModeChange("profile")
+          return
+        case "4":
+          event.preventDefault()
+          handleModeChange("investigate")
+          return
+        case "r":
+        case "R":
+          event.preventDefault()
+          handleIntentReset()
+          resetWarroomState()
+          setSelectedZip(null)
+          return
+        case "p":
+        case "P":
+          if (!state.selectedEntity) return
+          event.preventDefault()
+          if (pinnedNpis.has(state.selectedEntity)) {
+            removePin(state.selectedEntity)
+          } else {
+            addPin(state.selectedEntity)
+          }
+          return
+        default:
+          return
       }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [handleCommandShortcut])
+  }, [
+    addPin,
+    handleCommandShortcut,
+    handleIntentReset,
+    handleModeChange,
+    pinnedNpis,
+    removePin,
+    resetWarroomState,
+    shortcutsOpen,
+    state.selectedEntity,
+  ])
 
   const summary = effectiveBundle?.summary ?? null
   const zipScores = effectiveBundle?.zipScores ?? []
@@ -358,7 +446,11 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                     {activeLensLabel}
                   </span>
                   <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
-                    {scope.zipCount} ZIPs
+                    {scope.kind === "us"
+                      ? "All US practices"
+                      : scope.zipCount === 1
+                        ? "1 ZIP"
+                        : `${scope.zipCount} ZIPs`}
                   </span>
                   {rankedTargets.length > 0 && (
                     <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
@@ -383,6 +475,17 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                   <Search className="h-4 w-4" />
                   <span>Cmd K</span>
                   <Command className="h-3.5 w-3.5 text-[#B5B5A8]" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShortcutsOpen(true)}
+                  className="h-9 w-9 border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
+                  aria-label="Keyboard shortcuts"
+                  title="Keyboard shortcuts (?)"
+                >
+                  <Keyboard className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -507,6 +610,25 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
           />
         )}
 
+        {state.mode === "profile" && (
+          <ProfileModePanel
+            pinnedNpis={state.filters.pins}
+            pinTargets={pinTargets}
+            selectedEntity={state.selectedEntity}
+            onSelectEntity={handleTargetSelect}
+            rankedTargets={visibleTargets}
+          />
+        )}
+
+        {state.mode === "investigate" && (
+          <InvestigateModePanel
+            bundle={effectiveBundle}
+            rankedTargets={visibleTargets}
+            onTargetSelect={handleTargetSelect}
+            onIntentRequest={handleDossierIntentRequest}
+          />
+        )}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <LivingMap
             lens={state.lens}
@@ -517,6 +639,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
             selectedZip={selectedZip}
             onZipSelect={setSelectedZip}
             onTargetSelect={handleTargetSelect}
+            onZipDossierOpen={setDossierZip}
             className="xl:min-h-[560px]"
           />
 
@@ -533,6 +656,9 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
               onPinEntity={addPin}
               onSelectEntity={setSelectedEntity}
               onRemovePin={removePin}
+              onReorderPins={reorderPins}
+              onClearPins={clearPins}
+              pinTargets={pinTargets}
             />
           </aside>
         </div>
@@ -557,6 +683,33 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
         onIntentRequest={handleDossierIntentRequest}
         nearbyDeals={nearbyDeals}
         recentChanges={changesForSelected}
+      />
+
+      <ZipDossierDrawer
+        zipCode={dossierZip}
+        zipScore={
+          dossierZip
+            ? zipScores.find((row) => row.zip_code === dossierZip) ?? null
+            : null
+        }
+        zipSignal={
+          dossierZip
+            ? zipSignals.find((row) => row.zip_code === dossierZip) ?? null
+            : null
+        }
+        rankedTargets={rankedTargets}
+        recentChanges={effectiveBundle?.recentChanges ?? []}
+        onClose={() => setDossierZip(null)}
+        onTargetSelect={(npi) => {
+          setDossierZip(null)
+          handleTargetSelect(npi)
+        }}
+        onIntentRequest={handleDossierIntentRequest}
+      />
+
+      <KeyboardShortcutsOverlay
+        open={shortcutsOpen}
+        onOpenChange={setShortcutsOpen}
       />
     </div>
   )

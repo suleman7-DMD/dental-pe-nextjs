@@ -17,6 +17,7 @@ import {
 } from "@/lib/warroom/scope"
 
 export const WARROOM_LOCAL_STORAGE_KEY = "dental-pe-warroom-state-v0"
+export const WARROOM_PIN_LIMIT = 20
 
 export const WARROOM_QUERY_PARAMS = {
   scope: "scope",
@@ -154,7 +155,7 @@ function coerceFilters(value: unknown, fallback = createDefaultFilters()): Warro
       Array.isArray(value.pins)
         ? value.pins.filter((item): item is string => typeof item === "string")
         : [],
-      12
+      WARROOM_PIN_LIMIT
     ),
   }
 }
@@ -189,7 +190,7 @@ function parseUrlState(searchParams: SearchParamReader): WarroomState {
     filters: {
       signals: coerceSignals(parseList(searchParams.get(WARROOM_QUERY_PARAMS.signals))),
       confidence: coerceConfidence(confidence),
-      pins: uniqueLimited(parseList(searchParams.get(WARROOM_QUERY_PARAMS.pins)), 12),
+      pins: uniqueLimited(parseList(searchParams.get(WARROOM_QUERY_PARAMS.pins)), WARROOM_PIN_LIMIT),
     },
   }
 }
@@ -398,7 +399,7 @@ export function useWarroomState() {
 
       setFilters((current) => ({
         ...current,
-        pins: uniqueLimited([clean, ...current.pins], 12),
+        pins: uniqueLimited([clean, ...current.pins], WARROOM_PIN_LIMIT),
       }))
     },
     [setFilters]
@@ -413,6 +414,20 @@ export function useWarroomState() {
     },
     [setFilters]
   )
+
+  const reorderPins = useCallback(
+    (nextPins: string[]) => {
+      setFilters((current) => ({
+        ...current,
+        pins: uniqueLimited(nextPins, WARROOM_PIN_LIMIT),
+      }))
+    },
+    [setFilters]
+  )
+
+  const clearPins = useCallback(() => {
+    setFilters((current) => ({ ...current, pins: [] }))
+  }, [setFilters])
 
   const resetWarroomState = useCallback(() => {
     commitState(createDefaultWarroomState())
@@ -430,6 +445,8 @@ export function useWarroomState() {
     toggleSignalFilter,
     addPin,
     removePin,
+    reorderPins,
+    clearPins,
     resetWarroomState,
   }
 }

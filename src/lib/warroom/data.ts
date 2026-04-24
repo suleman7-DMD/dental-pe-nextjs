@@ -113,6 +113,12 @@ export async function getSitrepBundle(
   const zipCodes = resolveScopeZipCodes(scope);
   const scopeLabel = getScopeLabel(scope);
   const warnings: string[] = [];
+  const practiceFetchLimit = zipCodes === null ? Math.max(rankLimit * 50, 5000) : undefined;
+  if (practiceFetchLimit != null) {
+    warnings.push(
+      `US target ranking is capped to the top ${practiceFetchLimit.toLocaleString()} practices by buyability to avoid loading the full national practice table.`
+    );
+  }
 
   const [
     summary,
@@ -123,7 +129,11 @@ export async function getSitrepBundle(
     signalBundle,
   ] = await Promise.all([
     getWarroomSummary(scope, supabase),
-    getScopedPractices(scope, { orderBy: "buyability_score", ascending: false }, supabase),
+    getScopedPractices(
+      scope,
+      { orderBy: "buyability_score", ascending: false, maxRows: practiceFetchLimit },
+      supabase
+    ),
     getScopedZipScores(scope, {}, supabase),
     getScopedDeals(scope, {}, supabase),
     getScopedChanges(scope, { maxRows: 500 }, supabase),

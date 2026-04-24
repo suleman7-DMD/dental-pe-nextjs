@@ -27,6 +27,7 @@ interface LivingMapProps {
   selectedZip: string | null
   onZipSelect: (zip: string | null) => void
   onTargetSelect?: (npi: string) => void
+  onZipDossierOpen?: (zip: string) => void
   height?: number
   className?: string
 }
@@ -150,6 +151,7 @@ export function LivingMap({
   selectedZip,
   onZipSelect,
   onTargetSelect,
+  onZipDossierOpen,
   height = 560,
   className,
 }: LivingMapProps) {
@@ -393,6 +395,15 @@ export function LivingMap({
                   ×
                 </button>
               </div>
+              {onZipDossierOpen && (
+                <button
+                  type="button"
+                  onClick={() => onZipDossierOpen(selected.zip)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-[#B8860B]/30 bg-[#B8860B]/10 px-2 py-1.5 text-[11px] font-semibold text-[#B8860B] transition-colors hover:bg-[#B8860B]/20"
+                >
+                  Open ZIP dossier →
+                </button>
+              )}
               <div className="rounded-md bg-[#FAFAF7] px-2 py-1">
                 <p className="text-[#6B6B60]">
                   {computation.label}:{" "}

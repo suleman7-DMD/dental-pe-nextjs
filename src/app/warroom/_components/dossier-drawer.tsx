@@ -1,13 +1,16 @@
 "use client"
 
+import Link from "next/link"
 import { useMemo, useState } from "react"
 import {
   AlertTriangle,
   ArrowUpRight,
   BadgeCheck,
+  Briefcase,
   Building2,
   Check,
   Clock,
+  Compass,
   Copy,
   Crosshair,
   ExternalLink,
@@ -16,20 +19,28 @@ import {
   Gauge,
   Globe,
   Handshake,
+  Info,
   Layers,
   LineChart,
   MapPin,
   Phone,
   Pin,
   Scale,
+  Search,
   ShieldAlert,
   Sparkles,
   Star,
   ThermometerSnowflake,
   ThermometerSun,
+  TrendingUp,
   Users,
   Zap,
 } from "lucide-react"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Sheet,
   SheetContent,
@@ -46,6 +57,10 @@ import {
   formatPercent,
 } from "@/lib/utils/formatting"
 import { getEntityClassificationLabel } from "@/lib/constants/entity-classifications"
+import {
+  filterNearbyDealsWithin,
+  type NearbyDealMatch,
+} from "@/lib/warroom/geo"
 import type {
   RankedTarget,
   WarroomChangeRecord,
@@ -247,6 +262,75 @@ function humanizeFieldName(key: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+function ScoreComponentRow({ component }: { component: WarroomScoreComponent }) {
+  const positive = component.contribution > 0
+  const negative = component.contribution < 0
+  const tone = positive
+    ? "text-[#2D8B4E]"
+    : negative
+    ? "text-[#C23B3B]"
+    : "text-[#9C9C90]"
+  const bar = positive
+    ? "bg-[#2D8B4E]/25"
+    : negative
+    ? "bg-[#C23B3B]/25"
+    : "bg-[#E8E5DE]"
+  const width = Math.min(100, Math.abs(component.contribution) * 3)
+
+  return (
+    <Popover>
+      <PopoverTrigger className="group w-full rounded-md border border-transparent px-1.5 py-1 text-left transition-colors hover:border-[#E8E5DE] hover:bg-[#FFFFFF] focus:outline-none focus-visible:border-[#B8860B]/40 focus-visible:bg-[#FFFFFF]">
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="flex items-center gap-1 font-medium text-[#1A1A1A]">
+            {component.label}
+            <Info className="h-3 w-3 text-[#B5B5A8] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+          </span>
+          <span className={cn("font-mono font-semibold", tone)}>
+            {positive ? "+" : ""}
+            {component.contribution}
+            <span className="ml-0.5 text-[9px] text-[#9C9C90]">
+              (w {component.weight})
+            </span>
+          </span>
+        </div>
+        <div className="mt-1 relative h-1.5 w-full overflow-hidden rounded-full bg-[#F7F7F4]">
+          <div
+            className={cn("absolute inset-y-0 left-0 rounded-full", bar)}
+            style={{ width: `${width}%` }}
+          />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent side="left" align="start" className="w-80 text-[12px]">
+        <div className="flex items-center justify-between gap-2 border-b border-[#E8E5DE] pb-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+            {component.label}
+          </p>
+          <span className={cn("font-mono text-[13px] font-bold", tone)}>
+            {positive ? "+" : ""}
+            {component.contribution}
+          </span>
+        </div>
+        <dl className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+          <div>
+            <dt className="uppercase tracking-wider text-[#9C9C90]">Weight</dt>
+            <dd className="font-mono text-[#1A1A1A]">{component.weight}</dd>
+          </div>
+          <div>
+            <dt className="uppercase tracking-wider text-[#9C9C90]">Points</dt>
+            <dd className={cn("font-mono", tone)}>
+              {positive ? "+" : ""}
+              {component.contribution}
+            </dd>
+          </div>
+        </dl>
+        <p className="mt-2 whitespace-pre-wrap text-[11px] leading-snug text-[#1A1A1A]">
+          {component.reasoning}
+        </p>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function ScoreBreakdownInline({ components }: { components: WarroomScoreComponent[] }) {
   const ranked = [...components].sort(
     (a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)
@@ -254,36 +338,13 @@ function ScoreBreakdownInline({ components }: { components: WarroomScoreComponen
   if (ranked.length === 0) return null
 
   return (
-    <div className="space-y-1.5">
-      {ranked.map((component) => {
-        const positive = component.contribution > 0
-        const negative = component.contribution < 0
-        const tone = positive
-          ? "text-[#2D8B4E]"
-          : negative
-          ? "text-[#C23B3B]"
-          : "text-[#9C9C90]"
-        const bar = positive ? "bg-[#2D8B4E]/15" : negative ? "bg-[#C23B3B]/15" : "bg-[#E8E5DE]"
-        const width = Math.min(100, Math.abs(component.contribution) * 3)
-        return (
-          <div key={component.label} className="space-y-1">
-            <div className="flex items-center justify-between gap-2 text-[11px]">
-              <span className="font-medium text-[#1A1A1A]">{component.label}</span>
-              <span className={cn("font-mono font-semibold", tone)}>
-                {positive ? "+" : ""}
-                {component.contribution}
-              </span>
-            </div>
-            <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-[#F7F7F4]">
-              <div
-                className={cn("absolute inset-y-0 left-0 rounded-full", bar)}
-                style={{ width: `${width}%` }}
-              />
-            </div>
-            <p className="text-[11px] leading-snug text-[#6B6B60]">{component.reasoning}</p>
-          </div>
-        )
-      })}
+    <div className="space-y-0.5">
+      <p className="px-1.5 pb-1 text-[10px] italic text-[#9C9C90]">
+        Click any component for its reasoning.
+      </p>
+      {ranked.map((component) => (
+        <ScoreComponentRow key={component.label} component={component} />
+      ))}
     </div>
   )
 }
@@ -488,12 +549,13 @@ export function DossierDrawer({
   const practiceFlags = useMemo(() => gatherPracticeFlags(signal), [signal])
   const zipFlags = useMemo(() => gatherZipFlags(zipSignal), [zipSignal])
 
-  const localDeals = useMemo(() => {
-    if (!practice?.zip) return []
-    return nearbyDeals
-      .filter((deal) => deal.target_zip && deal.target_zip.slice(0, 5) === practice.zip)
-      .slice(0, 5)
-  }, [nearbyDeals, practice])
+  const nearbyDealMatches = useMemo<NearbyDealMatch[]>(() => {
+    if (!target) return []
+    return filterNearbyDealsWithin(nearbyDeals, target, {
+      withinMiles: 2,
+      withinMonths: 24,
+    }).slice(0, 8)
+  }, [nearbyDeals, target])
 
   const localChanges = useMemo(() => {
     if (!practice) return []
@@ -644,7 +706,7 @@ export function DossierDrawer({
               <MarketTab
                 zipScore={zipScore}
                 zipSignal={zipSignal}
-                localDeals={localDeals}
+                nearbyDealMatches={nearbyDealMatches}
               />
             </TabsContent>
 
@@ -877,44 +939,70 @@ function EvidenceTab({
       {recentChanges.length > 0 && (
         <section>
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
-            Recent Changes ({recentChanges.length})
+            Change Timeline ({recentChanges.length})
           </h3>
-          <ul className="mt-2 space-y-2">
-            {recentChanges.map((change) => (
-              <li
-                key={change.id}
-                className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] p-3 text-[12px]"
-              >
-                <div className="flex items-center justify-between text-[11px] text-[#9C9C90]">
-                  <span className="font-mono uppercase tracking-wider">
-                    {change.change_type ?? change.field_changed ?? "Change"}
-                  </span>
-                  <span>{formatDate(change.change_date)}</span>
-                </div>
-                <p className="mt-1 text-[#1A1A1A]">
-                  {change.field_changed ?? "field"} —{" "}
-                  <span className="text-[#C23B3B]">{change.old_value ?? "—"}</span>
-                  {" → "}
-                  <span className="text-[#2D8B4E]">{change.new_value ?? "—"}</span>
-                </p>
-                {change.notes && <p className="mt-1 text-[11px] text-[#6B6B60]">{change.notes}</p>}
-              </li>
-            ))}
-          </ul>
+          <ol className="mt-3 relative ml-1.5 border-l-2 border-[#E8E5DE]">
+            {recentChanges.map((change) => {
+              const dotColor = changeDotColor(change.change_type ?? change.field_changed)
+              return (
+                <li key={change.id} className="relative pl-4 pb-4 last:pb-0">
+                  <span
+                    className="absolute -left-[7px] top-1.5 h-3 w-3 rounded-full border-2 border-[#FFFFFF] shadow-sm"
+                    style={{ backgroundColor: dotColor }}
+                    aria-hidden
+                  />
+                  <div className="flex items-baseline justify-between gap-2 text-[11px] text-[#9C9C90]">
+                    <span className="font-mono uppercase tracking-wider" style={{ color: dotColor }}>
+                      {change.change_type ?? change.field_changed ?? "Change"}
+                    </span>
+                    <span className="font-mono">{formatDate(change.change_date)}</span>
+                  </div>
+                  <p className="mt-1 text-[12px] text-[#1A1A1A]">
+                    <span className="font-semibold">{change.field_changed ?? "field"}</span>
+                    {(change.old_value || change.new_value) && (
+                      <>
+                        {" — "}
+                        <span className="text-[#C23B3B] line-through decoration-[#C23B3B]/50">
+                          {change.old_value ?? "—"}
+                        </span>
+                        {" → "}
+                        <span className="font-semibold text-[#2D8B4E]">
+                          {change.new_value ?? "—"}
+                        </span>
+                      </>
+                    )}
+                  </p>
+                  {change.notes && (
+                    <p className="mt-1 text-[11px] italic text-[#6B6B60]">{change.notes}</p>
+                  )}
+                </li>
+              )
+            })}
+          </ol>
         </section>
       )}
     </div>
   )
 }
 
+function changeDotColor(type: string | null | undefined): string {
+  if (!type) return "#9C9C90"
+  const key = type.toLowerCase()
+  if (key.includes("ownership") || key.includes("dso") || key.includes("acquisition")) return "#C23B3B"
+  if (key.includes("phone") || key.includes("website") || key.includes("name")) return "#2563EB"
+  if (key.includes("address")) return "#7C3AED"
+  if (key.includes("hours") || key.includes("status")) return "#D4920B"
+  return "#B8860B"
+}
+
 function MarketTab({
   zipScore,
   zipSignal,
-  localDeals,
+  nearbyDealMatches,
 }: {
   zipScore: WarroomZipScoreRecord | null
   zipSignal: WarroomZipSignalRecord | null
-  localDeals: WarroomDealRecord[]
+  nearbyDealMatches: NearbyDealMatch[]
 }) {
   if (!zipScore && !zipSignal) {
     return (
@@ -1051,22 +1139,41 @@ function MarketTab({
         </section>
       )}
 
-      {localDeals.length > 0 && (
-        <section>
+      <section>
+        <div className="flex items-baseline justify-between gap-2">
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
-            Deals in this ZIP ({localDeals.length})
+            Deal catchment
+            <span className="ml-2 text-[10px] normal-case tracking-normal text-[#6B6B60]">
+              within 2 mi · last 24 mo
+            </span>
           </h3>
+          {nearbyDealMatches.length > 0 && (
+            <span className="rounded-full bg-[#7C3AED]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#7C3AED]">
+              {nearbyDealMatches.length} deals
+            </span>
+          )}
+        </div>
+        {nearbyDealMatches.length === 0 ? (
+          <p className="mt-2 rounded-md border border-dashed border-[#D4D0C8] bg-[#FAFAF7] px-3 py-4 text-center text-[11px] italic text-[#6B6B60]">
+            No PE deals within 2 miles in the last 24 months.
+          </p>
+        ) : (
           <ul className="mt-2 space-y-2">
-            {localDeals.map((deal) => (
+            {nearbyDealMatches.map(({ deal, distanceMiles }) => (
               <li
                 key={deal.id}
                 className="rounded-md border border-[#7C3AED]/30 bg-[#7C3AED]/5 p-3 text-[12px]"
               >
-                <div className="flex items-center justify-between text-[11px] text-[#6B6B60]">
+                <div className="flex items-center justify-between gap-2 text-[11px] text-[#6B6B60]">
                   <span>{formatDate(deal.deal_date)}</span>
-                  <span className="font-semibold text-[#7C3AED]">
-                    {deal.deal_type ?? "Deal"}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-flex items-center rounded-full border border-[#7C3AED]/30 bg-[#FFFFFF] px-1.5 py-0.5 font-mono text-[10px] font-semibold text-[#7C3AED]">
+                      {distanceMiles.toFixed(1)} mi
+                    </span>
+                    <span className="font-semibold text-[#7C3AED]">
+                      {deal.deal_type ?? "Deal"}
+                    </span>
+                  </div>
                 </div>
                 <p className="mt-1 font-semibold text-[#1A1A1A]">
                   {deal.target_name ?? "Unnamed target"}
@@ -1075,11 +1182,16 @@ function MarketTab({
                   Acquired by {deal.platform_company ?? "unknown platform"}
                   {deal.pe_sponsor ? ` · ${deal.pe_sponsor}` : ""}
                 </p>
+                {(deal.target_city || deal.target_zip) && (
+                  <p className="mt-0.5 text-[11px] text-[#9C9C90]">
+                    {[deal.target_city, deal.target_zip].filter(Boolean).join(" · ")}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
-        </section>
-      )}
+        )}
+      </section>
     </div>
   )
 }
@@ -1097,9 +1209,21 @@ function ActionsTab({
   const addressLine = [practice.address, practice.city, practice.state, practice.zip]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(", ")
+  const deepLinks = buildDeepLinks(target)
 
   return (
     <div className="space-y-5">
+      <section>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          Dashboard deep-links
+        </h3>
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {deepLinks.map((link) => (
+            <DeepLinkRow key={link.href} {...link} />
+          ))}
+        </div>
+      </section>
+
       <section>
         <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
           Copy to Clipboard
@@ -1214,5 +1338,103 @@ function ExternalLinkRow({
       </div>
       <ExternalLink className="h-4 w-4 shrink-0 text-[#9C9C90] group-hover:text-[#B8860B]" />
     </a>
+  )
+}
+
+interface DeepLink {
+  href: string
+  label: string
+  description: string
+  icon: typeof Sparkles
+  color: string
+}
+
+function buildDeepLinks(target: RankedTarget): DeepLink[] {
+  const practice = target.candidate.practice
+  const links: DeepLink[] = []
+
+  links.push({
+    href: "/market-intel?tab=consolidation",
+    label: "Market Intel",
+    description: "ZIP consolidation landscape",
+    icon: Compass,
+    color: "#2563EB",
+  })
+
+  links.push({
+    href: "/job-market?location=all_chicagoland&tab=directory",
+    label: "Job Market · Directory",
+    description: "All Chicagoland practice directory",
+    icon: Briefcase,
+    color: "#0D9488",
+  })
+
+  if (practice.affiliated_pe_sponsor) {
+    const sponsor = practice.affiliated_pe_sponsor
+    links.push({
+      href: `/deal-flow?tab=deals&sponsors=${encodeURIComponent(sponsor)}`,
+      label: "Deal Flow · Sponsor",
+      description: `Filter deals by ${sponsor}`,
+      icon: TrendingUp,
+      color: "#7C3AED",
+    })
+    links.push({
+      href: "/research?tab=sponsor",
+      label: "Research · Sponsor",
+      description: `Profile ${sponsor}`,
+      icon: Search,
+      color: "#B8860B",
+    })
+  }
+
+  if (practice.affiliated_dso) {
+    const dso = practice.affiliated_dso
+    links.push({
+      href: `/deal-flow?tab=deals&platforms=${encodeURIComponent(dso)}`,
+      label: "Deal Flow · Platform",
+      description: `Filter deals by ${dso}`,
+      icon: TrendingUp,
+      color: "#C23B3B",
+    })
+    links.push({
+      href: "/research?tab=platform",
+      label: "Research · Platform",
+      description: `Profile ${dso}`,
+      icon: Search,
+      color: "#B8860B",
+    })
+  }
+
+  if (practice.state) {
+    links.push({
+      href: `/deal-flow?tab=geography&states=${encodeURIComponent(practice.state)}`,
+      label: "Deal Flow · State",
+      description: `All ${practice.state} deals`,
+      icon: TrendingUp,
+      color: "#D4920B",
+    })
+  }
+
+  return links
+}
+
+function DeepLinkRow({ href, label, description, icon: Icon, color }: DeepLink) {
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-3 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] p-3 transition-colors hover:border-[#B8860B]/40 hover:bg-[#FAFAF7]"
+    >
+      <span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md"
+        style={{ backgroundColor: `${color}15`, color }}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] font-semibold text-[#1A1A1A]">{label}</p>
+        <p className="truncate text-[11px] text-[#6B6B60]">{description}</p>
+      </div>
+      <ArrowUpRight className="h-4 w-4 shrink-0 text-[#9C9C90] group-hover:text-[#B8860B]" />
+    </Link>
   )
 }

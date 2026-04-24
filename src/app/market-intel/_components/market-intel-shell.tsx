@@ -13,6 +13,7 @@ import {
 } from '@/lib/constants/entity-classifications'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
+import { WarroomCrossLink } from '@/components/layout/warroom-cross-link'
 import { DSOPenetrationTable } from './dso-penetration-table'
 
 // Lazy-load heavy components (maps, large tables with sub-queries)
@@ -171,6 +172,11 @@ function MarketIntelShellInner({
             independent, and where consolidation is happening.
           </p>
         </div>
+
+        <WarroomCrossLink
+          context="See consolidation, targets, and signals together — with scope, lens, and intent in one command surface."
+          hrefSuffix="?mode=sitrep&lens=consolidation"
+        />
 
         {/* Data freshness bar */}
         <div className="rounded-lg border border-[#D4D0C8] bg-gradient-to-r from-[#F7F7F4] to-[#F5F5F0] px-5 py-3 flex items-center justify-between flex-wrap gap-2">

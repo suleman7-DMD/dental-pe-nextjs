@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-A Next.js 16 + Supabase + Vercel web application that tracks private equity consolidation in US dentistry. It connects to a Supabase Postgres database populated by a Python scraper pipeline, visualizes 400k+ dental practices, 2,500+ PE deals, and 290 scored markets. The frontend provides 7 pages of market intelligence with maps, charts, data tables, and deep-dive research tools.
+A Next.js 16 + Supabase + Vercel web application that tracks private equity consolidation in US dentistry. It connects to a Supabase Postgres database populated by a Python scraper pipeline, visualizes 400k+ dental practices, 2,500+ PE deals, and 290 scored markets. The frontend provides 8 pages of market intelligence — including the **Warroom** god-mode command surface for Chicagoland — with maps, charts, data tables, and deep-dive research tools.
 
 **Live app:** https://dental-pe-nextjs.vercel.app
 **Data pipeline repo:** github.com/suleman7-DMD/dental-pe-tracker (Python scrapers write to SQLite, sync to Supabase)
@@ -12,12 +12,14 @@ A Next.js 16 + Supabase + Vercel web application that tracks private equity cons
 
 ```
 src/
-  app/                    Next.js App Router — 7 page routes + API routes
+  app/                    Next.js App Router — 8 page routes + API routes
     _components/          Home page shell
+    warroom/              Chicagoland god-mode command surface (4 modes, 8 lenses, 12 scopes)
     deal-flow/            PE deal tracking (timeline, sponsors, state choropleth)
     market-intel/         ZIP consolidation analysis (maps, saturation, changes)
     buyability/           Acquisition target scoring
     job-market/           Career opportunity finder (density maps, directory)
+    intelligence/         AI qualitative dossiers (ZIP + practice intel)
     research/             Deep dives (sponsor/platform profiles, SQL explorer)
     system/               Pipeline health, data freshness, manual entry
     api/                  Route handlers (deals, practices, sql-explorer, watched-zips)
@@ -25,15 +27,16 @@ src/
     charts/               Recharts wrappers (bar, donut, scatter, histogram, etc.)
     data-display/         DataTable, KPI cards, badges, confidence stars
     filters/              Filter bar, multi-select, date range, search
-    layout/               Sidebar, sticky section nav
+    layout/               Sidebar, sticky section nav, warroom-cross-link banner
     maps/                 Mapbox GL container
     ui/                   shadcn base components (button, card, dialog, etc.)
   lib/
     constants/            Entity classifications, colors, design tokens, locations
-    hooks/                useSidebar, useUrlFilters, useSectionObserver
+    hooks/                useSidebar, useUrlFilters, useSectionObserver, useWarroomState, useWarroomData
     supabase/             Client/server Supabase setup + query functions
     types/                TypeScript interfaces (Deal, Practice, ZipScore w/ 40+ fields, etc.)
     utils/                Formatting, scoring, CSV export, color helpers
+    warroom/              Warroom-specific: mode, scope, signals, intent, ranking, briefing, geo, data
   providers/              QueryProvider (React Query), SidebarProvider
 ```
 
@@ -87,17 +90,80 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token
 ```
 
-## Dashboard Pages (7 total)
+## Dashboard Pages (8 total)
 
 | Route | Page | What It Shows |
 |-------|------|---------------|
 | `/` | **Home** | 8 KPI cards (deals, sponsors, practices, ZIPs, corporate %, retirement risk, YTD deals, freshness), 6 nav cards, recent deals table, data freshness bar |
+| `/warroom` | **Warroom** | Chicagoland god-mode command surface. 4 modes (Sitrep / Hunt / Profile / Investigate), 8 lenses (consolidation, density, buyability, retirement, pe_exposure, saturation, whitespace, disagreement), 12 scopes (US, chicagoland, 7 subzones, 3 saved presets). Intent bar (⌘K), Living Map, ranked target list, ZIP + practice dossier drawers, pinboard tray, signal flag overlays, keyboard shortcuts overlay (?), URL-synced state. |
 | `/deal-flow` | **Deal Flow** | 2,512 PE deals — KPIs, monthly stacked bar timeline, top 15 sponsors/platforms, state choropleth, searchable deals table with CSV. All queries paginated (no 1000-row truncation). |
-| `/market-intel` | **Market Intel** | Tiered consolidation KPIs (high-confidence corporate ~2.3% vs all-signals ~9.9%), DSO penetration table, consolidation map, ZIP score table, city practice tree with pre-loaded counts, ownership breakdown with per-classification counts |
+| `/market-intel` | **Market Intel** | Tiered consolidation KPIs (high-confidence corporate ~2.3% vs all-signals ~9.9%), DSO penetration table, consolidation map, ZIP score table, city practice tree with pre-loaded counts, ownership breakdown with per-classification counts. Cross-link banner to Warroom. |
 | `/buyability` | **Buyability** | Data-driven KPIs (Acquisition Targets, Dead Ends, Job Targets, Specialists computed from entity_classification + buyability_score), 25-row paginated table with category badges, color-coded by category |
 | `/job-market` | **Job Market** | Living location selector, 9 KPI cards with **tiered consolidation display** (high-confidence 1.9% + all-signals 9.9% + industry estimate), pydeck density map, market overview (donut, bar, histogram, top DSOs), paginated practice directory with 4 tabs, opportunity signals, ownership landscape, market analytics |
+| `/intelligence` | **Intelligence** | AI qualitative dossiers — 6 KPI cards (coverage, readiness, cost, confidence), ZIP market intel table with expandable 10-signal panels, practice dossier table with readiness/confidence badges. Cross-link banner to Warroom Investigate mode. |
 | `/research` | **Research** | 4 tabs — PE sponsor profiles, platform profiles, state deep dive, SQL explorer with preset queries |
 | `/system` | **System** | Data source coverage table, freshness timestamps, completeness bars, pipeline log viewer, manual entry forms (add deal, update practice, add ZIP) |
+
+## Warroom Architecture
+
+The Warroom (`/warroom`) is the unified command surface for Chicagoland acquisition intelligence. It collapses Market Intel, Buyability, Job Market, and Intelligence into one stateful dashboard driven by URL params.
+
+### State model
+
+URL-synced state lives in `src/lib/hooks/use-warroom-state.ts` and serializes the full viewport — mode, lens, scope, filters, selected entity, pins — into query params. Deep links always reproduce the exact view.
+
+| Dimension | Values | Purpose |
+|-----------|--------|---------|
+| `mode` | `sitrep` \| `hunt` \| `profile` \| `investigate` | Top-level task (snapshot vs. prospecting vs. deep dive vs. pattern analysis) |
+| `lens` | `consolidation` \| `density` \| `buyability` \| `retirement` \| `pe_exposure` \| `saturation` \| `whitespace` \| `disagreement` | What to color/rank by |
+| `scope` | `us` \| `chicagoland` \| `chicago_west_loop` \| `chicago_south_loop` \| `woodridge` \| `bolingbrook` \| `oak_park` \| `evanston` \| `naperville` \| `saved_high_risk` \| `saved_retirement` \| `saved_whitespace` | Which ZIP set to load |
+
+### Library layer (`src/lib/warroom/`)
+
+| File | Purpose |
+|------|---------|
+| `mode.ts` | `WARROOM_MODES` + `WARROOM_LENSES` constants with labels/icons |
+| `scope.ts` | 12 scope definitions (US, chicagoland, 7 subzones, 3 saved) + `normalizeWarroomDataScope()` |
+| `geo.ts` | Geographic helpers — subzone ZIP lookups, bounding boxes |
+| `signals.ts` | `WarroomPracticeRecord`, `WarroomSitrepBundle`, `RankedTarget` types + 15 signal flag definitions |
+| `data.ts` | `getSitrepBundle()` — batch-fetches practices/zip_scores/signals by scope, computes `topSignals` (stealthClusters, intelDisagreements, whitespace, etc.) |
+| `intent.ts` | `buildIntentFromFilter()`, `PRACTICE_FLAG_LABELS`, `ZIP_FLAG_LABELS` — natural-language intent parsing |
+| `ranking.ts` | `rankTargets()` — composite scoring across lens, flag count, enrichment, buyability |
+| `briefing.ts` | `buildBriefingItems()` — contextual alerts + suggested actions per scope |
+
+### UI layer (`src/app/warroom/_components/`)
+
+| Component | Role |
+|-----------|------|
+| `warroom-shell.tsx` | Orchestrator — holds state hook, renders conditional mode panels + drawers, wires keyboard shortcuts |
+| `scope-selector.tsx` | Scope dropdown with 12 options grouped into US / Chicagoland / Subzones / Saved |
+| `intent-bar.tsx` | ⌘K-focusable intent input — parses natural language into filter state |
+| `sitrep-kpi-strip.tsx` | 6 KPIs in Sitrep mode (practices, corporate %, retirement risk, etc.) |
+| `living-map.tsx` | Mapbox ZIP choropleth colored by active lens with signal flag overlays |
+| `briefing-pane.tsx` | Scope-specific alerts + suggested intent chips |
+| `target-list.tsx` | Ranked practices in Hunt mode with flag badges |
+| `dossier-drawer.tsx` | Practice deep dive — signals, flags, intel dossier if present, action buttons |
+| `zip-dossier-drawer.tsx` | ZIP deep dive — saturation, ownership mix, top practices |
+| `profile-mode-panel.tsx` | Pinned-targets workspace with side-by-side compare |
+| `investigate-mode-panel.tsx` | Signal co-occurrence analysis + compound-flag target list |
+| `pinboard-tray.tsx` | Bottom tray showing pinned targets across sessions |
+| `keyboard-shortcuts-overlay.tsx` | `?`-triggered shadcn Dialog listing all shortcuts |
+
+### Signal flags (15 practice + 8 ZIP)
+
+Computed at load time in `data.ts` and merged into `signals` array on each practice record. Used for rank boosts, drawer badges, and investigate-mode clustering.
+
+Practice-level (examples): `stealth_dso_flag`, `phantom_inventory_flag`, `retirement_combo_flag`, `white_space_flag`, `intel_quant_disagreement_flag`, `high_opportunity_flag`, `pe_sponsor_recent_flag`.
+
+ZIP-level: `saturation_imbalance_flag`, `confidence_divergence_flag`, `whitespace_flag`, etc. (see `signals.ts` for the full list).
+
+### Keyboard shortcuts
+
+`?` toggles the overlay. `⌘K` / `/` focuses the intent bar. `1`-`4` switches modes. `R` resets filters + intent + selection. `P` toggles pin on the selected target. `Esc` closes drawers / overlays. Single-key shortcuts are suppressed when focus is in an `<input>` / `<textarea>` / contenteditable.
+
+### Cross-links from legacy pages
+
+`/market-intel` and `/intelligence` render a `WarroomCrossLink` banner (`src/components/layout/warroom-cross-link.tsx`) with preset `hrefSuffix` — e.g., Market Intel → `?mode=sitrep&lens=consolidation`, Intelligence → `?mode=investigate&lens=disagreement`. Legacy pages retain their full deep-dive functionality.
 
 ## Data Flow Pattern
 
@@ -250,10 +316,12 @@ Practices are categorized from entity_classification + buyability_score (NOT fro
 | Page | Shell File | Key Components |
 |------|-----------|----------------|
 | Home | `_components/home-shell.tsx` | Nav cards, recent deals, freshness bar |
+| Warroom | `warroom/_components/warroom-shell.tsx` | scope-selector, intent-bar, sitrep-kpi-strip, living-map, briefing-pane, target-list, dossier-drawer, zip-dossier-drawer, profile-mode-panel, investigate-mode-panel, pinboard-tray, keyboard-shortcuts-overlay |
 | Deal Flow | `deal-flow/_components/deal-flow-shell.tsx` | deal-kpis, deal-volume-timeline, specialty-charts, sponsor-platform-charts, state-choropleth, deals-table |
-| Market Intel | `market-intel/_components/market-intel-shell.tsx` | consolidation-map, zip-score-table, city-practice-tree, dso-penetration-table |
+| Market Intel | `market-intel/_components/market-intel-shell.tsx` | consolidation-map, zip-score-table, city-practice-tree, dso-penetration-table, warroom-cross-link |
 | Buyability | `buyability/_components/buyability-shell.tsx` | Data-driven categorization, 25-row paginated table with category badges |
 | Job Market | `job-market/_components/job-market-shell.tsx` | living-location-selector, practice-density-map, market-overview-charts, practice-directory, opportunity-signals, ownership-landscape, market-analytics, practice-detail-drawer |
+| Intelligence | `intelligence/_components/intelligence-shell.tsx` | ZIP intel table, practice dossier table, expandable 10-signal panels, warroom-cross-link |
 | Research | `research/_components/research-shell.tsx` | sponsor-profile, platform-profile, state-deep-dive, sql-explorer |
 | System | `system/_components/system-shell.tsx` | freshness-indicators, data-coverage, completeness-bars, pipeline-log-viewer, manual-entry-forms |
 
@@ -320,6 +388,29 @@ Monthly NPPES refresh (first Sunday 6am): downloads federal provider data update
 | `system.ts::getSourceCoverage()` | Added `dso_locations` + `ada_hpi_benchmarks` head-count queries to the Promise.all and wired `adsoCount`/`adaCount` into `result["ADSO Scraper"].count` and `result["ADA HPI"].count`. Previously hardcoded `count: 0` on those two keys, so the Data Source Coverage panel rendered 0 rows for both even though 92 DSO locations and 918 ADA benchmark rows are live |
 
 Paired with `scrapers/sync_to_supabase.py` per-row savepoint fix so deals with `uix_deal_no_dup` IntegrityError hits don't abort the whole batch transaction. Before this pair of fixes, a single duplicate in the deals sync would roll back every queued row — so recent deal scrapes never reached Supabase.
+
+## Warroom Ship Log (2026-04-24) — Do Not Regress
+
+Phases 0-7 of the Chicagoland god-mode Warroom are all shipped. Earlier rounds (Phase 0 scaffold, Rounds 1-4 wiring) landed in six commits between `13b129b` and `62e7651`. This ship closes the remaining phases:
+
+| Area | Delivered |
+|------|-----------|
+| Scope model | 12 scope IDs wired end-to-end (US, chicagoland, 7 subzones, 3 saved presets); `normalizeWarroomDataScope()` maps saved presets to ZIP arrays |
+| Hunt mode | Intent-driven filtering, tier floors, flag badges, enrichment-aware ranking |
+| Profile mode | New `profile-mode-panel.tsx` — pinboard workspace for comparing 2-6 targets side-by-side |
+| Investigate mode | New `investigate-mode-panel.tsx` — signal co-occurrence analysis + compound-flag list (flagCount ≥ 2) + stealth DSO cluster / intel-disagreement sample cards |
+| ZIP dossier | New `zip-dossier-drawer.tsx` — separate drawer for ZIP selections (saturation, ownership mix, top practices) |
+| Pinboard | `pinboard-tray.tsx` bottom tray shows pinned targets across sessions; persisted in URL |
+| Keyboard shortcuts | New `keyboard-shortcuts-overlay.tsx` — `?`, `⌘K`/`/`, `1-4`, `R`, `P`, `Esc`. Single-key guards for typing contexts |
+| Legacy cross-links | New `warroom-cross-link.tsx` banner rendered on `/market-intel` and `/intelligence` with preset `hrefSuffix` deep-links |
+| Geo helpers | New `src/lib/warroom/geo.ts` — subzone ZIP lookups + bounding boxes |
+
+Do not regress:
+- `use-warroom-state.ts` MUST keep URL-param sync for all 7 state dimensions (mode, lens, scope, filters, selectedEntity, pins, intent) — breaks share links otherwise
+- Single-key shortcuts MUST check `isTypingTarget()` before firing — typing in forms should never switch modes
+- `normalizeWarroomDataScope()` MUST return concrete ZIP arrays for saved presets — downstream `getSitrepBundle()` assumes no preset IDs leak through
+- Cross-link banners are soft entry points — don't replace them with hard redirects; legacy pages retain their functionality
+- Investigate mode flag co-occurrence is computed client-side from `rankedTargets.flags` — server-side aggregation isn't needed until target count exceeds ~500
 
 ## Development
 

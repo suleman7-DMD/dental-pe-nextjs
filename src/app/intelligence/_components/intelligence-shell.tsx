@@ -5,6 +5,7 @@ import { KpiCard } from '@/components/data-display/kpi-card'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { DataTable } from '@/components/data-display/data-table'
 import { StickySectionNav } from '@/components/layout/sticky-section-nav'
+import { WarroomCrossLink } from '@/components/layout/warroom-cross-link'
 import { formatRelativeTime } from '@/lib/utils/formatting'
 import type { ZipQualitativeIntel, PracticeIntel, IntelStats } from '@/lib/types/intel'
 import {
@@ -347,6 +348,11 @@ export function IntelligenceShell({
             due diligence, and acquisition readiness scoring.
           </p>
         </div>
+
+        <WarroomCrossLink
+          context="Intel disagreements, stealth DSO clusters, and signal co-occurrence in the Investigate view."
+          hrefSuffix="?mode=investigate&lens=disagreement"
+        />
 
         {/* ── Section 1: KPIs ─────────────────────────────────────────── */}
         <div id="kpis">
