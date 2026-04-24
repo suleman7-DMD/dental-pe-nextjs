@@ -83,9 +83,9 @@ const LENS_COMPUTATIONS: Record<WarroomLens, LensComputation> = {
   saturation: {
     label: "People per GP door",
     unit: "residents",
-    description: "Population / GP locations. Higher = thinner coverage.",
+    description: "Population / GP locations. Higher = thinner coverage → less saturated.",
     get: ({ zipScore }) => zipScore?.people_per_gp_door ?? null,
-    invertScale: false,
+    invertScale: true,
     format: (value) => (value == null ? "--" : formatNumber(value)),
   },
   whitespace: {
