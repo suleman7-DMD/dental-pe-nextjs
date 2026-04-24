@@ -305,7 +305,9 @@ export function useWarroomState() {
   const urlSyncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingUrlState = useRef<WarroomState | null>(null)
   const replaceUrlRef = useRef(replaceUrl)
-  replaceUrlRef.current = replaceUrl
+  useEffect(() => {
+    replaceUrlRef.current = replaceUrl
+  }, [replaceUrl])
 
   const scheduleUrlSync = useCallback((nextState: WarroomState) => {
     pendingUrlState.current = nextState
