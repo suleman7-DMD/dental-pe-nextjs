@@ -442,7 +442,7 @@ export async function getScopedChanges(
       query = query.order("change_date", { ascending: false });
       return query as unknown as RangeableQuery<ChangeRow>;
     },
-    { pageSize: options.pageSize }
+    { pageSize: options.pageSize, maxRows: options.maxRows ?? 500 }
   );
 
   const npis = Array.from(new Set(changes.map((change) => change.npi).filter(Boolean)));
