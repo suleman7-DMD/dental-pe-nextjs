@@ -56,6 +56,7 @@ import {
   formatNumber,
   formatPercent,
 } from "@/lib/utils/formatting"
+import { safeExternalUrl } from "@/lib/utils/safe-url"
 import { getEntityClassificationLabel } from "@/lib/constants/entity-classifications"
 import {
   filterNearbyDealsWithin,
@@ -1260,7 +1261,7 @@ function ActionsTab({
             <ExternalLinkRow
               label="Practice Website"
               description="Direct link"
-              href={practice.website}
+              href={safeExternalUrl(practice.website)}
             />
           )}
           <ExternalLinkRow

@@ -7,6 +7,7 @@ import { DataTable } from '@/components/data-display/data-table'
 import { StickySectionNav } from '@/components/layout/sticky-section-nav'
 import { WarroomCrossLink } from '@/components/layout/warroom-cross-link'
 import { formatRelativeTime } from '@/lib/utils/formatting'
+import { safeExternalUrl } from '@/lib/utils/safe-url'
 import type { ZipQualitativeIntel, PracticeIntel, IntelStats } from '@/lib/types/intel'
 import {
   MapPin,
@@ -620,7 +621,7 @@ export function IntelligenceShell({
                     <span className="text-[#6B6B60]">URL:</span>{' '}
                     {selectedPractice.website_url ? (
                       <a
-                        href={selectedPractice.website_url}
+                        href={safeExternalUrl(selectedPractice.website_url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-[#B8860B] hover:underline"
