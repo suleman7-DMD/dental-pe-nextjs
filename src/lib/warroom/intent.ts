@@ -428,6 +428,26 @@ function detectYearEstablished(context: ParseContext) {
     context.recognized.add("retirement risk");
     addChip(context, "retire", "Retirement Risk", "retirementRiskOnly");
   }
+  if (
+    context.filter.retirementRiskOnly == null &&
+    /\b(?:near(?:ing)?|close to|approaching|facing|at)\s+retirement\b|\bretiring\s+(?:soon|dentists?|owners?)?\b|\bon the way out\b/.test(
+      context.normalized
+    )
+  ) {
+    context.filter.retirementRiskOnly = true;
+    context.recognized.add("near retirement");
+    addChip(context, "retire", "Retirement Risk", "retirementRiskOnly");
+  }
+  if (
+    context.filter.retirementRiskOnly == null &&
+    /\bold\s+(?:practices?|solos?|dentists?|dds|dmds|pas?|owners?|docs?|doctors?|timers?|guard)\b|\bgraying\s+owners?\b/.test(
+      context.normalized
+    )
+  ) {
+    context.filter.retirementRiskOnly = true;
+    context.recognized.add("old practices");
+    addChip(context, "retire", "Retirement Risk", "retirementRiskOnly");
+  }
 }
 
 function detectEmployees(context: ParseContext) {
