@@ -1,7 +1,14 @@
 "use client"
 
-import { Suspense } from "react"
-import { Command, Map, RotateCcw, Search, SlidersHorizontal } from "lucide-react"
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import { AlertTriangle, Command, RotateCcw, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
@@ -9,15 +16,36 @@ import {
   getWarroomLensLabel,
   type WarroomLens,
 } from "@/lib/warroom/mode"
-import { getWarroomScopeOption } from "@/lib/warroom/scope"
+import {
+  getWarroomScopeOption,
+  type WarroomScope,
+} from "@/lib/warroom/scope"
 import {
   WARROOM_SIGNAL_FILTERS,
   useWarroomState,
   type WarroomConfidenceFilter,
+  type WarroomSignalFilter,
 } from "@/lib/hooks/use-warroom-state"
+import { useWarroomData } from "@/lib/hooks/use-warroom-data"
+import type {
+  RankedTarget,
+  WarroomIntent,
+  WarroomSitrepBundle,
+} from "@/lib/warroom/signals"
+import { BriefingRail } from "./briefing-rail"
+import { DossierDrawer } from "./dossier-drawer"
+import { IntentBar } from "./intent-bar"
+import { LivingMap } from "./living-map"
 import { ModeSwitcher } from "./mode-switcher"
 import { PinboardTray } from "./pinboard-tray"
 import { ScopeSelector } from "./scope-selector"
+import { SitrepKpiStrip } from "./sitrep-kpi-strip"
+import { TargetList } from "./target-list"
+
+interface WarroomShellProps {
+  initialBundle?: WarroomSitrepBundle | null
+  initialBundleError?: string | null
+}
 
 const CONFIDENCE_OPTIONS: { value: WarroomConfidenceFilter; label: string }[] = [
   { value: "all", label: "All Confidence" },
@@ -57,7 +85,18 @@ function LensSelector({
   )
 }
 
-function WarroomShellInner() {
+function signalFiltersToFlags(signals: WarroomSignalFilter[]): string[] {
+  const flags: string[] = []
+  if (signals.includes("recent_changes")) flags.push("last_change_90d_flag")
+  if (signals.includes("retirement_risk")) flags.push("retirement_combo_flag")
+  return flags
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean)))
+}
+
+function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellProps) {
   const {
     state,
     hydrated,
@@ -72,8 +111,137 @@ function WarroomShellInner() {
     resetWarroomState,
   } = useWarroomState()
 
+  const [intentText, setIntentText] = useState("")
+  const [activeIntent, setActiveIntent] = useState<WarroomIntent | null>(null)
+  const [selectedZip, setSelectedZip] = useState<string | null>(null)
+  const intentInputRef = useRef<HTMLDivElement>(null)
+
   const scope = getWarroomScopeOption(state.scope)
   const activeLensLabel = getWarroomLensLabel(state.lens)
+
+  const requireFlags = useMemo(() => {
+    const fromSignals = signalFiltersToFlags(state.filters.signals)
+    const fromIntent = activeIntent?.filter.requireFlags ?? []
+    return dedupeStrings([...fromSignals, ...fromIntent])
+  }, [activeIntent, state.filters.signals])
+
+  const excludeFlags = useMemo(() => {
+    return dedupeStrings(activeIntent?.filter.excludeFlags ?? [])
+  }, [activeIntent])
+
+  const excludeCorporate = useMemo(() => {
+    const intentFilter = activeIntent?.filter
+    if (!intentFilter) return false
+    if (intentFilter.excludeFlags.includes("ownership:corporate")) return true
+    if (intentFilter.requirePeBacked === false) return true
+    return false
+  }, [activeIntent])
+
+  const rankLimit = useMemo(() => activeIntent?.filter.limit ?? 40, [activeIntent])
+
+  const { data: bundle, isFetching, error } = useWarroomData({
+    scope: state.scope,
+    lens: state.lens,
+    rankLimit,
+    requireFlags: requireFlags.length > 0 ? requireFlags : undefined,
+    excludeFlags: excludeFlags.length > 0 ? excludeFlags : undefined,
+    excludeCorporate,
+    initialData: initialBundle ?? undefined,
+  })
+
+  const effectiveBundle = bundle ?? initialBundle ?? null
+
+  const pinnedNpis = useMemo<Set<string>>(
+    () => new Set(state.filters.pins),
+    [state.filters.pins]
+  )
+
+  const selectedTarget = useMemo<RankedTarget | null>(() => {
+    if (!state.selectedEntity || !effectiveBundle) return null
+    return (
+      effectiveBundle.rankedTargets.find(
+        (target) => target.npi === state.selectedEntity
+      ) ?? null
+    )
+  }, [effectiveBundle, state.selectedEntity])
+
+  const nearbyDeals = useMemo(() => {
+    if (!selectedTarget?.zip || !effectiveBundle) return []
+    return effectiveBundle.recentDeals.filter(
+      (deal) => deal.target_zip === selectedTarget.zip
+    )
+  }, [effectiveBundle, selectedTarget])
+
+  const changesForSelected = useMemo(() => {
+    if (!selectedTarget || !effectiveBundle) return []
+    return effectiveBundle.recentChanges
+      .filter((change) => change.npi === selectedTarget.npi)
+      .slice(0, 12)
+  }, [effectiveBundle, selectedTarget])
+
+  const handleIntentSubmit = useCallback(
+    (intent: WarroomIntent) => {
+      setActiveIntent(intent)
+      const nextScope = intent.filter.scope as WarroomScope | null
+      if (nextScope && nextScope !== state.scope) {
+        setScope(nextScope)
+      }
+    },
+    [setScope, state.scope]
+  )
+
+  const handleIntentReset = useCallback(() => {
+    setIntentText("")
+    setActiveIntent(null)
+  }, [])
+
+  const handleTargetSelect = useCallback(
+    (npi: string) => {
+      setSelectedEntity(npi)
+    },
+    [setSelectedEntity]
+  )
+
+  const handleDossierClose = useCallback(() => {
+    setSelectedEntity(null)
+  }, [setSelectedEntity])
+
+  const handleDossierIntentRequest = useCallback(
+    (text: string) => {
+      setIntentText(text)
+      intentInputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    },
+    []
+  )
+
+  const handleCommandShortcut = useCallback(() => {
+    const input = intentInputRef.current?.querySelector<HTMLInputElement>(
+      "input[aria-label='Describe the targets you want']"
+    )
+    input?.focus()
+    input?.select()
+  }, [])
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const isMeta = event.metaKey || event.ctrlKey
+      if (isMeta && event.key.toLowerCase() === "k") {
+        event.preventDefault()
+        handleCommandShortcut()
+      }
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [handleCommandShortcut])
+
+  const summary = effectiveBundle?.summary ?? null
+  const zipScores = effectiveBundle?.zipScores ?? []
+  const zipSignals = effectiveBundle?.zipSignals ?? []
+  const rankedTargets = effectiveBundle?.rankedTargets ?? []
+  const briefingItems = effectiveBundle?.briefing ?? []
+  const dataHealth = effectiveBundle?.dataHealth
+  const combinedError =
+    (error instanceof Error ? error.message : null) ?? initialBundleError ?? null
 
   return (
     <div className="min-h-[calc(100vh-3rem)] bg-[#FAFAF7] text-[#1A1A1A]">
@@ -96,6 +264,11 @@ function WarroomShellInner() {
                   >
                     {hydrated ? "Synced" : "Loading"}
                   </span>
+                  {isFetching && (
+                    <span className="rounded-full border border-[#B8860B]/30 bg-[#B8860B]/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-[#B8860B]">
+                      Refreshing
+                    </span>
+                  )}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#6B6B60]">
                   <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
@@ -107,6 +280,11 @@ function WarroomShellInner() {
                   <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
                     {scope.zipCount} ZIPs
                   </span>
+                  {rankedTargets.length > 0 && (
+                    <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
+                      {rankedTargets.length} ranked
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -118,8 +296,9 @@ function WarroomShellInner() {
                   type="button"
                   variant="outline"
                   size="lg"
+                  onClick={handleCommandShortcut}
                   className="h-9 border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
-                  aria-label="Command palette"
+                  aria-label="Focus intent bar"
                 >
                   <Search className="h-4 w-4" />
                   <span>Cmd K</span>
@@ -130,22 +309,6 @@ function WarroomShellInner() {
 
             <div className="flex flex-col gap-3 border-t border-[#E8E5DE] pt-3 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex flex-wrap items-end gap-3">
-                <div className="flex flex-col gap-1">
-                  <label
-                    htmlFor="warroom-entity"
-                    className="text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]"
-                  >
-                    Entity
-                  </label>
-                  <input
-                    id="warroom-entity"
-                    value={state.selectedEntity ?? ""}
-                    onChange={(event) => setSelectedEntity(event.target.value)}
-                    placeholder="NPI, ZIP, platform"
-                    className="h-9 w-full min-w-[220px] rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-3 text-sm text-[#1A1A1A] outline-none transition-colors placeholder:text-[#B5B5A8] hover:border-[#D4D0C8] focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/20 sm:w-[270px]"
-                  />
-                </div>
-
                 <div className="flex flex-col gap-1">
                   <label
                     htmlFor="warroom-confidence"
@@ -200,7 +363,11 @@ function WarroomShellInner() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={resetWarroomState}
+                  onClick={() => {
+                    handleIntentReset()
+                    resetWarroomState()
+                    setSelectedZip(null)
+                  }}
                   className="h-8 text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
@@ -211,113 +378,64 @@ function WarroomShellInner() {
           </div>
         </div>
 
+        {combinedError && (
+          <div className="flex items-start gap-2 rounded-lg border border-[#C23B3B]/30 bg-[#C23B3B]/5 px-4 py-3 text-sm text-[#C23B3B]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold">Data load issue</p>
+              <p className="text-[#6B6B60]">{combinedError}</p>
+            </div>
+          </div>
+        )}
+
+        {dataHealth?.warnings && dataHealth.warnings.length > 0 && !combinedError && (
+          <div className="rounded-lg border border-[#D4920B]/30 bg-[#D4920B]/5 px-4 py-3 text-xs text-[#6B6B60]">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#B0780A]">
+              Pipeline notes
+            </p>
+            <ul className="list-inside list-disc space-y-1">
+              {dataHealth.warnings.map((warning, index) => (
+                <li key={`${warning}-${index}`}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div ref={intentInputRef}>
+          <IntentBar
+            value={intentText}
+            onChange={setIntentText}
+            onIntentSubmit={handleIntentSubmit}
+            onReset={handleIntentReset}
+            pendingHint={
+              activeIntent?.chips.length
+                ? `${activeIntent.chips.length} filters recognized`
+                : undefined
+            }
+          />
+        </div>
+
+        {summary && <SitrepKpiStrip summary={summary} />}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="min-h-[520px] overflow-hidden rounded-lg border border-[#E8E5DE] bg-[#FFFFFF]">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E8E5DE] px-4 py-3">
-              <div>
-                <h2 className="text-sm font-semibold text-[#1A1A1A]">
-                  Market Map
-                </h2>
-                <p className="text-xs text-[#9C9C90]">
-                  {scope.label} / {activeLensLabel}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1 text-xs font-medium text-[#6B6B60]">
-                <Map className="h-3.5 w-3.5 text-[#B8860B]" />
-                Layer Frame
-              </div>
-            </div>
-            <div className="relative min-h-[465px] bg-[#F7F7F4]">
-              <div
-                className="absolute inset-0 opacity-60"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(#E8E5DE 1px, transparent 1px), linear-gradient(90deg, #E8E5DE 1px, transparent 1px)",
-                  backgroundSize: "28px 28px",
-                }}
-              />
-              <div className="relative flex min-h-[465px] flex-col justify-between p-4">
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 py-1 text-xs font-medium text-[#6B6B60]">
-                    {state.mode}
-                  </span>
-                  <span className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 py-1 text-xs font-medium text-[#6B6B60]">
-                    {state.lens}
-                  </span>
-                  {state.selectedEntity && (
-                    <span className="max-w-[260px] truncate rounded-md border border-[#B8860B]/30 bg-[#FFFFFF] px-2 py-1 text-xs font-medium text-[#1A1A1A]">
-                      {state.selectedEntity}
-                    </span>
-                  )}
-                </div>
-                <div className="mx-auto flex w-full max-w-sm flex-col items-center rounded-lg border border-dashed border-[#D4D0C8] bg-[#FFFFFF]/85 px-4 py-6 text-center">
-                  <SlidersHorizontal className="h-5 w-5 text-[#B8860B]" />
-                  <p className="mt-2 text-sm font-medium text-[#1A1A1A]">
-                    Signal layers queued
-                  </p>
-                  <p className="mt-1 text-xs text-[#9C9C90]">
-                    {state.filters.signals.length} active filters
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {WARROOM_LENSES.slice(0, 4).map((lens) => (
-                    <div
-                      key={lens.id}
-                      className={cn(
-                        "rounded-md border px-3 py-2",
-                        state.lens === lens.id
-                          ? "border-[#B8860B]/40 bg-[#FFFFFF]"
-                          : "border-[#E8E5DE] bg-[#FFFFFF]/75"
-                      )}
-                    >
-                      <p className="truncate text-xs font-medium text-[#1A1A1A]">
-                        {lens.label}
-                      </p>
-                      <p className="mt-1 text-[11px] text-[#9C9C90]">Layer</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
+          <LivingMap
+            lens={state.lens}
+            onLensChange={setLens}
+            zipScores={zipScores}
+            zipSignals={zipSignals}
+            rankedTargets={rankedTargets}
+            selectedZip={selectedZip}
+            onZipSelect={setSelectedZip}
+            onTargetSelect={handleTargetSelect}
+            className="xl:min-h-[560px]"
+          />
 
           <aside className="space-y-4">
-            <section className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF]">
-              <div className="border-b border-[#E8E5DE] px-4 py-3">
-                <h2 className="text-sm font-semibold text-[#1A1A1A]">
-                  Right Rail
-                </h2>
-                <p className="text-xs text-[#9C9C90]">Signal queue</p>
-              </div>
-              <div className="space-y-3 p-4">
-                <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]">
-                    Active Lens
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[#1A1A1A]">
-                    {activeLensLabel}
-                  </p>
-                </div>
-                <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]">
-                    Filters
-                  </p>
-                  <p className="mt-1 text-sm font-semibold text-[#1A1A1A]">
-                    {state.filters.signals.length === 0
-                      ? "None"
-                      : `${state.filters.signals.length} active`}
-                  </p>
-                </div>
-                <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]">
-                    Selected Entity
-                  </p>
-                  <p className="mt-1 truncate text-sm font-semibold text-[#1A1A1A]">
-                    {state.selectedEntity ?? "None"}
-                  </p>
-                </div>
-              </div>
-            </section>
+            <BriefingRail
+              items={briefingItems}
+              onIntentRequest={handleDossierIntentRequest}
+              onLensChange={setLens}
+            />
 
             <PinboardTray
               pins={state.filters.pins}
@@ -327,50 +445,37 @@ function WarroomShellInner() {
               onRemovePin={removePin}
             />
           </aside>
-
-          <section className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] xl:col-span-2">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E8E5DE] px-4 py-3">
-              <div>
-                <h2 className="text-sm font-semibold text-[#1A1A1A]">Dossier</h2>
-                <p className="text-xs text-[#9C9C90]">
-                  {state.selectedEntity ?? "No entity selected"}
-                </p>
-              </div>
-              <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1 text-xs font-medium text-[#6B6B60]">
-                {state.mode}
-              </span>
-            </div>
-            <div className="grid gap-3 p-4 md:grid-cols-3">
-              <div className="rounded-md border border-dashed border-[#D4D0C8] bg-[#FAFAF7] p-4">
-                <p className="text-xs font-medium uppercase tracking-wider text-[#9C9C90]">
-                  Snapshot
-                </p>
-                <p className="mt-3 text-sm text-[#6B6B60]">Empty</p>
-              </div>
-              <div className="rounded-md border border-dashed border-[#D4D0C8] bg-[#FAFAF7] p-4">
-                <p className="text-xs font-medium uppercase tracking-wider text-[#9C9C90]">
-                  Evidence
-                </p>
-                <p className="mt-3 text-sm text-[#6B6B60]">Empty</p>
-              </div>
-              <div className="rounded-md border border-dashed border-[#D4D0C8] bg-[#FAFAF7] p-4">
-                <p className="text-xs font-medium uppercase tracking-wider text-[#9C9C90]">
-                  Actions
-                </p>
-                <p className="mt-3 text-sm text-[#6B6B60]">Empty</p>
-              </div>
-            </div>
-          </section>
         </div>
+
+        <TargetList
+          targets={rankedTargets}
+          lens={state.lens}
+          selectedNpi={state.selectedEntity}
+          onSelect={handleTargetSelect}
+          pinnedNpis={pinnedNpis}
+          onPin={addPin}
+          onUnpin={removePin}
+        />
       </div>
+
+      <DossierDrawer
+        target={selectedTarget}
+        onClose={handleDossierClose}
+        onPin={addPin}
+        onUnpin={removePin}
+        isPinned={selectedTarget ? pinnedNpis.has(selectedTarget.npi) : false}
+        onIntentRequest={handleDossierIntentRequest}
+        nearbyDeals={nearbyDeals}
+        recentChanges={changesForSelected}
+      />
     </div>
   )
 }
 
-export function WarroomShell() {
+export function WarroomShell(props: WarroomShellProps) {
   return (
     <Suspense fallback={<WarroomLoadingFrame />}>
-      <WarroomShellInner />
+      <WarroomShellInner {...props} />
     </Suspense>
   )
 }
@@ -380,11 +485,13 @@ function WarroomLoadingFrame() {
     <div className="min-h-[calc(100vh-3rem)] bg-[#FAFAF7]">
       <div className="space-y-4">
         <div className="h-40 animate-pulse rounded-lg border border-[#E8E5DE] bg-[#F7F7F4]" />
+        <div className="h-28 animate-pulse rounded-lg border border-[#E8E5DE] bg-[#F7F7F4]" />
+        <div className="h-40 animate-pulse rounded-lg border border-[#E8E5DE] bg-[#F7F7F4]" />
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="h-[520px] animate-pulse rounded-lg border border-[#E8E5DE] bg-[#F7F7F4]" />
           <div className="h-[520px] animate-pulse rounded-lg border border-[#E8E5DE] bg-[#F7F7F4]" />
-          <div className="h-48 animate-pulse rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] xl:col-span-2" />
         </div>
+        <div className="h-96 animate-pulse rounded-lg border border-[#E8E5DE] bg-[#F7F7F4]" />
       </div>
     </div>
   )
