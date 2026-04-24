@@ -21,6 +21,7 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -235,13 +236,18 @@ export function ZipDossierDrawer({
             <SheetTitle className="text-xl font-bold text-[#1A1A1A]">
               {locationLine}
             </SheetTitle>
-            <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[#6B6B60]">
-              <MapPin className="h-3.5 w-3.5 text-[#707064]" />
-              {gpLocations != null
-                ? `${formatNumber(gpLocations)} GP locations`
-                : "GP count unavailable"}
-              {population != null ? ` · ${formatNumber(population)} residents` : ""}
-            </p>
+            <SheetDescription className="mt-1 flex items-center gap-1.5 text-[12px] text-[#6B6B60]">
+              <MapPin className="h-3.5 w-3.5 text-[#707064]" aria-hidden="true" />
+              <span>
+                ZIP {zipCode} dossier —{" "}
+                {gpLocations != null
+                  ? `${formatNumber(gpLocations)} GP locations`
+                  : "GP count unavailable"}
+                {population != null
+                  ? ` · ${formatNumber(population)} residents`
+                  : ""}
+              </span>
+            </SheetDescription>
           </div>
           <div className="flex flex-wrap gap-2">
             {onIntentRequest && (

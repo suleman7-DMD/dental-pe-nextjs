@@ -655,8 +655,15 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="mr-1 text-[11px] font-medium uppercase tracking-wider text-[#707064]">
+              <div
+                role="group"
+                aria-labelledby="warroom-signal-filter-label"
+                className="flex flex-wrap items-center gap-2"
+              >
+                <span
+                  id="warroom-signal-filter-label"
+                  className="mr-1 text-[11px] font-medium uppercase tracking-wider text-[#707064]"
+                >
                   Signals
                 </span>
                 {WARROOM_SIGNAL_FILTERS.map((filter) => {
@@ -674,6 +681,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                           : "border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
                       )}
                       aria-pressed={active}
+                      aria-label={`${filter.label} filter, ${active ? "active" : "inactive"}`}
                     >
                       {filter.label}
                     </button>

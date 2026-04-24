@@ -634,6 +634,12 @@ export function DossierDrawer({
               onClick={() =>
                 isPinned ? onUnpin?.(target.npi) : onPin?.(target.npi)
               }
+              aria-pressed={isPinned}
+              aria-label={
+                isPinned
+                  ? `Unpin ${target.practiceName ?? "target"}`
+                  : `Pin ${target.practiceName ?? "target"} for later review`
+              }
               className={cn(
                 "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[12px] font-medium transition-colors",
                 isPinned
@@ -642,9 +648,9 @@ export function DossierDrawer({
               )}
             >
               {isPinned ? (
-                <Star className="h-3.5 w-3.5" fill="currentColor" />
+                <Star className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true" />
               ) : (
-                <Pin className="h-3.5 w-3.5" />
+                <Pin className="h-3.5 w-3.5" aria-hidden="true" />
               )}
               {isPinned ? "Pinned" : "Pin target"}
             </button>
