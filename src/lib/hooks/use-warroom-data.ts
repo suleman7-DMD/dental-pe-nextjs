@@ -8,8 +8,8 @@ import {
   resolveScopeZipCodes,
   type WarroomScopeInput,
 } from "../warroom/scope";
-import type { WarroomLens } from "../warroom/mode";
-import type { WarroomSitrepBundle } from "../warroom/signals";
+import { DEFAULT_WARROOM_LENS, type WarroomLens } from "../warroom/mode";
+import type { WarroomIntentFilter, WarroomSitrepBundle } from "../warroom/signals";
 
 const SITREP_BUNDLE_KEY = "warroom-sitrep";
 
@@ -21,6 +21,8 @@ export interface UseWarroomDataOptions {
   requireFlags?: string[];
   excludeFlags?: string[];
   excludeCorporate?: boolean;
+  confidence?: "all" | "high" | "medium" | "low";
+  intentFilter?: WarroomIntentFilter | null;
   initialData?: WarroomSitrepBundle;
   enabled?: boolean;
   staleTime?: number;
@@ -38,16 +40,37 @@ function serializeScope(scope: WarroomScopeInput | undefined): string {
   return [...zipCodes].sort().join(",");
 }
 
+function sorted(values: string[]): string[] {
+  return [...values].sort();
+}
+
+function serializeIntentFilter(filter: WarroomIntentFilter | null | undefined): string {
+  if (!filter) return "";
+  return JSON.stringify({
+    ...filter,
+    zipCodes: sorted(filter.zipCodes),
+    subzones: sorted(filter.subzones),
+    ownershipGroups: sorted(filter.ownershipGroups),
+    entityClassifications: sorted(filter.entityClassifications),
+    requireFlags: sorted(filter.requireFlags),
+    excludeFlags: sorted(filter.excludeFlags),
+    dsoNames: sorted(filter.dsoNames),
+    peSponsorNames: sorted(filter.peSponsorNames),
+  });
+}
+
 function buildQueryKey(options: UseWarroomDataOptions): readonly unknown[] {
   return [
     SITREP_BUNDLE_KEY,
     serializeScope(options.scope),
-    options.lens ?? "buyability",
+    options.lens ?? DEFAULT_WARROOM_LENS,
     options.rankLimit ?? 40,
     options.topSignalLimit ?? 8,
     options.requireFlags?.slice().sort().join("|") ?? "",
     options.excludeFlags?.slice().sort().join("|") ?? "",
     options.excludeCorporate ?? false,
+    options.confidence ?? "all",
+    serializeIntentFilter(options.intentFilter),
   ] as const;
 }
 
@@ -59,6 +82,8 @@ export function useWarroomData(options: UseWarroomDataOptions = {}): UseWarroomD
     requireFlags: options.requireFlags,
     excludeFlags: options.excludeFlags,
     excludeCorporate: options.excludeCorporate,
+    confidence: options.confidence,
+    intentFilter: options.intentFilter,
   };
 
   const queryOptions: UseQueryOptions<WarroomSitrepBundle, Error, WarroomSitrepBundle> = {
@@ -72,9 +97,23 @@ export function useWarroomData(options: UseWarroomDataOptions = {}): UseWarroomD
     staleTime: options.staleTime ?? 5 * 60 * 1000,
     gcTime: options.gcTime ?? 30 * 60 * 1000,
     enabled: options.enabled ?? true,
-    initialData: options.initialData,
     retry: 1,
   };
+
+  if (options.initialData) {
+    const initialKey = buildQueryKey({
+      scope: DEFAULT_WARROOM_SCOPE,
+      lens: DEFAULT_WARROOM_LENS,
+      rankLimit: 40,
+      topSignalLimit: 8,
+      excludeCorporate: false,
+      confidence: "all",
+    });
+    const activeKey = buildQueryKey(options);
+    if (JSON.stringify(initialKey) === JSON.stringify(activeKey)) {
+      queryOptions.initialData = options.initialData;
+    }
+  }
 
   const query = useQuery<WarroomSitrepBundle, Error>(queryOptions);
 

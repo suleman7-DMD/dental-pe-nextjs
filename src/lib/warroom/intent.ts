@@ -1,4 +1,9 @@
-import type { OwnershipGroup, WarroomIntent, WarroomIntentFilter } from "./signals";
+import type {
+  OwnershipGroup,
+  WarroomIntent,
+  WarroomIntentFilter,
+  WarroomTierFloor,
+} from "./signals";
 
 const OWNERSHIP_GROUP_SYNONYMS: Record<string, OwnershipGroup> = {
   independent: "independent",
@@ -67,7 +72,8 @@ const SIGNAL_SYNONYMS: Record<string, string> = {
   "white space": "zip_white_space_flag",
   "whitespace": "zip_white_space_flag",
   "compound demand": "zip_compound_demand_flag",
-  "mirror pair": "zip_white_space_flag",
+  "mirror pair": "zip_mirror_pair",
+  "mirror pairs": "zip_mirror_pair",
   "contested": "zip_contested_zone_flag",
   "contested zone": "zip_contested_zone_flag",
   "ada gap": "zip_ada_benchmark_gap_flag",
@@ -144,8 +150,79 @@ function createInitialFilter(): WarroomIntentFilter {
     retirementRiskOnly: false,
     acquisitionTargetsOnly: false,
     limit: null,
+    minTier: null,
   };
 }
+
+export function createEmptyFilter(): WarroomIntentFilter {
+  return createInitialFilter();
+}
+
+export const WARROOM_TIER_FLOOR_OPTIONS: {
+  value: WarroomTierFloor;
+  label: string;
+  description: string;
+}[] = [
+  { value: "hot", label: "Hot only", description: "Score ≥ 80" },
+  { value: "warm", label: "Warm+", description: "Score ≥ 60" },
+  { value: "cool", label: "Cool+", description: "Score ≥ 40" },
+  { value: "cold", label: "All tiers", description: "No floor" },
+];
+
+export const OWNERSHIP_GROUP_LABELS: Record<OwnershipGroup, string> = {
+  independent: "Independent",
+  corporate: "Corporate / DSO",
+  specialist: "Specialist",
+  non_clinical: "Non-clinical",
+  unknown: "Unclassified",
+};
+
+export const ENTITY_CLASSIFICATION_LABELS: Record<string, string> = {
+  solo_established: "Solo — Established",
+  solo_new: "Solo — New",
+  solo_inactive: "Solo — Inactive",
+  solo_high_volume: "Solo — High Volume",
+  family_practice: "Family Practice",
+  small_group: "Small Group",
+  large_group: "Large Group",
+  dso_regional: "DSO — Regional",
+  dso_national: "DSO — National",
+  specialist: "Specialist",
+  non_clinical: "Non-clinical",
+};
+
+export const PRACTICE_FLAG_LABELS: Record<string, string> = {
+  stealth_dso_flag: "Stealth DSO",
+  phantom_inventory_flag: "Phantom Inventory",
+  revenue_default_flag: "Revenue Default",
+  family_dynasty_flag: "Family Dynasty",
+  micro_cluster_flag: "Micro-Cluster",
+  intel_quant_disagreement_flag: "Intel Disagreement",
+  retirement_combo_flag: "Retirement Combo",
+  last_change_90d_flag: "Recent Movement",
+  high_peer_buyability_flag: "High Peer Buyability",
+  high_peer_retirement_flag: "High Peer Retirement",
+};
+
+export const ZIP_FLAG_LABELS: Record<string, string> = {
+  zip_white_space_flag: "White-Space ZIP",
+  zip_compound_demand_flag: "Compound Demand",
+  zip_mirror_pair: "Mirror Pair",
+  zip_contested_zone_flag: "Contested Zone",
+  zip_ada_benchmark_gap_flag: "ADA Benchmark Gap",
+};
+
+export const ALL_FLAG_LABELS: Record<string, string> = {
+  ...PRACTICE_FLAG_LABELS,
+  ...ZIP_FLAG_LABELS,
+};
+
+const TIER_FLOOR_LABELS: Record<WarroomTierFloor, string> = {
+  hot: "Hot",
+  warm: "Warm",
+  cool: "Cool",
+  cold: "Cold",
+};
 
 function normalizeForParse(text: string): string {
   return text
@@ -437,29 +514,232 @@ export function emptyIntent(): WarroomIntent {
   };
 }
 
-export function intentHasFilters(intent: WarroomIntent): boolean {
-  const f = intent.filter;
+export function filterHasContent(filter: WarroomIntentFilter): boolean {
   return (
-    f.scope != null ||
-    f.zipCodes.length > 0 ||
-    f.subzones.length > 0 ||
-    f.ownershipGroups.length > 0 ||
-    f.entityClassifications.length > 0 ||
-    f.requireFlags.length > 0 ||
-    f.excludeFlags.length > 0 ||
-    f.minBuyability != null ||
-    f.maxBuyability != null ||
-    f.minYearEstablished != null ||
-    f.maxYearEstablished != null ||
-    f.minEmployees != null ||
-    f.maxEmployees != null ||
-    f.requirePeBacked != null ||
-    f.dsoNames.length > 0 ||
-    f.peSponsorNames.length > 0 ||
-    f.retirementRiskOnly ||
-    f.acquisitionTargetsOnly ||
-    f.limit != null
+    filter.scope != null ||
+    filter.zipCodes.length > 0 ||
+    filter.subzones.length > 0 ||
+    filter.ownershipGroups.length > 0 ||
+    filter.entityClassifications.length > 0 ||
+    filter.requireFlags.length > 0 ||
+    filter.excludeFlags.length > 0 ||
+    filter.minBuyability != null ||
+    filter.maxBuyability != null ||
+    filter.minYearEstablished != null ||
+    filter.maxYearEstablished != null ||
+    filter.minEmployees != null ||
+    filter.maxEmployees != null ||
+    filter.requirePeBacked != null ||
+    filter.dsoNames.length > 0 ||
+    filter.peSponsorNames.length > 0 ||
+    filter.retirementRiskOnly ||
+    filter.acquisitionTargetsOnly ||
+    filter.limit != null ||
+    filter.minTier != null
   );
+}
+
+export function intentHasFilters(intent: WarroomIntent): boolean {
+  return filterHasContent(intent.filter);
+}
+
+function subzoneChipLabel(subzone: string): string {
+  const map: Record<string, string> = {
+    core: "Core (DuPage/Will)",
+    north: "North Shore",
+    city: "Chicago City",
+    south: "South Suburbs",
+    west: "Inner West",
+    far_west: "Far West / Fox Valley",
+    far_south: "Far South / Joliet",
+  };
+  return map[subzone] ?? subzone.replace(/_/g, " ");
+}
+
+function scopeChipLabel(scope: WarroomIntentFilter["scope"]): string {
+  if (!scope) return "";
+  const map: Record<Exclude<WarroomIntentFilter["scope"], null>, string> = {
+    chicagoland: "All Chicagoland",
+    west_loop_south_loop: "West Loop / South Loop",
+    woodridge: "Woodridge",
+    bolingbrook: "Bolingbrook",
+  };
+  return map[scope];
+}
+
+function flagLabel(flag: string): string {
+  if (flag.startsWith("ownership:")) {
+    const group = flag.slice("ownership:".length) as OwnershipGroup;
+    return OWNERSHIP_GROUP_LABELS[group] ?? group;
+  }
+  return ALL_FLAG_LABELS[flag] ?? flag.replace(/_flag$/, "").replace(/_/g, " ");
+}
+
+function pushChip(
+  chips: WarroomIntent["chips"],
+  chip: WarroomIntent["chips"][number]
+) {
+  if (chips.some((existing) => existing.id === chip.id)) return;
+  chips.push(chip);
+}
+
+export function buildIntentFromFilter(filter: WarroomIntentFilter): WarroomIntent {
+  const chips: WarroomIntent["chips"] = [];
+  const parts: string[] = [];
+
+  if (filter.limit != null) {
+    pushChip(chips, { id: `limit:${filter.limit}`, label: `Top ${filter.limit}`, key: "limit" });
+    parts.push(`top ${filter.limit}`);
+  }
+
+  if (filter.minTier) {
+    pushChip(chips, {
+      id: `tier:${filter.minTier}`,
+      label: `${TIER_FLOOR_LABELS[filter.minTier]} tier floor`,
+      key: "minTier",
+    });
+  }
+
+  if (filter.scope) {
+    pushChip(chips, {
+      id: `scope:${filter.scope}`,
+      label: scopeChipLabel(filter.scope),
+      key: "scope",
+    });
+    parts.push(scopeChipLabel(filter.scope).toLowerCase());
+  }
+
+  filter.subzones.forEach((subzone) => {
+    pushChip(chips, {
+      id: `subzone:${subzone}`,
+      label: subzoneChipLabel(subzone),
+      key: "subzones",
+    });
+    parts.push(subzone.replace(/_/g, " "));
+  });
+
+  filter.zipCodes.forEach((zip) => {
+    pushChip(chips, { id: `zip:${zip}`, label: `ZIP ${zip}`, key: "zipCodes" });
+    parts.push(zip);
+  });
+
+  filter.ownershipGroups.forEach((group) => {
+    pushChip(chips, {
+      id: `own:${group}`,
+      label: OWNERSHIP_GROUP_LABELS[group] ?? group,
+      key: "ownershipGroups",
+    });
+    if (group === "independent") parts.push("independent");
+    else if (group === "corporate") parts.push("dso");
+    else if (group === "specialist") parts.push("specialists");
+    else if (group === "non_clinical") parts.push("non-clinical");
+  });
+
+  filter.entityClassifications.forEach((ec) => {
+    pushChip(chips, {
+      id: `ec:${ec}`,
+      label: ENTITY_CLASSIFICATION_LABELS[ec] ?? ec,
+      key: "entityClassifications",
+    });
+  });
+
+  if (filter.minBuyability != null) {
+    pushChip(chips, {
+      id: `minBuy:${filter.minBuyability}`,
+      label: `Buyability ≥ ${filter.minBuyability}`,
+      key: "minBuyability",
+    });
+    parts.push(`buyability over ${filter.minBuyability}`);
+  }
+  if (filter.maxBuyability != null) {
+    pushChip(chips, {
+      id: `maxBuy:${filter.maxBuyability}`,
+      label: `Buyability ≤ ${filter.maxBuyability}`,
+      key: "maxBuyability",
+    });
+    parts.push(`buyability under ${filter.maxBuyability}`);
+  }
+
+  if (filter.minYearEstablished != null) {
+    pushChip(chips, {
+      id: `minYear:${filter.minYearEstablished}`,
+      label: `Est. ≥ ${filter.minYearEstablished}`,
+      key: "minYearEstablished",
+    });
+  }
+  if (filter.maxYearEstablished != null) {
+    pushChip(chips, {
+      id: `maxYear:${filter.maxYearEstablished}`,
+      label: `Before ${filter.maxYearEstablished}`,
+      key: "maxYearEstablished",
+    });
+    parts.push(`established before ${filter.maxYearEstablished}`);
+  }
+
+  if (filter.minEmployees != null) {
+    pushChip(chips, {
+      id: `emp:${filter.minEmployees}`,
+      label: `${filter.minEmployees}+ staff`,
+      key: "minEmployees",
+    });
+    parts.push(`${filter.minEmployees} staff`);
+  }
+  if (filter.maxEmployees != null) {
+    pushChip(chips, {
+      id: `empMax:${filter.maxEmployees}`,
+      label: `≤ ${filter.maxEmployees} staff`,
+      key: "maxEmployees",
+    });
+  }
+
+  filter.requireFlags.forEach((flag) => {
+    pushChip(chips, { id: `flag:${flag}`, label: flagLabel(flag), key: "requireFlags" });
+    const human = flagLabel(flag).toLowerCase();
+    if (human && !human.startsWith("no ")) parts.push(human);
+  });
+  filter.excludeFlags.forEach((flag) => {
+    pushChip(chips, { id: `xflag:${flag}`, label: `No ${flagLabel(flag)}`, key: "excludeFlags" });
+    parts.push(`no ${flagLabel(flag).toLowerCase()}`);
+  });
+
+  if (filter.requirePeBacked === false) {
+    pushChip(chips, { id: "pe:exclude", label: "No PE", key: "requirePeBacked" });
+    parts.push("no pe");
+  } else if (filter.requirePeBacked === true) {
+    pushChip(chips, { id: "pe:require", label: "PE-Backed", key: "requirePeBacked" });
+    parts.push("pe backed");
+  }
+
+  filter.dsoNames.forEach((name) => {
+    pushChip(chips, { id: `dso:${name}`, label: name, key: "dsoNames" });
+  });
+  filter.peSponsorNames.forEach((name) => {
+    pushChip(chips, { id: `pe:${name}`, label: name, key: "peSponsorNames" });
+  });
+
+  if (filter.retirementRiskOnly) {
+    pushChip(chips, { id: "retire", label: "Retirement Risk", key: "retirementRiskOnly" });
+    parts.push("retirement risk");
+  }
+  if (filter.acquisitionTargetsOnly) {
+    pushChip(chips, { id: "acqTarget", label: "Acquisition Targets", key: "acquisitionTargetsOnly" });
+    parts.push("acquisition targets");
+  }
+
+  const rawText = parts.join(" ").trim();
+
+  return {
+    rawText,
+    normalized: normalizeForParse(rawText),
+    filter,
+    chips,
+    warnings: [],
+    recognizedTokens: [],
+  };
+}
+
+export function describeFilter(filter: WarroomIntentFilter): string {
+  return buildIntentFromFilter(filter).rawText;
 }
 
 export const INTENT_PRESETS: { id: string; label: string; query: string }[] = [

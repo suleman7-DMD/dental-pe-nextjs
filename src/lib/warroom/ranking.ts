@@ -1,8 +1,10 @@
 import { classifyPractice } from "@/lib/constants/entity-classifications";
 import type { WarroomLens } from "./mode";
+import { getSubzoneZipCodes, resolveScopeZipCodes } from "./scope";
 import type {
   OwnershipGroup,
   RankedTarget,
+  WarroomIntentFilter,
   WarroomPracticeRecord,
   WarroomPracticeSignalRecord,
   WarroomScoreComponent,
@@ -369,9 +371,20 @@ function dealCatchmentComponent(
   zipSignal: WarroomZipSignalRecord | null,
   weight: number
 ): WarroomScoreComponent {
-  const practiceCatchment = signal?.deal_catchment_24mo ?? 0;
-  const zipCatchment = zipSignal?.deal_catchment_max_24mo ?? 0;
-  const peak = Math.max(practiceCatchment, zipCatchment);
+  const catchmentValues = [
+    signal?.deal_catchment_24mo,
+    zipSignal?.deal_catchment_max_24mo,
+  ].filter((value): value is number => value != null);
+  if (catchmentValues.length === 0) {
+    return {
+      label: "Deal catchment",
+      weight,
+      contribution: 0,
+      reasoning: "Deal locations are not granular enough for a 2-mi catchment score.",
+    };
+  }
+
+  const peak = Math.max(...catchmentValues);
   if (peak === 0) {
     return {
       label: "Deal catchment",
@@ -434,21 +447,23 @@ function stealthDsoComponent(
 
 function collectFlags(signal: WarroomPracticeSignalRecord | null, zipSignal: WarroomZipSignalRecord | null): string[] {
   const flags: string[] = [];
-  if (signal?.stealth_dso_flag) flags.push("stealth_dso");
-  if (signal?.phantom_inventory_flag) flags.push("phantom_inventory");
-  if (signal?.revenue_default_flag) flags.push("revenue_default");
-  if (signal?.family_dynasty_flag) flags.push("family_dynasty");
-  if (signal?.micro_cluster_flag) flags.push("micro_cluster");
-  if (signal?.intel_quant_disagreement_flag) flags.push("intel_quant_disagreement");
-  if (signal?.retirement_combo_flag) flags.push("retirement_combo");
-  if (signal?.last_change_90d_flag) flags.push("last_change_90d");
-  if (signal?.high_peer_buyability_flag) flags.push("high_peer_buyability");
-  if (signal?.high_peer_retirement_flag) flags.push("high_peer_retirement");
-  if (zipSignal?.white_space_flag) flags.push("zip_white_space");
-  if (zipSignal?.compound_demand_flag) flags.push("zip_compound_demand");
-  if (zipSignal?.contested_zone_flag) flags.push("zip_contested_zone");
-  if (zipSignal?.ada_benchmark_gap_flag) flags.push("zip_ada_benchmark_gap");
-  if (zipSignal?.mirror_pair_flag) flags.push("zip_mirror_pair");
+  const add = (...values: string[]) => flags.push(...values);
+
+  if (signal?.stealth_dso_flag) add("stealth_dso", "stealth_dso_flag");
+  if (signal?.phantom_inventory_flag) add("phantom_inventory", "phantom_inventory_flag");
+  if (signal?.revenue_default_flag) add("revenue_default", "revenue_default_flag");
+  if (signal?.family_dynasty_flag) add("family_dynasty", "family_dynasty_flag");
+  if (signal?.micro_cluster_flag) add("micro_cluster", "micro_cluster_flag");
+  if (signal?.intel_quant_disagreement_flag) add("intel_quant_disagreement", "intel_quant_disagreement_flag");
+  if (signal?.retirement_combo_flag) add("retirement_combo", "retirement_combo_flag");
+  if (signal?.last_change_90d_flag) add("last_change_90d", "last_change_90d_flag");
+  if (signal?.high_peer_buyability_flag) add("high_peer_buyability", "high_peer_buyability_flag");
+  if (signal?.high_peer_retirement_flag) add("high_peer_retirement", "high_peer_retirement_flag");
+  if (zipSignal?.white_space_flag) add("zip_white_space", "zip_white_space_flag");
+  if (zipSignal?.compound_demand_flag) add("zip_compound_demand", "zip_compound_demand_flag");
+  if (zipSignal?.contested_zone_flag) add("zip_contested_zone", "zip_contested_zone_flag");
+  if (zipSignal?.ada_benchmark_gap_flag) add("zip_ada_benchmark_gap", "zip_ada_benchmark_gap_flag");
+  if (zipSignal?.mirror_pair_flag) add("zip_mirror_pair");
   return flags;
 }
 
@@ -480,13 +495,179 @@ function tierFromScore(score: number): RankedTarget["tier"] {
   return "cold";
 }
 
+const TIER_RANK: Record<RankedTarget["tier"], number> = {
+  hot: 3,
+  warm: 2,
+  cool: 1,
+  cold: 0,
+};
+
+function tierMeetsFloor(
+  tier: RankedTarget["tier"],
+  floor: WarroomIntentFilter["minTier"]
+): boolean {
+  if (!floor) return true;
+  return TIER_RANK[tier] >= TIER_RANK[floor];
+}
+
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function textMatchesAny(
+  values: Array<string | null | undefined>,
+  needles: string[]
+): boolean {
+  if (needles.length === 0) return true;
+  const haystack = values.map(normalizeText).filter(Boolean);
+  if (haystack.length === 0) return false;
+  return needles.some((needle) => {
+    const normalizedNeedle = normalizeText(needle);
+    return Boolean(normalizedNeedle) && haystack.some((value) => value.includes(normalizedNeedle));
+  });
+}
+
+function hasPeBacking(practice: WarroomPracticeRecord): boolean {
+  const status = normalizeText(practice.ownership_status).replace(/\s+/g, "_");
+  return status === "pe_backed" || Boolean(practice.affiliated_pe_sponsor);
+}
+
+function valueInRange(
+  value: number | null,
+  min: number | null,
+  max: number | null
+): boolean {
+  if (min == null && max == null) return true;
+  if (value == null) return false;
+  if (min != null && value < min) return false;
+  if (max != null && value > max) return false;
+  return true;
+}
+
+function practiceInZipSet(
+  practice: WarroomPracticeRecord,
+  zipCodes: string[] | null
+): boolean {
+  if (!zipCodes || zipCodes.length === 0) return true;
+  return Boolean(practice.zip && new Set(zipCodes).has(practice.zip));
+}
+
+function matchesIntentScope(
+  practice: WarroomPracticeRecord,
+  filter: WarroomIntentFilter
+): boolean {
+  if (filter.scope) {
+    const scopeZips = resolveScopeZipCodes(filter.scope);
+    if (!practiceInZipSet(practice, scopeZips)) return false;
+  }
+
+  if (filter.zipCodes.length > 0) {
+    if (!practice.zip || !filter.zipCodes.includes(practice.zip)) return false;
+  }
+
+  if (filter.subzones.length > 0) {
+    const subzoneZips = new Set(filter.subzones.flatMap((subzone) => getSubzoneZipCodes(subzone)));
+    if (subzoneZips.size === 0) return false;
+    if (!practice.zip || !subzoneZips.has(practice.zip)) return false;
+  }
+
+  return true;
+}
+
+function candidateMatchesIntentFilter(
+  candidate: WarroomTargetCandidate,
+  ownership: OwnershipGroup,
+  flags: string[],
+  filter: WarroomIntentFilter | null | undefined
+): boolean {
+  if (!filter) return true;
+
+  const { practice, signal } = candidate;
+
+  if (!matchesIntentScope(practice, filter)) return false;
+
+  if (filter.ownershipGroups.length > 0 && !filter.ownershipGroups.includes(ownership)) {
+    return false;
+  }
+
+  if (
+    filter.entityClassifications.length > 0 &&
+    (!practice.entity_classification ||
+      !filter.entityClassifications.includes(practice.entity_classification))
+  ) {
+    return false;
+  }
+
+  if (!valueInRange(practice.buyability_score, filter.minBuyability, filter.maxBuyability)) {
+    return false;
+  }
+
+  if (!valueInRange(practice.year_established, filter.minYearEstablished, filter.maxYearEstablished)) {
+    return false;
+  }
+
+  if (!valueInRange(practice.employee_count, filter.minEmployees, filter.maxEmployees)) {
+    return false;
+  }
+
+  if (filter.requirePeBacked != null && hasPeBacking(practice) !== filter.requirePeBacked) {
+    return false;
+  }
+
+  if (
+    !textMatchesAny(
+      [
+        practice.affiliated_dso,
+        practice.parent_company,
+        practice.franchise_name,
+        practice.practice_name,
+        practice.doing_business_as,
+      ],
+      filter.dsoNames
+    )
+  ) {
+    return false;
+  }
+
+  if (!textMatchesAny([practice.affiliated_pe_sponsor, practice.parent_company], filter.peSponsorNames)) {
+    return false;
+  }
+
+  if (filter.retirementRiskOnly && !signal?.retirement_combo_flag && !flags.includes("retirement_combo_flag")) {
+    return false;
+  }
+
+  if (filter.acquisitionTargetsOnly) {
+    const score = practice.buyability_score ?? 0;
+    if (ownership !== "independent" || score < 50) return false;
+  }
+
+  return true;
+}
+
 export interface RankTargetsOptions {
   lens?: WarroomLens;
   weights?: Partial<ComponentWeights>;
   excludeCorporate?: boolean;
   requireFlags?: string[];
   excludeFlags?: string[];
+  confidence?: "all" | "high" | "medium" | "low";
+  intentFilter?: WarroomIntentFilter | null;
   limit?: number;
+}
+
+function matchesConfidenceFilter(
+  value: number | null,
+  confidence: RankTargetsOptions["confidence"]
+): boolean {
+  if (!confidence || confidence === "all") return true;
+  if (confidence === "high") return (value ?? 0) >= 80;
+  if (confidence === "medium") return (value ?? 0) >= 50 && (value ?? 0) < 80;
+  return value == null || value < 50;
 }
 
 export function rankTargets(
@@ -504,14 +685,17 @@ export function rankTargets(
       const { practice, signal, zipScore, zipSignal } = candidate;
       const ownership = classifyPractice(practice.entity_classification, practice.ownership_status);
       const flags = collectFlags(signal, zipSignal);
+      const matchFlags = [...flags, `ownership:${ownership}`];
 
       if (options.excludeCorporate && ownership === "corporate") return null;
+      if (!matchesConfidenceFilter(practice.classification_confidence, options.confidence)) return null;
+      if (!candidateMatchesIntentFilter(candidate, ownership, flags, options.intentFilter)) return null;
 
       for (const required of requireFlagSet) {
-        if (!flags.includes(required)) return null;
+        if (!matchFlags.includes(required)) return null;
       }
       for (const excluded of excludeFlagSet) {
-        if (flags.includes(excluded)) return null;
+        if (matchFlags.includes(excluded)) return null;
       }
 
       const components: WarroomScoreComponent[] = [
@@ -533,6 +717,9 @@ export function rankTargets(
 
       const raw = components.reduce((sum, component) => sum + component.contribution, 0);
       const score = clamp(raw + 50, 0, 100);
+      const tier = tierFromScore(score);
+
+      if (!tierMeetsFloor(tier, options.intentFilter?.minTier ?? null)) return null;
 
       return {
         npi: practice.npi,
@@ -550,7 +737,7 @@ export function rankTargets(
         longitude: practice.longitude,
         score: round1(score),
         rank: 0,
-        tier: tierFromScore(score),
+        tier,
         flagCount: flags.length,
         flags,
         components,

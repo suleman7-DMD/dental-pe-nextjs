@@ -29,10 +29,21 @@ export const WARROOM_QUERY_PARAMS = {
 } as const
 
 export const WARROOM_SIGNAL_FILTERS = [
-  { id: "targets", label: "Targets" },
+  { id: "stealth_dso", label: "Stealth DSO" },
+  { id: "phantom_inventory", label: "Phantom" },
+  { id: "revenue_default", label: "Revenue Default" },
+  { id: "family_dynasty", label: "Family Dynasty" },
+  { id: "micro_cluster", label: "Micro-Cluster" },
+  { id: "intel_disagreement", label: "Intel Gap" },
+  { id: "retirement_risk", label: "Retirement" },
   { id: "recent_changes", label: "Recent Movement" },
-  { id: "high_confidence", label: "High Confidence" },
-  { id: "retirement_risk", label: "Retirement Risk" },
+  { id: "high_peer_buyability", label: "Peer Buyability" },
+  { id: "high_peer_retirement", label: "Peer Retirement" },
+  { id: "white_space", label: "White-Space" },
+  { id: "compound_demand", label: "Compound Demand" },
+  { id: "mirror_pair", label: "Mirror Pair" },
+  { id: "contested_zone", label: "Contested" },
+  { id: "ada_gap", label: "ADA Gap" },
 ] as const
 
 export type WarroomSignalFilter = (typeof WARROOM_SIGNAL_FILTERS)[number]["id"]
@@ -329,6 +340,13 @@ export function useWarroomState() {
     [updateState]
   )
 
+  const setModeAndLens = useCallback(
+    (mode: WarroomMode, lens: WarroomLens) => {
+      updateState((current) => ({ ...current, mode, lens }))
+    },
+    [updateState]
+  )
+
   const setSelectedEntity = useCallback(
     (selectedEntity: string | null) => {
       updateState((current) => ({
@@ -406,6 +424,7 @@ export function useWarroomState() {
     setScope,
     setMode,
     setLens,
+    setModeAndLens,
     setSelectedEntity,
     setFilters,
     toggleSignalFilter,

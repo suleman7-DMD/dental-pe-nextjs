@@ -11,7 +11,7 @@ import {
   getWarroomSummary,
 } from "../supabase/queries/warroom";
 import { buildWarroomBriefing } from "./briefing";
-import type { WarroomLens } from "./mode";
+import { DEFAULT_WARROOM_LENS, type WarroomLens } from "./mode";
 import { rankTargets, summarizeRankedTargets } from "./ranking";
 import {
   DEFAULT_WARROOM_SCOPE,
@@ -23,6 +23,7 @@ import {
 } from "./scope";
 import type {
   RankedTarget,
+  WarroomIntentFilter,
   WarroomPracticeRecord,
   WarroomPracticeSignalRecord,
   WarroomSitrepBundle,
@@ -94,6 +95,8 @@ export interface SitrepLoadOptions {
   requireFlags?: string[];
   excludeFlags?: string[];
   excludeCorporate?: boolean;
+  confidence?: "all" | "high" | "medium" | "low";
+  intentFilter?: WarroomIntentFilter | null;
 }
 
 export async function getSitrepBundle(
@@ -102,7 +105,7 @@ export async function getSitrepBundle(
   supabaseClient?: SupabaseClient
 ): Promise<WarroomSitrepBundle> {
   const supabase = supabaseClient ?? getSupabaseBrowserClient();
-  const lens: WarroomLens = options.lens ?? "buyability";
+  const lens: WarroomLens = options.lens ?? DEFAULT_WARROOM_LENS;
   const rankLimit = options.rankLimit ?? DEFAULT_RANK_LIMIT;
   const topSignalLimit = options.topSignalLimit ?? DEFAULT_TOP_SIGNAL_LIMIT;
 
@@ -148,6 +151,8 @@ export async function getSitrepBundle(
     requireFlags: options.requireFlags,
     excludeFlags: options.excludeFlags,
     excludeCorporate: options.excludeCorporate,
+    confidence: options.confidence,
+    intentFilter: options.intentFilter,
   });
 
   const briefing = buildWarroomBriefing({

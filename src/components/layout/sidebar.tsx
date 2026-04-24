@@ -10,6 +10,7 @@ import {
   Briefcase,
   Search,
   Brain,
+  Crosshair,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -41,6 +42,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "OVERVIEW",
     items: [
       { label: "Dashboard", href: "/", icon: LayoutDashboard },
+      { label: "Warroom", href: "/warroom", icon: Crosshair },
     ],
   },
   {

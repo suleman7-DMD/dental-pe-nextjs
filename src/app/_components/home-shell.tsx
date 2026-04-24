@@ -16,6 +16,7 @@ import {
   Building2,
   RefreshCw,
   Brain,
+  Crosshair,
 } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import type { HomeSummary, PracticeChange } from '@/lib/types'
@@ -44,6 +45,13 @@ interface NavCard {
 
 const NAV_CARDS: NavCard[] = [
   {
+    href: '/warroom',
+    icon: Crosshair,
+    title: 'Warroom',
+    description: 'Scope-aware command center',
+    accentColor: '#B8860B',
+  },
+  {
     href: '/job-market',
     icon: Briefcase,
     title: 'Job Market',
@@ -69,7 +77,7 @@ const NAV_CARDS: NavCard[] = [
     icon: BarChart3,
     title: 'Deal Flow',
     description: 'PE deal tracking and analytics',
-    accentColor: '#B8860B',
+    accentColor: '#6366F1',
   },
   {
     href: '/research',

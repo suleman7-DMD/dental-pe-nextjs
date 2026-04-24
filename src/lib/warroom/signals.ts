@@ -331,6 +331,8 @@ export interface WarroomBriefingItem {
   metric?: { label: string; value: string | number; unit?: string };
 }
 
+export type WarroomTierFloor = "hot" | "warm" | "cool" | "cold";
+
 export interface WarroomIntentFilter {
   scope: "chicagoland" | "west_loop_south_loop" | "woodridge" | "bolingbrook" | null;
   zipCodes: string[];
@@ -351,6 +353,7 @@ export interface WarroomIntentFilter {
   retirementRiskOnly: boolean;
   acquisitionTargetsOnly: boolean;
   limit: number | null;
+  minTier: WarroomTierFloor | null;
 }
 
 export interface WarroomIntent {

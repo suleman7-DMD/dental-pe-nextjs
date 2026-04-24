@@ -15,6 +15,7 @@ import {
   WARROOM_LENSES,
   getWarroomLensLabel,
   type WarroomLens,
+  type WarroomMode,
 } from "@/lib/warroom/mode"
 import {
   getWarroomScopeOption,
@@ -30,10 +31,18 @@ import { useWarroomData } from "@/lib/hooks/use-warroom-data"
 import type {
   RankedTarget,
   WarroomIntent,
+  WarroomIntentFilter,
   WarroomSitrepBundle,
 } from "@/lib/warroom/signals"
+import {
+  buildIntentFromFilter,
+  createEmptyFilter,
+  describeFilter,
+  filterHasContent,
+} from "@/lib/warroom/intent"
 import { BriefingRail } from "./briefing-rail"
 import { DossierDrawer } from "./dossier-drawer"
+import { HuntModePanel } from "./hunt-mode-panel"
 import { IntentBar } from "./intent-bar"
 import { LivingMap } from "./living-map"
 import { ModeSwitcher } from "./mode-switcher"
@@ -41,6 +50,13 @@ import { PinboardTray } from "./pinboard-tray"
 import { ScopeSelector } from "./scope-selector"
 import { SitrepKpiStrip } from "./sitrep-kpi-strip"
 import { TargetList } from "./target-list"
+
+const TIER_RANK: Record<"hot" | "warm" | "cool" | "cold", number> = {
+  hot: 3,
+  warm: 2,
+  cool: 1,
+  cold: 0,
+}
 
 interface WarroomShellProps {
   initialBundle?: WarroomSitrepBundle | null
@@ -53,6 +69,13 @@ const CONFIDENCE_OPTIONS: { value: WarroomConfidenceFilter; label: string }[] = 
   { value: "medium", label: "Medium" },
   { value: "low", label: "Low" },
 ]
+
+const MODE_DEFAULT_LENS: Record<WarroomMode, WarroomLens> = {
+  sitrep: "consolidation",
+  hunt: "retirement",
+  profile: "consolidation",
+  investigate: "disagreement",
+}
 
 function LensSelector({
   value,
@@ -87,8 +110,21 @@ function LensSelector({
 
 function signalFiltersToFlags(signals: WarroomSignalFilter[]): string[] {
   const flags: string[] = []
-  if (signals.includes("recent_changes")) flags.push("last_change_90d_flag")
+  if (signals.includes("stealth_dso")) flags.push("stealth_dso_flag")
+  if (signals.includes("phantom_inventory")) flags.push("phantom_inventory_flag")
+  if (signals.includes("revenue_default")) flags.push("revenue_default_flag")
+  if (signals.includes("family_dynasty")) flags.push("family_dynasty_flag")
+  if (signals.includes("micro_cluster")) flags.push("micro_cluster_flag")
+  if (signals.includes("intel_disagreement")) flags.push("intel_quant_disagreement_flag")
   if (signals.includes("retirement_risk")) flags.push("retirement_combo_flag")
+  if (signals.includes("recent_changes")) flags.push("last_change_90d_flag")
+  if (signals.includes("high_peer_buyability")) flags.push("high_peer_buyability_flag")
+  if (signals.includes("high_peer_retirement")) flags.push("high_peer_retirement_flag")
+  if (signals.includes("white_space")) flags.push("zip_white_space_flag")
+  if (signals.includes("compound_demand")) flags.push("zip_compound_demand_flag")
+  if (signals.includes("mirror_pair")) flags.push("zip_mirror_pair")
+  if (signals.includes("contested_zone")) flags.push("zip_contested_zone_flag")
+  if (signals.includes("ada_gap")) flags.push("zip_ada_benchmark_gap_flag")
   return flags
 }
 
@@ -101,8 +137,8 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     state,
     hydrated,
     setScope,
-    setMode,
     setLens,
+    setModeAndLens,
     setSelectedEntity,
     setFilters,
     toggleSignalFilter,
@@ -133,7 +169,6 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     const intentFilter = activeIntent?.filter
     if (!intentFilter) return false
     if (intentFilter.excludeFlags.includes("ownership:corporate")) return true
-    if (intentFilter.requirePeBacked === false) return true
     return false
   }, [activeIntent])
 
@@ -146,6 +181,8 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     requireFlags: requireFlags.length > 0 ? requireFlags : undefined,
     excludeFlags: excludeFlags.length > 0 ? excludeFlags : undefined,
     excludeCorporate,
+    confidence: state.filters.confidence,
+    intentFilter: activeIntent?.filter ?? null,
     initialData: initialBundle ?? undefined,
   })
 
@@ -195,6 +232,37 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     setActiveIntent(null)
   }, [])
 
+  const currentHuntFilter = useMemo<WarroomIntentFilter>(
+    () => activeIntent?.filter ?? createEmptyFilter(),
+    [activeIntent]
+  )
+
+  const handleHuntFilterChange = useCallback(
+    (next: WarroomIntentFilter) => {
+      if (!filterHasContent(next)) {
+        setActiveIntent(null)
+        setIntentText("")
+        return
+      }
+      const intent = buildIntentFromFilter(next)
+      setActiveIntent(intent)
+      setIntentText(describeFilter(next))
+    },
+    []
+  )
+
+  const handleHuntReset = useCallback(() => {
+    setActiveIntent(null)
+    setIntentText("")
+  }, [])
+
+  const handleModeChange = useCallback(
+    (mode: WarroomMode) => {
+      setModeAndLens(mode, MODE_DEFAULT_LENS[mode])
+    },
+    [setModeAndLens]
+  )
+
   const handleTargetSelect = useCallback(
     (npi: string) => {
       setSelectedEntity(npi)
@@ -237,11 +305,23 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   const summary = effectiveBundle?.summary ?? null
   const zipScores = effectiveBundle?.zipScores ?? []
   const zipSignals = effectiveBundle?.zipSignals ?? []
-  const rankedTargets = effectiveBundle?.rankedTargets ?? []
+  const rankedTargets = useMemo(
+    () => effectiveBundle?.rankedTargets ?? [],
+    [effectiveBundle]
+  )
   const briefingItems = effectiveBundle?.briefing ?? []
   const dataHealth = effectiveBundle?.dataHealth
   const combinedError =
     (error instanceof Error ? error.message : null) ?? initialBundleError ?? null
+
+  const visibleTargets = useMemo(() => {
+    const minTier = activeIntent?.filter.minTier
+    if (!minTier) return rankedTargets
+    const floor = TIER_RANK[minTier]
+    return rankedTargets.filter(
+      (target) => (TIER_RANK[target.tier] ?? 0) >= floor
+    )
+  }, [activeIntent, rankedTargets])
 
   return (
     <div className="min-h-[calc(100vh-3rem)] bg-[#FAFAF7] text-[#1A1A1A]">
@@ -290,7 +370,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
 
               <div className="flex flex-wrap items-end gap-3">
                 <ScopeSelector value={state.scope} onChange={setScope} />
-                <ModeSwitcher value={state.mode} onChange={setMode} />
+                <ModeSwitcher value={state.mode} onChange={handleModeChange} />
                 <LensSelector value={state.lens} onChange={setLens} />
                 <Button
                   type="button"
@@ -417,13 +497,23 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
 
         {summary && <SitrepKpiStrip summary={summary} />}
 
+        {state.mode === "hunt" && (
+          <HuntModePanel
+            filter={currentHuntFilter}
+            onFilterChange={handleHuntFilterChange}
+            matchingCount={visibleTargets.length}
+            totalCandidateCount={effectiveBundle?.dataHealth.practicesFetched ?? null}
+            onReset={handleHuntReset}
+          />
+        )}
+
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <LivingMap
             lens={state.lens}
             onLensChange={setLens}
             zipScores={zipScores}
             zipSignals={zipSignals}
-            rankedTargets={rankedTargets}
+            rankedTargets={visibleTargets}
             selectedZip={selectedZip}
             onZipSelect={setSelectedZip}
             onTargetSelect={handleTargetSelect}
@@ -448,7 +538,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
         </div>
 
         <TargetList
-          targets={rankedTargets}
+          targets={visibleTargets}
           lens={state.lens}
           selectedNpi={state.selectedEntity}
           onSelect={handleTargetSelect}
