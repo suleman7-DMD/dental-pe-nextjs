@@ -327,6 +327,9 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
       if (isMeta || event.altKey) return
       if (isTypingTarget(event.target)) return
 
+      const drawerOpen =
+        shortcutsOpen || Boolean(state.selectedEntity) || Boolean(selectedZip)
+
       switch (event.key) {
         case "?":
           event.preventDefault()
@@ -337,26 +340,45 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
           handleCommandShortcut()
           return
         case "Escape":
-          if (shortcutsOpen) setShortcutsOpen(false)
+          if (shortcutsOpen) {
+            event.preventDefault()
+            setShortcutsOpen(false)
+            return
+          }
+          if (state.selectedEntity) {
+            event.preventDefault()
+            setSelectedEntity(null)
+            return
+          }
+          if (selectedZip) {
+            event.preventDefault()
+            setSelectedZip(null)
+            return
+          }
           return
         case "1":
+          if (drawerOpen) return
           event.preventDefault()
           handleModeChange("sitrep")
           return
         case "2":
+          if (drawerOpen) return
           event.preventDefault()
           handleModeChange("hunt")
           return
         case "3":
+          if (drawerOpen) return
           event.preventDefault()
           handleModeChange("profile")
           return
         case "4":
+          if (drawerOpen) return
           event.preventDefault()
           handleModeChange("investigate")
           return
         case "r":
         case "R":
+          if (drawerOpen) return
           event.preventDefault()
           handleIntentReset()
           resetWarroomState()
@@ -386,6 +408,8 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     pinnedNpis,
     removePin,
     resetWarroomState,
+    selectedZip,
+    setSelectedEntity,
     shortcutsOpen,
     state.selectedEntity,
   ])
