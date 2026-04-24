@@ -44,6 +44,7 @@ import {
   intentHasFilters,
   parseIntent,
 } from "@/lib/warroom/intent"
+import { PanelErrorBoundary } from "@/components/ui/panel-error-boundary"
 import { BriefingRail } from "./briefing-rail"
 import { DossierDrawer } from "./dossier-drawer"
 import { HuntModePanel } from "./hunt-mode-panel"
@@ -746,77 +747,91 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
         {summary && <SitrepKpiStrip summary={summary} />}
 
         {state.mode === "hunt" && (
-          <HuntModePanel
-            filter={currentHuntFilter}
-            onFilterChange={handleHuntFilterChange}
-            matchingCount={visibleTargets.length}
-            totalCandidateCount={effectiveBundle?.dataHealth.practicesFetched ?? null}
-            onReset={handleHuntReset}
-          />
+          <PanelErrorBoundary panelName="Hunt mode">
+            <HuntModePanel
+              filter={currentHuntFilter}
+              onFilterChange={handleHuntFilterChange}
+              matchingCount={visibleTargets.length}
+              totalCandidateCount={effectiveBundle?.dataHealth.practicesFetched ?? null}
+              onReset={handleHuntReset}
+            />
+          </PanelErrorBoundary>
         )}
 
         {state.mode === "profile" && (
-          <ProfileModePanel
-            pinnedNpis={state.filters.pins}
-            pinTargets={pinTargets}
-            selectedEntity={state.selectedEntity}
-            onSelectEntity={handleTargetSelect}
-            rankedTargets={visibleTargets}
-          />
+          <PanelErrorBoundary panelName="Profile mode">
+            <ProfileModePanel
+              pinnedNpis={state.filters.pins}
+              pinTargets={pinTargets}
+              selectedEntity={state.selectedEntity}
+              onSelectEntity={handleTargetSelect}
+              rankedTargets={visibleTargets}
+            />
+          </PanelErrorBoundary>
         )}
 
         {state.mode === "investigate" && (
-          <InvestigateModePanel
-            bundle={effectiveBundle}
-            rankedTargets={visibleTargets}
-            onTargetSelect={handleTargetSelect}
-            onIntentRequest={handleDossierIntentRequest}
-          />
+          <PanelErrorBoundary panelName="Investigate mode">
+            <InvestigateModePanel
+              bundle={effectiveBundle}
+              rankedTargets={visibleTargets}
+              onTargetSelect={handleTargetSelect}
+              onIntentRequest={handleDossierIntentRequest}
+            />
+          </PanelErrorBoundary>
         )}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <LivingMap
-            lens={state.lens}
-            onLensChange={setLens}
-            zipScores={zipScores}
-            zipSignals={zipSignals}
-            rankedTargets={visibleTargets}
-            selectedZip={selectedZip}
-            onZipSelect={setSelectedZip}
-            onTargetSelect={handleTargetSelect}
-            onZipDossierOpen={setDossierZip}
-            className="xl:min-h-[560px]"
-          />
+          <PanelErrorBoundary panelName="Living Map">
+            <LivingMap
+              lens={state.lens}
+              onLensChange={setLens}
+              zipScores={zipScores}
+              zipSignals={zipSignals}
+              rankedTargets={visibleTargets}
+              selectedZip={selectedZip}
+              onZipSelect={setSelectedZip}
+              onTargetSelect={handleTargetSelect}
+              onZipDossierOpen={setDossierZip}
+              className="xl:min-h-[560px]"
+            />
+          </PanelErrorBoundary>
 
           <aside className="space-y-4">
-            <BriefingRail
-              items={briefingItems}
-              onIntentRequest={handleDossierIntentRequest}
-              onLensChange={setLens}
-            />
+            <PanelErrorBoundary panelName="Briefing">
+              <BriefingRail
+                items={briefingItems}
+                onIntentRequest={handleDossierIntentRequest}
+                onLensChange={setLens}
+              />
+            </PanelErrorBoundary>
 
-            <PinboardTray
-              pins={state.filters.pins}
-              selectedEntity={state.selectedEntity}
-              onPinEntity={handleAddPin}
-              onSelectEntity={setSelectedEntity}
-              onRemovePin={removePin}
-              onReorderPins={reorderPins}
-              onClearPins={clearPins}
-              pinTargets={pinTargets}
-            />
+            <PanelErrorBoundary panelName="Pinboard">
+              <PinboardTray
+                pins={state.filters.pins}
+                selectedEntity={state.selectedEntity}
+                onPinEntity={handleAddPin}
+                onSelectEntity={setSelectedEntity}
+                onRemovePin={removePin}
+                onReorderPins={reorderPins}
+                onClearPins={clearPins}
+                pinTargets={pinTargets}
+              />
+            </PanelErrorBoundary>
           </aside>
         </div>
 
-        <TargetList
-          targets={visibleTargets}
-          lens={state.lens}
-          selectedNpi={state.selectedEntity}
-          onSelect={handleTargetSelect}
-          pinnedNpis={pinnedNpis}
-          onPin={handleAddPin}
-          onUnpin={removePin}
-        />
+        <PanelErrorBoundary panelName="Target list">
+          <TargetList
+            targets={visibleTargets}
+            lens={state.lens}
+            selectedNpi={state.selectedEntity}
+            onSelect={handleTargetSelect}
+            pinnedNpis={pinnedNpis}
+            onPin={handleAddPin}
+            onUnpin={removePin}
+          />
+        </PanelErrorBoundary>
       </div>
 
       <DossierDrawer
