@@ -439,16 +439,25 @@ export function useWarroomState() {
   )
 
   const addPin = useCallback(
-    (entity: string) => {
+    (entity: string): boolean => {
       const clean = sanitizeText(entity)
-      if (!clean) return
+      if (!clean) return false
+
+      const currentPins = state.filters.pins
+      if (
+        !currentPins.includes(clean) &&
+        currentPins.length >= WARROOM_PIN_LIMIT
+      ) {
+        return false
+      }
 
       setFilters((current) => ({
         ...current,
         pins: uniqueLimited([clean, ...current.pins], WARROOM_PIN_LIMIT),
       }))
+      return true
     },
-    [setFilters]
+    [setFilters, state.filters.pins]
   )
 
   const removePin = useCallback(

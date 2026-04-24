@@ -23,6 +23,7 @@ import {
   type WarroomScope,
 } from "@/lib/warroom/scope"
 import {
+  WARROOM_PIN_LIMIT,
   WARROOM_SIGNAL_FILTERS,
   useWarroomState,
   type WarroomConfidenceFilter,
@@ -182,7 +183,23 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   const [selectedZip, setSelectedZip] = useState<string | null>(null)
   const [dossierZip, setDossierZip] = useState<string | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [pinLimitNotice, setPinLimitNotice] = useState(false)
   const intentInputRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!pinLimitNotice) return
+    const timer = window.setTimeout(() => setPinLimitNotice(false), 4000)
+    return () => window.clearTimeout(timer)
+  }, [pinLimitNotice])
+
+  const handleAddPin = useCallback(
+    (entity: string) => {
+      const added = addPin(entity)
+      if (!added) setPinLimitNotice(true)
+      return added
+    },
+    [addPin]
+  )
 
   const scope = getWarroomScopeOption(state.scope)
   const activeLensLabel = getWarroomLensLabel(state.lens)
@@ -438,7 +455,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
           if (pinnedNpis.has(state.selectedEntity)) {
             removePin(state.selectedEntity)
           } else {
-            addPin(state.selectedEntity)
+            handleAddPin(state.selectedEntity)
           }
           return
         default:
@@ -448,7 +465,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [
-    addPin,
+    handleAddPin,
     dossierZip,
     handleCommandShortcut,
     handleIntentReset,
@@ -485,6 +502,16 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
 
   return (
     <div className="min-h-[calc(100vh-3rem)] bg-[#FAFAF7] text-[#1A1A1A]">
+      {pinLimitNotice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed right-4 top-16 z-50 flex items-center gap-2 rounded-md border border-[#D4920B]/50 bg-[#FFFBEB] px-3 py-2 text-xs font-medium text-[#7A4A00] shadow-md"
+        >
+          <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+          Pin limit reached ({WARROOM_PIN_LIMIT}). Unpin a target first.
+        </div>
+      )}
       <div className="space-y-4">
         <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF]">
           <div className="flex flex-col gap-4 px-4 py-4">
@@ -725,7 +752,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
             <PinboardTray
               pins={state.filters.pins}
               selectedEntity={state.selectedEntity}
-              onPinEntity={addPin}
+              onPinEntity={handleAddPin}
               onSelectEntity={setSelectedEntity}
               onRemovePin={removePin}
               onReorderPins={reorderPins}
@@ -741,7 +768,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
           selectedNpi={state.selectedEntity}
           onSelect={handleTargetSelect}
           pinnedNpis={pinnedNpis}
-          onPin={addPin}
+          onPin={handleAddPin}
           onUnpin={removePin}
         />
       </div>
@@ -749,7 +776,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
       <DossierDrawer
         target={selectedTarget}
         onClose={handleDossierClose}
-        onPin={addPin}
+        onPin={handleAddPin}
         onUnpin={removePin}
         isPinned={selectedTarget ? pinnedNpis.has(selectedTarget.npi) : false}
         onIntentRequest={handleDossierIntentRequest}
