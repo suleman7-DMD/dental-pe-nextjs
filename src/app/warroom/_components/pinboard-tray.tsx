@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Download,
   Flame,
@@ -113,6 +113,15 @@ export function PinboardTray({
   const selectedIsPinned = selectedEntity ? pins.includes(selectedEntity) : false
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
+  const gripRefs = useRef(new Map<string, HTMLButtonElement>())
+  const pendingFocusNpi = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!pendingFocusNpi.current) return
+    const btn = gripRefs.current.get(pendingFocusNpi.current)
+    pendingFocusNpi.current = null
+    if (btn) btn.focus()
+  }, [pins])
 
   const hydratedCount = useMemo(() => {
     if (!pinTargets) return 0
@@ -149,6 +158,45 @@ export function PinboardTray({
       setOverIndex(null)
     },
     [dragIndex, onReorderPins, pins]
+  )
+
+  const movePin = useCallback(
+    (fromIndex: number, toIndex: number) => {
+      if (!onReorderPins) return
+      if (fromIndex === toIndex) return
+      if (toIndex < 0 || toIndex >= pins.length) return
+      const next = [...pins]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      pendingFocusNpi.current = moved
+      onReorderPins(next)
+    },
+    [onReorderPins, pins]
+  )
+
+  const handleGripKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      if (!onReorderPins) return
+      switch (event.key) {
+        case "ArrowUp":
+          event.preventDefault()
+          movePin(index, index - 1)
+          break
+        case "ArrowDown":
+          event.preventDefault()
+          movePin(index, index + 1)
+          break
+        case "Home":
+          event.preventDefault()
+          movePin(index, 0)
+          break
+        case "End":
+          event.preventDefault()
+          movePin(index, pins.length - 1)
+          break
+      }
+    },
+    [movePin, onReorderPins, pins.length]
   )
 
   const handleExport = useCallback(() => {
@@ -256,12 +304,18 @@ export function PinboardTray({
                   )}
                 >
                   {onReorderPins && (
-                    <span
-                      className="flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-[#8F8E82] hover:text-[#6B6B60] active:cursor-grabbing"
-                      aria-label="Drag to reorder"
+                    <button
+                      type="button"
+                      ref={(node) => {
+                        if (node) gripRefs.current.set(npi, node)
+                        else gripRefs.current.delete(npi)
+                      }}
+                      onKeyDown={(event) => handleGripKeyDown(event, index)}
+                      className="flex h-6 w-4 shrink-0 cursor-grab items-center justify-center rounded text-[#8F8E82] hover:text-[#6B6B60] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#B8860B]/60 active:cursor-grabbing"
+                      aria-label={`Reorder ${target?.practiceName ?? npi}. Position ${index + 1} of ${pins.length}. Use arrow up or down to move.`}
                     >
                       <GripVertical className="h-3.5 w-3.5" />
-                    </span>
+                    </button>
                   )}
 
                   <button
