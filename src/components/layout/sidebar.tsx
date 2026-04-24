@@ -11,6 +11,7 @@ import {
   Search,
   Brain,
   Crosshair,
+  Rocket,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -42,6 +43,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "OVERVIEW",
     items: [
       { label: "Dashboard", href: "/", icon: LayoutDashboard },
+      { label: "Launchpad", href: "/launchpad", icon: Rocket },
       { label: "Warroom", href: "/warroom", icon: Crosshair },
     ],
   },
