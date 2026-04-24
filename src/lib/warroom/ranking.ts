@@ -463,7 +463,7 @@ function collectFlags(signal: WarroomPracticeSignalRecord | null, zipSignal: War
   if (zipSignal?.compound_demand_flag) add("zip_compound_demand", "zip_compound_demand_flag");
   if (zipSignal?.contested_zone_flag) add("zip_contested_zone", "zip_contested_zone_flag");
   if (zipSignal?.ada_benchmark_gap_flag) add("zip_ada_benchmark_gap", "zip_ada_benchmark_gap_flag");
-  if (zipSignal?.mirror_pair_flag) add("zip_mirror_pair");
+  if (zipSignal?.mirror_pair_flag) add("zip_mirror_pair", "zip_mirror_pair_flag");
   return flags;
 }
 
