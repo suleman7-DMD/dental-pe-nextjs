@@ -500,7 +500,7 @@ function AddZipForm() {
             type="text"
             name="metro_area"
             placeholder="e.g., Chicagoland"
-            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B] placeholder:text-[#B5B5A8]"
+            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B] placeholder:text-[#8F8E82]"
           />
         </div>
       </div>

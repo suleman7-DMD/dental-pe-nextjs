@@ -21,7 +21,7 @@ export default async function BuyabilityPage() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">Buyability Scanner</h1>
           <p className="text-[#6B6B60]">Data is loading. Please refresh in a moment.</p>
-          <p className="text-[#9C9C90] text-sm mt-4">
+          <p className="text-[#707064] text-sm mt-4">
             Error: {error instanceof Error ? error.message : 'Unknown'}
           </p>
         </div>

@@ -235,7 +235,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
   }, [filtered])
 
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-[#B5B5A8]" />
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 text-[#8F8E82]" />
     return sortAsc ? (
       <ChevronUp className="h-3 w-3 text-[#B8860B]" />
     ) : (
@@ -503,7 +503,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
 
           {/* Pagination footer */}
           <div className="px-4 py-3 border-t border-[#E8E5DE] flex items-center justify-between">
-            <span className="text-[11px] text-[#9C9C90]">
+            <span className="text-[11px] text-[#707064]">
               Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of{' '}
               {filtered.length.toLocaleString()} practices
             </span>
@@ -512,17 +512,17 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                 <button
                   onClick={() => setPage(Math.max(0, page - 1))}
                   disabled={page === 0}
-                  className="h-8 w-8 flex items-center justify-center rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30 transition-colors"
+                  className="h-8 w-8 flex items-center justify-center rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#707064] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30 transition-colors"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <span className="text-[11px] text-[#9C9C90] px-2">
+                <span className="text-[11px] text-[#707064] px-2">
                   Page {page + 1} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
                   disabled={page >= totalPages - 1}
-                  className="h-8 w-8 flex items-center justify-center rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30 transition-colors"
+                  className="h-8 w-8 flex items-center justify-center rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#707064] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30 transition-colors"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>

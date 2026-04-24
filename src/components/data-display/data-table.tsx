@@ -243,17 +243,17 @@ export function DataTable<T extends Record<string, any>>({
         <div className="flex items-center gap-3">
           {searchable && (
             <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#9C9C90]" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#707064]" />
               <Input
                 value={globalFilter}
                 onChange={(e) => setGlobalFilter(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="pl-9 bg-[#FFFFFF] border-[#E8E5DE] text-[#1A1A1A] placeholder:text-[#B5B5A8] focus:border-[#B8860B] focus:ring-0"
+                className="pl-9 bg-[#FFFFFF] border-[#E8E5DE] text-[#1A1A1A] placeholder:text-[#8F8E82] focus:border-[#B8860B] focus:ring-0"
               />
             </div>
           )}
           <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-[#9C9C90]">
+            <span className="text-xs text-[#707064]">
               {filteredRowCount} rows
             </span>
             {handleCSVDownload && (
@@ -283,7 +283,7 @@ export function DataTable<T extends Record<string, any>>({
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="sticky top-0 z-10 bg-[#F5F5F0] text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90] border-b-2 border-[#E8E5DE]"
+                    className="sticky top-0 z-10 bg-[#F5F5F0] text-[11px] font-semibold uppercase tracking-wider text-[#707064] border-b-2 border-[#E8E5DE]"
                   >
                     {header.isPlaceholder ? null : (
                       <div
@@ -304,7 +304,7 @@ export function DataTable<T extends Record<string, any>>({
                           ) : header.column.getIsSorted() === "desc" ? (
                             <ArrowDown className="h-3 w-3 text-[#B8860B]" />
                           ) : (
-                            <ArrowUpDown className="h-3 w-3 text-[#9C9C90] opacity-40" />
+                            <ArrowUpDown className="h-3 w-3 text-[#707064] opacity-40" />
                           ))}
                       </div>
                     )}
@@ -318,7 +318,7 @@ export function DataTable<T extends Record<string, any>>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center text-[13px] text-[#9C9C90]"
+                  className="h-24 text-center text-[13px] text-[#707064]"
                 >
                   {emptyMessage}
                 </TableCell>
@@ -360,7 +360,7 @@ export function DataTable<T extends Record<string, any>>({
       {/* Pagination */}
       {pagination && pageCount > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-[#9C9C90]">
+          <span className="text-[11px] text-[#707064]">
             Page {currentPage} of {pageCount}
           </span>
           <div className="flex items-center gap-1">
@@ -369,7 +369,7 @@ export function DataTable<T extends Record<string, any>>({
               size="sm"
               onClick={() => table.previousPage()}
               disabled={!table.getCanPreviousPage()}
-              className="h-8 w-8 p-0 bg-[#FFFFFF] border-[#E8E5DE] text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30"
+              className="h-8 w-8 p-0 bg-[#FFFFFF] border-[#E8E5DE] text-[#707064] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -378,7 +378,7 @@ export function DataTable<T extends Record<string, any>>({
               size="sm"
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
-              className="h-8 w-8 p-0 bg-[#FFFFFF] border-[#E8E5DE] text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30"
+              className="h-8 w-8 p-0 bg-[#FFFFFF] border-[#E8E5DE] text-[#707064] hover:bg-[#F7F7F4] hover:text-[#3D3D35] disabled:opacity-30"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

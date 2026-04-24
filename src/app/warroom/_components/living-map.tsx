@@ -228,7 +228,7 @@ export function LivingMap({
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E8E5DE] px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-[#1A1A1A]">Living Map</h2>
-          <p className="text-xs text-[#9C9C90]">{computation.description}</p>
+          <p className="text-xs text-[#707064]">{computation.description}</p>
         </div>
         <div className="flex flex-wrap items-center gap-1">
           {WARROOM_LENSES.map((option) => (
@@ -315,7 +315,7 @@ export function LivingMap({
                     </span>
                   </p>
                   {hovered.zipScore?.total_gp_locations != null && (
-                    <p className="text-[#9C9C90]">
+                    <p className="text-[#707064]">
                       {formatNumber(hovered.zipScore.total_gp_locations)} GP locations
                     </p>
                   )}
@@ -350,7 +350,7 @@ export function LivingMap({
         </MapContainer>
 
         <div className="pointer-events-none absolute bottom-3 left-3 flex min-w-[220px] flex-col gap-1 rounded-md border border-[#E8E5DE] bg-[#FFFFFF]/95 px-3 py-2 text-[11px] shadow-sm">
-          <p className="font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <p className="font-semibold uppercase tracking-wider text-[#707064]">
             {getWarroomLensLabel(lens)}
           </p>
           <div className="flex items-center gap-1">
@@ -367,7 +367,7 @@ export function LivingMap({
             </div>
             <span className="font-mono text-[#6B6B60]">{computation.format(maxValue)}</span>
           </div>
-          <p className="text-[10px] text-[#9C9C90]">
+          <p className="text-[10px] text-[#707064]">
             {markers.length} ZIPs · {targetsGeoJson.features.length} target pins
           </p>
         </div>
@@ -380,7 +380,7 @@ export function LivingMap({
             <div className="absolute right-3 top-3 w-[260px] space-y-2 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] p-3 text-xs shadow-sm">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wider text-[#9C9C90]">Selected ZIP</p>
+                  <p className="text-[11px] uppercase tracking-wider text-[#707064]">Selected ZIP</p>
                   <p className="text-sm font-semibold text-[#1A1A1A]">
                     {selected.zip}
                     {selected.zipScore?.city ? ` · ${selected.zipScore.city}` : ""}
@@ -389,7 +389,7 @@ export function LivingMap({
                 <button
                   type="button"
                   onClick={() => onZipSelect(null)}
-                  className="text-[#9C9C90] hover:text-[#1A1A1A]"
+                  className="text-[#707064] hover:text-[#1A1A1A]"
                   aria-label="Dismiss ZIP selection"
                 >
                   ×
@@ -432,7 +432,7 @@ export function LivingMap({
               )}
               {topTargets.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-[11px] uppercase tracking-wider text-[#9C9C90]">
+                  <p className="text-[11px] uppercase tracking-wider text-[#707064]">
                     Top targets in ZIP
                   </p>
                   <ul className="space-y-1">

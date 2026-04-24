@@ -21,8 +21,8 @@ export const BORDERS = {
 export const TEXT = {
   primary: '#1A1A1A',
   secondary: '#6B6B60',
-  muted: '#9C9C90',
-  dimmed: '#B0B0A4',
+  muted: '#707064',
+  dimmed: '#8F8E82',
 } as const;
 
 // Semantic colors — use EVERYWHERE

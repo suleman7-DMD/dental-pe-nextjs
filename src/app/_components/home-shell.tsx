@@ -114,7 +114,7 @@ function NavCardComponent({ card }: { card: NavCard }) {
         >
           <Icon className="h-5 w-5" style={{ color: card.accentColor }} />
         </div>
-        <ArrowRight className="h-4 w-4 text-[#B5B5A8] group-hover:text-[var(--accent-color)] transition-colors" style={{ '--accent-color': card.accentColor } as React.CSSProperties} />
+        <ArrowRight className="h-4 w-4 text-[#8F8E82] group-hover:text-[var(--accent-color)] transition-colors" style={{ '--accent-color': card.accentColor } as React.CSSProperties} />
       </div>
 
       <div>
@@ -218,7 +218,7 @@ function RecentActivityFeed({ changes }: { changes?: PracticeChange[] }) {
   if (!changes || changes.length === 0) {
     return (
       <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 h-full flex items-center justify-center">
-        <p className="text-[#9C9C90] text-sm">No recent activity</p>
+        <p className="text-[#707064] text-sm">No recent activity</p>
       </div>
     )
   }
@@ -253,7 +253,7 @@ function RecentActivityFeed({ changes }: { changes?: PracticeChange[] }) {
                 {formatChangeDescription(change)}
               </p>
             </div>
-            <span className="text-[11px] text-[#9C9C90] font-mono whitespace-nowrap shrink-0">
+            <span className="text-[11px] text-[#707064] font-mono whitespace-nowrap shrink-0">
               {change.change_date ?? '--'}
             </span>
           </div>

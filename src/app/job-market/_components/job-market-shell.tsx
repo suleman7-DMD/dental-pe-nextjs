@@ -11,11 +11,11 @@ import { ADABenchmarks } from './ada-benchmarks'
 
 // Lazy-load heavy components (map, charts, large tables)
 const PracticeDensityMap = dynamic(() => import('./practice-density-map').then(m => ({ default: m.PracticeDensityMap })), {
-  loading: () => <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">Loading map...</div>,
+  loading: () => <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">Loading map...</div>,
   ssr: false,
 })
 const SaturationMap = dynamic(() => import('./saturation-map').then(m => ({ default: m.SaturationMap })), {
-  loading: () => <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">Loading saturation map...</div>,
+  loading: () => <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">Loading saturation map...</div>,
   ssr: false,
 })
 const MarketOverviewCharts = dynamic(() => import('./market-overview-charts').then(m => ({ default: m.MarketOverviewCharts })), {
@@ -584,7 +584,7 @@ function JobMarketShellInner({
                       All detected signals: {kpiDisplay.allSignals_pct}
                     </span>
                   </div>
-                  <p className="text-[9px] text-[#9C9C90] leading-tight">
+                  <p className="text-[9px] text-[#707064] leading-tight">
                     Industry estimate: 25-35%
                   </p>
                 </div>
@@ -733,7 +733,7 @@ function JobMarketShellInner({
                 centerLon={loc.center_lon}
               />
             ) : (
-              <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
+              <div className="h-[500px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">
                 Loading practice data...
               </div>
             )}
@@ -749,7 +749,7 @@ function JobMarketShellInner({
                 allPractices={practicesWithScore}
               />
             ) : (
-              <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
+              <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">
                 Loading practice data...
               </div>
             )}
@@ -783,7 +783,7 @@ function JobMarketShellInner({
                 />
               </>
             ) : (
-              <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">
+              <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">
                 Loading practice data...
               </div>
             )}

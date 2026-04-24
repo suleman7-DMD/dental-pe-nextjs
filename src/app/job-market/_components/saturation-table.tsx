@@ -262,7 +262,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
             Download saturation analysis
           </button>
           {demoDate && (
-            <span className="text-[0.72rem] text-[#9C9C90]">
+            <span className="text-[0.72rem] text-[#707064]">
               Demographics last updated: {demoDate}
             </span>
           )}

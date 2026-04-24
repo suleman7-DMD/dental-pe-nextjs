@@ -26,7 +26,7 @@ export function StickySectionNav({ sections }: StickySectionNavProps) {
               "relative whitespace-nowrap pb-[9px] pt-[11px] text-sm font-medium transition-colors duration-200",
               activeId === section.id
                 ? "text-[#B8860B]"
-                : "text-[#9C9C90] hover:text-[#6B6B60]"
+                : "text-[#707064] hover:text-[#6B6B60]"
             )}
           >
             {section.label}

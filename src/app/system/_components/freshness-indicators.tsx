@@ -16,7 +16,7 @@ interface FreshnessIndicatorsProps {
 // "scraper is broken" (old lastIngest AND old lastDeal). Green ≤ 35 days
 // matches the monthly cadence of PESP/GDN roundup posts.
 function freshnessClass(days: number | null): string {
-  if (days == null) return 'text-[#9C9C90]' // gray — no data
+  if (days == null) return 'text-[#707064]' // gray — no data
   if (days <= 35) return 'text-[#2D8B4E]' // green
   if (days <= 90) return 'text-[#D4920B]' // amber
   return 'text-[#C23B3B]' // red

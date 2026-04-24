@@ -69,7 +69,7 @@ const NAV_ITEMS = [
 
 function ConfidenceBadge({ confidence }: { confidence: string | null | undefined }) {
   const c = (confidence ?? '').toLowerCase()
-  let bg = 'bg-gray-500/10 text-[#9C9C90]'
+  let bg = 'bg-gray-500/10 text-[#707064]'
   let label = confidence ?? '\u2014'
   if (c === 'high') {
     bg = 'bg-green-500/10 text-[#2D8B4E]'
@@ -92,7 +92,7 @@ function ConfidenceBadge({ confidence }: { confidence: string | null | undefined
 
 function ReadinessBadge({ readiness }: { readiness: string | null | undefined }) {
   const r = (readiness ?? '').toLowerCase()
-  let bg = 'bg-gray-500/10 text-[#9C9C90]'
+  let bg = 'bg-gray-500/10 text-[#707064]'
   let label = readiness ?? '\u2014'
   if (r === 'high') {
     bg = 'bg-red-500/10 text-[#C23B3B]'
@@ -104,7 +104,7 @@ function ReadinessBadge({ readiness }: { readiness: string | null | undefined })
     bg = 'bg-green-500/10 text-[#2D8B4E]'
     label = 'Low'
   } else if (r === 'unlikely') {
-    bg = 'bg-gray-500/10 text-[#9C9C90]'
+    bg = 'bg-gray-500/10 text-[#707064]'
     label = 'Unlikely'
   }
   return (
@@ -125,7 +125,7 @@ function SignalCard({
 }) {
   return (
     <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90] mb-2">
+      <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064] mb-2">
         {title}
       </h4>
       <div className="text-[13px] text-[#3D3D35] space-y-1">{children}</div>
@@ -136,7 +136,7 @@ function SignalCard({
 /** Render a signal value, showing em-dash for null/empty. */
 function SignalValue({ value }: { value: string | number | null | undefined }) {
   if (value === null || value === undefined || value === '') {
-    return <span className="text-[#B5B5A8]">{'\u2014'}</span>
+    return <span className="text-[#8F8E82]">{'\u2014'}</span>
   }
   return <span>{String(value)}</span>
 }
@@ -284,7 +284,7 @@ export function IntelligenceShell({
         header: 'Red Flags',
         render: (val: string | null) => {
           const flags = safeParseJsonArray(val)
-          if (flags.length === 0) return <span className="text-[#B5B5A8]">0</span>
+          if (flags.length === 0) return <span className="text-[#8F8E82]">0</span>
           return <span className="text-[#C23B3B] font-medium">{flags.length}</span>
         },
       },
@@ -293,7 +293,7 @@ export function IntelligenceShell({
         header: 'Green Flags',
         render: (val: string | null) => {
           const flags = safeParseJsonArray(val)
-          if (flags.length === 0) return <span className="text-[#B5B5A8]">0</span>
+          if (flags.length === 0) return <span className="text-[#8F8E82]">0</span>
           return <span className="text-[#2D8B4E] font-medium">{flags.length}</span>
         },
       },
@@ -304,7 +304,7 @@ export function IntelligenceShell({
           val === 1 ? (
             <CheckCircle2 className="h-4 w-4 text-[#B8860B]" />
           ) : (
-            <span className="text-[#B5B5A8]">{'\u2014'}</span>
+            <span className="text-[#8F8E82]">{'\u2014'}</span>
           ),
       },
       {
@@ -430,7 +430,7 @@ export function IntelligenceShell({
                 </h3>
                 <button
                   onClick={() => setSelectedZip(null)}
-                  className="text-[#9C9C90] hover:text-[#6B6B60] transition-colors"
+                  className="text-[#707064] hover:text-[#6B6B60] transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -475,7 +475,7 @@ export function IntelligenceShell({
                     {selectedZip.median_home_price != null ? (
                       <span className="font-mono">${selectedZip.median_home_price.toLocaleString()}</span>
                     ) : (
-                      <span className="text-[#B5B5A8]">{'\u2014'}</span>
+                      <span className="text-[#8F8E82]">{'\u2014'}</span>
                     )}
                   </p>
                   <p><span className="text-[#6B6B60]">Trend:</span> <SignalValue value={selectedZip.home_price_trend} /></p>
@@ -486,7 +486,7 @@ export function IntelligenceShell({
                         {selectedZip.home_price_yoy_pct >= 0 ? '+' : ''}{selectedZip.home_price_yoy_pct.toFixed(1)}%
                       </span>
                     ) : (
-                      <span className="text-[#B5B5A8]">{'\u2014'}</span>
+                      <span className="text-[#8F8E82]">{'\u2014'}</span>
                     )}
                   </p>
                   <p><span className="text-[#6B6B60]">Source:</span> <SignalValue value={selectedZip.real_estate_source} /></p>
@@ -554,7 +554,7 @@ export function IntelligenceShell({
                       {safeParseJsonArray(selectedZip.sources).length > 0 ? (
                         safeParseJsonArray(selectedZip.sources).map((src, i) => (
                           <li key={i} className="flex items-center gap-1.5">
-                            <ExternalLink className="h-3 w-3 text-[#B5B5A8] flex-shrink-0" />
+                            <ExternalLink className="h-3 w-3 text-[#8F8E82] flex-shrink-0" />
                             <span>{src}</span>
                           </li>
                         ))
@@ -567,7 +567,7 @@ export function IntelligenceShell({
               </div>
 
               {/* Metadata */}
-              <div className="mt-4 flex items-center gap-4 text-[11px] text-[#9C9C90]">
+              <div className="mt-4 flex items-center gap-4 text-[11px] text-[#707064]">
                 <span>Confidence: <ConfidenceBadge confidence={selectedZip.confidence} /></span>
                 <span>Method: {selectedZip.research_method ?? '\u2014'}</span>
                 <span>Model: {selectedZip.model_used ?? '\u2014'}</span>
@@ -608,7 +608,7 @@ export function IntelligenceShell({
                 </h3>
                 <button
                   onClick={() => setSelectedPractice(null)}
-                  className="text-[#9C9C90] hover:text-[#6B6B60] transition-colors"
+                  className="text-[#707064] hover:text-[#6B6B60] transition-colors"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -629,7 +629,7 @@ export function IntelligenceShell({
                         {selectedPractice.website_url}
                       </a>
                     ) : (
-                      <span className="text-[#B5B5A8]">{'\u2014'}</span>
+                      <span className="text-[#8F8E82]">{'\u2014'}</span>
                     )}
                   </p>
                   <p><span className="text-[#6B6B60]">Era:</span> <SignalValue value={selectedPractice.website_era} /></p>
@@ -656,7 +656,7 @@ export function IntelligenceShell({
                         {selectedPractice.google_rating.toFixed(1)}{'\u2605'}
                       </span>
                     ) : (
-                      <span className="text-[#B5B5A8]">{'\u2014'}</span>
+                      <span className="text-[#8F8E82]">{'\u2014'}</span>
                     )}
                   </p>
                   <p>
@@ -664,7 +664,7 @@ export function IntelligenceShell({
                     {selectedPractice.google_review_count != null ? (
                       <span className="font-mono">{selectedPractice.google_review_count}</span>
                     ) : (
-                      <span className="text-[#B5B5A8]">{'\u2014'}</span>
+                      <span className="text-[#8F8E82]">{'\u2014'}</span>
                     )}
                   </p>
                   <p><span className="text-[#6B6B60]">Recent Date:</span> <SignalValue value={selectedPractice.google_recent_date} /></p>
@@ -678,7 +678,7 @@ export function IntelligenceShell({
                     {selectedPractice.hiring_active === 1 ? (
                       <span className="text-[#D4920B] font-medium">Yes</span>
                     ) : (
-                      <span className="text-[#B5B5A8]">No</span>
+                      <span className="text-[#8F8E82]">No</span>
                     )}
                   </p>
                   <p><span className="text-[#6B6B60]">Positions:</span> <SignalValue value={selectedPractice.hiring_positions} /></p>
@@ -691,7 +691,7 @@ export function IntelligenceShell({
                     {selectedPractice.acquisition_found === 1 ? (
                       <span className="text-[#C23B3B] font-medium">Yes</span>
                     ) : (
-                      <span className="text-[#B5B5A8]">No</span>
+                      <span className="text-[#8F8E82]">No</span>
                     )}
                   </p>
                   <p><span className="text-[#6B6B60]">Details:</span> <SignalValue value={selectedPractice.acquisition_details} /></p>
@@ -709,7 +709,7 @@ export function IntelligenceShell({
                     {selectedPractice.provider_count_web != null ? (
                       <span className="font-mono">{selectedPractice.provider_count_web}</span>
                     ) : (
-                      <span className="text-[#B5B5A8]">{'\u2014'}</span>
+                      <span className="text-[#8F8E82]">{'\u2014'}</span>
                     )}
                   </p>
                   <p><span className="text-[#6B6B60]">Career Stage:</span> <SignalValue value={selectedPractice.owner_career_stage} /></p>
@@ -737,7 +737,7 @@ export function IntelligenceShell({
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[13px] text-[#B5B5A8]">None identified</p>
+                    <p className="text-[13px] text-[#8F8E82]">None identified</p>
                   )}
                 </div>
 
@@ -756,7 +756,7 @@ export function IntelligenceShell({
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[13px] text-[#B5B5A8]">None identified</p>
+                    <p className="text-[13px] text-[#8F8E82]">None identified</p>
                   )}
                 </div>
               </div>
@@ -784,7 +784,7 @@ export function IntelligenceShell({
               )}
 
               {/* Metadata */}
-              <div className="flex flex-wrap items-center gap-4 text-[11px] text-[#9C9C90]">
+              <div className="flex flex-wrap items-center gap-4 text-[11px] text-[#707064]">
                 <span>
                   Readiness: <ReadinessBadge readiness={selectedPractice.acquisition_readiness} />
                 </span>

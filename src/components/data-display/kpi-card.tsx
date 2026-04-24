@@ -81,7 +81,7 @@ export function KpiCard({
                 delay={200}
                 render={
                   <span className="cursor-help">
-                    <HelpCircle className="h-3 w-3 text-[#B5B5A8]" />
+                    <HelpCircle className="h-3 w-3 text-[#8F8E82]" />
                   </span>
                 }
               />
@@ -135,7 +135,7 @@ export function KpiCard({
             </span>
           )}
           {normalizedDelta.label && (
-            <span className="text-[#9C9C90]">{normalizedDelta.label}</span>
+            <span className="text-[#707064]">{normalizedDelta.label}</span>
           )}
         </div>
       )}

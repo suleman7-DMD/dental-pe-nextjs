@@ -480,7 +480,7 @@ export function SaturationMap({
                 style={{ background: gradientCss }}
               />
               <span className="text-[10px] text-[#6B6B60] min-w-[28px]">{cfg.legendMax}</span>
-              <span className="text-[10px] text-[#9C9C90] ml-1">{cfg.legendNote}</span>
+              <span className="text-[10px] text-[#707064] ml-1">{cfg.legendNote}</span>
             </div>
 
             {/* Size legend + dot legend */}
@@ -497,7 +497,7 @@ export function SaturationMap({
                 <span className="inline-block w-4 h-4 rounded-full border border-[#D4D0C8] bg-[#9C9C90]" />
                 Large ZIP
               </span>
-              <span className="text-[11px] text-[#9C9C90]">
+              <span className="text-[11px] text-[#707064]">
                 Circle size = GP office count
               </span>
             </div>

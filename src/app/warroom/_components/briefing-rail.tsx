@@ -83,7 +83,7 @@ export function BriefingRail({
       <header className="flex items-center justify-between border-b border-[#E8E5DE] px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-[#1A1A1A]">Market Briefing</h2>
-          <p className="text-xs text-[#9C9C90]">
+          <p className="text-xs text-[#707064]">
             {items.length} auto-synthesized insights
           </p>
         </div>
@@ -156,11 +156,11 @@ export function BriefingRail({
                           {item.metric.value}
                         </span>
                         {item.metric.unit && (
-                          <span className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                          <span className="text-[10px] uppercase tracking-wider text-[#707064]">
                             {item.metric.unit}
                           </span>
                         )}
-                        <span className="ml-1 text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                        <span className="ml-1 text-[10px] uppercase tracking-wider text-[#707064]">
                           {item.metric.label}
                         </span>
                       </div>

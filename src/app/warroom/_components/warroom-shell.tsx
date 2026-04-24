@@ -92,7 +92,7 @@ function LensSelector({
     <div className="flex flex-col gap-1">
       <label
         htmlFor="warroom-lens"
-        className="text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]"
+        className="text-[11px] font-medium uppercase tracking-wider text-[#707064]"
       >
         Lens
       </label>
@@ -474,7 +474,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                 >
                   <Search className="h-4 w-4" />
                   <span>Cmd K</span>
-                  <Command className="h-3.5 w-3.5 text-[#B5B5A8]" />
+                  <Command className="h-3.5 w-3.5 text-[#8F8E82]" />
                 </Button>
                 <Button
                   type="button"
@@ -495,7 +495,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                 <div className="flex flex-col gap-1">
                   <label
                     htmlFor="warroom-confidence"
-                    className="text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]"
+                    className="text-[11px] font-medium uppercase tracking-wider text-[#707064]"
                   >
                     Confidence
                   </label>
@@ -519,7 +519,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <span className="mr-1 text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]">
+                <span className="mr-1 text-[11px] font-medium uppercase tracking-wider text-[#707064]">
                   Signals
                 </span>
                 {WARROOM_SIGNAL_FILTERS.map((filter) => {
@@ -551,7 +551,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                     resetWarroomState()
                     setSelectedZip(null)
                   }}
-                  className="h-8 text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
+                  className="h-8 text-[#707064] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   Reset

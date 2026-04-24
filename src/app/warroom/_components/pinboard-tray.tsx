@@ -171,7 +171,7 @@ export function PinboardTray({
       <div className="flex items-center justify-between border-b border-[#E8E5DE] px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-[#1A1A1A]">Pinboard</h2>
-          <p className="text-xs text-[#9C9C90]">
+          <p className="text-xs text-[#707064]">
             {pins.length} pinned
             {pinTargets && pins.length > 0 && (
               <span className="ml-1 text-[10px]">
@@ -222,8 +222,8 @@ export function PinboardTray({
 
       <div className="max-h-[320px] overflow-y-auto p-3 scrollbar-thin">
         {pins.length === 0 ? (
-          <div className="rounded-md border border-dashed border-[#D4D0C8] bg-[#F7F7F4] px-3 py-6 text-center text-sm text-[#9C9C90]">
-            <Pin className="mx-auto h-4 w-4 text-[#B5B5A8]" />
+          <div className="rounded-md border border-dashed border-[#D4D0C8] bg-[#F7F7F4] px-3 py-6 text-center text-sm text-[#707064]">
+            <Pin className="mx-auto h-4 w-4 text-[#8F8E82]" />
             <p className="mt-1.5 font-medium">No pinned practices</p>
             <p className="mt-0.5 text-[11px]">Click the pin icon on any target to save it.</p>
           </div>
@@ -257,7 +257,7 @@ export function PinboardTray({
                 >
                   {onReorderPins && (
                     <span
-                      className="flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-[#B5B5A8] hover:text-[#6B6B60] active:cursor-grabbing"
+                      className="flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-[#8F8E82] hover:text-[#6B6B60] active:cursor-grabbing"
                       aria-label="Drag to reorder"
                     >
                       <GripVertical className="h-3.5 w-3.5" />
@@ -308,7 +308,7 @@ export function PinboardTray({
                         </span>
                       )}
                       {!target && (
-                        <span className="rounded-full border border-[#E8E5DE] bg-[#FFFFFF] px-1.5 py-0.5 font-mono text-[10px] text-[#9C9C90]">
+                        <span className="rounded-full border border-[#E8E5DE] bg-[#FFFFFF] px-1.5 py-0.5 font-mono text-[10px] text-[#707064]">
                           {npi}
                         </span>
                       )}
@@ -326,7 +326,7 @@ export function PinboardTray({
                       event.stopPropagation()
                       onRemovePin(npi)
                     }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#9C9C90] transition-colors hover:bg-[#FFFFFF] hover:text-[#C23B3B]"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#707064] transition-colors hover:bg-[#FFFFFF] hover:text-[#C23B3B]"
                     aria-label={`Remove ${target?.practiceName ?? npi}`}
                   >
                     <X className="h-3.5 w-3.5" />

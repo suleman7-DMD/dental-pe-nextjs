@@ -137,7 +137,7 @@ export function SitrepKpiStrip({ summary, className }: SitrepKpiStripProps) {
               {countsToPct(signalCounts.totalFlaggedPractices, ownership.total)} of scope
             </span>
           ) : (
-            <span className="text-[11px] text-[#B5B5A8]">Signal sync pending</span>
+            <span className="text-[11px] text-[#8F8E82]">Signal sync pending</span>
           )
         }
         tooltip="Any practice flagged by at least one of the 10 hidden-gold signals (stealth DSO, phantom, retirement combo, intel disagreement, etc.)."
@@ -154,7 +154,7 @@ export function SitrepKpiStrip({ summary, className }: SitrepKpiStripProps) {
               {formatNumber(signalCounts.stealthDsoPractices)} practices
             </span>
           ) : (
-            <span className="text-[11px] text-[#B5B5A8]">Signal sync pending</span>
+            <span className="text-[11px] text-[#8F8E82]">Signal sync pending</span>
           )
         }
         tooltip="Groups of 3+ practices sharing phone/brand/EIN signals indicating an under-the-radar DSO."

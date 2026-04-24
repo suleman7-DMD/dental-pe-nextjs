@@ -81,7 +81,7 @@ export function KeyboardShortcutsOverlay({
         <div className="space-y-4">
           {SHORTCUT_GROUPS.map((group) => (
             <div key={group.label} className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
                 {group.label}
               </p>
               <ul className="space-y-1.5">
@@ -97,7 +97,7 @@ export function KeyboardShortcutsOverlay({
                       {row.keys.map((key, idx) => (
                         <span key={`${row.description}-${idx}`} className="flex items-center gap-1">
                           {idx > 0 && (
-                            <span className="text-[10px] text-[#9C9C90]">+</span>
+                            <span className="text-[10px] text-[#707064]">+</span>
                           )}
                           <Key label={key} />
                         </span>

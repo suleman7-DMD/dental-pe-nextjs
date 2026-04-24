@@ -17,7 +17,7 @@ const SponsorPlatformCharts = dynamic(() => import('./sponsor-platform-charts').
   loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
 })
 const StateChoropleth = dynamic(() => import('./state-choropleth').then(m => ({ default: m.StateChoropleth })), {
-  loading: () => <div className="h-[400px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">Loading map...</div>,
+  loading: () => <div className="h-[400px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">Loading map...</div>,
   ssr: false,
 })
 const SpecialtyCharts = dynamic(() => import('./specialty-charts').then(m => ({ default: m.SpecialtyCharts })), {
@@ -166,7 +166,7 @@ export function DealFlowShell({
           <p className="text-[#6B6B60] mt-1 text-sm">
             Real-time tracking of private equity activity in U.S. dentistry
           </p>
-          <p className="text-[#9C9C90] text-xs mt-0.5">
+          <p className="text-[#707064] text-xs mt-0.5">
             {totalCount.toLocaleString()} deals | {sourceCount} sources | Filtered view
           </p>
         </div>
@@ -252,7 +252,7 @@ export function DealFlowShell({
                 <span className="font-mono text-[#1A1A1A]">
                   {new Date(lastSourceCheck).toISOString().slice(0, 10)}
                 </span>{' '}
-                <span className="text-[#9C9C90]">
+                <span className="text-[#707064]">
                   (latest ingest timestamp across GDN, PESP, PitchBook, Manual)
                 </span>
               </div>

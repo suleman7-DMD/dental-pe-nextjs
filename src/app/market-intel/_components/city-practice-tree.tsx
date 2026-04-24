@@ -217,7 +217,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                 className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-[#F7F7F4] transition-colors"
               >
                 <svg
-                  className={`w-4 h-4 text-[#9C9C90] transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                  className={`w-4 h-4 text-[#707064] transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -289,7 +289,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                               className="w-full flex items-center gap-3 px-6 py-2.5 text-left hover:bg-[#F7F7F4] transition-colors"
                             >
                               <svg
-                                className={`w-3.5 h-3.5 text-[#9C9C90] transition-transform flex-shrink-0 ${zipIsExpanded ? 'rotate-90' : ''}`}
+                                className={`w-3.5 h-3.5 text-[#707064] transition-transform flex-shrink-0 ${zipIsExpanded ? 'rotate-90' : ''}`}
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"

@@ -270,7 +270,7 @@ function ScoreComponentRow({ component }: { component: WarroomScoreComponent }) 
     ? "text-[#2D8B4E]"
     : negative
     ? "text-[#C23B3B]"
-    : "text-[#9C9C90]"
+    : "text-[#707064]"
   const bar = positive
     ? "bg-[#2D8B4E]/25"
     : negative
@@ -284,12 +284,12 @@ function ScoreComponentRow({ component }: { component: WarroomScoreComponent }) 
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <span className="flex items-center gap-1 font-medium text-[#1A1A1A]">
             {component.label}
-            <Info className="h-3 w-3 text-[#B5B5A8] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
+            <Info className="h-3 w-3 text-[#8F8E82] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
           </span>
           <span className={cn("font-mono font-semibold", tone)}>
             {positive ? "+" : ""}
             {component.contribution}
-            <span className="ml-0.5 text-[9px] text-[#9C9C90]">
+            <span className="ml-0.5 text-[9px] text-[#707064]">
               (w {component.weight})
             </span>
           </span>
@@ -303,7 +303,7 @@ function ScoreComponentRow({ component }: { component: WarroomScoreComponent }) 
       </PopoverTrigger>
       <PopoverContent side="left" align="start" className="w-80 text-[12px]">
         <div className="flex items-center justify-between gap-2 border-b border-[#E8E5DE] pb-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             {component.label}
           </p>
           <span className={cn("font-mono text-[13px] font-bold", tone)}>
@@ -313,11 +313,11 @@ function ScoreComponentRow({ component }: { component: WarroomScoreComponent }) 
         </div>
         <dl className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
           <div>
-            <dt className="uppercase tracking-wider text-[#9C9C90]">Weight</dt>
+            <dt className="uppercase tracking-wider text-[#707064]">Weight</dt>
             <dd className="font-mono text-[#1A1A1A]">{component.weight}</dd>
           </div>
           <div>
-            <dt className="uppercase tracking-wider text-[#9C9C90]">Points</dt>
+            <dt className="uppercase tracking-wider text-[#707064]">Points</dt>
             <dd className={cn("font-mono", tone)}>
               {positive ? "+" : ""}
               {component.contribution}
@@ -340,7 +340,7 @@ function ScoreBreakdownInline({ components }: { components: WarroomScoreComponen
 
   return (
     <div className="space-y-0.5">
-      <p className="px-1.5 pb-1 text-[10px] italic text-[#9C9C90]">
+      <p className="px-1.5 pb-1 text-[10px] italic text-[#707064]">
         Click any component for its reasoning.
       </p>
       {ranked.map((component) => (
@@ -379,7 +379,7 @@ function SignalFlagCard({
         <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
           {extras.map((extra) => (
             <div key={extra.label} className="flex items-center gap-1">
-              <dt className="uppercase tracking-wider text-[#9C9C90]">{extra.label}</dt>
+              <dt className="uppercase tracking-wider text-[#707064]">{extra.label}</dt>
               <dd className="font-mono font-semibold text-[#1A1A1A]">{extra.value}</dd>
             </div>
           ))}
@@ -425,15 +425,15 @@ function DossierField({
   const empty = value == null || value === ""
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#707064]">
         {label}
       </p>
       <div className="mt-0.5 flex items-center gap-1.5">
-        {Icon && <Icon className="h-3.5 w-3.5 shrink-0 text-[#9C9C90]" />}
+        {Icon && <Icon className="h-3.5 w-3.5 shrink-0 text-[#707064]" />}
         <p
           className={cn(
             "truncate text-[13px]",
-            empty ? "text-[#B5B5A8]" : "text-[#1A1A1A]"
+            empty ? "text-[#8F8E82]" : "text-[#1A1A1A]"
           )}
         >
           {empty ? "—" : value}
@@ -459,7 +459,7 @@ function StatBlock({
       className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] p-3"
       style={{ borderLeft: `3px solid ${accent}` }}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#707064]">
         {label}
       </p>
       <p className="mt-1 font-mono text-lg font-bold text-[#1A1A1A]">{value}</p>
@@ -735,7 +735,7 @@ function SnapshotTab({
   return (
     <div className="space-y-5">
       <section>
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
           Score Composition
         </h3>
         <div className="mt-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
@@ -744,7 +744,7 @@ function SnapshotTab({
       </section>
 
       <section>
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
           Practice Economics
         </h3>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -793,7 +793,7 @@ function SnapshotTab({
       </section>
 
       <section>
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
           Identity & Contact
         </h3>
         <div className="mt-2 grid grid-cols-2 gap-3">
@@ -820,7 +820,7 @@ function SnapshotTab({
 
       {practice.classification_reasoning && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             Classification Reasoning
           </h3>
           <p className="mt-2 whitespace-pre-wrap rounded-md border-l-2 border-[#B8860B] bg-[#FAFAF7] p-3 font-mono text-[11px] leading-relaxed text-[#1A1A1A]">
@@ -831,7 +831,7 @@ function SnapshotTab({
 
       {(practice.parent_company || practice.ein || practice.franchise_name || practice.affiliated_dso) && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             Corporate Signals
           </h3>
           <div className="mt-2 grid grid-cols-2 gap-3">
@@ -882,7 +882,7 @@ function EvidenceTab({
 
       {practiceFlags.length > 0 && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             Practice-Level Signals
             <span className="ml-2 rounded-full bg-[#F7F7F4] px-1.5 py-0.5 text-[10px] font-medium text-[#6B6B60]">
               {practiceFlags.length}
@@ -905,7 +905,7 @@ function EvidenceTab({
 
       {zipFlags.length > 0 && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             ZIP-Level Signals
             <span className="ml-2 rounded-full bg-[#F7F7F4] px-1.5 py-0.5 text-[10px] font-medium text-[#6B6B60]">
               {zipFlags.length}
@@ -928,7 +928,7 @@ function EvidenceTab({
 
       {signal?.data_limitations && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             Data Limitations
           </h3>
           <p className="mt-2 rounded-md border border-[#D4920B]/30 bg-[#D4920B]/5 p-3 text-[11px] leading-snug text-[#1A1A1A]">
@@ -939,7 +939,7 @@ function EvidenceTab({
 
       {recentChanges.length > 0 && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             Change Timeline ({recentChanges.length})
           </h3>
           <ol className="mt-3 relative ml-1.5 border-l-2 border-[#E8E5DE]">
@@ -952,7 +952,7 @@ function EvidenceTab({
                     style={{ backgroundColor: dotColor }}
                     aria-hidden
                   />
-                  <div className="flex items-baseline justify-between gap-2 text-[11px] text-[#9C9C90]">
+                  <div className="flex items-baseline justify-between gap-2 text-[11px] text-[#707064]">
                     <span className="font-mono uppercase tracking-wider" style={{ color: dotColor }}>
                       {change.change_type ?? change.field_changed ?? "Change"}
                     </span>
@@ -1023,7 +1023,7 @@ function MarketTab({
     <div className="space-y-5">
       {zipScore && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             ZIP {zipScore.zip_code} · {zipScore.city ?? "—"}
           </h3>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1082,13 +1082,13 @@ function MarketTab({
 
       {zipSignal && (zipSignal.mirror_pair_flag || zipSignal.compound_demand_flag || zipSignal.white_space_flag) && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             ZIP Signals Summary
           </h3>
           <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 text-[12px]">
             {zipSignal.white_space_score != null && (
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
                   White-space score
                 </dt>
                 <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
@@ -1098,7 +1098,7 @@ function MarketTab({
             )}
             {zipSignal.compound_demand_score != null && (
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
                   Compound demand
                 </dt>
                 <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
@@ -1108,7 +1108,7 @@ function MarketTab({
             )}
             {zipSignal.top_mirror_zip && (
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
                   Mirror pair
                 </dt>
                 <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
@@ -1118,7 +1118,7 @@ function MarketTab({
             )}
             {zipSignal.contested_platform_count != null && zipSignal.contested_platform_count > 0 && (
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
                   Contested platforms
                 </dt>
                 <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
@@ -1128,7 +1128,7 @@ function MarketTab({
             )}
             {zipSignal.ada_benchmark_gap_pp != null && (
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
                   ADA gap (pp)
                 </dt>
                 <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
@@ -1142,7 +1142,7 @@ function MarketTab({
 
       <section>
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             Deal catchment
             <span className="ml-2 text-[10px] normal-case tracking-normal text-[#6B6B60]">
               within 2 mi · last 24 mo
@@ -1184,7 +1184,7 @@ function MarketTab({
                   {deal.pe_sponsor ? ` · ${deal.pe_sponsor}` : ""}
                 </p>
                 {(deal.target_city || deal.target_zip) && (
-                  <p className="mt-0.5 text-[11px] text-[#9C9C90]">
+                  <p className="mt-0.5 text-[11px] text-[#707064]">
                     {[deal.target_city, deal.target_zip].filter(Boolean).join(" · ")}
                   </p>
                 )}
@@ -1215,7 +1215,7 @@ function ActionsTab({
   return (
     <div className="space-y-5">
       <section>
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
           Dashboard deep-links
         </h3>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1226,7 +1226,7 @@ function ActionsTab({
       </section>
 
       <section>
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
           Copy to Clipboard
         </h3>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -1238,7 +1238,7 @@ function ActionsTab({
       </section>
 
       <section>
-        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
           External Lookups
         </h3>
         <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -1274,7 +1274,7 @@ function ActionsTab({
 
       {onIntentRequest && (
         <section>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             Hunt Actions
           </h3>
           <div className="mt-2 space-y-2">
@@ -1337,7 +1337,7 @@ function ExternalLinkRow({
         <p className="text-[12px] font-semibold text-[#1A1A1A]">{label}</p>
         <p className="truncate text-[11px] text-[#6B6B60]">{description}</p>
       </div>
-      <ExternalLink className="h-4 w-4 shrink-0 text-[#9C9C90] group-hover:text-[#B8860B]" />
+      <ExternalLink className="h-4 w-4 shrink-0 text-[#707064] group-hover:text-[#B8860B]" />
     </a>
   )
 }
@@ -1435,7 +1435,7 @@ function DeepLinkRow({ href, label, description, icon: Icon, color }: DeepLink) 
         <p className="text-[12px] font-semibold text-[#1A1A1A]">{label}</p>
         <p className="truncate text-[11px] text-[#6B6B60]">{description}</p>
       </div>
-      <ArrowUpRight className="h-4 w-4 shrink-0 text-[#9C9C90] group-hover:text-[#B8860B]" />
+      <ArrowUpRight className="h-4 w-4 shrink-0 text-[#707064] group-hover:text-[#B8860B]" />
     </Link>
   )
 }

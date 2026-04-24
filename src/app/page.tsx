@@ -123,7 +123,7 @@ export default async function HomePage() {
           <p className="text-[#6B6B60]">
             Data is being fetched. Please refresh in a moment.
           </p>
-          <p className="text-[#9C9C90] text-sm mt-4">
+          <p className="text-[#707064] text-sm mt-4">
             If this persists, check Supabase connection.
           </p>
         </div>

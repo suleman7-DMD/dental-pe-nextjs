@@ -98,7 +98,7 @@ export function DealsTable({ deals }: DealsTableProps) {
       header: 'Source',
       render: (val: unknown) => {
         const v = val as string | null
-        return <span className="text-[#9C9C90] text-[0.75rem]">{v ?? '\u2014'}</span>
+        return <span className="text-[#707064] text-[0.75rem]">{v ?? '\u2014'}</span>
       },
     },
   ]

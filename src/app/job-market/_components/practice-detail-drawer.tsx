@@ -316,7 +316,7 @@ export function PracticeDetailDrawer({
 
           {/* ── Classification Reasoning ─────────────────────────── */}
           <div className="px-4 py-4">
-            <h4 className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-2">
+            <h4 className="text-[11px] uppercase tracking-wider text-[#707064] font-medium mb-2">
               Classification Reasoning
             </h4>
             {reasoning ? (
@@ -331,13 +331,13 @@ export function PracticeDetailDrawer({
                 className="bg-[#FAFAF7] rounded-md p-3 font-mono text-xs text-[#1A1A1A] leading-relaxed border-l-2"
                 style={{ borderLeftColor: ecColor }}
               >
-                <p className="italic text-[#9C9C90] mb-2 text-[11px] font-sans">
+                <p className="italic text-[#707064] mb-2 text-[11px] font-sans">
                   Auto-generated observations (no stored reasoning):
                 </p>
                 <ul className="space-y-1">
                   {observations.map((obs, i) => (
                     <li key={i} className="flex items-start gap-1.5">
-                      <span className="shrink-0 text-[#B5B5A8] mt-0.5">&bull;</span>
+                      <span className="shrink-0 text-[#8F8E82] mt-0.5">&bull;</span>
                       <span>{obs}</span>
                     </li>
                   ))}
@@ -345,7 +345,7 @@ export function PracticeDetailDrawer({
               </div>
             ) : (
               <div
-                className="bg-[#FAFAF7] rounded-md p-3 font-mono text-xs text-[#B5B5A8] leading-relaxed border-l-2 border-l-[#B5B5A8]"
+                className="bg-[#FAFAF7] rounded-md p-3 font-mono text-xs text-[#8F8E82] leading-relaxed border-l-2 border-l-[#B5B5A8]"
               >
                 No reasoning available.
               </div>
@@ -357,7 +357,7 @@ export function PracticeDetailDrawer({
             <>
               <div className="border-t border-[#E8E5DE]" />
               <div className="px-4 py-4">
-                <h4 className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-2">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#707064] font-medium mb-2">
                   Family Indicators
                 </h4>
                 <div className="bg-[#FAFAF7] rounded-md p-3 border-l-2 border-l-[#D4920B]">
@@ -374,7 +374,7 @@ export function PracticeDetailDrawer({
             <>
               <div className="border-t border-[#E8E5DE]" />
               <div className="px-4 py-4">
-                <h4 className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-2">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#707064] font-medium mb-2">
                   Providers at Address
                 </h4>
                 <div className="bg-[#FAFAF7] rounded-md p-3 border-l-2 border-l-[#B8860B]">
@@ -389,7 +389,7 @@ export function PracticeDetailDrawer({
                       </li>
                     ))}
                     {sameAddress.length > 10 && (
-                      <li className="text-xs text-[#B5B5A8]">
+                      <li className="text-xs text-[#8F8E82]">
                         +{sameAddress.length - 10} more
                       </li>
                     )}
@@ -404,7 +404,7 @@ export function PracticeDetailDrawer({
             <>
               <div className="border-t border-[#E8E5DE]" />
               <div className="px-4 py-4">
-                <h4 className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-2">
+                <h4 className="text-[11px] uppercase tracking-wider text-[#707064] font-medium mb-2">
                   Multi-ZIP Presence
                 </h4>
                 <div className="bg-[#FAFAF7] rounded-md p-3 border-l-2 border-l-[#C23B3B]">
@@ -423,7 +423,7 @@ export function PracticeDetailDrawer({
                       </span>
                     ))}
                     {multiZipData.zips.length > 20 && (
-                      <span className="text-[11px] text-[#B5B5A8]">
+                      <span className="text-[11px] text-[#8F8E82]">
                         +{multiZipData.zips.length - 20} more
                       </span>
                     )}
@@ -457,7 +457,7 @@ function DossierField({
   const isEmpty = value == null || value === '' || value === '\u2014'
   return (
     <div className="min-w-0">
-      <div className="text-[11px] uppercase tracking-wider text-[#9C9C90] font-medium mb-0.5">
+      <div className="text-[11px] uppercase tracking-wider text-[#707064] font-medium mb-0.5">
         {label}
       </div>
       <div className="flex items-center gap-1.5 min-w-0">
@@ -468,7 +468,7 @@ function DossierField({
           />
         )}
         <span
-          className={`text-[14px] truncate ${isEmpty ? 'text-[#B5B5A8]' : 'text-[#1A1A1A]'}`}
+          className={`text-[14px] truncate ${isEmpty ? 'text-[#8F8E82]' : 'text-[#1A1A1A]'}`}
         >
           {isEmpty ? '\u2014' : String(value)}
         </span>

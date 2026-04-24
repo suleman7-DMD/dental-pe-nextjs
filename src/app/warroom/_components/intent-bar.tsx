@@ -102,10 +102,10 @@ export function IntentBar({
               }}
               placeholder={pendingHint ?? "Ask in plain English — e.g. “top 25 acquisition targets in SW suburbs, no PE exposure, retirement risk”"}
               disabled={disabled}
-              className="h-10 w-full rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-3 pr-24 text-sm text-[#1A1A1A] outline-none transition-colors placeholder:text-[#B5B5A8] hover:border-[#D4D0C8] focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/20 disabled:opacity-50"
+              className="h-10 w-full rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-3 pr-24 text-sm text-[#1A1A1A] outline-none transition-colors placeholder:text-[#8F8E82] hover:border-[#D4D0C8] focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/20 disabled:opacity-50"
               aria-label="Describe the targets you want"
             />
-            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center gap-1 text-[11px] text-[#B5B5A8]">
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center gap-1 text-[11px] text-[#8F8E82]">
               <span className="rounded border border-[#E8E5DE] bg-[#F7F7F4] px-1 font-mono">⏎</span>
               <span>to hunt</span>
             </div>
@@ -169,7 +169,7 @@ export function IntentBar({
 
       {(showPresets || value.length === 0) && (
         <div className="border-t border-[#E8E5DE] bg-[#FAFAF7] px-4 py-2.5">
-          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[#9C9C90]">
+          <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-[#707064]">
             <Lightbulb className="h-3 w-3 text-[#D4920B]" />
             Try a preset
           </div>

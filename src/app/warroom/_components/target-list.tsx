@@ -116,14 +116,14 @@ function ScoreBreakdown({ components }: { components: WarroomScoreComponent[] })
       )}
       {neutral.length > 0 && (
         <details className="rounded-md border border-[#E8E5DE] px-2 py-1">
-          <summary className="cursor-pointer text-[11px] font-medium text-[#9C9C90]">
+          <summary className="cursor-pointer text-[11px] font-medium text-[#707064]">
             {neutral.length} neutral factors
           </summary>
           <ul className="mt-1 space-y-1">
             {neutral.map((component) => (
               <li key={component.label} className="flex items-start justify-between gap-3">
                 <span className="font-medium text-[#6B6B60]">{component.label}</span>
-                <span className="font-mono text-[#9C9C90]">{component.contribution}</span>
+                <span className="font-mono text-[#707064]">{component.contribution}</span>
               </li>
             ))}
           </ul>
@@ -252,7 +252,7 @@ export function TargetList({
               {getWarroomLensLabel(lens)}
             </span>
           </h2>
-          <p className="text-xs text-[#9C9C90]">
+          <p className="text-xs text-[#707064]">
             {targets.length} ranked · top score {targets[0]?.score ?? 0}
           </p>
         </div>
@@ -316,7 +316,7 @@ export function TargetList({
                       type="button"
                       aria-label={isExpanded ? "Collapse breakdown" : "Expand breakdown"}
                       onClick={() => toggleExpanded(target.npi)}
-                      className="mt-0.5 text-[#9C9C90] hover:text-[#1A1A1A]"
+                      className="mt-0.5 text-[#707064] hover:text-[#1A1A1A]"
                     >
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4" />
@@ -350,7 +350,7 @@ export function TargetList({
                             <TierIcon className="h-3 w-3" />
                             {tier.label}
                           </span>
-                          <span className="text-[11px] text-[#9C9C90]">
+                          <span className="text-[11px] text-[#707064]">
                             {target.ownershipGroup} · {target.entityClassification ?? "—"}
                           </span>
                         </div>
@@ -383,7 +383,7 @@ export function TargetList({
                               </span>
                             ))}
                             {target.flags.length > 6 && (
-                              <span className="rounded-full bg-[#F7F7F4] px-1.5 py-0.5 text-[10px] text-[#9C9C90]">
+                              <span className="rounded-full bg-[#F7F7F4] px-1.5 py-0.5 text-[10px] text-[#707064]">
                                 +{target.flags.length - 6} more
                               </span>
                             )}
@@ -404,7 +404,7 @@ export function TargetList({
                         <span className="font-mono text-base font-bold text-[#1A1A1A]">
                           {target.score}
                         </span>
-                        <span className="text-[10px] text-[#9C9C90]">/100</span>
+                        <span className="text-[10px] text-[#707064]">/100</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button

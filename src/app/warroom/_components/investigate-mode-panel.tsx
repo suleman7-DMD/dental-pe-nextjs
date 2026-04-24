@@ -120,7 +120,7 @@ export function InvestigateModePanel({
           </div>
           <div>
             <h2 className="text-sm font-semibold text-[#1A1A1A]">Investigate signals</h2>
-            <p className="text-[11px] text-[#9C9C90]">
+            <p className="text-[11px] text-[#707064]">
               Pattern detection across ranked targets
             </p>
           </div>
@@ -138,7 +138,7 @@ export function InvestigateModePanel({
       <div className="grid gap-4 px-4 py-4 lg:grid-cols-2">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#6B6B60]">
-            <Flag className="h-3.5 w-3.5 text-[#9C9C90]" />
+            <Flag className="h-3.5 w-3.5 text-[#707064]" />
             Signal prevalence &amp; co-occurrence
           </div>
           {flagStats.length === 0 ? (
@@ -164,7 +164,7 @@ export function InvestigateModePanel({
                       <span className="truncate text-[13px] font-semibold text-[#1A1A1A] hover:text-[#B8860B]">
                         {stat.label}
                       </span>
-                      <Search className="h-3 w-3 shrink-0 text-[#9C9C90]" />
+                      <Search className="h-3 w-3 shrink-0 text-[#707064]" />
                     </button>
                     <span className="shrink-0 font-mono text-[12px] text-[#1A1A1A]">
                       {stat.count}
@@ -172,7 +172,7 @@ export function InvestigateModePanel({
                   </div>
                   {stat.topCoFlags.length > 0 && (
                     <p className="mt-1.5 flex flex-wrap gap-1 text-[11px] text-[#6B6B60]">
-                      <span className="text-[#9C9C90]">often with:</span>
+                      <span className="text-[#707064]">often with:</span>
                       {stat.topCoFlags.map((co) => (
                         <span
                           key={co.flag}
@@ -191,7 +191,7 @@ export function InvestigateModePanel({
 
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#6B6B60]">
-            <Layers className="h-3.5 w-3.5 text-[#9C9C90]" />
+            <Layers className="h-3.5 w-3.5 text-[#707064]" />
             Compound-signal targets
           </div>
           {compoundTargets.length === 0 ? (
@@ -214,11 +214,11 @@ export function InvestigateModePanel({
                       <p className="truncate text-[12px] font-semibold text-[#1A1A1A]">
                         {target.practiceName}
                       </p>
-                      <p className="text-[11px] text-[#9C9C90]">
+                      <p className="text-[11px] text-[#707064]">
                         ZIP {target.zip ?? "—"} · score {target.score}
                       </p>
                     </div>
-                    <ArrowUpRight className="h-3 w-3 shrink-0 text-[#9C9C90] transition-colors group-hover:text-[#B8860B]" />
+                    <ArrowUpRight className="h-3 w-3 shrink-0 text-[#707064] transition-colors group-hover:text-[#B8860B]" />
                   </button>
                 </li>
               ))}
@@ -273,7 +273,7 @@ function InvestigateSampleCard({
         </span>
       </div>
       {items.length === 0 ? (
-        <p className="mt-1.5 text-[11px] text-[#9C9C90]">No entries.</p>
+        <p className="mt-1.5 text-[11px] text-[#707064]">No entries.</p>
       ) : (
         <ul className="mt-1.5 space-y-0.5">
           {items.slice(0, 3).map((item, idx) => (
@@ -283,10 +283,10 @@ function InvestigateSampleCard({
                 onClick={item.onClick}
                 className="group flex w-full items-center gap-1 text-left text-[11px] text-[#1A1A1A] hover:text-[#B8860B]"
               >
-                <Users className="h-3 w-3 shrink-0 text-[#9C9C90] group-hover:text-[#B8860B]" />
+                <Users className="h-3 w-3 shrink-0 text-[#707064] group-hover:text-[#B8860B]" />
                 <span className="truncate">{item.title}</span>
               </button>
-              <p className="truncate pl-4 text-[10px] text-[#9C9C90]">{item.detail}</p>
+              <p className="truncate pl-4 text-[10px] text-[#707064]">{item.detail}</p>
             </li>
           ))}
         </ul>

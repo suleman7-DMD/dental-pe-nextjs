@@ -139,7 +139,7 @@ export function PipelineLogViewer() {
                   key={idx}
                   className="border-b border-[#E8E5DE]/50 hover:bg-[#E8E5DE]/20"
                 >
-                  <td className="px-4 py-2 text-[#9C9C90] font-mono text-xs whitespace-nowrap">
+                  <td className="px-4 py-2 text-[#707064] font-mono text-xs whitespace-nowrap">
                     {ev.timestamp.slice(0, 19).replace('T', ' ')}
                   </td>
                   <td className="px-4 py-2 text-[#1A1A1A] text-xs">{ev.source}</td>

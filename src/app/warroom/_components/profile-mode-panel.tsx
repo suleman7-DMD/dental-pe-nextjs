@@ -100,7 +100,7 @@ export function ProfileModePanel({
           </div>
           <div>
             <h2 className="text-sm font-semibold text-[#1A1A1A]">Profile focus</h2>
-            <p className="text-[11px] text-[#9C9C90]">
+            <p className="text-[11px] text-[#707064]">
               Deep dive one target and compare against peers
             </p>
           </div>
@@ -113,7 +113,7 @@ export function ProfileModePanel({
       <div className="grid gap-4 px-4 py-4 lg:grid-cols-[1fr_1fr]">
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#6B6B60]">
-            <Pin className="h-3.5 w-3.5 text-[#9C9C90]" />
+            <Pin className="h-3.5 w-3.5 text-[#707064]" />
             Pinned
           </div>
           {pinned.length === 0 ? (
@@ -153,7 +153,7 @@ export function ProfileModePanel({
                         <p className="truncate text-[12px] font-semibold text-[#1A1A1A]">
                           {target.practiceName}
                         </p>
-                        <p className="text-[11px] text-[#9C9C90]">
+                        <p className="text-[11px] text-[#707064]">
                           ZIP {target.zip ?? "—"}
                           {target.entityClassification
                             ? ` · ${target.entityClassification}`
@@ -173,7 +173,7 @@ export function ProfileModePanel({
 
         <div className="space-y-3">
           <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#6B6B60]">
-            <GitCompareArrows className="h-3.5 w-3.5 text-[#9C9C90]" />
+            <GitCompareArrows className="h-3.5 w-3.5 text-[#707064]" />
             {selectedTarget ? "Peer comparison" : "Recommended to pin"}
           </div>
 
@@ -215,14 +215,14 @@ export function ProfileModePanel({
                       <p className="truncate text-[12px] font-semibold text-[#1A1A1A]">
                         {target.practiceName}
                       </p>
-                      <p className="text-[11px] text-[#9C9C90]">
+                      <p className="text-[11px] text-[#707064]">
                         ZIP {target.zip ?? "—"} · {target.entityClassification ?? "—"}
                       </p>
                     </div>
                     <span className="font-mono text-[12px] text-[#1A1A1A]">
                       {target.score}
                     </span>
-                    <ArrowUpRight className="h-3 w-3 shrink-0 text-[#9C9C90] transition-colors group-hover:text-[#B8860B]" />
+                    <ArrowUpRight className="h-3 w-3 shrink-0 text-[#707064] transition-colors group-hover:text-[#B8860B]" />
                   </button>
                 </li>
               ))}

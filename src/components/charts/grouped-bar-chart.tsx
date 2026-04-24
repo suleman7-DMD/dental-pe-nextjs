@@ -40,7 +40,7 @@ export function GroupedBarChart({
 }: GroupedBarChartProps) {
   if (data.length === 0) {
     return (
-      <div className={`flex items-center justify-center text-[#9C9C90] text-sm ${className ?? ''}`} style={{ height }}>
+      <div className={`flex items-center justify-center text-[#707064] text-sm ${className ?? ''}`} style={{ height }}>
         No data available
       </div>
     )

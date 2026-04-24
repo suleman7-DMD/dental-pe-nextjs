@@ -42,7 +42,7 @@ export function ScopeSelector({ value, onChange }: ScopeSelectorProps) {
     <div className="flex flex-col gap-1">
       <label
         htmlFor="warroom-scope"
-        className="text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]"
+        className="text-[11px] font-medium uppercase tracking-wider text-[#707064]"
       >
         Scope
       </label>

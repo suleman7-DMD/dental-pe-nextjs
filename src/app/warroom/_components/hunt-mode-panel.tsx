@@ -245,7 +245,7 @@ function HuntPanelHeader({
         </div>
         <div>
           <h2 className="text-sm font-semibold text-[#1A1A1A]">Hunt controls</h2>
-          <p className="text-[11px] text-[#9C9C90]">
+          <p className="text-[11px] text-[#707064]">
             Filter the ranked target list in real time
           </p>
         </div>
@@ -262,9 +262,9 @@ function HuntPanelHeader({
         >
           {matchingCount}
           {totalCandidateCount != null && totalCandidateCount > matchingCount && (
-            <span className="ml-1 text-[#9C9C90]">/ {totalCandidateCount}</span>
+            <span className="ml-1 text-[#707064]">/ {totalCandidateCount}</span>
           )}
-          <span className="ml-1 text-[10px] uppercase tracking-wider text-[#9C9C90]">
+          <span className="ml-1 text-[10px] uppercase tracking-wider text-[#707064]">
             matches
           </span>
         </span>
@@ -279,7 +279,7 @@ function HuntPanelHeader({
           size="sm"
           onClick={onReset}
           disabled={!hasAnyFilters}
-          className="h-8 text-[#9C9C90] hover:bg-[#F7F7F4] hover:text-[#1A1A1A] disabled:opacity-40"
+          className="h-8 text-[#707064] hover:bg-[#F7F7F4] hover:text-[#1A1A1A] disabled:opacity-40"
         >
           <RotateCcw className="h-3.5 w-3.5" />
           Clear all
@@ -300,9 +300,9 @@ function SectionHeading({
 }) {
   return (
     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#6B6B60]">
-      <Icon className="h-3.5 w-3.5 text-[#9C9C90]" />
+      <Icon className="h-3.5 w-3.5 text-[#707064]" />
       <span>{title}</span>
-      {hint && <span className="font-normal normal-case tracking-normal text-[#9C9C90]">— {hint}</span>}
+      {hint && <span className="font-normal normal-case tracking-normal text-[#707064]">— {hint}</span>}
     </div>
   )
 }
@@ -319,7 +319,7 @@ function TargetTypeSection({
       <SectionHeading icon={Users} title="Target type" />
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] text-[#9C9C90]">Ownership group</span>
+        <span className="text-[11px] text-[#707064]">Ownership group</span>
         <div className="flex flex-wrap gap-1.5">
           {OWNERSHIP_OPTIONS.map((option) => {
             const active = filter.ownershipGroups.includes(option.value)
@@ -347,7 +347,7 @@ function TargetTypeSection({
                 {active ? (
                   <CheckSquare className="h-3.5 w-3.5 text-[#B8860B]" />
                 ) : (
-                  <Square className="h-3.5 w-3.5 text-[#B5B5A8]" />
+                  <Square className="h-3.5 w-3.5 text-[#8F8E82]" />
                 )}
                 {OWNERSHIP_GROUP_LABELS[option.value]}
               </button>
@@ -357,7 +357,7 @@ function TargetTypeSection({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] text-[#9C9C90]">Quick targeting toggles</span>
+        <span className="text-[11px] text-[#707064]">Quick targeting toggles</span>
         <div className="flex flex-wrap gap-1.5">
           <ToggleChip
             active={filter.retirementRiskOnly}
@@ -384,7 +384,7 @@ function TargetTypeSection({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] text-[#9C9C90]">Tier floor</span>
+        <span className="text-[11px] text-[#707064]">Tier floor</span>
         <div className="inline-flex rounded-md border border-[#E8E5DE] bg-[#F5F5F0] p-1">
           {WARROOM_TIER_FLOOR_OPTIONS.map((option) => {
             const isActive =
@@ -481,7 +481,7 @@ function MetricsSection({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-[11px] text-[#9C9C90]">Show top</span>
+        <span className="text-[11px] text-[#707064]">Show top</span>
         <div className="inline-flex rounded-md border border-[#E8E5DE] bg-[#F5F5F0] p-1">
           {LIMIT_OPTIONS.map((count) => {
             const active = (filter.limit ?? 40) === count
@@ -592,7 +592,7 @@ function FlagTriState({
           "rounded-[4px] px-2 py-0.5 transition-colors",
           state === "ignore"
             ? "bg-[#F5F5F0] text-[#1A1A1A]"
-            : "text-[#9C9C90] hover:text-[#6B6B60]"
+            : "text-[#707064] hover:text-[#6B6B60]"
         )}
         aria-pressed={state === "ignore"}
       >
@@ -661,7 +661,7 @@ function ToggleChip({
       {active ? (
         <CheckSquare className="h-3.5 w-3.5 text-[#B8860B]" />
       ) : (
-        <Square className="h-3.5 w-3.5 text-[#B5B5A8]" />
+        <Square className="h-3.5 w-3.5 text-[#8F8E82]" />
       )}
       {label}
     </button>
@@ -679,7 +679,7 @@ function TriStateChip({
 }) {
   return (
     <div className="inline-flex items-center rounded-md border border-[#E8E5DE] bg-[#FFFFFF] text-xs font-medium">
-      <span className="px-2.5 py-1 text-[#9C9C90]">{label}</span>
+      <span className="px-2.5 py-1 text-[#707064]">{label}</span>
       <div className="flex border-l border-[#E8E5DE] p-0.5">
         <TriStateButton
           pressed={value === true}
@@ -757,7 +757,7 @@ function NumberInputField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[11px] text-[#9C9C90]">{label}</label>
+      <label className="text-[11px] text-[#707064]">{label}</label>
       <input
         type="number"
         inputMode="numeric"
@@ -778,7 +778,7 @@ function NumberInputField({
           }
           onChange(num)
         }}
-        className="h-8 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 text-xs text-[#1A1A1A] outline-none transition-colors placeholder:text-[#B5B5A8] hover:border-[#D4D0C8] focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/20"
+        className="h-8 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 text-xs text-[#1A1A1A] outline-none transition-colors placeholder:text-[#8F8E82] hover:border-[#D4D0C8] focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/20"
       />
     </div>
   )
@@ -808,7 +808,7 @@ function DualRangeSlider({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between text-[11px] text-[#9C9C90]">
+      <div className="flex items-center justify-between text-[11px] text-[#707064]">
         <span>{label}</span>
         <span className="font-mono text-[#1A1A1A]">
           {formatValue(effectiveMin)} – {formatValue(effectiveMax)}
@@ -830,7 +830,7 @@ function DualRangeSlider({
             className="accent-[#B8860B]"
             aria-label={`${label} minimum`}
           />
-          <span className="text-center text-[10px] text-[#9C9C90]">
+          <span className="text-center text-[10px] text-[#707064]">
             min {formatValue(effectiveMin)}
           </span>
         </div>
@@ -849,7 +849,7 @@ function DualRangeSlider({
             className="accent-[#B8860B]"
             aria-label={`${label} maximum`}
           />
-          <span className="text-center text-[10px] text-[#9C9C90]">
+          <span className="text-center text-[10px] text-[#707064]">
             max {formatValue(effectiveMax)}
           </span>
         </div>
@@ -867,7 +867,7 @@ function ActiveChipsRow({
 }) {
   if (chips.length === 0) {
     return (
-      <footer className="border-t border-[#E8E5DE] px-4 py-3 text-[11px] text-[#9C9C90]">
+      <footer className="border-t border-[#E8E5DE] px-4 py-3 text-[11px] text-[#707064]">
         No filters active. Your target list is ranked by the default Warroom
         formula for the current lens.
       </footer>
@@ -876,7 +876,7 @@ function ActiveChipsRow({
 
   return (
     <footer className="border-t border-[#E8E5DE] px-4 py-3">
-      <div className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+      <div className="flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
         <span>Active filters</span>
         <span className="font-mono text-[#6B6B60]">{chips.length}</span>
       </div>

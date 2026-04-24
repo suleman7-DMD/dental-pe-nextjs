@@ -327,7 +327,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
               }}
             />
             <span className="text-[10px] text-[#6B6B60]">30%+</span>
-            <span className="text-[10px] text-[#9C9C90] ml-1">Consolidation % (of total)</span>
+            <span className="text-[10px] text-[#707064] ml-1">Consolidation % (of total)</span>
           </div>
         </>
       ) : (

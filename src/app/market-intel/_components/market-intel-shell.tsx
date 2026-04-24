@@ -18,7 +18,7 @@ import { DSOPenetrationTable } from './dso-penetration-table'
 
 // Lazy-load heavy components (maps, large tables with sub-queries)
 const ConsolidationMap = dynamic(() => import('./consolidation-map').then(m => ({ default: m.ConsolidationMap })), {
-  loading: () => <div className="h-[400px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#9C9C90] text-sm">Loading map...</div>,
+  loading: () => <div className="h-[400px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">Loading map...</div>,
   ssr: false,
 })
 const ZipScoreTable = dynamic(() => import('./zip-score-table').then(m => ({ default: m.ZipScoreTable })), {
@@ -265,7 +265,7 @@ function MarketIntelShellInner({
                 </div>
               </div>
 
-              <p className="text-[#9C9C90] text-xs mt-2">
+              <p className="text-[#707064] text-xs mt-2">
                 {kpis.totalP.toLocaleString()} practices: Independent {kpis.indepPct.toFixed(1)}% ({kpis.indepCount.toLocaleString()}) |
                 Specialist/Other {kpis.unkPct.toFixed(1)}% ({kpis.unkCount.toLocaleString()}).
                 All percentages use total practices as denominator.

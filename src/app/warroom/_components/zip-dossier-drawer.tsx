@@ -114,7 +114,7 @@ function StatBlock({
       className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] p-3"
       style={{ borderLeft: `3px solid ${accent}` }}
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-[#707064]">
         {label}
       </p>
       <p className="mt-1 font-mono text-lg font-bold text-[#1A1A1A]">{value}</p>
@@ -137,12 +137,12 @@ function DetailRow({
     <div className="flex items-start justify-between gap-3 border-b border-[#E8E5DE]/60 py-1.5 last:border-b-0">
       <div className="min-w-0">
         <p className="text-[11px] font-medium text-[#6B6B60]">{label}</p>
-        {hint && <p className="text-[10px] text-[#9C9C90]">{hint}</p>}
+        {hint && <p className="text-[10px] text-[#707064]">{hint}</p>}
       </div>
       <p
         className={cn(
           "shrink-0 font-mono text-[12px]",
-          empty ? "text-[#B5B5A8]" : "text-[#1A1A1A]"
+          empty ? "text-[#8F8E82]" : "text-[#1A1A1A]"
         )}
       >
         {empty ? "—" : value}
@@ -227,7 +227,7 @@ export function ZipDossierDrawer({
               </span>
             )}
             <span className="inline-flex items-center gap-1 rounded-full border border-[#E8E5DE] bg-[#FFFFFF] px-2 py-0.5">
-              <Info className="h-3 w-3 text-[#9C9C90]" />
+              <Info className="h-3 w-3 text-[#707064]" />
               Metrics confidence: {confidenceLabel}
             </span>
           </div>
@@ -236,7 +236,7 @@ export function ZipDossierDrawer({
               {locationLine}
             </SheetTitle>
             <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[#6B6B60]">
-              <MapPin className="h-3.5 w-3.5 text-[#9C9C90]" />
+              <MapPin className="h-3.5 w-3.5 text-[#707064]" />
               {gpLocations != null
                 ? `${formatNumber(gpLocations)} GP locations`
                 : "GP count unavailable"}
@@ -321,7 +321,7 @@ export function ZipDossierDrawer({
 
               {marketType && (
                 <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-[#707064]">
                     Market type
                   </p>
                   <p className="mt-1 text-sm font-semibold text-[#1A1A1A]">
@@ -429,7 +429,7 @@ export function ZipDossierDrawer({
               )}
 
               <div className="space-y-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
                   <TrendingUp className="h-3.5 w-3.5" />
                   Practice-level signal counts
                 </p>
@@ -542,7 +542,7 @@ export function ZipDossierDrawer({
                         <span className="shrink-0 rounded-full border border-[#E8E5DE] bg-[#FAFAF7] px-2 py-0.5 font-mono text-[11px] text-[#1A1A1A]">
                           {target.score}
                         </span>
-                        <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[#9C9C90] transition-colors group-hover:text-[#B8860B]" />
+                        <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-[#707064] transition-colors group-hover:text-[#B8860B]" />
                       </button>
                     </li>
                   ))}
@@ -551,20 +551,20 @@ export function ZipDossierDrawer({
 
               {zipChanges.length > 0 && (
                 <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
                     <Compass className="h-3.5 w-3.5" />
                     Recent changes in ZIP ({zipChanges.length})
                   </p>
                   <ul className="mt-2 space-y-1">
                     {zipChanges.map((change) => (
                       <li key={change.id} className="text-[11px] text-[#6B6B60]">
-                        <span className="font-mono text-[10px] text-[#9C9C90]">
+                        <span className="font-mono text-[10px] text-[#707064]">
                           {change.change_date ?? "—"}
                         </span>{" "}
                         <span className="font-medium text-[#1A1A1A]">
                           {change.practice_name ?? "Practice"}
                         </span>{" "}
-                        <span className="text-[#9C9C90]">
+                        <span className="text-[#707064]">
                           ({change.field_changed ?? change.change_type ?? "change"})
                         </span>
                       </li>
@@ -576,7 +576,7 @@ export function ZipDossierDrawer({
 
             <TabsContent value="evidence" className="m-0 space-y-4">
               <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
                   <Users className="h-3.5 w-3.5" />
                   Supply &amp; demand
                 </p>
@@ -627,7 +627,7 @@ export function ZipDossierDrawer({
               </div>
 
               <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#9C9C90]">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
                   <Info className="h-3.5 w-3.5" />
                   Data quality
                 </p>

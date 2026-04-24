@@ -25,7 +25,7 @@ const MODE_ICONS: Record<WarroomMode, LucideIcon> = {
 export function ModeSwitcher({ value, onChange }: ModeSwitcherProps) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-[#9C9C90]">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-[#707064]">
         Mode
       </span>
       <div className="grid grid-cols-2 gap-1 rounded-lg border border-[#E8E5DE] bg-[#F5F5F0] p-1 sm:grid-cols-4">
@@ -49,7 +49,7 @@ export function ModeSwitcher({ value, onChange }: ModeSwitcherProps) {
               <Icon
                 className={cn(
                   "h-3.5 w-3.5",
-                  active ? "text-[#B8860B]" : "text-[#9C9C90]"
+                  active ? "text-[#B8860B]" : "text-[#707064]"
                 )}
               />
               <span>{mode.label}</span>
