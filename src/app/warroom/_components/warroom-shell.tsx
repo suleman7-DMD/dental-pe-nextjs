@@ -12,6 +12,7 @@ import { AlertTriangle, Command, Keyboard, RotateCcw, Search } from "lucide-reac
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
+  DEFAULT_WARROOM_LENS,
   WARROOM_LENSES,
   getWarroomLensLabel,
   type WarroomLens,
@@ -310,9 +311,13 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
 
   const handleModeChange = useCallback(
     (mode: WarroomMode) => {
-      setModeAndLens(mode, MODE_DEFAULT_LENS[mode])
+      const nextLens =
+        state.lens === DEFAULT_WARROOM_LENS
+          ? MODE_DEFAULT_LENS[mode]
+          : state.lens
+      setModeAndLens(mode, nextLens)
     },
-    [setModeAndLens]
+    [setModeAndLens, state.lens]
   )
 
   const handleTargetSelect = useCallback(
