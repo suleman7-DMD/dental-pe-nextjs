@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-A Next.js 16 + Supabase + Vercel web application that tracks private equity consolidation in US dentistry. It connects to a Supabase Postgres database populated by a Python scraper pipeline, visualizes 400k+ dental practices, 2,500+ PE deals, and 290 scored markets. The frontend provides 8 pages of market intelligence — including the **Warroom** god-mode command surface for Chicagoland — with maps, charts, data tables, and deep-dive research tools.
+A Next.js 16 + Supabase + Vercel web application that tracks private equity consolidation in US dentistry. It connects to a Supabase Postgres database populated by a Python scraper pipeline, visualizes 400k+ dental practices, 2,500+ PE deals, and 290 scored markets. The frontend provides 9 pages of market intelligence — including the **Warroom** god-mode command surface and **Launchpad** for first-job finding — with maps, charts, data tables, and deep-dive research tools.
 
 **Live app:** https://dental-pe-nextjs.vercel.app
 **Data pipeline repo:** github.com/suleman7-DMD/dental-pe-tracker (Python scrapers write to SQLite, sync to Supabase)
@@ -12,9 +12,10 @@ A Next.js 16 + Supabase + Vercel web application that tracks private equity cons
 
 ```
 src/
-  app/                    Next.js App Router — 8 page routes + API routes
+  app/                    Next.js App Router — 9 page routes + API routes
     _components/          Home page shell
     warroom/              Chicagoland god-mode command surface (4 modes, 8 lenses, 12 scopes)
+    launchpad/              First-job finder for new grads (4 scopes, 3 tracks, 20 signals, 5-tab dossier)
     deal-flow/            PE deal tracking (timeline, sponsors, state choropleth)
     market-intel/         ZIP consolidation analysis (maps, saturation, changes)
     buyability/           Acquisition target scoring
@@ -37,6 +38,7 @@ src/
     types/                TypeScript interfaces (Deal, Practice, ZipScore w/ 40+ fields, etc.)
     utils/                Formatting, scoring, CSV export, color helpers
     warroom/              Warroom-specific: mode, scope, signals, intent, ranking, briefing, geo, data
+    launchpad/              Launchpad-specific: scope (4 locations), dso-tiers (16 curated DSOs), signals (20 IDs + types), ranking (track multipliers + scoring engine)
   providers/              QueryProvider (React Query), SidebarProvider
 ```
 
@@ -90,11 +92,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token
 ```
 
-## Dashboard Pages (8 total)
+## Dashboard Pages (9 total)
 
 | Route | Page | What It Shows |
 |-------|------|---------------|
 | `/` | **Home** | 8 KPI cards (deals, sponsors, practices, ZIPs, corporate %, retirement risk, YTD deals, freshness), 6 nav cards, recent deals table, data freshness bar |
+| `/launchpad` | **Launchpad** | First-job finder for new dental grads. Track-weighted 0-100 scoring across 3 tracks (Succession / Apprentice, High-Volume Ethical, DSO Associate). 20-signal catalog, 5-tier ranking (Best Fit / Strong / Maybe / Low / Avoid). 4 living-location scopes (West Loop, Woodridge, Bolingbrook, All Chicagoland). 5-tab practice dossier (Snapshot / Compensation / Mentorship / Red Flags / Interview Prep). Curated DSO tier list with comp bands + citations. Base score 50, signal×track multiplier, confidence cap at 70 for thin-data practices. |
 | `/warroom` | **Warroom** | Chicagoland god-mode command surface. 4 modes (Sitrep / Hunt / Profile / Investigate), 8 lenses (consolidation, density, buyability, retirement, pe_exposure, saturation, whitespace, disagreement), 12 scopes (US, chicagoland, 7 subzones, 3 saved presets). Intent bar (⌘K), Living Map, ranked target list, ZIP + practice dossier drawers, pinboard tray, signal flag overlays, keyboard shortcuts overlay (?), URL-synced state. |
 | `/deal-flow` | **Deal Flow** | 2,512 PE deals — KPIs, monthly stacked bar timeline, top 15 sponsors/platforms, state choropleth, searchable deals table with CSV. All queries paginated (no 1000-row truncation). |
 | `/market-intel` | **Market Intel** | Tiered consolidation KPIs (high-confidence corporate ~2.3% vs all-signals ~9.9%), DSO penetration table, consolidation map, ZIP score table, city practice tree with pre-loaded counts, ownership breakdown with per-classification counts. Cross-link banner to Warroom. |
@@ -164,6 +167,36 @@ ZIP-level: `saturation_imbalance_flag`, `confidence_divergence_flag`, `whitespac
 ### Cross-links from legacy pages
 
 `/market-intel` and `/intelligence` render a `WarroomCrossLink` banner (`src/components/layout/warroom-cross-link.tsx`) with preset `hrefSuffix` — e.g., Market Intel → `?mode=sitrep&lens=consolidation`, Intelligence → `?mode=investigate&lens=disagreement`. Legacy pages retain their full deep-dive functionality.
+
+## Launchpad File Reference
+
+| File | What It Does |
+|------|-------------|
+| `src/app/launchpad/page.tsx` | Launchpad — `force-dynamic` Server Component calling `getLaunchpadBundle` |
+| `src/app/launchpad/_components/launchpad-shell.tsx` | Launchpad orchestrator — holds state, wires top bar, list, dossier |
+| `src/app/launchpad/_components/scope-selector.tsx` | 4-option living-location dropdown (West Loop, Woodridge, Bolingbrook, All Chicagoland) |
+| `src/app/launchpad/_components/track-switcher.tsx` | All / Succession / High-Volume / DSO track toggle |
+| `src/app/launchpad/_components/launchpad-kpi-strip.tsx` | 6 KPIs (practices, best-fit, mentor-rich, hiring, avoid, comp range) |
+| `src/app/launchpad/_components/track-list.tsx` | Ranked list grouped by tier (Best Fit / Strong / Maybe / Low / Avoid) |
+| `src/app/launchpad/_components/track-list-card.tsx` | Single ranked-practice card with score, tier badge, signals, warnings |
+| `src/app/launchpad/_components/practice-dossier.tsx` | 5-tab drawer — Snapshot / Compensation / Mentorship / Red Flags / Interview Prep; header pin toggle, Snapshot tab embeds NarrativeCard |
+| `src/app/launchpad/_components/living-map.tsx` | Mapbox living map — practice hexes or ZIP choropleth, lens toggle, selection-aware |
+| `src/app/launchpad/_components/zip-dossier-drawer.tsx` | ZIP drawer (Overview / Top targets / PE activity) — auto-opens when selectedZip is set |
+| `src/app/launchpad/_components/narrative-card.tsx` | Claude Haiku "Why this practice for me?" narrative — generate-on-demand, React-Query cached by (npi, track), copy + regenerate |
+| `src/app/launchpad/_components/red-flag-patterns.tsx` | Co-occurrence heatmap of 8 warning signals + compound-red-flag target list |
+| `src/app/launchpad/_components/pinboard-panel.tsx` | Horizontal pinned-target strip — score, tier, DSO tier, unpin on hover, clear-all |
+| `src/app/launchpad/_components/saved-searches-menu.tsx` | Top-bar dropdown — save/load/delete named views (scope + track + pins), 12-search cap, localStorage-backed |
+| `src/app/api/launchpad/narrative/route.ts` | POST Claude Haiku narrative endpoint — returns 503 if `ANTHROPIC_API_KEY` unset |
+| `src/lib/launchpad/scope.ts` | LAUNCHPAD_SCOPES + resolveLaunchpadZipCodes (reuses LIVING_LOCATIONS) |
+| `src/lib/launchpad/signals.ts` | 20 signal IDs, LaunchpadTrack types, tier thresholds, LaunchpadBundle type contract |
+| `src/lib/launchpad/ranking.ts` | TRACK_MULTIPLIERS table, evaluateSignals, scoreForTrack, rankTargets orchestrator |
+| `src/lib/launchpad/dso-tiers.ts` | 16 hand-curated DSO entries with tiers, rationale, citations, comp bands |
+| `src/lib/hooks/use-launchpad-state.ts` | URL-synced Launchpad state — scope, track, selectedNpi, pinnedNpis, view, mapView, selectedZip + `togglePin`/`clearPins`/`loadSavedSearch` helpers |
+| `src/lib/hooks/use-launchpad-data.ts` | React Query wrapper for LaunchpadBundle |
+| `src/lib/hooks/use-launchpad-narrative.ts` | useMutation wrapper for narrative endpoint + `narrativeCacheKey(npi, track)` cache helper |
+| `src/lib/hooks/use-launchpad-saved-searches.ts` | localStorage CRUD for named saved views (scope + track + pins), 12-entry cap, sanitized IDs |
+| `src/lib/supabase/queries/launchpad.ts` | getLaunchpadBundle — parallel fetch + rankTargets + summary |
+
 
 ## Data Flow Pattern
 
@@ -316,6 +349,7 @@ Practices are categorized from entity_classification + buyability_score (NOT fro
 | Page | Shell File | Key Components |
 |------|-----------|----------------|
 | Home | `_components/home-shell.tsx` | Nav cards, recent deals, freshness bar |
+| Launchpad | `launchpad/_components/launchpad-shell.tsx` | scope-selector, track-switcher, launchpad-kpi-strip, track-list, track-list-card, practice-dossier |
 | Warroom | `warroom/_components/warroom-shell.tsx` | scope-selector, intent-bar, sitrep-kpi-strip, living-map, briefing-pane, target-list, dossier-drawer, zip-dossier-drawer, profile-mode-panel, investigate-mode-panel, pinboard-tray, keyboard-shortcuts-overlay |
 | Deal Flow | `deal-flow/_components/deal-flow-shell.tsx` | deal-kpis, deal-volume-timeline, specialty-charts, sponsor-platform-charts, state-choropleth, deals-table |
 | Market Intel | `market-intel/_components/market-intel-shell.tsx` | consolidation-map, zip-score-table, city-practice-tree, dso-penetration-table, warroom-cross-link |
@@ -411,6 +445,50 @@ Do not regress:
 - `normalizeWarroomDataScope()` MUST return concrete ZIP arrays for saved presets — downstream `getSitrepBundle()` assumes no preset IDs leak through
 - Cross-link banners are soft entry points — don't replace them with hard redirects; legacy pages retain their functionality
 - Investigate mode flag co-occurrence is computed client-side from `rankedTargets.flags` — server-side aggregation isn't needed until target count exceeds ~500
+
+## Launchpad Ship Log (2026-04-24) — Do Not Regress
+
+Phase 1 MVP of Launchpad (first-job finder for new dental grads) shipped on 2026-04-24.
+
+| Area | Delivered |
+|------|-----------|
+| Foundation | `src/lib/launchpad/{scope,dso-tiers,signals,ranking}.ts` — 4 scope options, 16 curated DSO entries, 20 signal definitions, TRACK_MULTIPLIERS scoring engine |
+| Data layer | `src/lib/supabase/queries/launchpad.ts::getLaunchpadBundle()` — fetches practices/intel/zip_scores/watched_zips/recent_deals in parallel, runs rankTargets, returns LaunchpadBundle |
+| Shell | `src/app/launchpad/page.tsx` (force-dynamic Server Component) + `_components/launchpad-shell.tsx` orchestrator |
+| Hooks | `src/lib/hooks/use-launchpad-state.ts` (URL-synced scope/track/selectedNpi/pinnedNpis) + `use-launchpad-data.ts` (React Query) |
+| Top bar | `scope-selector.tsx` (4 locations), `track-switcher.tsx` (All/Succession/High-Volume/DSO), `launchpad-kpi-strip.tsx` (6 KPIs), `track-list.tsx` + `track-list-card.tsx` |
+| Dossier | `practice-dossier.tsx` — 5-tab drawer (Snapshot / Compensation / Mentorship / Red Flags / Interview Prep) |
+| Sidebar | Added Launchpad to OVERVIEW group between Dashboard and Warroom with `Rocket` icon |
+
+### Scoring contract (do not regress)
+
+- Base score: 50. Each active signal: `baseWeight × TRACK_MULTIPLIERS[track][signalId]`. Clamp 0-100.
+- Tier thresholds: best_fit 80-100, strong 65-79, maybe 50-64, low 35-49, avoid 0-34.
+- Confidence cap at 70 applied when `intel == null` OR `classification_confidence < 40` — only trims scores above 70, never boosts low scores.
+- Three track scores computed for every practice; "All" track picks max, specific tracks use their own score.
+- DSO tier list is hand-curated in `dso-tiers.ts` with citations — changing tier = material change, update rationale + citations together.
+- Avoid-tier DSOs: Aspen, Sage, Western, Smile Brands, Risas. Tier 1: Mortenson, MB2, Dental Associates WI. See full list in `dso-tiers.ts`.
+
+### Phase 2 shipped (2026-04-24)
+
+| Area | Delivered |
+|------|-----------|
+| Living Map | `living-map.tsx` — Mapbox hex density (practices view) + ZIP choropleth (ZIPs view), lens toggle, selection-aware. Optional `onOpenZipDossier` prop — omitted by shell so map click sets `selectedZip` and the ZIP dossier auto-opens. |
+| ZIP dossier | `zip-dossier-drawer.tsx` — three-tab Sheet (Overview saturation, Top targets, PE activity). Shell auto-opens whenever `selectedZip` flips truthy; `onClose` clears selectedZip. |
+| AI narrative | `api/launchpad/narrative/route.ts` (Node runtime, `force-dynamic`) calls Claude Haiku 4.5 (`claude-haiku-4-5-20251001`, 500 max_tokens, 0.4 temp) with a dental-career-advisor system prompt. `use-launchpad-narrative.ts` wraps it in useMutation and caches per `(npi, track)` via `queryClient.setQueryData`. `narrative-card.tsx` inlined into Snapshot tab: generate-on-demand (not auto-fire), regenerate (clears cache via `removeQueries`), copy to clipboard. 503 + actionable message when `ANTHROPIC_API_KEY` missing. |
+| Red-flag matrix | `red-flag-patterns.tsx` — collapsible section between KPI strip and list. Computes marginals + pairwise co-occurrence across 8 warning signals (dso_avoid, family_dynasty, ghost_practice, recent_acquisition, associate_saturated, medicaid_mill, non_compete_radius, pe_recap_volatility). Heatmap intensity by co-occurrence count. Compound-red-flag sidebar lists top 12 practices with 2+ warnings, click opens dossier. |
+| Pinboard | `pinboard-panel.tsx` — horizontal strip between KPI strip and red-flags. Only renders when `pinnedNpis.length > 0`. Hover-X unpin, Clear all; gracefully handles out-of-scope pins. Pin toggle added to `track-list-card.tsx` (next to score) and `practice-dossier.tsx` header. |
+| Saved searches | `saved-searches-menu.tsx` in top bar — dropdown with count badge, Save-current-view input, saved list (scope + track + pin-count badges + delete), 12-entry cap. `use-launchpad-saved-searches.ts` backs it via localStorage (`dental-pe-launchpad-saved-searches-v0`) with coerce/sanitize validation. Loading a view commits `{scope, track, pinnedNpis}` via `loadSavedSearch` state helper. |
+
+### Do not regress (Phase 2)
+
+- Pin click inside `track-list-card.tsx` MUST call `e.stopPropagation()` — otherwise toggling a pin also opens the dossier.
+- Narrative endpoint MUST return 503 (not 500) when `ANTHROPIC_API_KEY` missing; the UI error state surfaces the message verbatim.
+- `narrativeCacheKey(npi, track)` is the single source of truth for narrative cache reads and writes — don't hand-roll new query keys.
+- Saved searches and pinboard are both **per-device** (localStorage) — don't upgrade to Supabase without planning user auth.
+- `loadSavedSearch` MUST clear `selectedNpi` and `selectedZip` when committing — otherwise a stale drawer leaks across views.
+- `PinboardPanel` MUST render nothing when pin list is empty (don't show an empty "no pins" placeholder above the red-flag matrix).
+- Red-flag heatmap uses `presentSignals` (only rendered warnings with at least one hit), not the full 8-item `WARNING_SIGNALS` set — keeps matrix dense when signals are rare.
 
 ## Development
 
