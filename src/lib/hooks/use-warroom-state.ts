@@ -27,7 +27,10 @@ export const WARROOM_QUERY_PARAMS = {
   signals: "signals",
   confidence: "confidence",
   pins: "pins",
+  intent: "intent",
 } as const
+
+export const WARROOM_INTENT_MAX_LENGTH = 512
 
 export const WARROOM_SIGNAL_FILTERS = [
   { id: "stealth_dso", label: "Stealth DSO" },
@@ -62,6 +65,7 @@ export interface WarroomState {
   lens: WarroomLens
   selectedEntity: string | null
   filters: WarroomFilters
+  intent: string
 }
 
 type SearchParamReader = Pick<URLSearchParams, "get" | "has" | "toString">
@@ -94,6 +98,7 @@ function createDefaultWarroomState(): WarroomState {
     lens: DEFAULT_WARROOM_LENS,
     selectedEntity: null,
     filters: createDefaultFilters(),
+    intent: "",
   }
 }
 
@@ -165,6 +170,7 @@ function coerceStoredState(value: unknown): WarroomState | null {
 
   const defaults = createDefaultWarroomState()
   const selectedEntity = sanitizeText(value.selectedEntity)
+  const intent = sanitizeText(value.intent, WARROOM_INTENT_MAX_LENGTH) ?? ""
 
   return {
     scope: isWarroomScopeId(value.scope) ? value.scope : defaults.scope,
@@ -172,6 +178,7 @@ function coerceStoredState(value: unknown): WarroomState | null {
     lens: isWarroomLens(value.lens) ? value.lens : defaults.lens,
     selectedEntity,
     filters: coerceFilters(value.filters, defaults.filters),
+    intent,
   }
 }
 
@@ -192,6 +199,11 @@ function parseUrlState(searchParams: SearchParamReader): WarroomState {
       confidence: coerceConfidence(confidence),
       pins: uniqueLimited(parseList(searchParams.get(WARROOM_QUERY_PARAMS.pins)), WARROOM_PIN_LIMIT),
     },
+    intent:
+      sanitizeText(
+        searchParams.get(WARROOM_QUERY_PARAMS.intent),
+        WARROOM_INTENT_MAX_LENGTH
+      ) ?? "",
   }
 }
 
@@ -249,6 +261,12 @@ function applyStateToParams(params: URLSearchParams, state: WarroomState) {
   } else {
     params.delete(WARROOM_QUERY_PARAMS.pins)
   }
+
+  if (state.intent) {
+    params.set(WARROOM_QUERY_PARAMS.intent, state.intent)
+  } else {
+    params.delete(WARROOM_QUERY_PARAMS.intent)
+  }
 }
 
 export function useWarroomState() {
@@ -284,6 +302,32 @@ export function useWarroomState() {
     [pathname, router, searchParams]
   )
 
+  const urlSyncTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingUrlState = useRef<WarroomState | null>(null)
+  const replaceUrlRef = useRef(replaceUrl)
+  replaceUrlRef.current = replaceUrl
+
+  const scheduleUrlSync = useCallback((nextState: WarroomState) => {
+    pendingUrlState.current = nextState
+    if (urlSyncTimeout.current != null) return
+    urlSyncTimeout.current = setTimeout(() => {
+      urlSyncTimeout.current = null
+      const snapshot = pendingUrlState.current
+      pendingUrlState.current = null
+      if (snapshot) replaceUrlRef.current(snapshot)
+    }, 150)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (urlSyncTimeout.current != null) {
+        clearTimeout(urlSyncTimeout.current)
+        urlSyncTimeout.current = null
+      }
+    },
+    []
+  )
+
   useEffect(() => {
     if (hydratedOnce.current) return
     hydratedOnce.current = true
@@ -308,9 +352,9 @@ export function useWarroomState() {
       const normalized = coerceStoredState(nextState) ?? createDefaultWarroomState()
       setStoredState(normalized)
       writeStoredWarroomState(normalized)
-      replaceUrl(normalized)
+      scheduleUrlSync(normalized)
     },
-    [replaceUrl]
+    [scheduleUrlSync]
   )
 
   const updateState = useCallback(
@@ -429,6 +473,17 @@ export function useWarroomState() {
     setFilters((current) => ({ ...current, pins: [] }))
   }, [setFilters])
 
+  const setIntent = useCallback(
+    (intent: string) => {
+      updateState((current) => ({
+        ...current,
+        intent:
+          sanitizeText(intent, WARROOM_INTENT_MAX_LENGTH) ?? "",
+      }))
+    },
+    [updateState]
+  )
+
   const resetWarroomState = useCallback(() => {
     commitState(createDefaultWarroomState())
   }, [commitState])
@@ -447,6 +502,7 @@ export function useWarroomState() {
     removePin,
     reorderPins,
     clearPins,
+    setIntent,
     resetWarroomState,
   }
 }
