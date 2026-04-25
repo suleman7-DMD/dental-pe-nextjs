@@ -96,7 +96,9 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
   })
 
   const isRefused =
-    !!data && data.thesis === null && data.reason === "no_verified_research"
+    !!data &&
+    data.thesis === null &&
+    (data.reason === "no_verified_research" || data.reason === "validation_failed")
   const isPartial =
     !!data && !!data.thesis && data.evidence_quality === "partial"
   const isVerified =
@@ -166,7 +168,9 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
               <div className="flex items-center gap-1.5">
                 <FileSearch className="h-3.5 w-3.5 text-[#9C9C90]" aria-hidden="true" />
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6B6B60]">
-                  No verified research available
+                  {data.reason === "validation_failed"
+                    ? "Thesis withheld — failed numeric audit"
+                    : "No verified research available"}
                 </p>
               </div>
               {data.structural_summary && (
@@ -242,9 +246,13 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
                 </dl>
               )}
               <p className="mt-3 border-t border-[#E8E5DE] pt-2 text-[11px] text-[#9C9C90]">
-                Thesis cannot be developed from structural signals alone. This
-                practice has not been deep-researched yet.
+                {data.reason === "validation_failed"
+                  ? "Generated thesis included numeric claims that don't appear in the verified intel. Refused rather than ship unsourced facts."
+                  : "Thesis cannot be developed from structural signals alone. This practice has not been deep-researched yet."}
               </p>
+              {data.reason === "validation_failed" && (
+                <RegenerateButton onClick={() => void refetch()} />
+              )}
             </div>
           )}
 

@@ -188,6 +188,163 @@ function buildStructuralSummary(body: CompoundNarrativeRequest): NonNullable<
   }
 }
 
+function extractNumericClaims(prose: string): { raw: string; num: string }[] {
+  const claims: { raw: string; num: string }[] = []
+  const patterns: RegExp[] = [
+    /\$\s?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s?([KMB]?)/gi,
+    /(\d+(?:\.\d+)?)\s?%/g,
+    /(\d+(?:,\d{3})*)[\s-]+(?:years?|reviews?|employees?|providers?|locations?|patients?|staff|operatories|chairs|sq\s?ft|square\s+feet|miles?)/gi,
+    /(\d+(?:\.\d+)?)\s+(?:rating|stars?|out\s+of\s+\d+)/gi,
+  ]
+  for (const re of patterns) {
+    let m: RegExpExecArray | null
+    while ((m = re.exec(prose)) !== null) {
+      claims.push({ raw: m[0], num: m[1].replace(/,/g, "") })
+    }
+  }
+  return claims
+}
+
+function getNumericVariants(rawClaim: string, numStr: string): string[] {
+  const variants = new Set<string>()
+  variants.add(numStr)
+
+  const suffixMatch = rawClaim.match(/([KMB])/i)
+  if (suffixMatch) {
+    const suffix = suffixMatch[1].toUpperCase()
+    const base = parseFloat(numStr)
+    if (!isNaN(base)) {
+      const mult = suffix === "K" ? 1000 : suffix === "M" ? 1000000 : 1000000000
+      variants.add(String(Math.round(base * mult)))
+      variants.add(String(base * mult))
+    }
+  }
+
+  const n = parseFloat(numStr)
+  if (!isNaN(n)) {
+    if (n >= 1000 && n < 1000000) variants.add(String(n / 1000))
+    if (n >= 1000000) variants.add(String(n / 1000000))
+    if (Number.isInteger(n)) {
+      variants.add(String(Math.round(n)))
+      if (!numStr.includes(".")) variants.add(`${Math.round(n)}.0`)
+    }
+  }
+
+  return Array.from(variants)
+}
+
+function buildValidationHaystack(
+  intel: PracticeIntel,
+  practice: CompoundNarrativeRequest["practice"]
+): string {
+  const currentYear = new Date().getFullYear()
+  const parts: string[] = [JSON.stringify(intel)]
+
+  if (practice.year_established != null) {
+    parts.push(String(practice.year_established))
+    parts.push(String(currentYear - practice.year_established))
+  }
+  if (practice.num_providers != null) parts.push(String(practice.num_providers))
+  if (practice.employee_count != null) parts.push(String(practice.employee_count))
+  if (practice.estimated_revenue != null) parts.push(String(practice.estimated_revenue))
+  if (practice.buyability_score != null) parts.push(String(practice.buyability_score))
+  if (practice.classification_confidence != null)
+    parts.push(String(practice.classification_confidence))
+  parts.push(String(currentYear))
+
+  const intelJson = JSON.stringify(intel)
+  const yearMatches = intelJson.matchAll(/\b(19\d{2}|20\d{2})\b/g)
+  for (const ym of yearMatches) {
+    const year = parseInt(ym[1], 10)
+    const age = currentYear - year
+    if (age > 0 && age < 100) parts.push(String(age))
+  }
+
+  return parts.join(" ")
+}
+
+function validateClaims(
+  claims: { raw: string; num: string }[],
+  haystack: string
+): { ok: boolean; missing: string[] } {
+  const haystackNoCommas = haystack.replace(/,/g, "")
+  const missing: string[] = []
+  for (const claim of claims) {
+    const variants = getNumericVariants(claim.raw, claim.num)
+    const found = variants.some((v) => {
+      const escaped = v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      const re = new RegExp(`(?<!\\d)${escaped}(?!\\d)`)
+      return re.test(haystackNoCommas)
+    })
+    if (!found) missing.push(claim.raw)
+  }
+  return { ok: missing.length === 0, missing }
+}
+
+async function callAnthropic(
+  apiKey: string,
+  userPrompt: string,
+  maxTokens: number
+): Promise<{ ok: true; thesis: string } | { ok: false; status: number; error: string }> {
+  let upstream: Response
+  try {
+    upstream = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: NARRATIVE_MODEL,
+        max_tokens: maxTokens,
+        temperature: TEMPERATURE,
+        system: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    })
+  } catch (err) {
+    return {
+      ok: false,
+      status: 502,
+      error: `Anthropic request failed: ${err instanceof Error ? err.message : String(err)}`,
+    }
+  }
+
+  if (!upstream.ok) {
+    const text = await upstream.text().catch(() => "")
+    return {
+      ok: false,
+      status: 502,
+      error: `Anthropic error ${upstream.status}: ${text.slice(0, 300)}`,
+    }
+  }
+
+  const data = (await upstream.json()) as AnthropicResponse
+  if (data.error) {
+    return { ok: false, status: 502, error: `Anthropic API error: ${data.error.message}` }
+  }
+
+  const thesis =
+    data.content
+      ?.filter((c) => c.type === "text")
+      .map((c) => c.text ?? "")
+      .join("\n")
+      .trim() ?? ""
+
+  if (!thesis) {
+    return { ok: false, status: 502, error: "Empty thesis returned by Anthropic" }
+  }
+
+  return { ok: true, thesis }
+}
+
 export async function POST(
   req: NextRequest
 ): Promise<NextResponse<CompoundNarrativeResponse | { error: string }>> {
@@ -263,65 +420,48 @@ export async function POST(
         : MAX_TOKENS_VERIFIED
 
   const userPrompt = buildUserPrompt(body, intel!, evidenceQuality)
+  const haystack = buildValidationHaystack(intel!, body.practice)
 
-  let upstream: Response
-  try {
-    upstream = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: NARRATIVE_MODEL,
-        max_tokens: maxTokens,
-        temperature: TEMPERATURE,
-        system: [
-          {
-            type: "text",
-            text: SYSTEM_PROMPT,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    })
-  } catch (err) {
-    return NextResponse.json(
-      {
-        error: `Anthropic request failed: ${err instanceof Error ? err.message : String(err)}`,
-      },
-      { status: 502 }
-    )
+  const r1 = await callAnthropic(apiKey, userPrompt, maxTokens)
+  if (!r1.ok) {
+    return NextResponse.json({ error: r1.error }, { status: r1.status })
   }
 
-  if (!upstream.ok) {
-    const text = await upstream.text().catch(() => "")
-    return NextResponse.json(
-      { error: `Anthropic error ${upstream.status}: ${text.slice(0, 300)}` },
-      { status: 502 }
-    )
+  const claims1 = extractNumericClaims(r1.thesis)
+  const v1 = validateClaims(claims1, haystack)
+  if (v1.ok) {
+    return NextResponse.json({ thesis: r1.thesis, evidence_quality: evidenceQuality })
   }
 
-  const data = (await upstream.json()) as AnthropicResponse
-  if (data.error) {
-    return NextResponse.json(
-      { error: `Anthropic API error: ${data.error.message}` },
-      { status: 502 }
-    )
+  console.warn(
+    `[compound-narrative] pass 1 validation failed for npi=${body.practice.npi}: missing=[${v1.missing.join(" | ")}]`
+  )
+
+  const retryAddendum = [
+    ``,
+    ``,
+    `PRIOR ATTEMPT FAILED VALIDATION. The following numeric claims in your prior thesis do not appear anywhere in the verified intel above: ${v1.missing.join(", ")}.`,
+    `Regenerate the thesis. Remove or replace any number that cannot be sourced from the structural facts or verified intel sections above. Do NOT introduce new numeric claims to compensate. If you cannot meet the citation requirement without those numbers, write a shorter thesis using only claims you can source.`,
+  ].join("\n")
+
+  const r2 = await callAnthropic(apiKey, userPrompt + retryAddendum, maxTokens)
+  if (!r2.ok) {
+    return NextResponse.json({ error: r2.error }, { status: r2.status })
   }
 
-  const thesis =
-    data.content
-      ?.filter((c) => c.type === "text")
-      .map((c) => c.text ?? "")
-      .join("\n")
-      .trim() ?? ""
-
-  if (!thesis) {
-    return NextResponse.json({ error: "Empty thesis returned by Anthropic" }, { status: 502 })
+  const claims2 = extractNumericClaims(r2.thesis)
+  const v2 = validateClaims(claims2, haystack)
+  if (v2.ok) {
+    return NextResponse.json({ thesis: r2.thesis, evidence_quality: evidenceQuality })
   }
 
-  return NextResponse.json({ thesis, evidence_quality: evidenceQuality })
+  console.warn(
+    `[compound-narrative] pass 2 validation failed for npi=${body.practice.npi}: missing=[${v2.missing.join(" | ")}] — refusing`
+  )
+
+  return NextResponse.json({
+    thesis: null,
+    reason: "validation_failed",
+    structural_summary: buildStructuralSummary(body),
+  })
 }

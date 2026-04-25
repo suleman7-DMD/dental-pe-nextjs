@@ -82,7 +82,7 @@ export interface CompoundNarrativeRequest {
 
 export interface CompoundNarrativeResponse {
   thesis: string | null
-  reason?: "no_verified_research"
+  reason?: "no_verified_research" | "validation_failed"
   evidence_quality?: "verified" | "partial" | "high"
   structural_summary?: {
     name: string
