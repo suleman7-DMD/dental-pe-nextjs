@@ -128,9 +128,20 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
 
           {data?.thesis && !isFetching && (
             <div className="rounded-md border border-[#B8860B]/20 bg-gradient-to-br from-[#FEF9E7] to-[#FFFFFF] p-3 pr-12">
-              <p className="text-[12px] italic leading-relaxed text-[#6B6B60]">
+              <p className="whitespace-pre-line text-[12px] leading-relaxed text-[#1A1A1A]">
                 {data.thesis}
               </p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void refetch()
+                }}
+                className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-[#B8860B] underline-offset-2 hover:underline"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Regenerate
+              </button>
             </div>
           )}
         </div>

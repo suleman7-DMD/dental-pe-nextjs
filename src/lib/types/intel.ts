@@ -116,6 +116,10 @@ export interface PracticeIntel {
   acquisition_readiness: string | null
   confidence: string | null
   sources: string | null
+  // Anti-hallucination verification (April 2026)
+  verification_searches: number | null
+  verification_quality: string | null
+  verification_urls: string | null
   // Metadata
   research_method: string | null
   escalated: number | null
