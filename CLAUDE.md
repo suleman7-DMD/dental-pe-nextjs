@@ -422,21 +422,27 @@ Monthly NPPES refresh (first Sunday 6am): downloads federal provider data update
 
 Paired with `scrapers/sync_to_supabase.py` per-row savepoint fix so deals with `uix_deal_no_dup` IntegrityError hits don't abort the whole batch transaction. Before this pair of fixes, a single duplicate in the deals sync would roll back every queued row — so recent deal scrapes never reached Supabase.
 
-## Warroom Ship Log (2026-04-24) — Do Not Regress
+## Warroom Ship Log (2026-04-24 → 2026-04-25) — Do Not Regress
 
-Phases 0-7 of the Chicagoland god-mode Warroom are all shipped. Earlier rounds (Phase 0 scaffold, Rounds 1-4 wiring) landed in six commits between `13b129b` and `62e7651`. This ship closes the remaining phases:
+Phases 0-7 of the Chicagoland Warroom shipped 2026-04-24, then trimmed and extended on 2026-04-25 (commits `ff5a7f1`, `9fd171f`, `f8beecb`, `50aecbb`).
 
 | Area | Delivered |
 |------|-----------|
-| Scope model | 12 scope IDs wired end-to-end (US, chicagoland, 7 subzones, 3 saved presets); `normalizeWarroomDataScope()` maps saved presets to ZIP arrays |
-| Hunt mode | Intent-driven filtering, tier floors, flag badges, enrichment-aware ranking |
-| Profile mode | New `profile-mode-panel.tsx` — pinboard workspace for comparing 2-6 targets side-by-side |
-| Investigate mode | New `investigate-mode-panel.tsx` — signal co-occurrence analysis + compound-flag list (flagCount ≥ 2) + stealth DSO cluster / intel-disagreement sample cards |
-| ZIP dossier | New `zip-dossier-drawer.tsx` — separate drawer for ZIP selections (saturation, ownership mix, top practices) |
-| Pinboard | `pinboard-tray.tsx` bottom tray shows pinned targets across sessions; persisted in URL |
-| Keyboard shortcuts | New `keyboard-shortcuts-overlay.tsx` — `?`, `⌘K`/`/`, `1-4`, `R`, `P`, `Esc`. Single-key guards for typing contexts |
-| Legacy cross-links | New `warroom-cross-link.tsx` banner rendered on `/market-intel` and `/intelligence` with preset `hrefSuffix` deep-links |
-| Geo helpers | New `src/lib/warroom/geo.ts` — subzone ZIP lookups + bounding boxes |
+| Scope model | 11 scope IDs (chicagoland, 7 subzones, 3 saved presets) — `US` and `Profile` cut in the 04-25 triage. `normalizeWarroomDataScope()` maps saved presets to ZIP arrays |
+| Modes | 2 modes: Hunt and Investigate. Sitrep KPI strip is always-visible above both panels. (Profile mode and standalone Sitrep mode were cut 04-25; Profile's compare workflow lives in the new `pin-compare-drawer`.) |
+| Lenses | 4 lenses: consolidation, density, buyability, retirement (was 8 — pe_exposure / saturation / whitespace / disagreement cut as low-signal) |
+| Hunt mode | Intent-driven filtering, tier floors, flag badges, enrichment-aware ranking, intel-availability + reviewed-only filter chips, "In pipeline · N" lifecycle filter |
+| Investigate mode | `investigate-mode-panel.tsx` — signal co-occurrence + compound-flag list (flagCount ≥ 2) + stealth DSO cluster / intel-disagreement sample cards |
+| Pin lifecycle | `use-warroom-pin-lifecycle.ts` localStorage hook (5,000 entries, cross-tab sync) — 6 stages: Untouched / Reviewed / Following / Contacted / Pursuing / Passed. Stage selector in dossier header (only when pinned). Per-row stage badge in TargetList. |
+| Reviewed tracking | `use-warroom-reviewed.ts` localStorage hook + Mark/Unmark Reviewed toggle in dossier header (timestamp tooltip). TargetList "Reviewed · N" filter chip; reviewed rows get a muted tint. Keyboard `V` toggles reviewed on the active target. |
+| Dossier nav | Prev/Next arrows + "X of Y" indicator in dossier header — index walks `visibleTargets` so it tracks the active filter chain. Keyboard `[` and `]` jump between targets. |
+| Pin compare drawer | `pin-compare-drawer.tsx` — replaces the deleted Profile mode. Multi-target side-by-side metrics + intel snippet. |
+| Pin notes | `use-warroom-pin-notes.ts` — per-NPI freeform notes attached to the dossier. |
+| Intel availability | `getPracticeIntelAvailability()` query + `useIntelAvailability` hook → drives Sparkles "Intel" badges + intel-only TargetList filter. |
+| ZIP dossier | `zip-dossier-drawer.tsx` — separate drawer for ZIP selections (saturation, ownership mix, top practices) |
+| Keyboard shortcuts | `?`, `⌘K`/`/`, `2`, `4`, `R`, `P`, `[`, `]`, `V`, `Esc`. Single-key guards for typing contexts (input/textarea/contenteditable). |
+| Legacy cross-links | `warroom-cross-link.tsx` banner on `/market-intel` and `/intelligence` with preset `hrefSuffix` deep-links |
+| Geo helpers | `src/lib/warroom/geo.ts` — subzone ZIP lookups + bounding boxes |
 
 Do not regress:
 - `use-warroom-state.ts` MUST keep URL-param sync for all 7 state dimensions (mode, lens, scope, filters, selectedEntity, pins, intent) — breaks share links otherwise
@@ -444,6 +450,8 @@ Do not regress:
 - `normalizeWarroomDataScope()` MUST return concrete ZIP arrays for saved presets — downstream `getSitrepBundle()` assumes no preset IDs leak through
 - Cross-link banners are soft entry points — don't replace them with hard redirects; legacy pages retain their functionality
 - Investigate mode flag co-occurrence is computed client-side from `rankedTargets.flags` — server-side aggregation isn't needed until target count exceeds ~500
+- Pin lifecycle, reviewed tracking, and pin notes are all **per-device localStorage** — don't migrate to Supabase without a user-auth design pass
+- `dossierIndex` MUST be derived from `visibleTargets` (the post-filter list), not raw `bundle.rankedTargets` — otherwise prev/next walks targets the user has filtered out
 
 ## Launchpad Ship Log (2026-04-24) — Do Not Regress
 
@@ -524,9 +532,11 @@ Six Claude API routes layered onto the existing rank-and-score scaffold, plus a 
 ### Backend (Python scrapers)
 
 - `research_engine.py` — added `JOB_HUNT_SYSTEM` + `JOB_HUNT_PRACTICE_USER` prompts, `research_practice_jobhunt()` method, `build_batch_requests_jobhunt()` for batch API
-- `database.py` — 7 new `PracticeIntel` columns (`succession_intent_detected`, `new_grad_friendly_score`, `mentorship_signals`, `associate_runway`, `compensation_signals`, `red_flags_for_grad`, `green_flags_for_grad`)
-- `intel_database.py` — `store_practice_intel()` updated to map new columns
-- `migrations/2026_04_24_launchpad_jobhunt_columns.sql` — Postgres DDL for Supabase mirror (must be applied manually before first sync)
+- `research_engine.py` (Phase 3 anti-hallucination, commit `59e8403`): rewrote `PRACTICE_SYSTEM` prompt to require ≥2 web searches, per-field `_source_url`, mandatory `verification` block. Added `force_search=True` parameter that sets `tool_choice` to require `web_search`. `research_practice()` and `build_batch_requests()` use `force_search=True` + `max_searches=5` for practice items.
+- `weekly_research.py` (Phase 3 anti-hallucination): new `validate_dossier()` quarantine gate. Practice dossiers that fail evidence rules (missing verification block, 0 searches executed, evidence_quality=insufficient, website.url without `_source_url`, google metrics without `_source_url`) are NOT stored. Rejection reasons aggregated and reported in batch summary. Per-row try/except so one bad dossier can't kill the batch.
+- `database.py` — 10 new `PracticeIntel` columns: 7 jobhunt (`succession_intent_detected`, `new_grad_friendly_score`, `mentorship_signals`, `associate_runway`, `compensation_signals`, `red_flags_for_grad`, `green_flags_for_grad`) + 3 verification (`verification_searches`, `verification_quality`, `verification_urls`)
+- `intel_database.py` — `store_practice_intel()` updated to map all 10 new columns
+- `migrations/2026_04_24_launchpad_jobhunt_columns.sql` — Postgres DDL for all 10 new columns + index on `verification_quality`. **Must be applied manually before first sync.**
 
 ### Cost reality (verified, supersedes earlier estimates)
 
@@ -550,8 +560,16 @@ Six Claude API routes layered onto the existing rank-and-score scaffold, plus a 
 ### User actions required after deploy
 
 1. Add `ANTHROPIC_API_KEY` to Vercel env vars (production + preview environments)
-2. Apply `dental-pe-tracker/scrapers/migrations/2026_04_24_launchpad_jobhunt_columns.sql` to Supabase Postgres (SQL editor → paste → run)
-3. Authorize an initial seeding run: `python3 scrapers/weekly_research.py --budget 30 --jobhunt`
+2. Apply `dental-pe-tracker/scrapers/migrations/2026_04_24_launchpad_jobhunt_columns.sql` to Supabase Postgres (SQL editor → paste → run). Migration now includes the 3 verification columns from commit `59e8403`.
+3. Authorize an initial seeding run: `python3 scrapers/weekly_research.py --budget 30 --jobhunt`. The new `validate_dossier()` gate will quarantine any dossier that fails the anti-hallucination checks and report the rejection breakdown in the batch summary.
+
+### Deploy verification (2026-04-25 05:08 UTC)
+
+- Commits `9fd171f` (Phase 3 frontend), `f8beecb` (target-list filters), `50aecbb` (dossier nav + reviewed tracking) all pushed to `main`
+- Live URL: https://dental-pe-nextjs.vercel.app — `/launchpad` returns 200 OK from Vercel CDN
+- Vercel deploy `4480719868` for `ff5a7f1` was the failed-deploy email — transient; `f8beecb` (12 min later) and `50aecbb` deployed successfully on retry
+- AI route smoke test: `POST /api/launchpad/ask` → 503 with `"AI Q&A disabled: ANTHROPIC_API_KEY is not set. Add it to Vercel env vars to enable."` — wired correctly, awaiting env var
+- Parent repo `dental-pe-tracker`: `8b68777` + `73ad4fd` + `59e8403` + `9508865` all on `main`
 
 ## Development
 
