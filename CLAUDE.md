@@ -2,7 +2,7 @@
 
 ## What This Project Is
 
-A Next.js 16 + Supabase + Vercel web application that tracks private equity consolidation in US dentistry. It connects to a Supabase Postgres database populated by a Python scraper pipeline, visualizes 400k+ dental practices, 2,500+ PE deals, and 290 scored markets. The frontend provides 9 pages of market intelligence — including the **Warroom** god-mode command surface and **Launchpad** for first-job finding — with maps, charts, data tables, and deep-dive research tools.
+A Next.js 16 + Supabase + Vercel web application that tracks private equity consolidation in US dentistry. It connects to a Supabase Postgres database populated by a Python scraper pipeline, visualizes 400k+ dental practices, 2,895 PE deals, and 290 scored markets. The frontend provides 9 pages of market intelligence — including the **Warroom** god-mode command surface and **Launchpad** for first-job finding — with maps, charts, data tables, and deep-dive research tools.
 
 **Live app:** https://dental-pe-nextjs.vercel.app
 **Data pipeline repo:** github.com/suleman7-DMD/dental-pe-tracker (Python scrapers write to SQLite, sync to Supabase)
@@ -64,8 +64,8 @@ Push to `main` → Vercel auto-deploys in ~90s.
 
 Key tables (mirrored from Python pipeline's SQLite via `sync_to_supabase.py`):
 
-- **practices**: 400,962 rows. NPI (PK), practice_name, doing_business_as, address, city, state, zip, phone, entity_type, taxonomy_code, ownership_status, entity_classification, classification_reasoning, affiliated_dso, affiliated_pe_sponsor, buyability_score, classification_confidence, data_source, latitude, longitude, parent_company, ein, franchise_name, website, year_established, employee_count, estimated_revenue, num_providers, location_type, data_axle_import_date
-- **deals**: 2,512 rows. PE dental deals from PESP, GDN, PitchBook
+- **practices**: 402,004 rows (per SQLite live 2026-04-25). NPI (PK), practice_name, doing_business_as, address, city, state, zip, phone, entity_type, taxonomy_code, ownership_status, entity_classification, classification_reasoning, affiliated_dso, affiliated_pe_sponsor, buyability_score, classification_confidence, data_source, latitude, longitude, parent_company, ein, franchise_name, website, year_established, employee_count, estimated_revenue, num_providers, location_type, data_axle_import_date
+- **deals**: 2,895 rows. PE dental deals from PESP, GDN, PitchBook (per Supabase live 2026-04-25; SQLite has 2,861 — a +34 surplus in Supabase from prior scraper experiments — see audit §15 #11)
 - **practice_changes**: 5,100+ rows. Change log for name/address/ownership changes (acquisition detection).
 - **zip_scores**: 290 rows. Per-ZIP consolidation stats with 40+ columns including saturation metrics (dld_gp_per_10k, buyable_practice_ratio, corporate_share_pct, corporate_highconf_count, market_type, metrics_confidence, opportunity_score, etc.)
 - **watched_zips**: 290 ZIPs (269 Chicagoland + 21 Boston). Includes population, median_household_income.
@@ -75,8 +75,8 @@ Key tables (mirrored from Python pipeline's SQLite via `sync_to_supabase.py`):
 - **platforms**: 69 known DSO platform profiles.
 
 ### Current Data Stats
-- 401,645 practices (14,045 in watched ZIPs, all with entity_classification)
-- 3,215 deals (164 YTD 2026, coverage Oct 2020 – Mar 2026)
+- 402,004 practices (14,053 in watched ZIPs, all with entity_classification — live 2026-04-25)
+- 2,895 deals (coverage Oct 2020 – 2026-03-02; per Supabase live 2026-04-25). GDN's April roundup was 404 as of 2026-04-25, so 03-02 is current per source. SQLite has 2,861 (+34 ghost rows in Supabase, audit §15 #11).
 - 2,992 Data Axle enriched practices (with lat/lon, revenue, employees, year established)
 - 290 scored ZIPs (279 with saturation metrics)
 - 226 retirement risk practices (independent, established before 1995, in watched ZIPs)
@@ -99,7 +99,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token
 | `/` | **Home** | 8 KPI cards (deals, sponsors, practices, ZIPs, corporate %, retirement risk, YTD deals, freshness), 6 nav cards, recent deals table, data freshness bar |
 | `/launchpad` | **Launchpad** | First-job finder for new dental grads. Track-weighted 0-100 scoring across 3 tracks (Succession / Apprentice, High-Volume Ethical, DSO Associate). 20-signal catalog, 5-tier ranking (Best Fit / Strong / Maybe / Low / Avoid). 4 living-location scopes (West Loop, Woodridge, Bolingbrook, All Chicagoland). 5-tab practice dossier (Snapshot / Compensation / Mentorship / Red Flags / Interview Prep). Curated DSO tier list with comp bands + citations. Base score 50, signal×track multiplier, confidence cap at 70 for thin-data practices. |
 | `/warroom` | **Warroom** | Chicagoland command surface. 2 modes (Hunt / Investigate), 4 lenses (consolidation, density, buyability, retirement), 11 scopes (chicagoland, 7 subzones, 3 saved presets). Always-visible Sitrep KPI strip. Intent bar (⌘K), Living Map, ranked target list, ZIP + practice dossier drawers, pinboard tray, signal flag overlays, keyboard shortcuts overlay (?), URL-synced state. |
-| `/deal-flow` | **Deal Flow** | 2,512 PE deals — KPIs, monthly stacked bar timeline, top 15 sponsors/platforms, state choropleth, searchable deals table with CSV. All queries paginated (no 1000-row truncation). |
+| `/deal-flow` | **Deal Flow** | 2,895 PE deals — KPIs, monthly stacked bar timeline, top 15 sponsors/platforms, state choropleth, searchable deals table with CSV. All queries paginated (no 1000-row truncation). |
 | `/market-intel` | **Market Intel** | Tiered consolidation KPIs (high-confidence corporate ~2.3% vs all-signals ~9.9%), DSO penetration table, consolidation map, ZIP score table, city practice tree with pre-loaded counts, ownership breakdown with per-classification counts. Cross-link banner to Warroom. |
 | `/buyability` | **Buyability** | Data-driven KPIs (Acquisition Targets, Dead Ends, Job Targets, Specialists computed from entity_classification + buyability_score), 25-row paginated table with category badges, color-coded by category |
 | `/job-market` | **Job Market** | Living location selector, 9 KPI cards with **tiered consolidation display** (high-confidence 1.9% + all-signals 9.9% + industry estimate), pydeck density map, market overview (donut, bar, histogram, top DSOs), paginated practice directory with 4 tabs, opportunity signals, ownership landscape, market analytics |
@@ -143,7 +143,7 @@ URL-synced state lives in `src/lib/hooks/use-warroom-state.ts` and serializes th
 | `intent-bar.tsx` | ⌘K-focusable intent input — parses natural language into filter state |
 | `sitrep-kpi-strip.tsx` | Persistent KPI strip (practices, corporate %, retirement risk, etc.) above mode panels |
 | `living-map.tsx` | Mapbox ZIP choropleth colored by active lens with signal flag overlays |
-| `briefing-pane.tsx` | Scope-specific alerts + suggested intent chips |
+| `briefing-rail.tsx` | Scope-specific alerts + suggested intent chips |
 | `target-list.tsx` | Ranked practices in Hunt mode with flag badges |
 | `dossier-drawer.tsx` | Practice deep dive — signals, flags, intel dossier if present, action buttons |
 | `zip-dossier-drawer.tsx` | ZIP deep dive — saturation, ownership mix, top practices, qualitative intel |
@@ -211,7 +211,7 @@ Page shells (e.g., `deal-flow-shell.tsx`) are `'use client'`. They handle filter
 
 ### Supabase Query Layer
 `src/lib/supabase/queries/` contains all query functions organized by table:
-- `deals.ts` — getDealStats (paginated, fetches all 2,512 deals), getDealsByFilters, getTopSponsors (paginated), getTopPlatforms (paginated), getRecentDeals, getDistinctSponsors/Platforms/States (all paginated via fetchAllDealColumn helper)
+- `deals.ts` — getDealStats (paginated, fetches all 2,895 deals), getDealsByFilters, getTopSponsors (paginated), getTopPlatforms (paginated), getRecentDeals, getDistinctSponsors/Platforms/States (all paginated via fetchAllDealColumn helper)
 - `practices.ts` — getPracticesByZips, searchPractices, getPracticeStats (high-confidence corporate), getRetirementRiskCount, getAcquisitionTargetCount, getBuyabilityPractices, getPracticeCountsByStatus (per-status count queries), getPracticesWithCoords (chunked + paginated)
 - `zip-scores.ts` — getZipScores (deduped by zip_code), getSaturationMetrics
 - `watched-zips.ts` — getWatchedZips, getDistinctMetroAreas, getZipsByMetro
@@ -334,7 +334,7 @@ Practices are categorized from entity_classification + buyability_score (NOT fro
 ### Supabase Query Safety
 - Supabase returns max 1000 rows per query — ALWAYS paginate with `.range()` for tables that could exceed this
 - For large result sets, chunk ZIP arrays (100 ZIPs per chunk) and paginate within each chunk (1000 rows per page)
-- `getDealStats()` paginates through all 2,512 deals (3 pages of 1000)
+- `getDealStats()` paginates through all 2,895 deals (3 pages of 1000)
 - `getSourceCoverage()` uses per-source count queries (no row fetching)
 - `getPracticeCountsByStatus()` uses per-status count queries (no row fetching)
 

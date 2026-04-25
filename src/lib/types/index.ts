@@ -201,7 +201,10 @@ export interface HomeSummary {
   consolidatedPct: string
   independentPct: string
   watchedZips: number
+  /** MAX(created_at) on deals — when we last ingested ANY deal row (proxy for sync freshness) */
   lastPipelineRun: string | null
+  /** MAX(deal_date) on deals — when the most recent deal was actually ANNOUNCED */
+  lastNewDealDate: string | null
   retirementRisk: number
   enrichedCount: number
   recentDeals: Deal[]

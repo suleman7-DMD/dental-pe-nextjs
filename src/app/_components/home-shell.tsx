@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Brain,
   Crosshair,
+  AlertTriangle,
 } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import type { HomeSummary, PracticeChange } from '@/lib/types'
@@ -267,7 +268,19 @@ function RecentActivityFeed({ changes }: { changes?: PracticeChange[] }) {
 // Main component
 // ────────────────────────────────────────────────────────────────────────────
 
+function daysBetween(dateStr: string | null): number | null {
+  if (!dateStr) return null
+  // Parse as UTC noon to avoid TZ off-by-one on date-only strings
+  const then = new Date(`${dateStr}T12:00:00Z`).getTime()
+  if (Number.isNaN(then)) return null
+  const now = Date.now()
+  return Math.floor((now - then) / (24 * 60 * 60 * 1000))
+}
+
 export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeShellProps) {
+  const daysSinceLastNewDeal = daysBetween(summary.lastNewDealDate)
+  const dealFlowStale = daysSinceLastNewDeal !== null && daysSinceLastNewDeal > 30
+
   return (
     <div className="min-h-screen bg-[#FAFAF7]">
       <div className="px-6 py-8 space-y-8 max-w-7xl mx-auto">
@@ -280,6 +293,26 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             Tracking consolidation across {summary.totalPractices.toLocaleString()} practices in {summary.watchedZips.toLocaleString()} markets
           </p>
         </div>
+
+        {/* Honesty banner: only fires when MAX(deal_date) is >30d old. Distinguishes
+            "source flowing" from "source dry" — the Data Freshness KPI alone can lie
+            because it tracks last sync run, not last new deal. */}
+        {dealFlowStale && (
+          <div className="flex items-start gap-3 rounded-lg border border-[#D4920B]/40 bg-[#FFF7E5] px-4 py-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-[#D4920B] mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-[#1A1A1A]">
+                Last new deal: {summary.lastNewDealDate} ({daysSinceLastNewDeal}d ago)
+              </p>
+              <p className="text-xs text-[#6B6B60] mt-1">
+                Pipeline syncs are running normally
+                {summary.lastPipelineRun ? ` (last sync ${summary.lastPipelineRun})` : ''}
+                , but no new deals have been announced upstream. GDN&apos;s next monthly
+                roundup hasn&apos;t published yet — historical deals remain queryable.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* KPI Strip — 6 cards in horizontal flex */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -322,8 +355,17 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
           />
           <KpiCard
             icon={<Activity className="h-4 w-4" />}
-            label="Data Freshness"
-            value={summary.lastPipelineRun ?? '--'}
+            label="Last New Deal"
+            value={summary.lastNewDealDate ?? '--'}
+            subtitle={
+              <span className="text-xs text-[#6B6B60]">
+                {summary.lastPipelineRun
+                  ? `Sync ${summary.lastPipelineRun}`
+                  : 'Sync —'}
+              </span>
+            }
+            tooltip="Top: most recent deal_date in the database (when a deal was actually announced). Bottom: most recent sync that committed a row. The two diverge when sources go quiet between scrapes."
+            accentColor={dealFlowStale ? '#D4920B' : undefined}
           />
         </div>
 
@@ -369,7 +411,18 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
           {summary.lastPipelineRun && (
             <>
               <span className="text-[#E8E5DE]">|</span>
-              <span>Last refresh: {summary.lastPipelineRun}</span>
+              <span>Last sync: {summary.lastPipelineRun}</span>
+            </>
+          )}
+          {summary.lastNewDealDate && (
+            <>
+              <span className="text-[#E8E5DE]">|</span>
+              <span title="MAX(deal_date) — most recent deal announcement">
+                Last new deal: {summary.lastNewDealDate}
+                {daysSinceLastNewDeal !== null && daysSinceLastNewDeal > 0 && (
+                  <span className="text-[#9C9C90]"> ({daysSinceLastNewDeal}d ago)</span>
+                )}
+              </span>
             </>
           )}
         </div>

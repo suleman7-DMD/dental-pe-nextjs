@@ -66,7 +66,11 @@ export default async function HomePage() {
     })
 
     // Phase 3: secondary metrics (lightweight, each does 1-2 queries)
-    const [retirementRisk, acquisitionTargets, recentChanges, latestDealResult] =
+    // latestDealResult = MAX(created_at) — proxy for last sync that committed a deal row
+    // latestDealDateResult = MAX(deal_date) — when the most recent deal was actually ANNOUNCED
+    // These are two different numbers. The deal_date is what matters for "is the source flowing?"
+    // — if it's stale by 30+ days the honesty banner fires regardless of how often sync runs.
+    const [retirementRisk, acquisitionTargets, recentChanges, latestDealResult, latestDealDateResult] =
       await Promise.all([
         getRetirementRiskCount(supabase).catch((err) => {
           console.error('[HomePage] retirementRisk error:', err)
@@ -90,10 +94,22 @@ export default async function HomePage() {
             .limit(1)
           return data as { created_at: string }[] | null
         })(),
+        (async () => {
+          const { data } = await supabase
+            .from('deals')
+            .select('deal_date')
+            .not('deal_date', 'is', null)
+            .order('deal_date', { ascending: false })
+            .limit(1)
+          return data as { deal_date: string }[] | null
+        })(),
       ])
 
     const lastPipelineRun = latestDealResult?.[0]?.created_at
       ? String(latestDealResult[0].created_at).slice(0, 10)
+      : null
+    const lastNewDealDate = latestDealDateResult?.[0]?.deal_date
+      ? String(latestDealDateResult[0].deal_date).slice(0, 10)
       : null
 
     // Use enrichedCount from practiceStats (already fetched there) to avoid duplicate query
@@ -108,6 +124,7 @@ export default async function HomePage() {
       independentPct: practiceStats.independentPct,
       watchedZips,
       lastPipelineRun,
+      lastNewDealDate,
       retirementRisk,
       enrichedCount,
       recentDeals,
