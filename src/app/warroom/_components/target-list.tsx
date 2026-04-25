@@ -303,6 +303,40 @@ export function TargetList({
               )
             })}
           </div>
+          {intelAvailable && intelCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setIntelOnly((prev) => !prev)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-colors",
+                intelOnly
+                  ? "border-[#7C3AED]/40 bg-[#7C3AED]/10 text-[#7C3AED]"
+                  : "border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
+              )}
+              aria-pressed={intelOnly}
+              title="Show only practices with AI dossiers"
+            >
+              <Sparkles className="h-3 w-3" />
+              Intel · {intelCount}
+            </button>
+          )}
+          {reviewedNpis && reviewedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setHideReviewed((prev) => !prev)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-colors",
+                hideReviewed
+                  ? "border-[#2D8B4E]/40 bg-[#2D8B4E]/10 text-[#2D8B4E]"
+                  : "border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
+              )}
+              aria-pressed={hideReviewed}
+              title="Hide practices already reviewed"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              {hideReviewed ? `Hidden · ${reviewedCount}` : `Reviewed · ${reviewedCount}`}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => exportRankedCsv(targets, lens)}
@@ -327,13 +361,15 @@ export function TargetList({
               const isExpanded = expanded.has(target.npi)
               const isSelected = selectedNpi === target.npi
               const isPinned = pinnedNpis?.has(target.npi) ?? false
+              const hasIntel = intelAvailable?.has(target.npi) ?? false
+              const isReviewed = reviewedNpis?.has(target.npi) ?? false
               const TierIcon = tier.icon
               return (
                 <li
                   key={target.npi}
                   className={cn(
                     "group px-4 py-3 transition-colors",
-                    isSelected ? "bg-[#B8860B]/5" : "hover:bg-[#FAFAF7]"
+                    isSelected ? "bg-[#B8860B]/5" : isReviewed ? "bg-[#FAFAF7]/60" : "hover:bg-[#FAFAF7]"
                   )}
                 >
                   <div className="flex items-start gap-3">
@@ -375,6 +411,24 @@ export function TargetList({
                             <TierIcon className="h-3 w-3" />
                             {tier.label}
                           </span>
+                          {hasIntel && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-[#7C3AED]/30 bg-[#7C3AED]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#7C3AED]"
+                              title="AI dossier available"
+                            >
+                              <Sparkles className="h-3 w-3" />
+                              Intel
+                            </span>
+                          )}
+                          {isReviewed && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-[#2D8B4E]/30 bg-[#2D8B4E]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#2D8B4E]"
+                              title="You reviewed this target"
+                            >
+                              <CheckCircle2 className="h-3 w-3" />
+                              Reviewed
+                            </span>
+                          )}
                           <span className="text-[11px] text-[#707064]">
                             {target.ownershipGroup} · {target.entityClassification ?? "—"}
                           </span>
@@ -456,6 +510,23 @@ export function TargetList({
                             ) : (
                               <Pin className="h-3 w-3" />
                             )}
+                          </button>
+                        )}
+                        {(onMarkReviewed || onUnmarkReviewed) && (
+                          <button
+                            type="button"
+                            aria-label={isReviewed ? "Mark as not reviewed" : "Mark reviewed"}
+                            onClick={() =>
+                              isReviewed ? onUnmarkReviewed?.(target.npi) : onMarkReviewed?.(target.npi)
+                            }
+                            className={cn(
+                              "inline-flex h-7 items-center rounded-md border px-2 text-[11px] font-medium",
+                              isReviewed
+                                ? "border-[#2D8B4E]/40 bg-[#2D8B4E]/10 text-[#2D8B4E]"
+                                : "border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4]"
+                            )}
+                          >
+                            <CheckCircle2 className="h-3 w-3" />
                           </button>
                         )}
                       </div>
