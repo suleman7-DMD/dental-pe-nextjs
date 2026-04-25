@@ -66,11 +66,14 @@ export default async function HomePage() {
     })
 
     // Phase 3: secondary metrics (lightweight, each does 1-2 queries)
-    // latestDealResult = MAX(created_at) — proxy for last sync that committed a deal row
-    // latestDealDateResult = MAX(deal_date) — when the most recent deal was actually ANNOUNCED
-    // These are two different numbers. The deal_date is what matters for "is the source flowing?"
-    // — if it's stale by 30+ days the honesty banner fires regardless of how often sync runs.
-    const [retirementRisk, acquisitionTargets, recentChanges, latestDealResult, latestDealDateResult] =
+    // latestPipelineEvent = MAX(pipeline_events.timestamp) — last time the pipeline ran AT ALL.
+    //   This is the honest "is sync alive?" signal: it advances on every run, including syncs
+    //   that bring zero new deals. (Previously this used MAX(deals.created_at), which only
+    //   moved when a NEW deal row was committed — making the page look stale during quiet weeks.)
+    // latestDealDateResult = MAX(deal_date) — when the most recent deal was actually ANNOUNCED.
+    //   Drives the honesty banner: if MAX(deal_date) is >30d old the banner fires regardless
+    //   of how often sync runs, so stale upstream sources can't hide behind a healthy sync.
+    const [retirementRisk, acquisitionTargets, recentChanges, latestPipelineEvent, latestDealDateResult] =
       await Promise.all([
         getRetirementRiskCount(supabase).catch((err) => {
           console.error('[HomePage] retirementRisk error:', err)
@@ -88,11 +91,11 @@ export default async function HomePage() {
           }),
         (async () => {
           const { data } = await supabase
-            .from('deals')
-            .select('created_at')
-            .order('created_at', { ascending: false })
+            .from('pipeline_events')
+            .select('timestamp')
+            .order('timestamp', { ascending: false })
             .limit(1)
-          return data as { created_at: string }[] | null
+          return data as { timestamp: string }[] | null
         })(),
         (async () => {
           const { data } = await supabase
@@ -105,8 +108,8 @@ export default async function HomePage() {
         })(),
       ])
 
-    const lastPipelineRun = latestDealResult?.[0]?.created_at
-      ? String(latestDealResult[0].created_at).slice(0, 10)
+    const lastPipelineRun = latestPipelineEvent?.[0]?.timestamp
+      ? String(latestPipelineEvent[0].timestamp).slice(0, 10)
       : null
     const lastNewDealDate = latestDealDateResult?.[0]?.deal_date
       ? String(latestDealDateResult[0].deal_date).slice(0, 10)
