@@ -147,6 +147,7 @@ async function fetchZipScores(
           "people_per_gp_door",
           "buyable_practice_ratio",
           "corporate_share_pct",
+          "corporate_highconf_count",
           "market_type",
           "metrics_confidence",
           "opportunity_score",
@@ -350,8 +351,7 @@ export async function getLaunchpadBundle(options: {
   }
 
   // 4. Merge watched_zips demographic data into zip_scores
-  // Supabase zip_scores schema is missing population + corporate_highconf_count;
-  // population lives on watched_zips, and corporate_highconf_count is defaulted to null.
+  // population + median_household_income live on watched_zips, not zip_scores.
   const watchedZipByZip = new Map<string, WatchedZipRow>()
   for (const wz of watchedZipRows) {
     watchedZipByZip.set(wz.zip_code, wz)
@@ -362,7 +362,6 @@ export async function getLaunchpadBundle(options: {
       ...zs,
       population: wz?.population ?? null,
       median_household_income: wz?.median_household_income ?? null,
-      corporate_highconf_count: null,
     }
   })
 
