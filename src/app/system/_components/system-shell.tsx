@@ -5,6 +5,7 @@ import { DataCoverage } from './data-coverage'
 import { FreshnessIndicators } from './freshness-indicators'
 import { CompletenessBars } from './completeness-bars'
 import { PipelineLogViewer } from './pipeline-log-viewer'
+import { ScraperHealthPanel } from './scraper-health-panel'
 import { ManualEntryForms } from './manual-entry-forms'
 import type {
   SourceCoverage,
@@ -71,6 +72,15 @@ export function SystemShell({
             description="How complete your data is across key fields. Green = 80%+ filled. Yellow = 50-80%. Red = under 50%. Deals with PE sponsor = % of deals where we know the PE firm. Practices classified = % where ownership is known."
           />
           <CompletenessBars metrics={initialCompleteness} />
+        </section>
+
+        {/* Scraper Health */}
+        <section>
+          <SectionHeader
+            title="Scraper Health"
+            description="Per-source last successful run and last failure. Healthy = succeeded within 8 days. Stale = no success in 8-30 days. Failing = the latest event is an error or no success in 30+ days."
+          />
+          <ScraperHealthPanel />
         </section>
 
         {/* Pipeline Activity Log */}
