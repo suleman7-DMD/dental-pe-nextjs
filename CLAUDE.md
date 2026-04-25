@@ -453,6 +453,88 @@ Do not regress:
 - Pin lifecycle, reviewed tracking, and pin notes are all **per-device localStorage** — don't migrate to Supabase without a user-auth design pass
 - `dossierIndex` MUST be derived from `visibleTargets` (the post-filter list), not raw `bundle.rankedTargets` — otherwise prev/next walks targets the user has filtered out
 
+### Phase 3 Triage Audit Trail (2026-04-25) — Read Before Resuming
+
+Debug record for the multi-session Warroom triage so a future agent can rebuild context without re-reading 50 commits.
+
+**Original audit scope (3 phases):**
+1. Phase 1 — Verdict (assess what's earning its complexity in Warroom). Shipped 2026-04-25 in commit `ff5a7f1`.
+2. Phase 2 — Cuts (delete low-signal modes/lenses/flags). Shipped in same `ff5a7f1`: modes 4→2 (Sitrep + Profile cut), lenses 8→4 (pe_exposure / saturation / whitespace / disagreement cut), scopes 12→11 (US cut), 4 ZIP-level decorative flags + 2 weak practice flags removed.
+3. Phase 3 — Grow (3 new proposals to deepen the surface). User-approved priority C → A → B.
+
+**Phase 3 proposal status:**
+
+| Proposal | Description | Status | Owner | Commits |
+|----------|-------------|--------|-------|---------|
+| C | Score breakdown panel inside dossier (show why a target ranked) | ✅ Shipped | Parallel session | Landed before this session — verified live in `dossier-drawer.tsx` |
+| A | Pipeline lifecycle stages on pinned targets (per-device, 6 stages) | ✅ Shipped (this session) | Me (Opus) | Hook + dossier wiring + target-list integration on `main` (rolled into `9fd171f` / `50aecbb` chain by parallel session's rebase; CLAUDE.md fix shipped as `c41e0dd`) |
+| B | "What's new since you last visited" briefing | ⏳ NOT STARTED | — | — |
+
+**Proposal A — what got built (this session):**
+
+Source-of-truth files for debug:
+- `src/lib/hooks/use-warroom-pin-lifecycle.ts` — the hook. localStorage key `dental-pe-warroom-pin-lifecycle-v0`. Exports `LIFECYCLE_STAGES`, `LIFECYCLE_STAGE_LABELS`, `LIFECYCLE_STAGE_COLORS`, `LifecycleStage`, `LifecycleMap`, `useWarroomPinLifecycle`. Hook returns `{ stages, hydrated, getStage, setStage, clearStage, clearAll, counts }`.
+- 6 stages (canonical order): `untouched`, `researching`, `contacting`, `in_dialogue`, `passed`, `won`. Labels in `LIFECYCLE_STAGE_LABELS` are "Untouched / Researching / Contacting / In dialogue / Passed / Won". Anything else in the docs is a bug — fix it.
+- Cross-tab sync via `window.addEventListener('storage', ...)`. No entry cap. `setStage(npi, "untouched")` deletes the key (untouched is the default, never persisted).
+- `src/app/warroom/_components/dossier-drawer.tsx` — accepts `currentStage?: LifecycleStage` + `onStageChange?: (npi, stage) => void`. Renders the stage selector dropdown (with colored dot + bg/border/text from `LIFECYCLE_STAGE_COLORS[stage]`) ONLY when `isPinned && onStageChange`. Selector is gated on pin status because un-pinned targets shouldn't have lifecycle state.
+- `src/app/warroom/_components/target-list.tsx` — accepts `lifecycleStages?: LifecycleMap`. Renders per-row stage badge (next to tier badge) using same color set. New `pipelineOnly` toggle + "In pipeline · N" header chip filters rows whose NPI has a non-`untouched` stage. `pipelineCount` is derived from `Object.keys(lifecycleStages).length` (because untouched is never persisted).
+- `src/app/warroom/_components/warroom-shell.tsx` — calls `useWarroomPinLifecycle()`, threads `lifecycleStages` to TargetList and `currentStage` + `onStageChange` to DossierDrawer.
+
+**Why localStorage and not Supabase:** No user auth in the app yet. Per-device is acceptable; same pattern as `use-warroom-reviewed.ts` and `use-warroom-pin-notes.ts` from the parallel session. Migrating to Supabase requires a user-auth design pass first.
+
+**Vercel deploy chain (2026-04-25):**
+
+| SHA | Time (UTC) | Status | Notes |
+|-----|------------|--------|-------|
+| `ff5a7f1` | 04:01 | ❌ FAILED | Phase 2 triage commit. Build error truncated in Vercel logs but irrelevant — self-healed by the next push |
+| `f8beecb` | 04:13 | ✅ success | Parallel session's target-list intel + reviewed filters |
+| `9fd171f` | (earlier) | ✅ success | Parallel session's Launchpad Phase 3 + initial pin lifecycle wiring |
+| `50aecbb` | 05:08 | ✅ success | Dossier prev/next nav + reviewed tracking + my pipeline badge |
+| `e615bb8` | 05:11 | ✅ success | Parallel session's anti-hallucination docs |
+| `c41e0dd` | 05:30 | ✅ success | This session's CLAUDE.md stage-name fix |
+
+The "failed Vercel deploy" email the user received was `ff5a7f1`. Resolved automatically by `f8beecb` 12 minutes later. No manual rollback needed.
+
+**Coexistence rules with parallel session (do not break):**
+
+This Warroom work was developed across two simultaneous Claude sessions. Files owned by the **other** session — DO NOT stage or modify without coordination:
+- `src/app/warroom/_components/pinboard-tray.tsx`
+- `src/app/warroom/_components/pin-compare-drawer.tsx`
+- `src/lib/hooks/use-warroom-intel.ts`
+- `src/lib/hooks/use-warroom-pin-notes.ts`
+- `src/lib/hooks/use-warroom-reviewed.ts`
+- `src/lib/hooks/use-warroom-intel-availability.ts`
+
+Files owned by **this** session (safe to modify):
+- `src/lib/hooks/use-warroom-pin-lifecycle.ts`
+
+Shared files (modified by both — read first, edit small, commit fast):
+- `src/app/warroom/_components/warroom-shell.tsx`
+- `src/app/warroom/_components/dossier-drawer.tsx`
+- `src/app/warroom/_components/target-list.tsx`
+- `dental-pe-nextjs/CLAUDE.md`
+
+**Known docs drift caught in this session:**
+
+- Parallel session wrote stage names as "Untouched / Reviewed / Following / Contacted / Pursuing / Passed" in this Warroom Ship Log table — those names do NOT exist in the hook. Real names per `LIFECYCLE_STAGE_LABELS`: "Untouched / Researching / Contacting / In dialogue / Passed / Won". Fixed in `c41e0dd`. If you see those wrong names anywhere else, treat as drift and fix.
+- Parallel session also claimed "(5,000 entries, cross-tab sync)" — there is no entry cap in the hook. Fixed in same commit.
+
+**Next steps (resume here):**
+
+1. **Proposal B — "What's new since you last visited" briefing (3-4d effort).** Plan:
+   - New hook `src/lib/hooks/use-warroom-last-visit.ts` with localStorage key `dental-pe-warroom-last-visit-v0`. Map: `{ [scopeId]: ISO timestamp }`. `markVisited(scope)` on Warroom mount, `getLastVisit(scope)` for the briefing.
+   - New component `src/app/warroom/_components/since-last-visit-card.tsx` — renders above `target-list.tsx` when `lastVisit` exists for the active scope. Shows: new deals in scope (`deals.deal_date > lastVisit AND deal.state in scope's states`), new practice_changes in scope (`changes.changed_at > lastVisit AND change.zip in scope's ZIPs`), NPIs that crossed `buyability_score >= 50` since lastVisit, ZIPs whose `corporate_share_pct` moved ≥3pp since lastVisit (requires snapshotting prior corporate_share — punt or compute from `practice_changes`).
+   - Briefing data fetch: extend `getSitrepBundle()` in `src/lib/warroom/data.ts` with optional `since?: string` param. When provided, runs supplemental queries and returns `briefing.sinceLastVisit: { newDealCount, newChangeCount, newBuyabilityCount, newCorporateShiftCount, items: [...] }`.
+   - "Mark as seen" button bumps the timestamp.
+   - Dim the badge after 7 days idle (don't shame skipped weeks).
+2. Optional polish before Proposal B: eyeball-verify Proposal C's score breakdown is rendering inside the live dossier (haven't tested visually — parallel session shipped it).
+3. If Proposal B is deferred, alternative work pile: intel coverage push (only 23/401k practices have `practice_intel` rows — running `weekly_research.py --budget 30` would meaningfully grow the dataset).
+
+**Source-of-truth files for resuming Phase 3:**
+- This audit trail (you are reading it)
+- `FIRST_JOB_FINDER_PLAN.md` at repo root — untracked, contains the original Launchpad design notes (parallel session's plan)
+- Commit log: `git log --oneline ff5a7f1..HEAD` shows the full Phase 2 → Phase 3 chain
+
 ## Launchpad Ship Log (2026-04-24) — Do Not Regress
 
 Phase 1 MVP of Launchpad (first-job finder for new dental grads) shipped on 2026-04-24.
@@ -498,6 +580,8 @@ Phase 1 MVP of Launchpad (first-job finder for new dental grads) shipped on 2026
 - Red-flag heatmap uses `presentSignals` (only rendered warnings with at least one hit), not the full 8-item `WARNING_SIGNALS` set — keeps matrix dense when signals are rare.
 
 ### Phase 3 shipped (2026-04-25) — qualitative-intel-driven first-job copilot
+
+> **Debug checkpoint:** see `dental-pe-tracker/PHASE3_RESUME.md` for the full mandate, commit-by-commit status board, verification commands, and symptom→fix runbook. Read that first if anything looks off.
 
 Six Claude API routes layered onto the existing rank-and-score scaffold, plus a signal-firing audit that fixed several silently-broken signals.
 
