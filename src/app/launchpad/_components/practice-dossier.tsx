@@ -43,7 +43,6 @@ import {
   type LaunchpadSignalId,
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
-import { NarrativeCard } from "./narrative-card"
 import { AskIntelDrawer } from "./ask-intel-drawer"
 import { InterviewPrepAi } from "./interview-prep-ai"
 import { ContractParser } from "./contract-parser"
@@ -147,10 +146,8 @@ function Banner({
 
 function SnapshotTab({
   target,
-  track,
 }: {
   target: LaunchpadRankedTarget
-  track: LaunchpadTrack
 }) {
   const { practice, intel } = target
   const age = getPracticeAge(practice.year_established)
@@ -253,9 +250,6 @@ function SnapshotTab({
           <div className="mt-0.5 text-[10px] text-[#9C9C90]">Data quality</div>
         </div>
       </div>
-
-      {/* AI narrative */}
-      <NarrativeCard target={target} track={track} />
 
       {/* Active signals */}
       {target.activeSignalIds.length > 0 && (
@@ -1014,7 +1008,7 @@ export function PracticeDossier({
 
             <div className="flex-1 overflow-y-auto">
               <TabsContent value="snapshot" className="p-4">
-                <SnapshotTab target={target} track={track} />
+                <SnapshotTab target={target} />
               </TabsContent>
               <TabsContent value="compensation" className="p-4">
                 <CompensationTab target={target} bundle={bundle} />

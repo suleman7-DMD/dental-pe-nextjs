@@ -2,7 +2,14 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Brain, ChevronDown, ChevronUp, AlertTriangle, RotateCcw } from "lucide-react"
+import {
+  Brain,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  RotateCcw,
+  FileSearch,
+} from "lucide-react"
 import type {
   CompoundNarrativeRequest,
   CompoundNarrativeResponse,
@@ -38,6 +45,31 @@ async function fetchCompoundThesis(
   return data as CompoundNarrativeResponse
 }
 
+function AiBadge() {
+  return (
+    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded border border-[#B8860B]/30 bg-[#B8860B]/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#B8860B]">
+      <Brain className="h-3 w-3" aria-hidden="true" />
+      AI
+    </span>
+  )
+}
+
+function RegenerateButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-[#B8860B] underline-offset-2 hover:underline"
+    >
+      <RotateCcw className="h-3 w-3" />
+      Regenerate
+    </button>
+  )
+}
+
 export function CompoundThesis({ npi, signals, scores, track, practice }: CompoundThesisProps) {
   const [expanded, setExpanded] = useState(false)
 
@@ -63,6 +95,15 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
     retry: false,
   })
 
+  const isRefused =
+    !!data && data.thesis === null && data.reason === "no_verified_research"
+  const isPartial =
+    !!data && !!data.thesis && data.evidence_quality === "partial"
+  const isVerified =
+    !!data &&
+    !!data.thesis &&
+    (data.evidence_quality === "verified" || data.evidence_quality === "high")
+
   return (
     <div className="mt-2 border-t border-[#E8E5DE]/60 pt-2">
       <button
@@ -86,13 +127,7 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
       </button>
 
       {expanded && (
-        <div className="relative mt-2">
-          {/* AI badge */}
-          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded border border-[#B8860B]/30 bg-[#B8860B]/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#B8860B]">
-            <Brain className="h-3 w-3" aria-hidden="true" />
-            AI
-          </span>
-
+        <div className="mt-2">
           {isFetching && (
             <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
               <div className="space-y-2">
@@ -126,22 +161,115 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
             </div>
           )}
 
-          {data?.thesis && !isFetching && (
-            <div className="rounded-md border border-[#B8860B]/20 bg-gradient-to-br from-[#FEF9E7] to-[#FFFFFF] p-3 pr-12">
+          {isRefused && data && !isFetching && (
+            <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+              <div className="flex items-center gap-1.5">
+                <FileSearch className="h-3.5 w-3.5 text-[#9C9C90]" aria-hidden="true" />
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6B6B60]">
+                  No verified research available
+                </p>
+              </div>
+              {data.structural_summary && (
+                <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
+                  <div className="flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                      Entity
+                    </dt>
+                    <dd className="font-medium text-[#1A1A1A]">
+                      {data.structural_summary.entity_classification ?? "unclassified"}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                      Years operating
+                    </dt>
+                    <dd className="font-medium text-[#1A1A1A]">
+                      {data.structural_summary.years_in_operation ?? "unknown"}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                      Providers
+                    </dt>
+                    <dd className="font-medium text-[#1A1A1A]">
+                      {data.structural_summary.providers ?? "unknown"}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                      Employees
+                    </dt>
+                    <dd className="font-medium text-[#1A1A1A]">
+                      {data.structural_summary.employees ?? "unknown"}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                      Buyability
+                    </dt>
+                    <dd className="font-medium text-[#1A1A1A]">
+                      {data.structural_summary.buyability_score ?? "unscored"}
+                    </dd>
+                  </div>
+                  <div className="flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                      Active signals
+                    </dt>
+                    <dd className="font-medium text-[#1A1A1A]">
+                      {data.structural_summary.active_signals.length}
+                    </dd>
+                  </div>
+                  <div className="col-span-2 flex flex-col">
+                    <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                      Track scores (succession / high-vol / dso)
+                    </dt>
+                    <dd className="font-medium text-[#1A1A1A]">
+                      {data.structural_summary.track_scores.succession} /{" "}
+                      {data.structural_summary.track_scores.high_volume} /{" "}
+                      {data.structural_summary.track_scores.dso}
+                    </dd>
+                  </div>
+                  {data.structural_summary.active_signals.length > 0 && (
+                    <div className="col-span-2 flex flex-col">
+                      <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                        Signals
+                      </dt>
+                      <dd className="text-[10px] text-[#6B6B60]">
+                        {data.structural_summary.active_signals.join(", ")}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+              <p className="mt-3 border-t border-[#E8E5DE] pt-2 text-[11px] text-[#9C9C90]">
+                Thesis cannot be developed from structural signals alone. This
+                practice has not been deep-researched yet.
+              </p>
+            </div>
+          )}
+
+          {isPartial && data && !isFetching && (
+            <div className="space-y-2">
+              <div className="rounded border border-[#D4920B]/30 bg-[#D4920B]/5 px-2 py-1 text-[10px] font-medium text-[#D4920B]">
+                Limited evidence — partial verification only.
+              </div>
+              <div className="relative rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 pr-12">
+                <AiBadge />
+                <p className="whitespace-pre-line text-[12px] italic leading-relaxed text-[#6B6B60]">
+                  {data.thesis}
+                </p>
+                <RegenerateButton onClick={() => void refetch()} />
+              </div>
+            </div>
+          )}
+
+          {isVerified && data && !isFetching && (
+            <div className="relative rounded-md border border-[#B8860B]/20 bg-gradient-to-br from-[#FEF9E7] to-[#FFFFFF] p-3 pr-12">
+              <AiBadge />
               <p className="whitespace-pre-line text-[12px] leading-relaxed text-[#1A1A1A]">
                 {data.thesis}
               </p>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  void refetch()
-                }}
-                className="mt-2 inline-flex items-center gap-1 text-[10px] font-medium text-[#B8860B] underline-offset-2 hover:underline"
-              >
-                <RotateCcw className="h-3 w-3" />
-                Regenerate
-              </button>
+              <RegenerateButton onClick={() => void refetch()} />
             </div>
           )}
         </div>

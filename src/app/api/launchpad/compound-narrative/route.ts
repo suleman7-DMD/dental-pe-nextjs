@@ -8,8 +8,9 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 const NARRATIVE_MODEL = "claude-sonnet-4-6"
-const MAX_TOKENS = 800
 const TEMPERATURE = 0.3
+const MAX_TOKENS_VERIFIED = 350
+const MAX_TOKENS_PARTIAL = 200
 
 interface AnthropicContentBlock {
   type: string
@@ -73,30 +74,36 @@ function shortDomain(url: string): string {
 }
 
 const SYSTEM_PROMPT = [
-  "You are a dental private-equity pattern analyst writing a verified investment thesis for a new dental graduate evaluating this practice as a first-job opportunity.",
+  "You are a dental private-equity pattern analyst writing a verified investment thesis for a new graduate evaluating this practice.",
   "",
-  "OUTPUT REQUIREMENTS:",
-  "- 200-300 words (4-6 sentences across 1-2 paragraphs).",
-  "- Concrete, specific, and grounded — never generic.",
-  "- Each substantive claim must be backed by either (a) the supplied structural signals, or (b) a `[source: domain]` citation drawn from the verified URL list.",
-  "- If the practice has verified web research (intel block present), weave its findings into the narrative AND cite at least 2 source domains using `[source: example.com]` shorthand.",
-  "- If the practice has NO verified web research (intel missing), open with: \"Structural signals only — verified web research not yet collected for this practice.\" Then write a thesis based purely on entity classification, age, providers, and active signals. Do NOT invent facts, reviews, or website details.",
-  "- Frame the conclusion in terms of fit for a new grad on the requested track (succession / high-volume / DSO).",
-  "- No markdown headers, no bullet points, no emojis. Plain prose.",
+  "NON-NEGOTIABLE RULES:",
+  "- Every claim must come from either (a) a structural fact stated in the user message, or (b) a verified URL with [source: domain] citation pulled from the supplied URL list.",
+  "- If neither (a) nor (b) supports a claim, OMIT the claim. Never produce filler analysis to hit a word count.",
+  "- Never paraphrase a signal ID into a fact. \"mentor_density\" is a signal label, not evidence of mentorship.",
+  "- Never invent doctor names, ages, retirement intent, review counts, or technology lists.",
+  "- Reviews/ratings: only cite if a Google or Healthgrades URL is in the source list.",
   "",
-  "VERIFICATION DISCIPLINE:",
-  "- Never fabricate doctor names, ages, retirement intent, review counts, or technology lists.",
-  "- If the intel says `partial` or `insufficient` evidence quality, hedge with phrases like \"limited public footprint suggests\" or \"available evidence indicates\".",
-  "- Reviews / ratings: only cite if the source URL list contains a Google or Healthgrades domain.",
+  "FORMAT:",
+  "- Plain prose, no headers, no bullets.",
+  "- 100-150 words when evidence quality is verified.",
+  "- ≤80 words when evidence quality is partial — recite verified facts only.",
+  "- Frame the conclusion in terms of fit for the requested track (succession / high_volume / dso).",
 ].join("\n")
 
 function buildUserPrompt(
   body: CompoundNarrativeRequest,
-  intel: PracticeIntel | null
+  intel: PracticeIntel,
+  evidenceQuality: "verified" | "partial" | "high"
 ): string {
   const { practice: p, signals, scores, track } = body
   const age =
     p.year_established != null ? new Date().getFullYear() - p.year_established : null
+
+  const greenFlags = parseList(intel.green_flags)
+  const redFlags = parseList(intel.red_flags)
+  const verUrls = parseUrls(intel.verification_urls).slice(0, 8)
+  const services = parseList(intel.services_listed).slice(0, 6)
+  const techs = parseList(intel.technology_listed).slice(0, 6)
 
   const lines: string[] = [
     `# Practice`,
@@ -119,45 +126,66 @@ function buildUserPrompt(
     `- high_volume: ${scores.high_volume}`,
     `- dso: ${scores.dso}`,
     `- Requested track: ${track}`,
+    ``,
+    `# Verified web research`,
+    `- Evidence quality (gated): ${evidenceQuality} (${intel.verification_searches ?? 0} web searches)`,
+    `- Overall assessment: ${intel.overall_assessment ?? "n/a"}`,
+    `- Acquisition readiness: ${intel.acquisition_readiness ?? "n/a"}`,
+    `- Confidence: ${intel.confidence ?? "n/a"}`,
+    `- Hiring active: ${intel.hiring_active === 1 ? "yes" : intel.hiring_active === 0 ? "no" : "unknown"}`,
+    `- Acquisition rumors found: ${intel.acquisition_found === 1 ? "yes" : intel.acquisition_found === 0 ? "no" : "unknown"}`,
+    `- Google reviews: ${intel.google_review_count ?? "?"} (rating ${intel.google_rating ?? "?"})`,
+    `- Owner career stage: ${intel.owner_career_stage ?? "unknown"}`,
+    services.length > 0 ? `- Services: ${services.join(", ")}` : "",
+    techs.length > 0 ? `- Technology: ${techs.join(", ")}` : "",
+    greenFlags.length > 0 ? `- Green flags: ${greenFlags.slice(0, 5).join("; ")}` : "",
+    redFlags.length > 0 ? `- Red flags: ${redFlags.slice(0, 5).join("; ")}` : "",
+    ``,
   ]
 
-  if (intel) {
-    const greenFlags = parseList(intel.green_flags)
-    const redFlags = parseList(intel.red_flags)
-    const verUrls = parseUrls(intel.verification_urls).slice(0, 8)
-    const services = parseList(intel.services_listed).slice(0, 6)
-    const techs = parseList(intel.technology_listed).slice(0, 6)
-
+  if (verUrls.length > 0) {
     lines.push(
+      `# Cite-able source URLs (use [source: domain]):`,
+      ...verUrls.map((u) => `- ${u} (cite as [source: ${shortDomain(u)}])`),
       ``,
-      `# Verified web research`,
-      `- Overall assessment: ${intel.overall_assessment ?? "n/a"}`,
-      `- Acquisition readiness: ${intel.acquisition_readiness ?? "n/a"}`,
-      `- Confidence: ${intel.confidence ?? "n/a"}`,
-      `- Evidence quality: ${intel.verification_quality ?? "n/a"} (${intel.verification_searches ?? 0} web searches)`,
-      `- Hiring active: ${intel.hiring_active === 1 ? "yes" : intel.hiring_active === 0 ? "no" : "unknown"}`,
-      `- Acquisition rumors found: ${intel.acquisition_found === 1 ? "yes" : intel.acquisition_found === 0 ? "no" : "unknown"}`,
-      `- Google reviews: ${intel.google_review_count ?? "?"} (rating ${intel.google_rating ?? "?"})`,
-      `- Owner career stage: ${intel.owner_career_stage ?? "unknown"}`,
-      services.length > 0 ? `- Services: ${services.join(", ")}` : "",
-      techs.length > 0 ? `- Technology: ${techs.join(", ")}` : "",
-      greenFlags.length > 0 ? `- Green flags: ${greenFlags.slice(0, 5).join("; ")}` : "",
-      redFlags.length > 0 ? `- Red flags: ${redFlags.slice(0, 5).join("; ")}` : "",
-      ``,
-      `# Cite-able source URLs (use as [source: domain]):`,
-      verUrls.length > 0
-        ? verUrls.map((u) => `- ${u} (cite as [source: ${shortDomain(u)}])`).join("\n")
-        : "- (no verified URLs — note this in the thesis)"
+      `Citation requirement: include at least 2 [source: ...] citations bound to URLs above. Never invent a domain not on this list.`
     )
   } else {
     lines.push(
+      `# Cite-able source URLs`,
+      `- (none — verified intel without URLs)`,
       ``,
-      `# Verified web research`,
-      `STATUS: NOT YET COLLECTED. Open the thesis with the required preface and stick to structural signals.`
+      `No URLs available. Stay strictly inside structural facts above. Cap output at 100 words. No [source: ...] citations required since none can be supported.`
+    )
+  }
+
+  if (evidenceQuality === "partial") {
+    lines.push(
+      ``,
+      `EVIDENCE QUALITY IS PARTIAL — recite verified facts only. ≤80 words. No analytical leaps.`
     )
   }
 
   return lines.filter(Boolean).join("\n")
+}
+
+function buildStructuralSummary(body: CompoundNarrativeRequest): NonNullable<
+  CompoundNarrativeResponse["structural_summary"]
+> {
+  const { practice: p, signals, scores } = body
+  const age =
+    p.year_established != null ? new Date().getFullYear() - p.year_established : null
+
+  return {
+    name: p.name,
+    entity_classification: p.entity_classification ?? null,
+    years_in_operation: age,
+    providers: p.num_providers ?? null,
+    employees: p.employee_count ?? null,
+    buyability_score: p.buyability_score ?? null,
+    active_signals: signals,
+    track_scores: scores,
+  }
 }
 
 export async function POST(
@@ -198,10 +226,43 @@ export async function POST(
       `[compound-narrative] practice_intel fetch failed for npi=${body.practice.npi}:`,
       err instanceof Error ? err.message : err
     )
-    // Fall through with intel=null — graceful degradation
+    // Fall through with intel=null — handled by gate below
   }
 
-  const userPrompt = buildUserPrompt(body, intel)
+  const intelQuality = intel?.verification_quality ?? null
+  // "high" is enum drift from the model — treat as verified for gating
+  const reliable = !!intel && (intelQuality === "verified" || intelQuality === "high")
+  const partial = !!intel && intelQuality === "partial"
+  const noUsable =
+    !intel ||
+    intelQuality === "insufficient" ||
+    intelQuality === "unverified" ||
+    !intelQuality
+
+  if (noUsable) {
+    return NextResponse.json({
+      thesis: null,
+      reason: "no_verified_research",
+      structural_summary: buildStructuralSummary(body),
+    })
+  }
+
+  const evidenceQuality: "verified" | "partial" | "high" =
+    intelQuality === "high"
+      ? "high"
+      : reliable
+        ? "verified"
+        : "partial"
+
+  const verUrlsCount = parseUrls(intel!.verification_urls).length
+  const maxTokens =
+    evidenceQuality === "partial"
+      ? MAX_TOKENS_PARTIAL
+      : verUrlsCount === 0
+        ? MAX_TOKENS_PARTIAL // no-URL path is also short
+        : MAX_TOKENS_VERIFIED
+
+  const userPrompt = buildUserPrompt(body, intel!, evidenceQuality)
 
   let upstream: Response
   try {
@@ -214,7 +275,7 @@ export async function POST(
       },
       body: JSON.stringify({
         model: NARRATIVE_MODEL,
-        max_tokens: MAX_TOKENS,
+        max_tokens: maxTokens,
         temperature: TEMPERATURE,
         system: [
           {
@@ -262,5 +323,5 @@ export async function POST(
     return NextResponse.json({ error: "Empty thesis returned by Anthropic" }, { status: 502 })
   }
 
-  return NextResponse.json({ thesis })
+  return NextResponse.json({ thesis, evidence_quality: evidenceQuality })
 }

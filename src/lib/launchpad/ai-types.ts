@@ -81,7 +81,19 @@ export interface CompoundNarrativeRequest {
 }
 
 export interface CompoundNarrativeResponse {
-  thesis: string
+  thesis: string | null
+  reason?: "no_verified_research"
+  evidence_quality?: "verified" | "partial" | "high"
+  structural_summary?: {
+    name: string
+    entity_classification: string | null
+    years_in_operation: number | null
+    providers: number | null
+    employees: number | null
+    buyability_score: number | null
+    active_signals: string[]
+    track_scores: TrackScores
+  }
 }
 
 // ---------------------------------------------------------------------------
