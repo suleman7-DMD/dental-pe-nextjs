@@ -3,6 +3,7 @@ import { getLaunchpadBundle } from "@/lib/supabase/queries/launchpad"
 import { DEFAULT_LAUNCHPAD_SCOPE } from "@/lib/launchpad/scope"
 import { DEFAULT_LAUNCHPAD_TRACK } from "@/lib/launchpad/signals"
 import { LaunchpadShell } from "./_components/launchpad-shell"
+import { AiDisabledBanner } from "./_components/ai-disabled-banner"
 
 export const dynamic = "force-dynamic"
 
@@ -36,6 +37,11 @@ function serializeError(error: unknown): string {
 }
 
 export default async function LaunchpadPage() {
+  // Server-side check: if ANTHROPIC_API_KEY is missing, show a banner.
+  // This is evaluated at request time (force-dynamic), so it reflects the live
+  // Vercel env var state. Audit §14.8 / §15 #1.
+  const aiDisabled = !process.env.ANTHROPIC_API_KEY
+
   const supabase = getSupabaseServerClient()
   try {
     const bundle = await getLaunchpadBundle({
@@ -43,14 +49,22 @@ export default async function LaunchpadPage() {
       track: DEFAULT_LAUNCHPAD_TRACK,
       supabase,
     })
-    return <LaunchpadShell initialBundle={bundle} />
+    return (
+      <>
+        <AiDisabledBanner show={aiDisabled} />
+        <LaunchpadShell initialBundle={bundle} />
+      </>
+    )
   } catch (error) {
     console.error("[launchpad/page] getLaunchpadBundle failed:", error)
     return (
-      <LaunchpadShell
-        initialBundle={null}
-        initialBundleError={serializeError(error)}
-      />
+      <>
+        <AiDisabledBanner show={aiDisabled} />
+        <LaunchpadShell
+          initialBundle={null}
+          initialBundleError={serializeError(error)}
+        />
+      </>
     )
   }
 }
