@@ -161,7 +161,7 @@ ZIP-level: `zip_ada_benchmark_gap_flag` (only). Decorative ZIP flags (white_spac
 
 ### Keyboard shortcuts
 
-`?` toggles the overlay. `⌘K` / `/` focuses the intent bar. `2` switches to Hunt, `4` switches to Investigate (Sitrep `1` and Profile `3` were cut). `R` resets filters + intent + selection. `P` toggles pin on the selected target. `Esc` closes drawers / overlays. Single-key shortcuts are suppressed when focus is in an `<input>` / `<textarea>` / contenteditable.
+`?` toggles the overlay. `⌘K` / `/` focuses the intent bar. `1` switches to Hunt, `2` switches to Investigate (Sitrep and Profile modes were cut entirely; the two remaining modes were renumbered to `1`/`2` — the cheat-sheet overlay was previously stale showing `2`/`4`, fixed 2026-04-25 audit §15 #24). `R` resets filters + intent + selection. `P` toggles pin on the selected target. `V` toggles reviewed. `[` / `]` jump between targets in the dossier. `Esc` closes drawers / overlays. Single-key shortcuts are suppressed when focus is in an `<input>` / `<textarea>` / contenteditable.
 
 ### Cross-links from legacy pages
 
@@ -440,7 +440,7 @@ Phases 0-7 of the Chicagoland Warroom shipped 2026-04-24, then trimmed and exten
 | Pin notes | `use-warroom-pin-notes.ts` — per-NPI freeform notes attached to the dossier. |
 | Intel availability | `getPracticeIntelAvailability()` query + `useIntelAvailability` hook → drives Sparkles "Intel" badges + intel-only TargetList filter. |
 | ZIP dossier | `zip-dossier-drawer.tsx` — separate drawer for ZIP selections (saturation, ownership mix, top practices) |
-| Keyboard shortcuts | `?`, `⌘K`/`/`, `2`, `4`, `R`, `P`, `[`, `]`, `V`, `Esc`. Single-key guards for typing contexts (input/textarea/contenteditable). |
+| Keyboard shortcuts | `?`, `⌘K`/`/`, `1`=Hunt, `2`=Investigate, `R`, `P`, `[`, `]`, `V`, `Esc`. Single-key guards for typing contexts (input/textarea/contenteditable). Overlay was stale `2`/`4` until 2026-04-25 audit §15 #24 fix. |
 | Legacy cross-links | `warroom-cross-link.tsx` banner on `/market-intel` and `/intelligence` with preset `hrefSuffix` deep-links |
 | Geo helpers | `src/lib/warroom/geo.ts` — subzone ZIP lookups + bounding boxes |
 

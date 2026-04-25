@@ -37,8 +37,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     label: "Modes",
     rows: [
-      { keys: ["2"], description: "Hunt — target prospecting" },
-      { keys: ["4"], description: "Investigate — signal patterns" },
+      { keys: ["1"], description: "Hunt — target prospecting" },
+      { keys: ["2"], description: "Investigate — signal patterns" },
     ],
   },
   {
