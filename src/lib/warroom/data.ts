@@ -24,9 +24,11 @@ import {
 import type {
   RankedTarget,
   WarroomIntentFilter,
+  WarroomOwnershipCounts,
   WarroomPracticeRecord,
   WarroomPracticeSignalRecord,
   WarroomSitrepBundle,
+  WarroomSummary,
   WarroomTargetCandidate,
   WarroomZipScoreRecord,
   WarroomZipSignalRecord,
@@ -120,14 +122,17 @@ export async function getSitrepBundle(
     );
   }
 
+  // Use Promise.allSettled so a single query timeout (e.g., practices table locked during
+  // sync) degrades gracefully instead of killing the entire bundle. Each settled result
+  // is checked individually and failures push a warning rather than throwing.
   const [
-    summary,
-    practices,
-    zipScores,
-    recentDeals,
-    recentChanges,
-    signalBundle,
-  ] = await Promise.all([
+    summaryResult,
+    practicesResult,
+    zipScoresResult,
+    recentDealsResult,
+    recentChangesResult,
+    signalBundleResult,
+  ] = await Promise.allSettled([
     getWarroomSummary(scope, supabase),
     getScopedPractices(
       scope,
@@ -139,6 +144,47 @@ export async function getSitrepBundle(
     getScopedChanges(scope, { maxRows: 500 }, supabase),
     loadSignalsSafely(scope, supabase),
   ]);
+
+  function settled<T>(result: PromiseSettledResult<T>, fallback: T, label: string): T {
+    if (result.status === "fulfilled") return result.value;
+    const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+    warnings.push(`${label} unavailable: ${msg.slice(0, 120)}`);
+    return fallback;
+  }
+
+  const emptyOwnership: WarroomOwnershipCounts = {
+    total: 0, independent: 0, corporate: 0, specialist: 0, nonClinical: 0,
+    unknown: 0, known: 0, corporatePct: 0, independentPct: 0, unknownPct: 0,
+  };
+  const emptySummary: WarroomSummary = {
+    scopeKind: normalizeWarroomDataScope(scope).kind,
+    scopeLabel,
+    zipCodes,
+    generatedAt: new Date().toISOString(),
+    ownership: emptyOwnership,
+    enrichedPractices: 0,
+    enrichedPct: 0,
+    acquisitionTargets: 0,
+    retirementRisk: 0,
+    dealCount: 0,
+    latestDealDate: null,
+    zipScoreCount: 0,
+    averageCorporateSharePct: null,
+    changeCount: 0,
+    changeCount90d: 0,
+    signalCounts: null,
+    corporateHighConfidence: 0,
+    corporateHighConfidencePct: 0,
+    avgBuyabilityScore: null,
+    avgOpportunityScore: null,
+  };
+
+  const summary = settled(summaryResult, emptySummary, "Summary");
+  const practices = settled(practicesResult, [] as WarroomPracticeRecord[], "Practices");
+  const zipScores = settled(zipScoresResult, [] as WarroomZipScoreRecord[], "ZIP scores");
+  const recentDeals = settled(recentDealsResult, [], "Recent deals");
+  const recentChanges = settled(recentChangesResult, [], "Recent changes");
+  const signalBundle = settled(signalBundleResult, { practiceSignals: [], zipSignals: [], error: "failed to load" }, "Signals");
 
   const { practiceSignals, zipSignals, error: signalsError } = signalBundle;
   const signalsAvailable = signalsError === null && (practiceSignals.length > 0 || zipSignals.length > 0);
