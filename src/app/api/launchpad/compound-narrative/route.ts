@@ -73,15 +73,50 @@ function shortDomain(url: string): string {
   }
 }
 
+// ZIP `sources` field stores either URLs OR plain-text source labels like
+// "Redfin (January 2026 housing data)". This extracts a short cite-able label
+// from each entry — short domain for URLs, leading non-paren token(s) for text.
+function parseZipSourceLabels(s: string | null): string[] {
+  if (!s) return []
+  let raw: string[] = []
+  try {
+    const parsed = JSON.parse(s)
+    if (Array.isArray(parsed)) {
+      raw = parsed.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+    }
+  } catch {
+    raw = s.split(/[\n;|]/).map((x) => x.trim()).filter(Boolean)
+  }
+  const labels = new Set<string>()
+  for (const entry of raw) {
+    if (entry.startsWith("http")) {
+      labels.add(shortDomain(entry))
+      continue
+    }
+    // Take everything before the first paren / dash / comma — that's the source name
+    const head = entry.split(/[(,\-–—]/)[0]?.trim()
+    if (head && head.length > 0 && head.length < 60) labels.add(head)
+  }
+  return Array.from(labels).slice(0, 8)
+}
+
+// `<cite index="...">x</cite>` artifacts leak in from synthetic ZIP intel rows.
+// Strip the wrapper but keep the content.
+function stripCiteTags(s: string | null | undefined): string | null {
+  if (s == null) return null
+  return s.replace(/<cite\s+index="[^"]*"\s*>([\s\S]*?)<\/cite>/gi, "$1").trim()
+}
+
 const SYSTEM_PROMPT = [
   "You are a dental private-equity pattern analyst writing a verified investment thesis for a new graduate evaluating this practice.",
   "",
   "NON-NEGOTIABLE RULES:",
-  "- Every claim must come from either (a) a structural fact stated in the user message, or (b) a verified URL with [source: domain] citation pulled from the supplied URL list (practice-level URLs and ZIP-level URLs both qualify).",
+  "- Every claim must come from either (a) a structural fact stated in the user message, or (b) a verified source with [source: ...] citation pulled from the supplied source list. Sources may be URLs (cite by domain) or named research providers (cite by provider name, e.g. [source: Redfin]).",
+  "- The demand_outlook, supply_outlook, and investment_thesis fields under '# ZIP market intelligence' are themselves structural facts (rule a). Paraphrasing or quoting from them is allowed without a separate citation, though attaching [source: ZIP intel] to such paraphrases is encouraged for transparency.",
+  "- Net-new market claims that go BEYOND those structural fields (specific dollar figures, named employers, named competitors, school rankings, etc.) require a [source: ...] citation from the cite-able ZIP source list.",
   "- If neither (a) nor (b) supports a claim, OMIT the claim. Never produce filler analysis to hit a word count.",
   "- Never paraphrase a signal ID into a fact. \"mentor_density\" is a signal label, not evidence of mentorship.",
   "- Never invent doctor names, ages, retirement intent, review counts, or technology lists.",
-  "- Never invent market-level claims (population growth, home price trends, new competitors, employer presence). These require a ZIP-source URL citation from the cite-able ZIP list. If no ZIP intel is provided, omit market-level commentary entirely.",
   "- Reviews/ratings: only cite if a Google or Healthgrades URL is in the source list.",
   "- When ZIP market intelligence is provided, integrate at least one substantive market-level fact alongside practice-level evidence so the thesis reflects both supply/demand context and target-specific structure.",
   "",
@@ -109,6 +144,14 @@ function buildUserPrompt(
   const services = parseList(intel.services_listed).slice(0, 6)
   const techs = parseList(intel.technology_listed).slice(0, 6)
   const zipUrls = zipIntel ? parseUrls(zipIntel.sources).slice(0, 6) : []
+  const zipSourceLabels = zipIntel ? parseZipSourceLabels(zipIntel.sources) : []
+  // Combined cite-able set: prefer URLs (cite by domain) but fall through to plain-text labels.
+  const zipCiteList: { display: string; label: string }[] = [
+    ...zipUrls.map((u) => ({ display: u, label: shortDomain(u) })),
+    ...zipSourceLabels
+      .filter((label) => !zipUrls.some((u) => shortDomain(u) === label))
+      .map((label) => ({ display: label, label })),
+  ].slice(0, 8)
 
   const lines: string[] = [
     `# Practice`,
@@ -149,11 +192,14 @@ function buildUserPrompt(
   ]
 
   if (zipIntel) {
+    const demand = stripCiteTags(zipIntel.demand_outlook)
+    const supply = stripCiteTags(zipIntel.supply_outlook)
+    const thesis = stripCiteTags(zipIntel.investment_thesis)
     lines.push(
       `# ZIP market intelligence (zip ${zipIntel.zip_code}, researched ${zipIntel.research_date ?? "unknown date"})`,
-      `- Demand outlook: ${zipIntel.demand_outlook ?? "n/a"}`,
-      `- Supply outlook: ${zipIntel.supply_outlook ?? "n/a"}`,
-      `- Investment thesis (analyst-curated): ${zipIntel.investment_thesis ?? "n/a"}`,
+      `- Demand outlook: ${demand ?? "n/a"}`,
+      `- Supply outlook: ${supply ?? "n/a"}`,
+      `- Investment thesis (analyst-curated): ${thesis ?? "n/a"}`,
       `- Confidence: ${zipIntel.confidence ?? "n/a"}`
     )
     const realEstateBits: string[] = []
@@ -164,18 +210,22 @@ function buildUserPrompt(
     if (zipIntel.home_price_trend) realEstateBits.push(`trend ${zipIntel.home_price_trend}`)
     if (realEstateBits.length > 0) lines.push(`- Real estate: ${realEstateBits.join(", ")}`)
     if (zipIntel.pop_growth_signals)
-      lines.push(`- Population growth: ${zipIntel.pop_growth_signals}`)
-    if (zipIntel.pop_demographics) lines.push(`- Demographics: ${zipIntel.pop_demographics}`)
-    if (zipIntel.major_employers) lines.push(`- Major employers: ${zipIntel.major_employers}`)
+      lines.push(`- Population growth: ${stripCiteTags(zipIntel.pop_growth_signals)}`)
+    if (zipIntel.pop_demographics)
+      lines.push(`- Demographics: ${stripCiteTags(zipIntel.pop_demographics)}`)
+    if (zipIntel.major_employers)
+      lines.push(`- Major employers: ${stripCiteTags(zipIntel.major_employers)}`)
     if (zipIntel.dental_new_offices)
-      lines.push(`- New dental offices nearby: ${zipIntel.dental_new_offices}`)
-    if (zipIntel.dental_dso_moves) lines.push(`- Recent DSO moves: ${zipIntel.dental_dso_moves}`)
-    if (zipIntel.competitor_new) lines.push(`- New competitors: ${zipIntel.competitor_new}`)
+      lines.push(`- New dental offices nearby: ${stripCiteTags(zipIntel.dental_new_offices)}`)
+    if (zipIntel.dental_dso_moves)
+      lines.push(`- Recent DSO moves: ${stripCiteTags(zipIntel.dental_dso_moves)}`)
+    if (zipIntel.competitor_new)
+      lines.push(`- New competitors: ${stripCiteTags(zipIntel.competitor_new)}`)
     if (zipIntel.competitor_closures)
-      lines.push(`- Recent closures: ${zipIntel.competitor_closures}`)
+      lines.push(`- Recent closures: ${stripCiteTags(zipIntel.competitor_closures)}`)
     if (zipIntel.housing_status || zipIntel.housing_summary) {
       lines.push(
-        `- Housing: ${[zipIntel.housing_status, zipIntel.housing_summary].filter(Boolean).join(" — ")}`
+        `- Housing: ${[stripCiteTags(zipIntel.housing_status), stripCiteTags(zipIntel.housing_summary)].filter(Boolean).join(" — ")}`
       )
     }
     if (zipIntel.school_district || zipIntel.school_rating) {
@@ -183,17 +233,21 @@ function buildUserPrompt(
         `- Schools: ${[zipIntel.school_district, zipIntel.school_rating].filter(Boolean).join(" rated ")}`
       )
     }
-    if (zipUrls.length > 0) {
+    if (zipCiteList.length > 0) {
       lines.push(
         ``,
-        `# Cite-able ZIP source URLs (use [source: domain] for market-level claims):`,
-        ...zipUrls.map((u) => `- ${u} (cite as [source: ${shortDomain(u)}])`),
-        `Substantive market-level claims (population, home prices, employers, competitors) require [source: ...] from this list.`
+        `# Cite-able ZIP sources (use [source: label] for net-new market-level claims):`,
+        ...zipCiteList.map((c) =>
+          c.display === c.label
+            ? `- ${c.label} (cite as [source: ${c.label}])`
+            : `- ${c.display} (cite as [source: ${c.label}])`
+        ),
+        `Citation guidance: paraphrasing demand_outlook / supply_outlook / investment_thesis above is allowed without citation (they ARE the structural facts). Net-new specifics (dollar figures, named employers, named competitors) require [source: ...] from this list.`
       )
     } else {
       lines.push(
         ``,
-        `# ZIP source URLs: (none on file — market-level claims must be omitted unless covered by the demand/supply/investment_thesis fields above)`
+        `# ZIP sources: (none on file — restrict ZIP commentary to paraphrasing the demand_outlook / supply_outlook / investment_thesis fields above; do not introduce new market specifics)`
       )
     }
     lines.push(``)
