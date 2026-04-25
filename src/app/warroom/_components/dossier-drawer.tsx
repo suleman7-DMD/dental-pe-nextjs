@@ -11,6 +11,8 @@ import {
   Building2,
   CheckCircle2,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   Compass,
   Copy,
@@ -94,6 +96,14 @@ interface DossierDrawerProps {
   recentChanges?: WarroomChangeRecord[]
   currentStage?: LifecycleStage
   onStageChange?: (npi: string, stage: LifecycleStage) => void
+  onPrev?: () => void
+  onNext?: () => void
+  currentIndex?: number | null
+  totalCount?: number
+  isReviewed?: boolean
+  reviewedAt?: string | null
+  onMarkReviewed?: (npi: string) => void
+  onUnmarkReviewed?: (npi: string) => void
 }
 
 const TIER_STYLES: Record<
@@ -510,6 +520,14 @@ export function DossierDrawer({
   recentChanges = [],
   currentStage = "untouched",
   onStageChange,
+  onPrev,
+  onNext,
+  currentIndex = null,
+  totalCount = 0,
+  isReviewed = false,
+  reviewedAt = null,
+  onMarkReviewed,
+  onUnmarkReviewed,
 }: DossierDrawerProps) {
   const isOpen = target != null
 
@@ -564,6 +582,39 @@ export function DossierDrawer({
         className="flex w-full flex-col gap-0 border-[#E8E5DE] bg-[#FFFFFF] p-0 sm:max-w-[640px]"
       >
         <SheetHeader className="space-y-3 border-b border-[#E8E5DE] bg-[#FAFAF7] p-5">
+          {(onPrev || onNext) && totalCount > 0 && (
+            <div className="flex items-center justify-between gap-2 text-[11px] text-[#6B6B60]">
+              <button
+                type="button"
+                onClick={onPrev}
+                disabled={!onPrev || currentIndex == null || currentIndex <= 0}
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 text-[11px] font-medium text-[#6B6B60] transition-colors hover:bg-[#F7F7F4] hover:text-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#FFFFFF] disabled:hover:text-[#6B6B60]"
+                aria-label="Previous target"
+                title="Previous target ([)"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Prev
+              </button>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-[#707064]">
+                {currentIndex != null ? `${currentIndex + 1} of ${totalCount}` : `— of ${totalCount}`}
+              </span>
+              <button
+                type="button"
+                onClick={onNext}
+                disabled={
+                  !onNext ||
+                  currentIndex == null ||
+                  currentIndex >= totalCount - 1
+                }
+                className="inline-flex h-7 items-center gap-1 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 text-[11px] font-medium text-[#6B6B60] transition-colors hover:bg-[#F7F7F4] hover:text-[#1A1A1A] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[#FFFFFF] disabled:hover:text-[#6B6B60]"
+                aria-label="Next target"
+                title="Next target (])"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#6B6B60]">
             <span className="font-mono text-[#B8860B]">#{target.rank}</span>
             <span
@@ -631,6 +682,36 @@ export function DossierDrawer({
               )}
               {isPinned ? "Pinned" : "Pin target"}
             </button>
+            {(onMarkReviewed || onUnmarkReviewed) && (
+              <button
+                type="button"
+                onClick={() =>
+                  isReviewed
+                    ? onUnmarkReviewed?.(target.npi)
+                    : onMarkReviewed?.(target.npi)
+                }
+                aria-pressed={isReviewed}
+                aria-label={
+                  isReviewed
+                    ? `Mark ${target.practiceName ?? "target"} as not reviewed`
+                    : `Mark ${target.practiceName ?? "target"} reviewed`
+                }
+                title={
+                  isReviewed && reviewedAt
+                    ? `Reviewed ${formatDate(reviewedAt)}`
+                    : "Mark reviewed"
+                }
+                className={cn(
+                  "inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[12px] font-medium transition-colors",
+                  isReviewed
+                    ? "border-[#2D8B4E]/40 bg-[#2D8B4E]/15 text-[#2D8B4E]"
+                    : "border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4]"
+                )}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {isReviewed ? "Reviewed" : "Mark reviewed"}
+              </button>
+            )}
             {onIntentRequest && (
               <button
                 type="button"

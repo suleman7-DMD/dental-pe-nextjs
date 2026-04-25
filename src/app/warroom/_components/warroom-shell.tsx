@@ -29,7 +29,9 @@ import {
   type WarroomSignalFilter,
 } from "@/lib/hooks/use-warroom-state"
 import { useWarroomData } from "@/lib/hooks/use-warroom-data"
+import { useWarroomIntelAvailability } from "@/lib/hooks/use-warroom-intel-availability"
 import { useWarroomPinLifecycle } from "@/lib/hooks/use-warroom-pin-lifecycle"
+import { useWarroomReviewed } from "@/lib/hooks/use-warroom-reviewed"
 import type {
   RankedTarget,
   WarroomIntent,
@@ -240,9 +242,18 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   const rankLimit = useMemo(() => activeIntent?.filter.limit ?? 40, [activeIntent])
 
   const {
+    stages: lifecycleStages,
     getStage: getLifecycleStage,
     setStage: setLifecycleStage,
   } = useWarroomPinLifecycle()
+
+  const {
+    reviewedSet,
+    isReviewed,
+    reviewedAt,
+    markReviewed,
+    unmarkReviewed,
+  } = useWarroomReviewed()
 
   const { data: bundle, isFetching, error } = useWarroomData({
     scope: state.scope,
@@ -385,6 +396,42 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     input?.select()
   }, [])
 
+  const rankedTargets = useMemo(
+    () => effectiveBundle?.rankedTargets ?? [],
+    [effectiveBundle]
+  )
+  const npisForIntel = useMemo(
+    () => rankedTargets.map((target) => target.npi),
+    [rankedTargets]
+  )
+  const { availability: intelAvailable } =
+    useWarroomIntelAvailability(npisForIntel)
+  const visibleTargets = useMemo(() => {
+    const minTier = activeIntent?.filter.minTier
+    if (!minTier) return rankedTargets
+    const floor = TIER_RANK[minTier]
+    return rankedTargets.filter(
+      (target) => (TIER_RANK[target.tier] ?? 0) >= floor
+    )
+  }, [activeIntent, rankedTargets])
+  const dossierIndex = useMemo(() => {
+    if (!state.selectedEntity) return null
+    const idx = visibleTargets.findIndex(
+      (target) => target.npi === state.selectedEntity
+    )
+    return idx >= 0 ? idx : null
+  }, [state.selectedEntity, visibleTargets])
+  const goToPrevTarget = useCallback(() => {
+    if (dossierIndex == null || dossierIndex <= 0) return
+    const prev = visibleTargets[dossierIndex - 1]
+    if (prev) setSelectedEntity(prev.npi)
+  }, [dossierIndex, visibleTargets, setSelectedEntity])
+  const goToNextTarget = useCallback(() => {
+    if (dossierIndex == null || dossierIndex >= visibleTargets.length - 1) return
+    const next = visibleTargets[dossierIndex + 1]
+    if (next) setSelectedEntity(next.npi)
+  }, [dossierIndex, visibleTargets, setSelectedEntity])
+
   useEffect(() => {
     function isTypingTarget(target: EventTarget | null): boolean {
       if (!(target instanceof HTMLElement)) return false
@@ -469,6 +516,26 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
             handleAddPin(state.selectedEntity)
           }
           return
+        case "v":
+        case "V":
+          if (!state.selectedEntity) return
+          event.preventDefault()
+          if (reviewedSet.has(state.selectedEntity)) {
+            unmarkReviewed(state.selectedEntity)
+          } else {
+            markReviewed(state.selectedEntity)
+          }
+          return
+        case "[":
+          if (!state.selectedEntity) return
+          event.preventDefault()
+          goToPrevTarget()
+          return
+        case "]":
+          if (!state.selectedEntity) return
+          event.preventDefault()
+          goToNextTarget()
+          return
         default:
           return
       }
@@ -478,25 +545,26 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   }, [
     handleAddPin,
     dossierZip,
+    goToNextTarget,
+    goToPrevTarget,
     handleCommandShortcut,
     handleIntentReset,
     handleModeChange,
+    markReviewed,
     pinnedNpis,
     removePin,
     resetWarroomState,
+    reviewedSet,
     selectedZip,
     setSelectedEntity,
     shortcutsOpen,
     state.selectedEntity,
+    unmarkReviewed,
   ])
 
   const summary = effectiveBundle?.summary ?? null
   const zipScores = effectiveBundle?.zipScores ?? []
   const zipSignals = effectiveBundle?.zipSignals ?? []
-  const rankedTargets = useMemo(
-    () => effectiveBundle?.rankedTargets ?? [],
-    [effectiveBundle]
-  )
   const briefingItems = effectiveBundle?.briefing ?? []
   const dataHealth = effectiveBundle?.dataHealth
   const rawErrorMessage =
@@ -514,15 +582,6 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     () => sanitizeErrorMessage(rawErrorMessage),
     [rawErrorMessage]
   )
-
-  const visibleTargets = useMemo(() => {
-    const minTier = activeIntent?.filter.minTier
-    if (!minTier) return rankedTargets
-    const floor = TIER_RANK[minTier]
-    return rankedTargets.filter(
-      (target) => (TIER_RANK[target.tier] ?? 0) >= floor
-    )
-  }, [activeIntent, rankedTargets])
 
   return (
     <div className="min-h-[calc(100vh-3rem)] bg-[#FAFAF7] text-[#1A1A1A]">
@@ -768,6 +827,11 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
             pinnedNpis={pinnedNpis}
             onPin={handleAddPin}
             onUnpin={removePin}
+            lifecycleStages={lifecycleStages}
+            intelAvailable={intelAvailable}
+            reviewedNpis={reviewedSet}
+            onMarkReviewed={markReviewed}
+            onUnmarkReviewed={unmarkReviewed}
           />
         </PanelErrorBoundary>
       </div>
@@ -785,6 +849,14 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
           selectedTarget ? getLifecycleStage(selectedTarget.npi) : undefined
         }
         onStageChange={setLifecycleStage}
+        onPrev={goToPrevTarget}
+        onNext={goToNextTarget}
+        currentIndex={dossierIndex}
+        totalCount={visibleTargets.length}
+        isReviewed={selectedTarget ? isReviewed(selectedTarget.npi) : false}
+        reviewedAt={selectedTarget ? reviewedAt(selectedTarget.npi) : null}
+        onMarkReviewed={markReviewed}
+        onUnmarkReviewed={unmarkReviewed}
       />
 
       <ZipDossierDrawer

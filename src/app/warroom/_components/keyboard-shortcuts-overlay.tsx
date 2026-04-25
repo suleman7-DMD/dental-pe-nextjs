@@ -46,6 +46,14 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     rows: [
       { keys: ["R"], description: "Reset filters + intent + selection" },
       { keys: ["P"], description: "Toggle pin on selected target" },
+      { keys: ["V"], description: "Toggle reviewed on selected target" },
+    ],
+  },
+  {
+    label: "Dossier",
+    rows: [
+      { keys: ["["], description: "Previous target in current list" },
+      { keys: ["]"], description: "Next target in current list" },
     ],
   },
 ]

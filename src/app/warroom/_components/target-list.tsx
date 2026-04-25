@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Download,
   Flame,
+  Handshake,
   MapPin,
   Pin,
   Sparkles,
@@ -21,6 +22,11 @@ import { exportToCsv } from "@/lib/utils/csv-export"
 import type { RankedTarget, WarroomScoreComponent } from "@/lib/warroom/signals"
 import type { WarroomLens } from "@/lib/warroom/mode"
 import { getWarroomLensLabel } from "@/lib/warroom/mode"
+import {
+  LIFECYCLE_STAGE_COLORS,
+  LIFECYCLE_STAGE_LABELS,
+  type LifecycleMap,
+} from "@/lib/hooks/use-warroom-pin-lifecycle"
 
 interface TargetListProps {
   targets: RankedTarget[]
@@ -34,6 +40,7 @@ interface TargetListProps {
   reviewedNpis?: Set<string>
   onMarkReviewed?: (npi: string) => void
   onUnmarkReviewed?: (npi: string) => void
+  lifecycleStages?: LifecycleMap
   className?: string
 }
 
@@ -214,12 +221,14 @@ export function TargetList({
   reviewedNpis,
   onMarkReviewed,
   onUnmarkReviewed,
+  lifecycleStages,
   className,
 }: TargetListProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [tierFilter, setTierFilter] = useState<TierFilter>("all")
   const [intelOnly, setIntelOnly] = useState(false)
   const [hideReviewed, setHideReviewed] = useState(false)
+  const [pipelineOnly, setPipelineOnly] = useState(false)
 
   const tierCounts = useMemo(() => {
     const counts: Record<RankedTarget["tier"], number> = {
@@ -244,13 +253,32 @@ export function TargetList({
     return targets.reduce((acc, target) => acc + (reviewedNpis.has(target.npi) ? 1 : 0), 0)
   }, [targets, reviewedNpis])
 
+  const pipelineCount = useMemo(() => {
+    if (!lifecycleStages) return 0
+    return targets.reduce(
+      (acc, target) => acc + (lifecycleStages[target.npi] ? 1 : 0),
+      0
+    )
+  }, [targets, lifecycleStages])
+
   const filtered = useMemo(() => {
     let out = targets
     if (tierFilter !== "all") out = out.filter((target) => target.tier === tierFilter)
     if (intelOnly && intelAvailable) out = out.filter((target) => intelAvailable.has(target.npi))
     if (hideReviewed && reviewedNpis) out = out.filter((target) => !reviewedNpis.has(target.npi))
+    if (pipelineOnly && lifecycleStages)
+      out = out.filter((target) => Boolean(lifecycleStages[target.npi]))
     return out
-  }, [targets, tierFilter, intelOnly, intelAvailable, hideReviewed, reviewedNpis])
+  }, [
+    targets,
+    tierFilter,
+    intelOnly,
+    intelAvailable,
+    hideReviewed,
+    reviewedNpis,
+    pipelineOnly,
+    lifecycleStages,
+  ])
 
   const toggleExpanded = (npi: string) => {
     setExpanded((current) => {
@@ -337,6 +365,23 @@ export function TargetList({
               {hideReviewed ? `Hidden · ${reviewedCount}` : `Reviewed · ${reviewedCount}`}
             </button>
           )}
+          {lifecycleStages && pipelineCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setPipelineOnly((prev) => !prev)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[11px] font-medium transition-colors",
+                pipelineOnly
+                  ? "border-[#B8860B]/40 bg-[#B8860B]/10 text-[#B8860B]"
+                  : "border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
+              )}
+              aria-pressed={pipelineOnly}
+              title="Show only targets that are in your pipeline"
+            >
+              <Handshake className="h-3 w-3" />
+              In pipeline · {pipelineCount}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => exportRankedCsv(targets, lens)}
@@ -363,6 +408,10 @@ export function TargetList({
               const isPinned = pinnedNpis?.has(target.npi) ?? false
               const hasIntel = intelAvailable?.has(target.npi) ?? false
               const isReviewed = reviewedNpis?.has(target.npi) ?? false
+              const lifecycleStage = lifecycleStages?.[target.npi]
+              const lifecycleColors = lifecycleStage
+                ? LIFECYCLE_STAGE_COLORS[lifecycleStage]
+                : null
               const TierIcon = tier.icon
               return (
                 <li
@@ -411,6 +460,23 @@ export function TargetList({
                             <TierIcon className="h-3 w-3" />
                             {tier.label}
                           </span>
+                          {lifecycleStage && lifecycleColors && (
+                            <span
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                                lifecycleColors.bg,
+                                lifecycleColors.text,
+                                lifecycleColors.border
+                              )}
+                              title={`Pipeline stage: ${LIFECYCLE_STAGE_LABELS[lifecycleStage]}`}
+                            >
+                              <span
+                                className={cn("h-1.5 w-1.5 rounded-full", lifecycleColors.dot)}
+                                aria-hidden="true"
+                              />
+                              {LIFECYCLE_STAGE_LABELS[lifecycleStage]}
+                            </span>
+                          )}
                           {hasIntel && (
                             <span
                               className="inline-flex items-center gap-1 rounded-full border border-[#7C3AED]/30 bg-[#7C3AED]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#7C3AED]"
