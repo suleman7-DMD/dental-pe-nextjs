@@ -433,7 +433,7 @@ Phases 0-7 of the Chicagoland Warroom shipped 2026-04-24, then trimmed and exten
 | Lenses | 4 lenses: consolidation, density, buyability, retirement (was 8 — pe_exposure / saturation / whitespace / disagreement cut as low-signal) |
 | Hunt mode | Intent-driven filtering, tier floors, flag badges, enrichment-aware ranking, intel-availability + reviewed-only filter chips, "In pipeline · N" lifecycle filter |
 | Investigate mode | `investigate-mode-panel.tsx` — signal co-occurrence + compound-flag list (flagCount ≥ 2) + stealth DSO cluster / intel-disagreement sample cards |
-| Pin lifecycle | `use-warroom-pin-lifecycle.ts` localStorage hook (5,000 entries, cross-tab sync) — 6 stages: Untouched / Reviewed / Following / Contacted / Pursuing / Passed. Stage selector in dossier header (only when pinned). Per-row stage badge in TargetList. |
+| Pin lifecycle | `use-warroom-pin-lifecycle.ts` localStorage hook (cross-tab sync via `storage` event) — 6 stages: Untouched / Researching / Contacting / In dialogue / Passed / Won. Stage selector in dossier header (only when pinned). Per-row stage badge in TargetList. "In pipeline · N" filter chip counts non-`untouched` stages. |
 | Reviewed tracking | `use-warroom-reviewed.ts` localStorage hook + Mark/Unmark Reviewed toggle in dossier header (timestamp tooltip). TargetList "Reviewed · N" filter chip; reviewed rows get a muted tint. Keyboard `V` toggles reviewed on the active target. |
 | Dossier nav | Prev/Next arrows + "X of Y" indicator in dossier header — index walks `visibleTargets` so it tracks the active filter chain. Keyboard `[` and `]` jump between targets. |
 | Pin compare drawer | `pin-compare-drawer.tsx` — replaces the deleted Profile mode. Multi-target side-by-side metrics + intel snippet. |
