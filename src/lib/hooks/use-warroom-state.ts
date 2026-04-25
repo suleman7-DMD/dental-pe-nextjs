@@ -38,15 +38,9 @@ export const WARROOM_SIGNAL_FILTERS = [
   { id: "revenue_default", label: "Revenue Default" },
   { id: "family_dynasty", label: "Family Dynasty" },
   { id: "micro_cluster", label: "Micro-Cluster" },
-  { id: "intel_disagreement", label: "Intel Gap" },
   { id: "retirement_risk", label: "Retirement" },
   { id: "recent_changes", label: "Recent Movement" },
-  { id: "high_peer_buyability", label: "Peer Buyability" },
   { id: "high_peer_retirement", label: "Peer Retirement" },
-  { id: "white_space", label: "White-Space" },
-  { id: "compound_demand", label: "Compound Demand" },
-  { id: "mirror_pair", label: "Mirror Pair" },
-  { id: "contested_zone", label: "Contested" },
   { id: "ada_gap", label: "ADA Gap" },
 ] as const
 

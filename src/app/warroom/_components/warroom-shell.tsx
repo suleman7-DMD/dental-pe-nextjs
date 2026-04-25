@@ -24,7 +24,6 @@ import {
 } from "@/lib/warroom/scope"
 import {
   WARROOM_PIN_LIMIT,
-  WARROOM_SIGNAL_FILTERS,
   useWarroomState,
   type WarroomConfidenceFilter,
   type WarroomSignalFilter,
@@ -54,7 +53,6 @@ import { KeyboardShortcutsOverlay } from "./keyboard-shortcuts-overlay"
 import { LivingMap } from "./living-map"
 import { ModeSwitcher } from "./mode-switcher"
 import { PinboardTray } from "./pinboard-tray"
-import { ProfileModePanel } from "./profile-mode-panel"
 import { ScopeSelector } from "./scope-selector"
 import { SitrepKpiStrip } from "./sitrep-kpi-strip"
 import { TargetList } from "./target-list"
@@ -80,10 +78,8 @@ const CONFIDENCE_OPTIONS: { value: WarroomConfidenceFilter; label: string }[] = 
 ]
 
 const MODE_DEFAULT_LENS: Record<WarroomMode, WarroomLens> = {
-  sitrep: "consolidation",
   hunt: "retirement",
-  profile: "consolidation",
-  investigate: "disagreement",
+  investigate: "buyability",
 }
 
 function LensSelector({
@@ -124,15 +120,9 @@ function signalFiltersToFlags(signals: WarroomSignalFilter[]): string[] {
   if (signals.includes("revenue_default")) flags.push("revenue_default_flag")
   if (signals.includes("family_dynasty")) flags.push("family_dynasty_flag")
   if (signals.includes("micro_cluster")) flags.push("micro_cluster_flag")
-  if (signals.includes("intel_disagreement")) flags.push("intel_quant_disagreement_flag")
   if (signals.includes("retirement_risk")) flags.push("retirement_combo_flag")
   if (signals.includes("recent_changes")) flags.push("last_change_90d_flag")
-  if (signals.includes("high_peer_buyability")) flags.push("high_peer_buyability_flag")
   if (signals.includes("high_peer_retirement")) flags.push("high_peer_retirement_flag")
-  if (signals.includes("white_space")) flags.push("zip_white_space_flag")
-  if (signals.includes("compound_demand")) flags.push("zip_compound_demand_flag")
-  if (signals.includes("mirror_pair")) flags.push("zip_mirror_pair_flag")
-  if (signals.includes("contested_zone")) flags.push("zip_contested_zone_flag")
   if (signals.includes("ada_gap")) flags.push("zip_ada_benchmark_gap_flag")
   return flags
 }
@@ -175,7 +165,6 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     setModeAndLens,
     setSelectedEntity,
     setFilters,
-    toggleSignalFilter,
     addPin,
     removePin,
     reorderPins,
@@ -449,19 +438,9 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
         case "1":
           if (drawerOpen) return
           event.preventDefault()
-          handleModeChange("sitrep")
-          return
-        case "2":
-          if (drawerOpen) return
-          event.preventDefault()
           handleModeChange("hunt")
           return
-        case "3":
-          if (drawerOpen) return
-          event.preventDefault()
-          handleModeChange("profile")
-          return
-        case "4":
+        case "2":
           if (drawerOpen) return
           event.preventDefault()
           handleModeChange("investigate")
@@ -656,38 +635,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                 </div>
               </div>
 
-              <div
-                role="group"
-                aria-labelledby="warroom-signal-filter-label"
-                className="flex flex-wrap items-center gap-2"
-              >
-                <span
-                  id="warroom-signal-filter-label"
-                  className="mr-1 text-[11px] font-medium uppercase tracking-wider text-[#707064]"
-                >
-                  Signals
-                </span>
-                {WARROOM_SIGNAL_FILTERS.map((filter) => {
-                  const active = state.filters.signals.includes(filter.id)
-
-                  return (
-                    <button
-                      key={filter.id}
-                      type="button"
-                      onClick={() => toggleSignalFilter(filter.id)}
-                      className={cn(
-                        "h-8 rounded-md border px-3 text-xs font-medium transition-colors",
-                        active
-                          ? "border-[#B8860B]/30 bg-[#B8860B]/10 text-[#1A1A1A]"
-                          : "border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
-                      )}
-                      aria-pressed={active}
-                      aria-label={`${filter.label} filter, ${active ? "active" : "inactive"}`}
-                    >
-                      {filter.label}
-                    </button>
-                  )
-                })}
+              <div className="flex items-center justify-end">
                 <Button
                   type="button"
                   variant="ghost"
@@ -754,18 +702,6 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
               matchingCount={visibleTargets.length}
               totalCandidateCount={effectiveBundle?.dataHealth.practicesFetched ?? null}
               onReset={handleHuntReset}
-            />
-          </PanelErrorBoundary>
-        )}
-
-        {state.mode === "profile" && (
-          <PanelErrorBoundary panelName="Profile mode">
-            <ProfileModePanel
-              pinnedNpis={state.filters.pins}
-              pinTargets={pinTargets}
-              selectedEntity={state.selectedEntity}
-              onSelectEntity={handleTargetSelect}
-              rankedTargets={visibleTargets}
             />
           </PanelErrorBoundary>
         )}

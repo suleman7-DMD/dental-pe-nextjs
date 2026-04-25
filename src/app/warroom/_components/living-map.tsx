@@ -73,35 +73,6 @@ const LENS_COMPUTATIONS: Record<WarroomLens, LensComputation> = {
     get: ({ zipSignal }) => zipSignal?.retirement_combo_high_count ?? null,
     format: (value) => (value == null ? "--" : formatNumber(value)),
   },
-  pe_exposure: {
-    label: "Deal catchment (24mo)",
-    unit: "deals",
-    description: "Aggregated nearby PE deals in last 24 months.",
-    get: ({ zipSignal }) => zipSignal?.deal_catchment_sum_24mo ?? null,
-    format: (value) => (value == null ? "--" : formatNumber(value)),
-  },
-  saturation: {
-    label: "People per GP door",
-    unit: "residents",
-    description: "Population / GP locations. Higher = thinner coverage → less saturated.",
-    get: ({ zipScore }) => zipScore?.people_per_gp_door ?? null,
-    invertScale: true,
-    format: (value) => (value == null ? "--" : formatNumber(value)),
-  },
-  whitespace: {
-    label: "White-space score",
-    unit: "/100",
-    description: "High demand, low supply composite score.",
-    get: ({ zipSignal }) => zipSignal?.white_space_score ?? null,
-    format: (value) => (value == null ? "--" : formatNumber(value)),
-  },
-  disagreement: {
-    label: "Intel disagreements",
-    unit: "practices",
-    description: "Practices where intel and quant signals diverge.",
-    get: ({ zipSignal }) => zipSignal?.intel_quant_disagreement_count ?? null,
-    format: (value) => (value == null ? "--" : formatNumber(value)),
-  },
 }
 
 interface ZipMarker {
@@ -418,16 +389,6 @@ export function LivingMap({
                   <span className="font-mono text-[#1A1A1A]">
                     {formatNumber(selected.zipScore.opportunity_score)}/100
                   </span>
-                </p>
-              )}
-              {selected.zipSignal?.compound_demand_flag && (
-                <p className="rounded bg-[#2D8B4E]/10 px-2 py-1 text-[#2D8B4E]">
-                  Compound demand flag active
-                </p>
-              )}
-              {selected.zipSignal?.white_space_flag && (
-                <p className="rounded bg-[#2563EB]/10 px-2 py-1 text-[#2563EB]">
-                  White-space flag active
                 </p>
               )}
               {topTargets.length > 0 && (

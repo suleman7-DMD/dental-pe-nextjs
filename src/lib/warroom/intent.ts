@@ -55,8 +55,6 @@ const SIGNAL_SYNONYMS: Record<string, string> = {
   "micro cluster": "micro_cluster_flag",
   "micro-cluster": "micro_cluster_flag",
   "micro clusters": "micro_cluster_flag",
-  "disagreement": "intel_quant_disagreement_flag",
-  "intel disagreement": "intel_quant_disagreement_flag",
   "retirement combo": "retirement_combo_flag",
   "retirement risk": "retirement_combo_flag",
   "retiring": "retirement_combo_flag",
@@ -67,15 +65,7 @@ const SIGNAL_SYNONYMS: Record<string, string> = {
   "recent changes": "last_change_90d_flag",
   "recent movement": "last_change_90d_flag",
   "moved": "last_change_90d_flag",
-  "high peer buyability": "high_peer_buyability_flag",
   "high peer retirement": "high_peer_retirement_flag",
-  "white space": "zip_white_space_flag",
-  "whitespace": "zip_white_space_flag",
-  "compound demand": "zip_compound_demand_flag",
-  "mirror pair": "zip_mirror_pair_flag",
-  "mirror pairs": "zip_mirror_pair_flag",
-  "contested": "zip_contested_zone_flag",
-  "contested zone": "zip_contested_zone_flag",
   "ada gap": "zip_ada_benchmark_gap_flag",
 };
 
@@ -197,18 +187,12 @@ export const PRACTICE_FLAG_LABELS: Record<string, string> = {
   revenue_default_flag: "Revenue Default",
   family_dynasty_flag: "Family Dynasty",
   micro_cluster_flag: "Micro-Cluster",
-  intel_quant_disagreement_flag: "Intel Disagreement",
   retirement_combo_flag: "Retirement Combo",
   last_change_90d_flag: "Recent Movement",
-  high_peer_buyability_flag: "High Peer Buyability",
   high_peer_retirement_flag: "High Peer Retirement",
 };
 
 export const ZIP_FLAG_LABELS: Record<string, string> = {
-  zip_white_space_flag: "White-Space ZIP",
-  zip_compound_demand_flag: "Compound Demand",
-  zip_mirror_pair_flag: "Mirror Pair",
-  zip_contested_zone_flag: "Contested Zone",
   zip_ada_benchmark_gap_flag: "ADA Benchmark Gap",
 };
 
@@ -777,16 +761,6 @@ export const INTENT_PRESETS: { id: string; label: string; query: string }[] = [
     id: "family-dynasties",
     label: "Family dynasties",
     query: "family dynasty practices with buyability over 50",
-  },
-  {
-    id: "whitespace",
-    label: "White-space ZIPs",
-    query: "white space zips with high buyability in Chicagoland",
-  },
-  {
-    id: "contested",
-    label: "Contested zones",
-    query: "contested zones with recent movement",
   },
   {
     id: "solo-retirement",

@@ -1,23 +1,17 @@
 export const WARROOM_MODES = [
-  { id: "sitrep", label: "Sitrep" },
   { id: "hunt", label: "Hunt" },
-  { id: "profile", label: "Profile" },
   { id: "investigate", label: "Investigate" },
 ] as const
 
 export type WarroomMode = (typeof WARROOM_MODES)[number]["id"]
 
-export const DEFAULT_WARROOM_MODE: WarroomMode = "sitrep"
+export const DEFAULT_WARROOM_MODE: WarroomMode = "hunt"
 
 export const WARROOM_LENSES = [
   { id: "consolidation", label: "Consolidation" },
   { id: "density", label: "Density" },
   { id: "buyability", label: "Buyability" },
   { id: "retirement", label: "Retirement" },
-  { id: "pe_exposure", label: "PE Exposure" },
-  { id: "saturation", label: "Saturation" },
-  { id: "whitespace", label: "Whitespace" },
-  { id: "disagreement", label: "Disagreement" },
 ] as const
 
 export type WarroomLens = (typeof WARROOM_LENSES)[number]["id"]

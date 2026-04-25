@@ -236,7 +236,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
 
   const ppoHeavy = isTruthyFlag(intel?.ppo_heavy ?? null)
   const medicaid = isTruthyFlag(intel?.accepts_medicaid ?? null)
-  if (intel && !ppoHeavy && !medicaid) {
+  if (intel?.ppo_heavy === false && intel?.accepts_medicaid === false) {
     active.push({
       id: "ffs_concierge_signal",
       reasoning: "Not PPO-heavy and not Medicaid — likely FFS or concierge mix.",
@@ -270,7 +270,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
 
   const zipMentorCount = practice.zip ? mentorRichCountByZip.get(practice.zip) ?? 0 : 0
   const zipCorpShare = zipScore?.corporate_share_pct ?? null
-  if (zipMentorCount >= 5 && (zipCorpShare == null || zipCorpShare < 0.25)) {
+  if (zipMentorCount >= 3 && (zipCorpShare == null || zipCorpShare < 0.25)) {
     active.push({
       id: "mentor_density_zip_signal",
       reasoning: `${zipMentorCount} mentor-rich practices in this ZIP with low corporate share — deep fallback options.`,
@@ -331,10 +331,10 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
     })
   }
 
-  if (practice.affiliated_pe_sponsor && ctx.recentDealZips.has(practice.zip ?? "")) {
+  if (practice.affiliated_pe_sponsor) {
     active.push({
       id: "pe_recap_volatility_warning",
-      reasoning: `PE-backed (${practice.affiliated_pe_sponsor}) with recent nearby deal — ownership in flux.`,
+      reasoning: `PE-backed (${practice.affiliated_pe_sponsor}) — PE ownership introduces comp and contract volatility.`,
     })
   }
 

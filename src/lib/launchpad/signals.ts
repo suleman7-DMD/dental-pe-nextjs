@@ -82,6 +82,7 @@ export interface LaunchpadSignalDefinition {
   category: LaunchpadSignalCategory
   baseWeight: number
   description: string
+  requiresIntel?: boolean
 }
 
 export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinition> = {
@@ -110,6 +111,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "opportunity",
     baseWeight: 20,
     description: "Active associate opening detected via website, Google listing, or AI research.",
+    requiresIntel: true,
   },
   high_volume_ethical_signal: {
     id: "high_volume_ethical_signal",
@@ -137,6 +139,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     baseWeight: 15,
     description:
       "Fee-for-service or concierge insurance mix — typically higher per-procedure margin and premium patient base.",
+    requiresIntel: true,
   },
   tech_modern_signal: {
     id: "tech_modern_signal",
@@ -145,6 +148,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "opportunity",
     baseWeight: 10,
     description: "High technology level (CBCT, iTero, intraoral scanner) detected by AI research.",
+    requiresIntel: true,
   },
   community_dso_signal: {
     id: "community_dso_signal",
@@ -184,9 +188,10 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     label: "Succession published",
     shortLabel: "Published",
     category: "opportunity",
-    baseWeight: 35,
+    baseWeight: 15,
     description:
       "Owner has published succession intent (AI research detected active-seeking language or broker listing).",
+    requiresIntel: true,
   },
   dso_avoid_warning: {
     id: "dso_avoid_warning",
@@ -240,6 +245,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     baseWeight: -15,
     description:
       "Medicaid-heavy + low-income ZIP + high Google-review velocity — high-throughput production pressure.",
+    requiresIntel: true,
   },
   non_compete_radius_warning: {
     id: "non_compete_radius_warning",
@@ -260,6 +266,14 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
       "PE-sponsor-backed with a deal in the past 12 months — ownership churn typically disrupts associate comp.",
   },
 }
+
+export const SIGNALS_REQUIRING_INTEL: LaunchpadSignalId[] = [
+  "hiring_now_signal",
+  "succession_published_signal",
+  "tech_modern_signal",
+  "ffs_concierge_signal",
+  "medicaid_mill_warning",
+]
 
 export interface LaunchpadPracticeRecord {
   id: number

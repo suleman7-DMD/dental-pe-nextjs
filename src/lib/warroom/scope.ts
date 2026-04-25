@@ -2,7 +2,6 @@ import { LIVING_LOCATIONS } from "@/lib/constants/living-locations"
 import { ZIP_CENTROIDS } from "@/lib/constants/zip-centroids"
 
 export type WarroomScopeKind =
-  | "us"
   | "chicagoland"
   | "subzone"
   | "polygon"
@@ -17,7 +16,6 @@ export interface BoundingBox {
 }
 
 export const WARROOM_SCOPE_IDS = [
-  "us",
   "chicagoland",
   "west_loop_south_loop",
   "woodridge",
@@ -34,7 +32,7 @@ export const WARROOM_SCOPE_IDS = [
 export type WarroomScope = (typeof WARROOM_SCOPE_IDS)[number]
 export type WarroomScopeId = WarroomScope
 
-export type WarroomScopeGroup = "metro" | "saved" | "subzone" | "global"
+export type WarroomScopeGroup = "metro" | "saved" | "subzone"
 
 export interface WarroomScopeOption {
   id: WarroomScope
@@ -170,20 +168,7 @@ function subzoneScopeOption(
   }
 }
 
-const US_SCOPE_OPTION: WarroomScopeOption = {
-  id: "us",
-  label: "United States (all practices)",
-  shortLabel: "US",
-  group: "global",
-  groupLabel: "Global",
-  kind: "us",
-  centerZip: null,
-  zipCount: 0,
-  zipCodes: [],
-}
-
 export const WARROOM_SCOPES: WarroomScopeOption[] = [
-  US_SCOPE_OPTION,
   zipSetScope("chicagoland", "All Chicagoland", "Chicagoland", "metro", "Metro"),
   zipSetScope("west_loop_south_loop", "West Loop / South Loop", "West Loop", "saved", "Saved lists"),
   zipSetScope("woodridge", "Woodridge", "Woodridge", "saved", "Saved lists"),
@@ -340,8 +325,6 @@ export function normalizeWarroomDataScope(scope: WarroomScopeInput | undefined):
   if (typeof scope !== "string") return scope
   const option = getWarroomScopeOption(scope)
   switch (option.kind) {
-    case "us":
-      return { kind: "us" }
     case "chicagoland":
       return { kind: "chicagoland" }
     case "subzone":
@@ -477,8 +460,6 @@ function getPolygonZipCodes(value: unknown): string[] {
 export function resolveScopeZipCodes(scope: WarroomScopeInput | undefined): string[] | null {
   const resolvedScope = normalizeWarroomDataScope(scope)
   switch (resolvedScope.kind) {
-    case "us":
-      return null
     case "chicagoland":
       return getChicagolandZipCodes()
     case "subzone":
@@ -502,8 +483,6 @@ export function getScopeLabel(scope: WarroomScopeInput | undefined): string {
   if (typeof scope === "string") return getWarroomScopeOption(scope).label
   const resolvedScope = normalizeWarroomDataScope(scope)
   switch (resolvedScope.kind) {
-    case "us":
-      return "United States"
     case "chicagoland":
       return "Chicagoland"
     case "subzone": {

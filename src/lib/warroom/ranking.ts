@@ -24,13 +24,11 @@ export interface ComponentWeights {
   enrichment: number;
   recentChange: number;
   corporatePenalty: number;
-  intelDisagreement: number;
   phantomInventory: number;
   familyDynastyPenalty: number;
   peerPercentile: number;
   marketTailwind: number;
   dealCatchment: number;
-  whitespaceBoost: number;
   stealthDsoPenalty: number;
 }
 
@@ -41,13 +39,11 @@ const DEFAULT_WEIGHTS: ComponentWeights = {
   enrichment: 10,
   recentChange: -10,
   corporatePenalty: -30,
-  intelDisagreement: 10,
   phantomInventory: 10,
   familyDynastyPenalty: -12,
   peerPercentile: 12,
   marketTailwind: 8,
   dealCatchment: -10,
-  whitespaceBoost: 6,
   stealthDsoPenalty: -15,
 };
 
@@ -72,26 +68,6 @@ const LENS_WEIGHT_MULTIPLIERS: Record<WarroomLens, Partial<ComponentWeights>> = 
     buyability: 22,
     familyDynastyPenalty: -18,
     peerPercentile: 16,
-  },
-  pe_exposure: {
-    corporatePenalty: -45,
-    dealCatchment: -18,
-    stealthDsoPenalty: -25,
-  },
-  saturation: {
-    marketTailwind: 14,
-    whitespaceBoost: 10,
-    corporatePenalty: -35,
-  },
-  whitespace: {
-    whitespaceBoost: 20,
-    marketTailwind: 14,
-    buyability: 22,
-  },
-  disagreement: {
-    intelDisagreement: 24,
-    phantomInventory: 18,
-    buyability: 18,
   },
 };
 
@@ -244,29 +220,6 @@ function corporatePenaltyComponent(
   };
 }
 
-function intelDisagreementComponent(
-  signal: WarroomPracticeSignalRecord | null,
-  weight: number
-): WarroomScoreComponent {
-  if (!signal?.intel_quant_disagreement_flag) {
-    return {
-      label: "Intel/Quant disagreement",
-      weight,
-      contribution: 0,
-      reasoning: "Intel and quant signals aligned.",
-    };
-  }
-  const contribution = round1(weight);
-  return {
-    label: "Intel/Quant disagreement",
-    weight,
-    contribution,
-    reasoning: signal.intel_quant_disagreement_type === "intel_favors"
-      ? "Intel research favors target despite weak quant — opportunity to validate."
-      : "Quant favors target despite cautious intel — dig into the reasoning.",
-  };
-}
-
 function phantomInventoryComponent(
   signal: WarroomPracticeSignalRecord | null,
   weight: number
@@ -338,10 +291,9 @@ function peerPercentileComponent(
 
 function marketTailwindComponent(
   zipScore: WarroomZipScoreRecord | null,
-  zipSignal: WarroomZipSignalRecord | null,
   weight: number
 ): WarroomScoreComponent {
-  if (!zipScore && !zipSignal) {
+  if (!zipScore) {
     return {
       label: "Market tailwind",
       weight,
@@ -349,20 +301,16 @@ function marketTailwindComponent(
       reasoning: "No ZIP-level market data.",
     };
   }
-  const opportunity = zipScore?.opportunity_score ?? 0;
-  const whiteSpace = zipSignal?.white_space_score ?? 0;
-  const compound = zipSignal?.compound_demand_score ?? 0;
-  const normalized = clamp(Math.max(opportunity, whiteSpace, compound) / 100, 0, 1);
+  const opportunity = zipScore.opportunity_score ?? 0;
+  const normalized = clamp(opportunity / 100, 0, 1);
   const contribution = round1(normalized * weight);
   return {
     label: "Market tailwind",
     weight,
     contribution,
-    reasoning: opportunity >= whiteSpace && opportunity >= compound
+    reasoning: opportunity > 0
       ? `ZIP opportunity score ${opportunity} → +${contribution}pt.`
-      : whiteSpace >= compound
-        ? `White-space score ${whiteSpace} in this ZIP.`
-        : `Compound-demand signal score ${compound}.`,
+      : "No market tailwind signal.",
   };
 }
 
@@ -403,27 +351,6 @@ function dealCatchmentComponent(
   };
 }
 
-function whitespaceBoostComponent(
-  zipSignal: WarroomZipSignalRecord | null,
-  weight: number
-): WarroomScoreComponent {
-  if (!zipSignal?.white_space_flag) {
-    return {
-      label: "White-space boost",
-      weight,
-      contribution: 0,
-      reasoning: "ZIP not flagged for white space.",
-    };
-  }
-  const contribution = round1(weight);
-  return {
-    label: "White-space boost",
-    weight,
-    contribution,
-    reasoning: "High demand, low supply — underserved market signal.",
-  };
-}
-
 function stealthDsoComponent(
   signal: WarroomPracticeSignalRecord | null,
   weight: number
@@ -454,16 +381,10 @@ function collectFlags(signal: WarroomPracticeSignalRecord | null, zipSignal: War
   if (signal?.revenue_default_flag) add("revenue_default", "revenue_default_flag");
   if (signal?.family_dynasty_flag) add("family_dynasty", "family_dynasty_flag");
   if (signal?.micro_cluster_flag) add("micro_cluster", "micro_cluster_flag");
-  if (signal?.intel_quant_disagreement_flag) add("intel_quant_disagreement", "intel_quant_disagreement_flag");
   if (signal?.retirement_combo_flag) add("retirement_combo", "retirement_combo_flag");
   if (signal?.last_change_90d_flag) add("last_change_90d", "last_change_90d_flag");
-  if (signal?.high_peer_buyability_flag) add("high_peer_buyability", "high_peer_buyability_flag");
   if (signal?.high_peer_retirement_flag) add("high_peer_retirement", "high_peer_retirement_flag");
-  if (zipSignal?.white_space_flag) add("zip_white_space", "zip_white_space_flag");
-  if (zipSignal?.compound_demand_flag) add("zip_compound_demand", "zip_compound_demand_flag");
-  if (zipSignal?.contested_zone_flag) add("zip_contested_zone", "zip_contested_zone_flag");
   if (zipSignal?.ada_benchmark_gap_flag) add("zip_ada_benchmark_gap", "zip_ada_benchmark_gap_flag");
-  if (zipSignal?.mirror_pair_flag) add("zip_mirror_pair", "zip_mirror_pair_flag");
   return flags;
 }
 
@@ -705,13 +626,11 @@ export function rankTargets(
         enrichmentComponent(practice, weights.enrichment),
         recentChangeComponent(signal, weights.recentChange),
         corporatePenaltyComponent(ownership, practice, weights.corporatePenalty),
-        intelDisagreementComponent(signal, weights.intelDisagreement),
         phantomInventoryComponent(signal, weights.phantomInventory),
         familyDynastyComponent(signal, weights.familyDynastyPenalty),
         peerPercentileComponent(signal, weights.peerPercentile),
-        marketTailwindComponent(zipScore, zipSignal, weights.marketTailwind),
+        marketTailwindComponent(zipScore, weights.marketTailwind),
         dealCatchmentComponent(signal, zipSignal, weights.dealCatchment),
-        whitespaceBoostComponent(zipSignal, weights.whitespaceBoost),
         stealthDsoComponent(signal, weights.stealthDsoPenalty),
       ];
 

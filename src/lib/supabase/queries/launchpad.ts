@@ -266,7 +266,7 @@ async function fetchRecentAcquisitionNpis(
       const { data, error } = await supabase
         .from("practice_changes")
         .select("npi")
-        .ilike("change_type", "%ownership%")
+        .ilike("change_type", "%acquisition%")
         .gte("change_date", cutoffDate)
         .in("npi", batch)
 

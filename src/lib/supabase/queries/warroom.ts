@@ -35,9 +35,9 @@ const DEAL_SELECT = "id,deal_date,platform_company,pe_sponsor,target_name,target
 const ZIP_SCORE_SELECT = "id,zip_code,city,state,metro_area,total_practices,total_gp_locations,total_specialist_locations,independent_count,dso_affiliated_count,pe_backed_count,unknown_count,consolidated_count,consolidation_pct_of_total,independent_pct_of_total,pe_penetration_pct,pct_unknown,dld_gp_per_10k,dld_total_per_10k,people_per_gp_door,buyable_practice_count,buyable_practice_ratio,corporate_location_count,corporate_share_pct,corporate_highconf_count,family_practice_count,recent_changes_90d,state_deal_count_12m,opportunity_score,market_type,metrics_confidence,market_type_confidence,entity_classification_coverage_pct,data_axle_enrichment_pct,score_date";
 const CHANGE_SELECT = "id,npi,change_date,field_changed,old_value,new_value,change_type,notes,created_at";
 
-const PRACTICE_SIGNAL_SELECT = "npi,practice_id,zip_code,practice_name,city,state,entity_classification,ownership_status,buyability_score,stealth_dso_flag,stealth_dso_cluster_id,stealth_dso_cluster_size,stealth_dso_zip_count,stealth_dso_basis,stealth_dso_reasoning,phantom_inventory_flag,phantom_inventory_reasoning,revenue_default_flag,revenue_default_reasoning,family_dynasty_flag,family_dynasty_reasoning,micro_cluster_flag,micro_cluster_id,micro_cluster_size,micro_cluster_reasoning,intel_quant_disagreement_flag,intel_quant_disagreement_type,intel_quant_disagreement_reasoning,retirement_combo_score,retirement_combo_flag,retirement_combo_reasoning,deal_catchment_24mo,deal_catchment_reasoning,last_change_90d_flag,last_change_date,last_change_type,last_change_reasoning,buyability_pctile_zip_class,buyability_pctile_class,retirement_pctile_zip_class,retirement_pctile_class,high_peer_buyability_flag,high_peer_retirement_flag,peer_percentile_reasoning,zip_white_space_flag,zip_compound_demand_flag,zip_contested_zone_flag,zip_ada_benchmark_gap_flag,data_limitations,created_at";
+const PRACTICE_SIGNAL_SELECT = "npi,practice_id,zip_code,practice_name,city,state,entity_classification,ownership_status,buyability_score,stealth_dso_flag,stealth_dso_cluster_id,stealth_dso_cluster_size,stealth_dso_zip_count,stealth_dso_basis,stealth_dso_reasoning,phantom_inventory_flag,phantom_inventory_reasoning,revenue_default_flag,revenue_default_reasoning,family_dynasty_flag,family_dynasty_reasoning,micro_cluster_flag,micro_cluster_id,micro_cluster_size,micro_cluster_reasoning,retirement_combo_score,retirement_combo_flag,retirement_combo_reasoning,deal_catchment_24mo,deal_catchment_reasoning,last_change_90d_flag,last_change_date,last_change_type,last_change_reasoning,buyability_pctile_zip_class,buyability_pctile_class,retirement_pctile_zip_class,retirement_pctile_class,high_peer_retirement_flag,peer_percentile_reasoning,zip_ada_benchmark_gap_flag,data_limitations,created_at";
 
-const ZIP_SIGNAL_SELECT = "zip_code,city,state,metro_area,population,total_practices,total_gp_locations,total_specialist_locations,dld_gp_per_10k,people_per_gp_door,corporate_share_pct,buyable_practice_ratio,stealth_dso_practice_count,stealth_dso_cluster_count,phantom_inventory_count,phantom_inventory_pct,revenue_default_count,family_dynasty_count,micro_cluster_count,micro_cluster_practice_count,intel_quant_disagreement_count,retirement_combo_high_count,last_change_90d_count,deal_count_all_time,deal_count_24mo,deal_catchment_sum_24mo,deal_catchment_max_24mo,compound_demand_flag,compound_demand_score,compound_demand_reasoning,mirror_pair_flag,mirror_pair_count,top_mirror_zip,top_mirror_similarity,top_mirror_corporate_gap_pp,mirror_zips_json,mirror_reasoning,white_space_flag,white_space_score,white_space_reasoning,contested_zone_flag,contested_platform_count,contested_platforms_json,contested_zone_reasoning,ada_benchmark_pct,ada_benchmark_gap_pp,ada_benchmark_gap_flag,ada_benchmark_reasoning,high_peer_buyability_count,high_peer_retirement_count,data_limitations,created_at";
+const ZIP_SIGNAL_SELECT = "zip_code,city,state,metro_area,population,total_practices,total_gp_locations,total_specialist_locations,dld_gp_per_10k,people_per_gp_door,corporate_share_pct,buyable_practice_ratio,stealth_dso_practice_count,stealth_dso_cluster_count,phantom_inventory_count,phantom_inventory_pct,revenue_default_count,family_dynasty_count,micro_cluster_count,micro_cluster_practice_count,retirement_combo_high_count,last_change_90d_count,deal_count_all_time,deal_count_24mo,deal_catchment_sum_24mo,deal_catchment_max_24mo,ada_benchmark_pct,ada_benchmark_gap_pp,ada_benchmark_gap_flag,ada_benchmark_reasoning,high_peer_retirement_count,data_limitations,created_at";
 
 type PracticeSignalRow = WarroomPracticeSignalRecord;
 type ZipSignalRow = WarroomZipSignalRecord;
@@ -669,14 +669,9 @@ export async function getScopedPracticeSignals(
           "phantom_inventory_flag",
           "family_dynasty_flag",
           "micro_cluster_flag",
-          "intel_quant_disagreement_flag",
           "retirement_combo_flag",
           "last_change_90d_flag",
-          "high_peer_buyability_flag",
           "high_peer_retirement_flag",
-          "zip_white_space_flag",
-          "zip_compound_demand_flag",
-          "zip_contested_zone_flag",
           "zip_ada_benchmark_gap_flag",
         ];
         const orClause = flags.map((flag) => `${String(flag)}.eq.true`).join(",");
@@ -735,13 +730,8 @@ export function computeSignalCounts(
     familyDynastyPractices: 0,
     microClusterPractices: 0,
     microClusters: 0,
-    intelDisagreements: 0,
     retirementComboHigh: 0,
     recentChanges90d: 0,
-    whiteSpaceZips: 0,
-    compoundDemandZips: 0,
-    mirrorPairZips: 0,
-    contestedZips: 0,
     adaGapZips: 0,
     totalFlaggedPractices: 0,
   };
@@ -760,7 +750,6 @@ export function computeSignalCounts(
       counts.microClusterPractices += 1;
       if (signal.micro_cluster_id) distinctMicroClusters.add(signal.micro_cluster_id);
     }
-    if (signal.intel_quant_disagreement_flag) counts.intelDisagreements += 1;
     if (signal.retirement_combo_flag) counts.retirementComboHigh += 1;
     if (signal.last_change_90d_flag) counts.recentChanges90d += 1;
 
@@ -769,10 +758,8 @@ export function computeSignalCounts(
       signal.phantom_inventory_flag ||
       signal.family_dynasty_flag ||
       signal.micro_cluster_flag ||
-      signal.intel_quant_disagreement_flag ||
       signal.retirement_combo_flag ||
       signal.last_change_90d_flag ||
-      signal.high_peer_buyability_flag ||
       signal.high_peer_retirement_flag;
     if (hasAnyFlag) counts.totalFlaggedPractices += 1;
   });
@@ -781,10 +768,6 @@ export function computeSignalCounts(
   counts.microClusters = distinctMicroClusters.size;
 
   zipSignals.forEach((signal) => {
-    if (signal.white_space_flag) counts.whiteSpaceZips += 1;
-    if (signal.compound_demand_flag) counts.compoundDemandZips += 1;
-    if (signal.mirror_pair_flag) counts.mirrorPairZips += 1;
-    if (signal.contested_zone_flag) counts.contestedZips += 1;
     if (signal.ada_benchmark_gap_flag) counts.adaGapZips += 1;
   });
 
@@ -795,7 +778,6 @@ export interface TopPracticeSignalsResult {
   stealthClusters: WarroomPracticeSignalRecord[];
   phantomInventory: WarroomPracticeSignalRecord[];
   retirementCombo: WarroomPracticeSignalRecord[];
-  intelDisagreements: WarroomPracticeSignalRecord[];
   familyDynasties: WarroomPracticeSignalRecord[];
   microClusters: WarroomPracticeSignalRecord[];
 }
@@ -816,9 +798,6 @@ export function extractTopPracticeSignals(
     retirementCombo: signals
       .filter((signal) => signal.retirement_combo_flag)
       .sort((a, b) => (b.retirement_combo_score ?? 0) - (a.retirement_combo_score ?? 0))
-      .slice(0, limit),
-    intelDisagreements: signals
-      .filter((signal) => signal.intel_quant_disagreement_flag)
       .slice(0, limit),
     familyDynasties: signals
       .filter((signal) => signal.family_dynasty_flag)

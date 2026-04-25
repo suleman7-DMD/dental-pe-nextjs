@@ -19,7 +19,6 @@ export interface BriefingInputs {
     stealthClusters: WarroomPracticeSignalRecord[];
     phantomInventory: WarroomPracticeSignalRecord[];
     retirementCombo: WarroomPracticeSignalRecord[];
-    intelDisagreements: WarroomPracticeSignalRecord[];
     familyDynasties: WarroomPracticeSignalRecord[];
     microClusters: WarroomPracticeSignalRecord[];
   };
@@ -136,7 +135,7 @@ function addPhantomInventoryItem(
     severity: signals.phantomInventoryPractices >= 30 ? "high" : "medium",
     title: `${signals.phantomInventoryPractices} phantom-inventory practices`,
     detail: `NPPES listed but missing digital footprint (no website + low review presence). Likely retired or semi-active — confirm before outreach.`,
-    lens: "disagreement",
+    lens: "buyability",
     action: {
       label: "Review phantom list",
       intentHint: "phantom inventory top 25",
@@ -164,112 +163,6 @@ function addFamilyDynastyItem(
   });
 }
 
-function addWhiteSpaceItem(
-  items: WarroomBriefingItem[],
-  signals: WarroomSignalCounts | null,
-  zipSignals: WarroomZipSignalRecord[]
-) {
-  if (!signals || signals.whiteSpaceZips === 0) return;
-  const top = zipSignals
-    .filter((row) => row.white_space_flag)
-    .sort((a, b) => (b.white_space_score ?? 0) - (a.white_space_score ?? 0))
-    .slice(0, 3);
-  const examples = top
-    .map((row) => `${row.zip_code}${row.city ? ` (${row.city})` : ""}`)
-    .join(", ");
-  items.push({
-    id: "white-space",
-    severity: "high",
-    title: `${signals.whiteSpaceZips} white-space ZIPs`,
-    detail: examples
-      ? `High demand, low supply — underserved markets. Examples: ${examples}.`
-      : "High demand, low supply — underserved markets ready for a new location.",
-    lens: "whitespace",
-    action: {
-      label: "Map white-space ZIPs",
-      intentHint: "white space zips",
-    },
-    metric: { label: "White-space ZIPs", value: signals.whiteSpaceZips, unit: "zips" },
-  });
-}
-
-function addCompoundDemandItem(
-  items: WarroomBriefingItem[],
-  signals: WarroomSignalCounts | null,
-  zipSignals: WarroomZipSignalRecord[]
-) {
-  if (!signals || signals.compoundDemandZips === 0) return;
-  const top = zipSignals
-    .filter((row) => row.compound_demand_flag)
-    .sort((a, b) => (b.compound_demand_score ?? 0) - (a.compound_demand_score ?? 0))
-    .slice(0, 3);
-  const examples = top.map((row) => row.zip_code).join(", ");
-  items.push({
-    id: "compound-demand",
-    severity: "medium",
-    title: `${signals.compoundDemandZips} compound-demand ZIPs`,
-    detail: `Population growth + aging dentist roster + low DSO penetration stacked together. ${
-      examples ? `Top: ${examples}.` : "Strong expansion pipeline candidates."
-    }`,
-    lens: "density",
-    action: {
-      label: "Investigate ZIPs",
-      intentHint: "compound demand zips",
-    },
-    metric: { label: "Compound", value: signals.compoundDemandZips, unit: "zips" },
-  });
-}
-
-function addMirrorPairItem(
-  items: WarroomBriefingItem[],
-  signals: WarroomSignalCounts | null,
-  zipSignals: WarroomZipSignalRecord[]
-) {
-  if (!signals || signals.mirrorPairZips === 0) return;
-  const exemplar = zipSignals
-    .filter((row) => row.mirror_pair_flag)
-    .sort((a, b) => (b.top_mirror_similarity ?? 0) - (a.top_mirror_similarity ?? 0))[0];
-  items.push({
-    id: "mirror-pairs",
-    severity: "info",
-    title: `${signals.mirrorPairZips} mirror-pair ZIPs`,
-    detail: exemplar
-      ? `Closest analog: ${exemplar.zip_code} ↔ ${exemplar.top_mirror_zip} (similarity ${round1(
-          exemplar.top_mirror_similarity ?? 0
-        )}, corporate-share gap ${round1(exemplar.top_mirror_corporate_gap_pp ?? 0)}pp).`
-      : "ZIPs structurally similar but with consolidation gaps — arbitrage opportunities.",
-    lens: "consolidation",
-    action: {
-      label: "Compare mirrors",
-      intentHint: "mirror pair zips",
-    },
-  });
-}
-
-function addContestedZoneItem(
-  items: WarroomBriefingItem[],
-  signals: WarroomSignalCounts | null,
-  zipSignals: WarroomZipSignalRecord[]
-) {
-  if (!signals || signals.contestedZips === 0) return;
-  const exemplar = zipSignals
-    .filter((row) => row.contested_zone_flag)
-    .sort((a, b) => (b.contested_platform_count ?? 0) - (a.contested_platform_count ?? 0))[0];
-  items.push({
-    id: "contested-zones",
-    severity: "high",
-    title: `${signals.contestedZips} contested zones`,
-    detail: exemplar
-      ? `${exemplar.zip_code}: ${exemplar.contested_platform_count ?? 0} competing platforms fighting for share. Incumbents may sell at higher multiples.`
-      : "Multiple platforms competing inside a ZIP — sellers have leverage.",
-    lens: "pe_exposure",
-    action: {
-      label: "View contested map",
-      intentHint: "contested zones",
-    },
-  });
-}
-
 function addAdaGapItem(items: WarroomBriefingItem[], signals: WarroomSignalCounts | null) {
   if (!signals || signals.adaGapZips === 0) return;
   items.push({
@@ -277,25 +170,7 @@ function addAdaGapItem(items: WarroomBriefingItem[], signals: WarroomSignalCount
     severity: "info",
     title: `${signals.adaGapZips} ZIPs exceed ADA benchmark`,
     detail: `Local DSO penetration is already above the state-level ADA benchmark — corridor may be near saturation.`,
-    lens: "saturation",
-  });
-}
-
-function addIntelDisagreementItem(
-  items: WarroomBriefingItem[],
-  signals: WarroomSignalCounts | null
-) {
-  if (!signals || signals.intelDisagreements === 0) return;
-  items.push({
-    id: "intel-disagreements",
-    severity: "medium",
-    title: `${signals.intelDisagreements} intel/quant disagreements`,
-    detail: `Qualitative and quantitative signals diverge — either the quant model is wrong, or the intel note is stale. Good queue for manual review.`,
-    lens: "disagreement",
-    action: {
-      label: "Reconcile disagreements",
-      intentHint: "intel disagreements top 25",
-    },
+    lens: "consolidation",
   });
 }
 
@@ -312,7 +187,7 @@ function addRecentDealItem(items: WarroomBriefingItem[], recentDeals: WarroomDea
           latest.target_state ? `, ${latest.target_state}` : ""
         }) — ${latest.platform_company ?? latest.pe_sponsor ?? "Unknown sponsor"} on ${latest.deal_date}.`
       : `Latest deal logged ${latest.deal_date}.`,
-    lens: "pe_exposure",
+    lens: "consolidation",
   });
 }
 
@@ -323,7 +198,7 @@ function addChangeActivityItem(items: WarroomBriefingItem[], summary: WarroomSum
     severity: summary.changeCount90d >= 30 ? "high" : "medium",
     title: `${summary.changeCount90d} ownership/name changes in 90d`,
     detail: `Each change is a potential acquisition breadcrumb — filter by recent change in Hunt mode to focus on post-event targets.`,
-    lens: "pe_exposure",
+    lens: "consolidation",
     action: {
       label: "Filter Hunt by recent",
       intentHint: "recent changes top 25",
@@ -371,7 +246,7 @@ function addMarketHeadlineItem(items: WarroomBriefingItem[], summary: WarroomSum
 
 export function buildWarroomBriefing(inputs: BriefingInputs): WarroomBriefingItem[] {
   const items: WarroomBriefingItem[] = [];
-  const { summary, recentDeals, zipSignals, topSignals } = inputs;
+  const { summary, recentDeals, topSignals } = inputs;
 
   addDataQualityItem(items, summary);
   addCorporateConsolidationItem(items, summary);
@@ -380,12 +255,7 @@ export function buildWarroomBriefing(inputs: BriefingInputs): WarroomBriefingIte
   addStealthDsoItem(items, summary.signalCounts, topSignals.stealthClusters);
   addPhantomInventoryItem(items, summary.signalCounts);
   addFamilyDynastyItem(items, summary.signalCounts);
-  addWhiteSpaceItem(items, summary.signalCounts, zipSignals);
-  addCompoundDemandItem(items, summary.signalCounts, zipSignals);
-  addMirrorPairItem(items, summary.signalCounts, zipSignals);
-  addContestedZoneItem(items, summary.signalCounts, zipSignals);
   addAdaGapItem(items, summary.signalCounts);
-  addIntelDisagreementItem(items, summary.signalCounts);
   addRecentDealItem(items, recentDeals);
   addChangeActivityItem(items, summary);
   addMarketHeadlineItem(items, summary);

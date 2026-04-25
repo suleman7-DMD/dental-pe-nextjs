@@ -68,18 +68,12 @@ const PRACTICE_FLAGS_ORDER: string[] = [
   "revenue_default_flag",
   "family_dynasty_flag",
   "micro_cluster_flag",
-  "intel_quant_disagreement_flag",
   "retirement_combo_flag",
   "last_change_90d_flag",
-  "high_peer_buyability_flag",
   "high_peer_retirement_flag",
 ]
 
 const ZIP_FLAGS_ORDER: string[] = [
-  "zip_white_space_flag",
-  "zip_compound_demand_flag",
-  "zip_mirror_pair_flag",
-  "zip_contested_zone_flag",
   "zip_ada_benchmark_gap_flag",
 ]
 

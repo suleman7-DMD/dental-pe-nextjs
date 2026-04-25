@@ -25,7 +25,6 @@ import {
   MapPin,
   Phone,
   Pin,
-  Scale,
   Search,
   ShieldAlert,
   Sparkles,
@@ -165,14 +164,6 @@ const PRACTICE_SIGNAL_SPECS: SignalFlagSpec[] = [
     extraKeys: ["micro_cluster_size"],
   },
   {
-    key: "intel_quant_disagreement_flag",
-    label: "Intel/Quant Disagreement",
-    icon: Scale,
-    color: "#2563EB",
-    reasoningKey: "intel_quant_disagreement_reasoning",
-    extraKeys: ["intel_quant_disagreement_type"],
-  },
-  {
     key: "retirement_combo_flag",
     label: "Retirement Combo",
     icon: Clock,
@@ -187,14 +178,6 @@ const PRACTICE_SIGNAL_SPECS: SignalFlagSpec[] = [
     color: "#2563EB",
     reasoningKey: "last_change_reasoning",
     extraKeys: ["last_change_date", "last_change_type"],
-  },
-  {
-    key: "high_peer_buyability_flag",
-    label: "High-Peer Buyability",
-    icon: LineChart,
-    color: "#2D8B4E",
-    reasoningKey: "peer_percentile_reasoning",
-    extraKeys: ["buyability_pctile_zip_class", "buyability_pctile_class"],
   },
   {
     key: "high_peer_retirement_flag",
@@ -213,34 +196,6 @@ const ZIP_SIGNAL_SPECS: {
   color: string
   reasoningKey?: keyof WarroomZipSignalRecord
 }[] = [
-  {
-    key: "white_space_flag",
-    label: "White-Space ZIP",
-    icon: Sparkles,
-    color: "#0D9488",
-    reasoningKey: "white_space_reasoning",
-  },
-  {
-    key: "compound_demand_flag",
-    label: "Compound Demand",
-    icon: LineChart,
-    color: "#2563EB",
-    reasoningKey: "compound_demand_reasoning",
-  },
-  {
-    key: "mirror_pair_flag",
-    label: "Mirror Pair",
-    icon: Layers,
-    color: "#7C3AED",
-    reasoningKey: "mirror_reasoning",
-  },
-  {
-    key: "contested_zone_flag",
-    label: "Contested Zone",
-    icon: Crosshair,
-    color: "#C23B3B",
-    reasoningKey: "contested_zone_reasoning",
-  },
   {
     key: "ada_benchmark_gap_flag",
     label: "ADA Benchmark Gap",
@@ -1086,62 +1041,20 @@ function MarketTab({
         </section>
       )}
 
-      {zipSignal && (zipSignal.mirror_pair_flag || zipSignal.compound_demand_flag || zipSignal.white_space_flag) && (
+      {zipSignal?.ada_benchmark_gap_pp != null && (
         <section>
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
             ZIP Signals Summary
           </h3>
           <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 text-[12px]">
-            {zipSignal.white_space_score != null && (
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
-                  White-space score
-                </dt>
-                <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
-                  {formatNumber(zipSignal.white_space_score)}
-                </dd>
-              </div>
-            )}
-            {zipSignal.compound_demand_score != null && (
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
-                  Compound demand
-                </dt>
-                <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
-                  {formatNumber(zipSignal.compound_demand_score)}
-                </dd>
-              </div>
-            )}
-            {zipSignal.top_mirror_zip && (
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
-                  Mirror pair
-                </dt>
-                <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
-                  {zipSignal.top_mirror_zip}
-                </dd>
-              </div>
-            )}
-            {zipSignal.contested_platform_count != null && zipSignal.contested_platform_count > 0 && (
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
-                  Contested platforms
-                </dt>
-                <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
-                  {zipSignal.contested_platform_count}
-                </dd>
-              </div>
-            )}
-            {zipSignal.ada_benchmark_gap_pp != null && (
-              <div>
-                <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
-                  ADA gap (pp)
-                </dt>
-                <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
-                  {formatNumber(zipSignal.ada_benchmark_gap_pp)}
-                </dd>
-              </div>
-            )}
+            <div>
+              <dt className="text-[10px] uppercase tracking-wider text-[#707064]">
+                ADA gap (pp)
+              </dt>
+              <dd className="font-mono text-[13px] font-semibold text-[#1A1A1A]">
+                {formatNumber(zipSignal.ada_benchmark_gap_pp)}
+              </dd>
+            </div>
           </dl>
         </section>
       )}
