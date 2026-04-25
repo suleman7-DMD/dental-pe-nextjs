@@ -32,7 +32,12 @@ const NPI_FILTER_CHUNK_SIZE = 200;
 
 const PRACTICE_SELECT = "id,npi,practice_name,doing_business_as,address,city,state,zip,phone,website,entity_classification,ownership_status,affiliated_dso,affiliated_pe_sponsor,buyability_score,classification_confidence,classification_reasoning,latitude,longitude,year_established,employee_count,estimated_revenue,num_providers,location_type,data_source,data_axle_import_date,parent_company,ein,franchise_name,iusa_number,taxonomy_code,taxonomy_description,updated_at";
 const DEAL_SELECT = "id,deal_date,platform_company,pe_sponsor,target_name,target_city,target_state,target_zip,deal_type,deal_size_mm,ebitda_multiple,specialty,num_locations,source,source_url,notes,created_at,updated_at";
-const ZIP_SCORE_SELECT = "id,zip_code,city,state,metro_area,total_practices,total_gp_locations,total_specialist_locations,independent_count,dso_affiliated_count,pe_backed_count,unknown_count,consolidated_count,consolidation_pct_of_total,independent_pct_of_total,pe_penetration_pct,pct_unknown,dld_gp_per_10k,dld_total_per_10k,people_per_gp_door,buyable_practice_count,buyable_practice_ratio,corporate_location_count,corporate_share_pct,corporate_highconf_count,family_practice_count,recent_changes_90d,state_deal_count_12m,opportunity_score,market_type,metrics_confidence,market_type_confidence,entity_classification_coverage_pct,data_axle_enrichment_pct,score_date";
+// NOTE: corporate_highconf_count is NOT yet in Supabase zip_scores (added to SQLite but
+// ALTER TABLE migration not yet applied to Supabase Postgres). Omit from SELECT and inject
+// null post-fetch — same workaround as launchpad.ts ~line 365. To fix permanently:
+//   ALTER TABLE zip_scores ADD COLUMN corporate_highconf_count INTEGER;
+// then remove this comment and add corporate_highconf_count back to ZIP_SCORE_SELECT.
+const ZIP_SCORE_SELECT = "id,zip_code,city,state,metro_area,total_practices,total_gp_locations,total_specialist_locations,independent_count,dso_affiliated_count,pe_backed_count,unknown_count,consolidated_count,consolidation_pct_of_total,independent_pct_of_total,pe_penetration_pct,pct_unknown,dld_gp_per_10k,dld_total_per_10k,people_per_gp_door,buyable_practice_count,buyable_practice_ratio,corporate_location_count,corporate_share_pct,family_practice_count,recent_changes_90d,state_deal_count_12m,opportunity_score,market_type,metrics_confidence,market_type_confidence,entity_classification_coverage_pct,data_axle_enrichment_pct,score_date";
 const CHANGE_SELECT = "id,npi,change_date,field_changed,old_value,new_value,change_type,notes,created_at";
 
 const PRACTICE_SIGNAL_SELECT = "npi,practice_id,zip_code,practice_name,city,state,entity_classification,ownership_status,buyability_score,stealth_dso_flag,stealth_dso_cluster_id,stealth_dso_cluster_size,stealth_dso_zip_count,stealth_dso_basis,stealth_dso_reasoning,phantom_inventory_flag,phantom_inventory_reasoning,revenue_default_flag,revenue_default_reasoning,family_dynasty_flag,family_dynasty_reasoning,micro_cluster_flag,micro_cluster_id,micro_cluster_size,micro_cluster_reasoning,retirement_combo_score,retirement_combo_flag,retirement_combo_reasoning,deal_catchment_24mo,deal_catchment_reasoning,last_change_90d_flag,last_change_date,last_change_type,last_change_reasoning,buyability_pctile_zip_class,buyability_pctile_class,retirement_pctile_zip_class,retirement_pctile_class,high_peer_retirement_flag,peer_percentile_reasoning,zip_ada_benchmark_gap_flag,data_limitations,created_at";
@@ -387,7 +392,9 @@ export async function getScopedZipScores(
   );
 
   const byZip = new Map<string, ZipScoreRow>();
-  rows.forEach((row) => byZip.set(row.zip_code, row));
+  // Inject corporate_highconf_count: null — column not yet in Supabase zip_scores.
+  // Use Object.assign to avoid TypeScript duplicate-key error from spread.
+  rows.forEach((row) => byZip.set(row.zip_code, Object.assign({ corporate_highconf_count: null as null }, row)));
 
   return Array.from(byZip.values()).sort((a, b) =>
     a.zip_code.localeCompare(b.zip_code)
