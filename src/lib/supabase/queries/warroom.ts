@@ -448,7 +448,7 @@ export async function getScopedChanges(
   const npis = Array.from(new Set(changes.map((change) => change.npi).filter(Boolean)));
   const practices = await fetchPracticeIdentitiesForNpis(supabase, npis);
   const practiceMap = new Map(practices.map((practice) => [practice.npi, practice]));
-  const includeMissingPractice = resolvedScope.kind === "us";
+  const includeMissingPractice = false;
 
   const scopedChanges = changes
     .map((change): WarroomChangeRecord | null => {

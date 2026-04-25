@@ -13,10 +13,9 @@ interface ScopeSelectorProps {
   onChange: (scope: WarroomScopeId) => void
 }
 
-const GROUP_ORDER: WarroomScopeGroup[] = ["global", "metro", "subzone", "saved"]
+const GROUP_ORDER: WarroomScopeGroup[] = ["metro", "subzone", "saved"]
 
 function optionDetail(option: WarroomScopeOption): string {
-  if (option.kind === "us") return "all practices"
   if (option.zipCount === 1) return "1 ZIP"
   return `${option.zipCount} ZIPs`
 }

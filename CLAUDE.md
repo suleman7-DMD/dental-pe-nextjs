@@ -14,7 +14,7 @@ A Next.js 16 + Supabase + Vercel web application that tracks private equity cons
 src/
   app/                    Next.js App Router — 9 page routes + API routes
     _components/          Home page shell
-    warroom/              Chicagoland god-mode command surface (4 modes, 8 lenses, 12 scopes)
+    warroom/              Chicagoland command surface (Hunt + Investigate, 4 lenses, 11 scopes)
     launchpad/              First-job finder for new grads (4 scopes, 3 tracks, 20 signals, 5-tab dossier)
     deal-flow/            PE deal tracking (timeline, sponsors, state choropleth)
     market-intel/         ZIP consolidation analysis (maps, saturation, changes)
@@ -98,7 +98,7 @@ NEXT_PUBLIC_MAPBOX_TOKEN=your-mapbox-token
 |-------|------|---------------|
 | `/` | **Home** | 8 KPI cards (deals, sponsors, practices, ZIPs, corporate %, retirement risk, YTD deals, freshness), 6 nav cards, recent deals table, data freshness bar |
 | `/launchpad` | **Launchpad** | First-job finder for new dental grads. Track-weighted 0-100 scoring across 3 tracks (Succession / Apprentice, High-Volume Ethical, DSO Associate). 20-signal catalog, 5-tier ranking (Best Fit / Strong / Maybe / Low / Avoid). 4 living-location scopes (West Loop, Woodridge, Bolingbrook, All Chicagoland). 5-tab practice dossier (Snapshot / Compensation / Mentorship / Red Flags / Interview Prep). Curated DSO tier list with comp bands + citations. Base score 50, signal×track multiplier, confidence cap at 70 for thin-data practices. |
-| `/warroom` | **Warroom** | Chicagoland god-mode command surface. 4 modes (Sitrep / Hunt / Profile / Investigate), 8 lenses (consolidation, density, buyability, retirement, pe_exposure, saturation, whitespace, disagreement), 12 scopes (US, chicagoland, 7 subzones, 3 saved presets). Intent bar (⌘K), Living Map, ranked target list, ZIP + practice dossier drawers, pinboard tray, signal flag overlays, keyboard shortcuts overlay (?), URL-synced state. |
+| `/warroom` | **Warroom** | Chicagoland command surface. 2 modes (Hunt / Investigate), 4 lenses (consolidation, density, buyability, retirement), 11 scopes (chicagoland, 7 subzones, 3 saved presets). Always-visible Sitrep KPI strip. Intent bar (⌘K), Living Map, ranked target list, ZIP + practice dossier drawers, pinboard tray, signal flag overlays, keyboard shortcuts overlay (?), URL-synced state. |
 | `/deal-flow` | **Deal Flow** | 2,512 PE deals — KPIs, monthly stacked bar timeline, top 15 sponsors/platforms, state choropleth, searchable deals table with CSV. All queries paginated (no 1000-row truncation). |
 | `/market-intel` | **Market Intel** | Tiered consolidation KPIs (high-confidence corporate ~2.3% vs all-signals ~9.9%), DSO penetration table, consolidation map, ZIP score table, city practice tree with pre-loaded counts, ownership breakdown with per-classification counts. Cross-link banner to Warroom. |
 | `/buyability` | **Buyability** | Data-driven KPIs (Acquisition Targets, Dead Ends, Job Targets, Specialists computed from entity_classification + buyability_score), 25-row paginated table with category badges, color-coded by category |
@@ -117,19 +117,19 @@ URL-synced state lives in `src/lib/hooks/use-warroom-state.ts` and serializes th
 
 | Dimension | Values | Purpose |
 |-----------|--------|---------|
-| `mode` | `sitrep` \| `hunt` \| `profile` \| `investigate` | Top-level task (snapshot vs. prospecting vs. deep dive vs. pattern analysis) |
-| `lens` | `consolidation` \| `density` \| `buyability` \| `retirement` \| `pe_exposure` \| `saturation` \| `whitespace` \| `disagreement` | What to color/rank by |
-| `scope` | `us` \| `chicagoland` \| `chicago_west_loop` \| `chicago_south_loop` \| `woodridge` \| `bolingbrook` \| `oak_park` \| `evanston` \| `naperville` \| `saved_high_risk` \| `saved_retirement` \| `saved_whitespace` | Which ZIP set to load |
+| `mode` | `hunt` \| `investigate` | Top-level task (prospecting vs. pattern analysis). Sitrep KPI strip is always visible above the mode panel. |
+| `lens` | `consolidation` \| `density` \| `buyability` \| `retirement` | What to color/rank by |
+| `scope` | `chicagoland` \| `chicago_west_loop` \| `chicago_south_loop` \| `woodridge` \| `bolingbrook` \| `oak_park` \| `evanston` \| `naperville` \| `saved_high_risk` \| `saved_retirement` \| `saved_whitespace` | Which ZIP set to load |
 
 ### Library layer (`src/lib/warroom/`)
 
 | File | Purpose |
 |------|---------|
-| `mode.ts` | `WARROOM_MODES` + `WARROOM_LENSES` constants with labels/icons |
-| `scope.ts` | 12 scope definitions (US, chicagoland, 7 subzones, 3 saved) + `normalizeWarroomDataScope()` |
+| `mode.ts` | `WARROOM_MODES` (hunt, investigate) + `WARROOM_LENSES` (4 lenses) constants with labels/icons |
+| `scope.ts` | 11 scope definitions (chicagoland, 7 subzones, 3 saved) + `normalizeWarroomDataScope()` |
 | `geo.ts` | Geographic helpers — subzone ZIP lookups, bounding boxes |
-| `signals.ts` | `WarroomPracticeRecord`, `WarroomSitrepBundle`, `RankedTarget` types + 15 signal flag definitions |
-| `data.ts` | `getSitrepBundle()` — batch-fetches practices/zip_scores/signals by scope, computes `topSignals` (stealthClusters, intelDisagreements, whitespace, etc.) |
+| `signals.ts` | `WarroomPracticeRecord`, `WarroomSitrepBundle`, `RankedTarget` types + signal flag definitions |
+| `data.ts` | `getSitrepBundle()` — batch-fetches practices/zip_scores/signals by scope, computes `topSignals.stealthClusters` |
 | `intent.ts` | `buildIntentFromFilter()`, `PRACTICE_FLAG_LABELS`, `ZIP_FLAG_LABELS` — natural-language intent parsing |
 | `ranking.ts` | `rankTargets()` — composite scoring across lens, flag count, enrichment, buyability |
 | `briefing.ts` | `buildBriefingItems()` — contextual alerts + suggested actions per scope |
@@ -139,34 +139,33 @@ URL-synced state lives in `src/lib/hooks/use-warroom-state.ts` and serializes th
 | Component | Role |
 |-----------|------|
 | `warroom-shell.tsx` | Orchestrator — holds state hook, renders conditional mode panels + drawers, wires keyboard shortcuts |
-| `scope-selector.tsx` | Scope dropdown with 12 options grouped into US / Chicagoland / Subzones / Saved |
+| `scope-selector.tsx` | Scope dropdown with 11 options grouped into Chicagoland / Subzones / Saved |
 | `intent-bar.tsx` | ⌘K-focusable intent input — parses natural language into filter state |
-| `sitrep-kpi-strip.tsx` | 6 KPIs in Sitrep mode (practices, corporate %, retirement risk, etc.) |
+| `sitrep-kpi-strip.tsx` | Persistent KPI strip (practices, corporate %, retirement risk, etc.) above mode panels |
 | `living-map.tsx` | Mapbox ZIP choropleth colored by active lens with signal flag overlays |
 | `briefing-pane.tsx` | Scope-specific alerts + suggested intent chips |
 | `target-list.tsx` | Ranked practices in Hunt mode with flag badges |
 | `dossier-drawer.tsx` | Practice deep dive — signals, flags, intel dossier if present, action buttons |
-| `zip-dossier-drawer.tsx` | ZIP deep dive — saturation, ownership mix, top practices |
-| `profile-mode-panel.tsx` | Pinned-targets workspace with side-by-side compare |
-| `investigate-mode-panel.tsx` | Signal co-occurrence analysis + compound-flag target list |
+| `zip-dossier-drawer.tsx` | ZIP deep dive — saturation, ownership mix, top practices, qualitative intel |
+| `investigate-mode-panel.tsx` | Signal co-occurrence analysis + compound-flag target list + stealth DSO sample card |
 | `pinboard-tray.tsx` | Bottom tray showing pinned targets across sessions |
 | `keyboard-shortcuts-overlay.tsx` | `?`-triggered shadcn Dialog listing all shortcuts |
 
-### Signal flags (15 practice + 8 ZIP)
+### Signal flags (8 practice + 1 ZIP after triage)
 
 Computed at load time in `data.ts` and merged into `signals` array on each practice record. Used for rank boosts, drawer badges, and investigate-mode clustering.
 
-Practice-level (examples): `stealth_dso_flag`, `phantom_inventory_flag`, `retirement_combo_flag`, `white_space_flag`, `intel_quant_disagreement_flag`, `high_opportunity_flag`, `pe_sponsor_recent_flag`.
+Practice-level: `stealth_dso_flag`, `phantom_inventory_flag`, `revenue_default_flag`, `family_dynasty_flag`, `micro_cluster_flag`, `retirement_combo_flag`, `last_change_90d_flag`, `high_peer_retirement_flag`.
 
-ZIP-level: `saturation_imbalance_flag`, `confidence_divergence_flag`, `whitespace_flag`, etc. (see `signals.ts` for the full list).
+ZIP-level: `zip_ada_benchmark_gap_flag` (only). Decorative ZIP flags (white_space, compound_demand, mirror_pair, contested_zone) and the practice-level `intel_quant_disagreement_flag` / `high_peer_buyability_flag` were cut in the Apr 2026 product triage.
 
 ### Keyboard shortcuts
 
-`?` toggles the overlay. `⌘K` / `/` focuses the intent bar. `1`-`4` switches modes. `R` resets filters + intent + selection. `P` toggles pin on the selected target. `Esc` closes drawers / overlays. Single-key shortcuts are suppressed when focus is in an `<input>` / `<textarea>` / contenteditable.
+`?` toggles the overlay. `⌘K` / `/` focuses the intent bar. `2` switches to Hunt, `4` switches to Investigate (Sitrep `1` and Profile `3` were cut). `R` resets filters + intent + selection. `P` toggles pin on the selected target. `Esc` closes drawers / overlays. Single-key shortcuts are suppressed when focus is in an `<input>` / `<textarea>` / contenteditable.
 
 ### Cross-links from legacy pages
 
-`/market-intel` and `/intelligence` render a `WarroomCrossLink` banner (`src/components/layout/warroom-cross-link.tsx`) with preset `hrefSuffix` — e.g., Market Intel → `?mode=sitrep&lens=consolidation`, Intelligence → `?mode=investigate&lens=disagreement`. Legacy pages retain their full deep-dive functionality.
+`/market-intel` and `/intelligence` render a `WarroomCrossLink` banner (`src/components/layout/warroom-cross-link.tsx`) with preset `hrefSuffix` — e.g., Market Intel → `?mode=hunt&lens=consolidation`, Intelligence → `?mode=investigate&lens=consolidation`. Legacy pages retain their full deep-dive functionality.
 
 ## Launchpad File Reference
 

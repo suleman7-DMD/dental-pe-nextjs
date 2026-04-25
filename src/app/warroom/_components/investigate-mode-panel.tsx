@@ -2,7 +2,6 @@
 
 import { useMemo } from "react"
 import {
-  AlertTriangle,
   ArrowUpRight,
   Flag,
   GitBranch,
@@ -92,10 +91,6 @@ export function InvestigateModePanel({
         .slice(0, 6),
     [rankedTargets]
   )
-
-  const topDisagreements = useMemo<WarroomPracticeSignalRecord[]>(() => {
-    return (bundle?.topSignals.intelDisagreements ?? []).slice(0, 5)
-  }, [bundle])
 
   const topStealthClusters = useMemo<WarroomPracticeSignalRecord[]>(() => {
     return (bundle?.topSignals.stealthClusters ?? []).slice(0, 5)
@@ -225,7 +220,7 @@ export function InvestigateModePanel({
             </ul>
           )}
 
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          <div className="pt-1">
             <InvestigateSampleCard
               icon={ShieldAlert}
               color="#C23B3B"
@@ -233,16 +228,6 @@ export function InvestigateModePanel({
               items={topStealthClusters.map((s) => ({
                 title: s.practice_name ?? "Practice",
                 detail: `ZIP ${s.zip_code} · cluster ${s.stealth_dso_cluster_size ?? "?"}`,
-                onClick: () => onTargetSelect(s.npi),
-              }))}
-            />
-            <InvestigateSampleCard
-              icon={AlertTriangle}
-              color="#D4920B"
-              label="Intel ≠ Quant"
-              items={topDisagreements.map((s) => ({
-                title: s.practice_name ?? "Practice",
-                detail: s.intel_quant_disagreement_type ?? "disagreement",
                 onClick: () => onTargetSelect(s.npi),
               }))}
             />

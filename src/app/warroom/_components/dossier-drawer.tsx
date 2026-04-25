@@ -6,13 +6,16 @@ import {
   AlertTriangle,
   ArrowUpRight,
   BadgeCheck,
+  BookOpen,
   Briefcase,
   Building2,
+  CheckCircle2,
   Check,
   Clock,
   Compass,
   Copy,
   Crosshair,
+  DollarSign,
   ExternalLink,
   FileWarning,
   Flame,
@@ -33,6 +36,7 @@ import {
   ThermometerSun,
   TrendingUp,
   Users,
+  XCircle,
   Zap,
 } from "lucide-react"
 import {
@@ -57,6 +61,8 @@ import {
 } from "@/lib/utils/formatting"
 import { safeExternalUrl } from "@/lib/utils/safe-url"
 import { getEntityClassificationLabel } from "@/lib/constants/entity-classifications"
+import { usePracticeIntel } from "@/lib/hooks/use-warroom-intel"
+import type { PracticeIntel } from "@/lib/types/intel"
 import {
   filterNearbyDealsWithin,
   type NearbyDealMatch,
@@ -502,6 +508,12 @@ export function DossierDrawer({
   const zipScore = target?.candidate.zipScore ?? null
   const zipSignal = target?.candidate.zipSignal ?? null
 
+  const {
+    data: intel,
+    isLoading: intelLoading,
+    isError: intelError,
+  } = usePracticeIntel(practice?.npi ?? null)
+
   const practiceFlags = useMemo(() => gatherPracticeFlags(signal), [signal])
   const zipFlags = useMemo(() => gatherZipFlags(zipSignal), [zipSignal])
 
@@ -637,6 +649,14 @@ export function DossierDrawer({
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="intel" className="flex-none">
+                Intel
+                {intel && (
+                  <span className="ml-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#B8860B]/15">
+                    <Sparkles className="h-2.5 w-2.5 text-[#B8860B]" />
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="market" className="flex-none">
                 Market
               </TabsTrigger>
@@ -662,6 +682,10 @@ export function DossierDrawer({
                 signal={signal}
                 recentChanges={localChanges}
               />
+            </TabsContent>
+
+            <TabsContent value="intel" className="px-5 py-4">
+              <IntelTab intel={intel ?? null} loading={intelLoading} error={intelError} />
             </TabsContent>
 
             <TabsContent value="market" className="px-5 py-4">
@@ -1112,6 +1136,373 @@ function MarketTab({
           </ul>
         )}
       </section>
+    </div>
+  )
+}
+
+function parseFlagList(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  const trimmed = raw.trim()
+  if (!trimmed) return []
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((item) => (typeof item === "string" ? item.trim() : String(item)))
+          .filter(Boolean)
+      }
+    } catch {
+      /* fall through to delimiter parsing */
+    }
+  }
+  const delim = trimmed.includes("|") ? "|" : trimmed.includes(";") ? ";" : "\n"
+  if (trimmed.includes(delim)) {
+    return trimmed
+      .split(delim)
+      .map((part) => part.trim())
+      .filter(Boolean)
+  }
+  return [trimmed]
+}
+
+function readinessStyle(value: string | null | undefined): {
+  bg: string
+  text: string
+  border: string
+  label: string
+} {
+  const key = (value ?? "").toLowerCase()
+  if (key === "high") {
+    return {
+      bg: "bg-[#2D8B4E]/10",
+      text: "text-[#2D8B4E]",
+      border: "border-[#2D8B4E]/30",
+      label: "High readiness",
+    }
+  }
+  if (key === "medium") {
+    return {
+      bg: "bg-[#D4920B]/10",
+      text: "text-[#D4920B]",
+      border: "border-[#D4920B]/30",
+      label: "Medium readiness",
+    }
+  }
+  if (key === "low") {
+    return {
+      bg: "bg-[#2563EB]/10",
+      text: "text-[#2563EB]",
+      border: "border-[#2563EB]/30",
+      label: "Low readiness",
+    }
+  }
+  if (key === "unlikely") {
+    return {
+      bg: "bg-[#C23B3B]/10",
+      text: "text-[#C23B3B]",
+      border: "border-[#C23B3B]/30",
+      label: "Unlikely",
+    }
+  }
+  return {
+    bg: "bg-[#E8E5DE]",
+    text: "text-[#6B6B60]",
+    border: "border-[#D4D0C8]",
+    label: value ? `Readiness: ${value}` : "Readiness unknown",
+  }
+}
+
+function confidenceStyle(value: string | null | undefined): {
+  bg: string
+  text: string
+  border: string
+  label: string
+} {
+  const key = (value ?? "").toLowerCase()
+  if (key === "high") {
+    return {
+      bg: "bg-[#2D8B4E]/10",
+      text: "text-[#2D8B4E]",
+      border: "border-[#2D8B4E]/30",
+      label: "High confidence",
+    }
+  }
+  if (key === "medium") {
+    return {
+      bg: "bg-[#D4920B]/10",
+      text: "text-[#D4920B]",
+      border: "border-[#D4920B]/30",
+      label: "Medium confidence",
+    }
+  }
+  if (key === "low") {
+    return {
+      bg: "bg-[#C23B3B]/10",
+      text: "text-[#C23B3B]",
+      border: "border-[#C23B3B]/30",
+      label: "Low confidence",
+    }
+  }
+  return {
+    bg: "bg-[#E8E5DE]",
+    text: "text-[#6B6B60]",
+    border: "border-[#D4D0C8]",
+    label: value ? `Confidence: ${value}` : "Confidence unknown",
+  }
+}
+
+function IntelTab({
+  intel,
+  loading,
+  error,
+}: {
+  intel: PracticeIntel | null
+  loading: boolean
+  error: boolean
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <div className="h-16 animate-pulse rounded-md border border-[#E8E5DE] bg-[#FAFAF7]" />
+        <div className="h-32 animate-pulse rounded-md border border-[#E8E5DE] bg-[#FAFAF7]" />
+        <div className="h-24 animate-pulse rounded-md border border-[#E8E5DE] bg-[#FAFAF7]" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-md border border-[#C23B3B]/30 bg-[#C23B3B]/5 px-4 py-6 text-center">
+        <AlertTriangle className="mx-auto h-5 w-5 text-[#C23B3B]" />
+        <p className="mt-2 text-sm font-medium text-[#1A1A1A]">
+          Intel lookup failed
+        </p>
+        <p className="mt-1 text-xs text-[#6B6B60]">
+          Couldn&apos;t reach the intel store — try refreshing this drawer or check Supabase status.
+        </p>
+      </div>
+    )
+  }
+
+  if (!intel) {
+    return (
+      <div className="rounded-md border border-dashed border-[#D4D0C8] bg-[#FAFAF7] px-4 py-10 text-center">
+        <BookOpen className="mx-auto h-5 w-5 text-[#B8860B]" />
+        <p className="mt-2 text-sm font-medium text-[#1A1A1A]">
+          No qualitative dossier yet
+        </p>
+        <p className="mt-1 text-xs text-[#6B6B60]">
+          This practice hasn&apos;t been run through the AI deep-dive pipeline.
+          Trigger via{" "}
+          <code className="rounded bg-[#FFFFFF] px-1 py-0.5 text-[10px] text-[#1A1A1A]">
+            practice_deep_dive.py --npi
+          </code>{" "}
+          to populate this tab.
+        </p>
+      </div>
+    )
+  }
+
+  const readiness = readinessStyle(intel.acquisition_readiness)
+  const confidence = confidenceStyle(intel.confidence)
+  const redFlags = parseFlagList(intel.red_flags)
+  const greenFlags = parseFlagList(intel.green_flags)
+  const escalated = (intel.escalated ?? 0) > 0
+  const hiringActive = (intel.hiring_active ?? 0) > 0
+  const acquisitionFound = (intel.acquisition_found ?? 0) > 0
+
+  return (
+    <div className="space-y-5">
+      <section className="flex flex-wrap items-center gap-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] px-3 py-2 text-[11px] text-[#6B6B60]">
+        <BookOpen className="h-3.5 w-3.5 text-[#B8860B]" />
+        <span className="font-mono text-[#1A1A1A]">
+          {formatDate(intel.research_date) || "—"}
+        </span>
+        <span
+          className={cn(
+            "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+            readiness.bg,
+            readiness.text,
+            readiness.border
+          )}
+        >
+          {readiness.label}
+        </span>
+        <span
+          className={cn(
+            "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+            confidence.bg,
+            confidence.text,
+            confidence.border
+          )}
+        >
+          {confidence.label}
+        </span>
+        {escalated && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-[#7C3AED]/30 bg-[#7C3AED]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#7C3AED]">
+            <Sparkles className="h-2.5 w-2.5" />
+            Sonnet escalation
+          </span>
+        )}
+      </section>
+
+      {intel.overall_assessment && (
+        <section>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+            Overall Assessment
+          </h3>
+          <p className="mt-2 whitespace-pre-wrap rounded-md border-l-2 border-[#B8860B] bg-[#FAFAF7] p-3 text-[12px] leading-relaxed text-[#1A1A1A]">
+            {intel.overall_assessment}
+          </p>
+        </section>
+      )}
+
+      {(redFlags.length > 0 || greenFlags.length > 0) && (
+        <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {redFlags.length > 0 && (
+            <div className="rounded-md border border-[#C23B3B]/20 bg-[#C23B3B]/5 p-3">
+              <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#C23B3B]">
+                <XCircle className="h-3.5 w-3.5" />
+                Red flags ({redFlags.length})
+              </h4>
+              <ul className="mt-2 space-y-1.5 text-[12px] text-[#1A1A1A]">
+                {redFlags.map((flag, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[#C23B3B]" />
+                    <span className="leading-snug">{flag}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {greenFlags.length > 0 && (
+            <div className="rounded-md border border-[#2D8B4E]/20 bg-[#2D8B4E]/5 p-3">
+              <h4 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#2D8B4E]">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Green flags ({greenFlags.length})
+              </h4>
+              <ul className="mt-2 space-y-1.5 text-[12px] text-[#1A1A1A]">
+                {greenFlags.map((flag, idx) => (
+                  <li key={idx} className="flex items-start gap-1.5">
+                    <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-[#2D8B4E]" />
+                    <span className="leading-snug">{flag}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
+      <section>
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+          Live Signals
+        </h3>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <StatBlock
+            label="Hiring"
+            value={hiringActive ? "Active" : "—"}
+            subtitle={intel.hiring_positions ?? undefined}
+            accent={hiringActive ? "#2D8B4E" : "#9C9C90"}
+          />
+          <StatBlock
+            label="Acquisition"
+            value={acquisitionFound ? "Reported" : "—"}
+            subtitle={intel.acquisition_details ? "See details below" : undefined}
+            accent={acquisitionFound ? "#C23B3B" : "#9C9C90"}
+          />
+          <StatBlock
+            label="Google"
+            value={
+              intel.google_rating != null
+                ? `${intel.google_rating.toFixed(1)}★`
+                : "—"
+            }
+            subtitle={
+              intel.google_review_count != null
+                ? `${formatNumber(intel.google_review_count)} reviews`
+                : undefined
+            }
+            accent="#2563EB"
+          />
+          <StatBlock
+            label="Healthgrades"
+            value={
+              intel.healthgrades_rating != null
+                ? `${intel.healthgrades_rating.toFixed(1)}★`
+                : "—"
+            }
+            subtitle={
+              intel.healthgrades_reviews != null
+                ? `${formatNumber(intel.healthgrades_reviews)} reviews`
+                : undefined
+            }
+            accent="#0D9488"
+          />
+          <StatBlock
+            label="Tech Level"
+            value={intel.technology_level ?? "—"}
+            accent="#7C3AED"
+          />
+          <StatBlock
+            label="Owner Stage"
+            value={intel.owner_career_stage ?? "—"}
+            accent="#D4920B"
+          />
+        </div>
+      </section>
+
+      {intel.acquisition_details && (
+        <section>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+            Acquisition News
+          </h3>
+          <p className="mt-2 whitespace-pre-wrap rounded-md border-l-2 border-[#C23B3B] bg-[#C23B3B]/5 p-3 text-[12px] leading-relaxed text-[#1A1A1A]">
+            {intel.acquisition_details}
+          </p>
+        </section>
+      )}
+
+      {intel.escalation_findings && (
+        <section>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+            Escalation Findings
+          </h3>
+          <p className="mt-2 whitespace-pre-wrap rounded-md border-l-2 border-[#7C3AED] bg-[#7C3AED]/5 p-3 text-[12px] leading-relaxed text-[#1A1A1A]">
+            {intel.escalation_findings}
+          </p>
+        </section>
+      )}
+
+      {intel.website_analysis && (
+        <section>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+            Website Read
+          </h3>
+          <p className="mt-2 whitespace-pre-wrap rounded-md border border-[#E8E5DE] bg-[#FFFFFF] p-3 text-[12px] leading-relaxed text-[#1A1A1A]">
+            {intel.website_analysis}
+          </p>
+          {(intel.website_era || intel.website_last_update) && (
+            <p className="mt-1 text-[10px] uppercase tracking-wider text-[#707064]">
+              {[intel.website_era, intel.website_last_update].filter(Boolean).join(" · ")}
+            </p>
+          )}
+        </section>
+      )}
+
+      {(intel.model_used || intel.cost_usd != null || intel.research_method) && (
+        <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[#E8E5DE] pt-3 text-[10px] uppercase tracking-wider text-[#9C9C90]">
+          {intel.model_used && <span>Model: {intel.model_used}</span>}
+          {intel.research_method && <span>Method: {intel.research_method}</span>}
+          {intel.cost_usd != null && (
+            <span className="inline-flex items-center gap-1">
+              <DollarSign className="h-2.5 w-2.5" />
+              {intel.cost_usd.toFixed(3)}
+            </span>
+          )}
+        </footer>
+      )}
     </div>
   )
 }

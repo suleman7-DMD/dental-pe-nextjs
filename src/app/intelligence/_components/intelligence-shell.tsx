@@ -352,7 +352,7 @@ export function IntelligenceShell({
 
         <WarroomCrossLink
           context="Intel disagreements, stealth DSO clusters, and signal co-occurrence in the Investigate view."
-          hrefSuffix="?mode=investigate&lens=disagreement"
+          hrefSuffix="?mode=investigate&lens=consolidation"
         />
 
         {/* ── Section 1: KPIs ─────────────────────────────────────────── */}

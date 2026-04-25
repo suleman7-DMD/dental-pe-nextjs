@@ -140,7 +140,7 @@ export function SitrepKpiStrip({ summary, className }: SitrepKpiStripProps) {
             <span className="text-[11px] text-[#8F8E82]">Signal sync pending</span>
           )
         }
-        tooltip="Any practice flagged by at least one of the 10 hidden-gold signals (stealth DSO, phantom, retirement combo, intel disagreement, etc.)."
+        tooltip="Any practice flagged by at least one hidden-gold signal (stealth DSO, phantom inventory, retirement combo, family dynasty, micro-cluster, ADA gap, etc.)."
         accentColor="#0D9488"
       />
 

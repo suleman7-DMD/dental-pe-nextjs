@@ -5,13 +5,13 @@ import { useMemo } from "react"
 import {
   AlertTriangle,
   ArrowUpRight,
+  BookOpen,
   Building2,
   Compass,
-  Crosshair,
+  DollarSign,
   ExternalLink,
+  Home,
   Info,
-  Layers,
-  LineChart,
   MapPin,
   Search,
   Sparkles,
@@ -28,9 +28,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import {
+  formatCurrency,
+  formatDate,
   formatNumber,
   formatPercent,
 } from "@/lib/utils/formatting"
+import { useZipIntel } from "@/lib/hooks/use-warroom-intel"
+import type { ZipQualitativeIntel } from "@/lib/types/intel"
 import type {
   RankedTarget,
   WarroomChangeRecord,
@@ -52,43 +56,11 @@ interface ZipDossierDrawerProps {
 const ZIP_FLAG_SPECS: {
   key: keyof WarroomZipSignalRecord
   label: string
-  icon: typeof Sparkles
+  icon: typeof AlertTriangle
   color: string
   bg: string
   reasoningKey?: keyof WarroomZipSignalRecord
 }[] = [
-  {
-    key: "white_space_flag",
-    label: "White-Space ZIP",
-    icon: Sparkles,
-    color: "#0D9488",
-    bg: "bg-[#0D9488]/10",
-    reasoningKey: "white_space_reasoning",
-  },
-  {
-    key: "compound_demand_flag",
-    label: "Compound Demand",
-    icon: LineChart,
-    color: "#2563EB",
-    bg: "bg-[#2563EB]/10",
-    reasoningKey: "compound_demand_reasoning",
-  },
-  {
-    key: "mirror_pair_flag",
-    label: "Mirror Pair",
-    icon: Layers,
-    color: "#7C3AED",
-    bg: "bg-[#7C3AED]/10",
-    reasoningKey: "mirror_reasoning",
-  },
-  {
-    key: "contested_zone_flag",
-    label: "Contested Zone",
-    icon: Crosshair,
-    color: "#C23B3B",
-    bg: "bg-[#C23B3B]/10",
-    reasoningKey: "contested_zone_reasoning",
-  },
   {
     key: "ada_benchmark_gap_flag",
     label: "ADA Benchmark Gap",
@@ -157,6 +129,330 @@ function formatConfidence(value: string | null): string {
   return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
+function intelOutlookStyle(value: string | null | undefined): {
+  bg: string
+  text: string
+  border: string
+} {
+  const key = (value ?? "").toLowerCase()
+  if (key.includes("strong") || key.includes("growing") || key.includes("expanding") || key.includes("positive") || key.includes("high")) {
+    return {
+      bg: "bg-[#2D8B4E]/10",
+      text: "text-[#2D8B4E]",
+      border: "border-[#2D8B4E]/30",
+    }
+  }
+  if (key.includes("weak") || key.includes("declining") || key.includes("contracting") || key.includes("negative") || key.includes("low")) {
+    return {
+      bg: "bg-[#C23B3B]/10",
+      text: "text-[#C23B3B]",
+      border: "border-[#C23B3B]/30",
+    }
+  }
+  if (key.includes("mixed") || key.includes("moderate") || key.includes("medium") || key.includes("stable")) {
+    return {
+      bg: "bg-[#D4920B]/10",
+      text: "text-[#D4920B]",
+      border: "border-[#D4920B]/30",
+    }
+  }
+  return {
+    bg: "bg-[#E8E5DE]",
+    text: "text-[#6B6B60]",
+    border: "border-[#D4D0C8]",
+  }
+}
+
+function intelConfidenceStyle(value: string | null | undefined): {
+  bg: string
+  text: string
+  border: string
+} {
+  const key = (value ?? "").toLowerCase()
+  if (key === "high") {
+    return {
+      bg: "bg-[#2D8B4E]/10",
+      text: "text-[#2D8B4E]",
+      border: "border-[#2D8B4E]/30",
+    }
+  }
+  if (key === "medium") {
+    return {
+      bg: "bg-[#D4920B]/10",
+      text: "text-[#D4920B]",
+      border: "border-[#D4920B]/30",
+    }
+  }
+  if (key === "low") {
+    return {
+      bg: "bg-[#C23B3B]/10",
+      text: "text-[#C23B3B]",
+      border: "border-[#C23B3B]/30",
+    }
+  }
+  return {
+    bg: "bg-[#E8E5DE]",
+    text: "text-[#6B6B60]",
+    border: "border-[#D4D0C8]",
+  }
+}
+
+function ZipIntelSection({
+  intel,
+  loading,
+  error,
+}: {
+  intel: ZipQualitativeIntel | null
+  loading: boolean
+  error: boolean
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-3 p-1">
+        <div className="h-12 animate-pulse rounded-md border border-[#E8E5DE] bg-[#FAFAF7]" />
+        <div className="h-32 animate-pulse rounded-md border border-[#E8E5DE] bg-[#FAFAF7]" />
+        <div className="h-24 animate-pulse rounded-md border border-[#E8E5DE] bg-[#FAFAF7]" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-md border border-[#C23B3B]/30 bg-[#C23B3B]/5 px-4 py-6 text-center">
+        <AlertTriangle className="mx-auto h-5 w-5 text-[#C23B3B]" />
+        <p className="mt-2 text-sm font-medium text-[#1A1A1A]">
+          Intel lookup failed
+        </p>
+        <p className="mt-1 text-xs text-[#6B6B60]">
+          Couldn&apos;t reach the intel store — try refreshing this drawer.
+        </p>
+      </div>
+    )
+  }
+
+  if (!intel) {
+    return (
+      <div className="rounded-md border border-dashed border-[#D4D0C8] bg-[#FAFAF7] px-4 py-10 text-center">
+        <BookOpen className="mx-auto h-5 w-5 text-[#B8860B]" />
+        <p className="mt-2 text-sm font-medium text-[#1A1A1A]">
+          No qualitative ZIP report yet
+        </p>
+        <p className="mt-1 text-xs text-[#6B6B60]">
+          This ZIP hasn&apos;t been run through the AI market scout.
+          Trigger via{" "}
+          <code className="rounded bg-[#FFFFFF] px-1 py-0.5 text-[10px] text-[#1A1A1A]">
+            qualitative_scout.py --zip
+          </code>{" "}
+          to populate this tab.
+        </p>
+      </div>
+    )
+  }
+
+  const demandStyle = intelOutlookStyle(intel.demand_outlook)
+  const supplyStyle = intelOutlookStyle(intel.supply_outlook)
+  const confidenceStyleObj = intelConfidenceStyle(intel.confidence)
+
+  return (
+    <div className="space-y-4">
+      <section className="flex flex-wrap items-center gap-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] px-3 py-2 text-[11px] text-[#6B6B60]">
+        <BookOpen className="h-3.5 w-3.5 text-[#B8860B]" />
+        <span className="font-mono text-[#1A1A1A]">
+          {formatDate(intel.research_date) || "—"}
+        </span>
+        {intel.confidence && (
+          <span
+            className={cn(
+              "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+              confidenceStyleObj.bg,
+              confidenceStyleObj.text,
+              confidenceStyleObj.border
+            )}
+          >
+            {intel.confidence} confidence
+          </span>
+        )}
+        {intel.research_method && (
+          <span className="rounded-full border border-[#E8E5DE] bg-[#FFFFFF] px-1.5 py-0.5 text-[10px] uppercase tracking-wider">
+            {intel.research_method}
+          </span>
+        )}
+      </section>
+
+      {intel.investment_thesis && (
+        <section>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+            Investment Thesis
+          </h3>
+          <p className="mt-2 whitespace-pre-wrap rounded-md border-l-2 border-[#B8860B] bg-[#FAFAF7] p-3 text-[12px] leading-relaxed text-[#1A1A1A]">
+            {intel.investment_thesis}
+          </p>
+        </section>
+      )}
+
+      {(intel.demand_outlook || intel.supply_outlook) && (
+        <section className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          {intel.demand_outlook && (
+            <div
+              className={cn(
+                "rounded-md border p-3",
+                demandStyle.border,
+                demandStyle.bg
+              )}
+            >
+              <p
+                className={cn(
+                  "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider",
+                  demandStyle.text
+                )}
+              >
+                <TrendingUp className="h-3 w-3" />
+                Demand outlook
+              </p>
+              <p className="mt-1 text-[12px] font-medium text-[#1A1A1A]">
+                {intel.demand_outlook}
+              </p>
+            </div>
+          )}
+          {intel.supply_outlook && (
+            <div
+              className={cn(
+                "rounded-md border p-3",
+                supplyStyle.border,
+                supplyStyle.bg
+              )}
+            >
+              <p
+                className={cn(
+                  "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider",
+                  supplyStyle.text
+                )}
+              >
+                <Building2 className="h-3 w-3" />
+                Supply outlook
+              </p>
+              <p className="mt-1 text-[12px] font-medium text-[#1A1A1A]">
+                {intel.supply_outlook}
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
+      {(intel.dental_new_offices ||
+        intel.dental_dso_moves ||
+        intel.dental_note ||
+        intel.competitor_new ||
+        intel.competitor_closures ||
+        intel.competitor_note) && (
+        <section>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+            Dental Activity
+          </h3>
+          <div className="mt-2 space-y-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 text-[12px]">
+            {intel.dental_new_offices && (
+              <DetailRow label="New offices" value={intel.dental_new_offices} />
+            )}
+            {intel.dental_dso_moves && (
+              <DetailRow label="DSO moves" value={intel.dental_dso_moves} />
+            )}
+            {intel.competitor_new && (
+              <DetailRow label="New competitors" value={intel.competitor_new} />
+            )}
+            {intel.competitor_closures && (
+              <DetailRow label="Closures" value={intel.competitor_closures} />
+            )}
+            {intel.competitor_note && (
+              <p className="pt-1 text-[11px] italic leading-snug text-[#6B6B60]">
+                {intel.competitor_note}
+              </p>
+            )}
+            {intel.dental_note && (
+              <p className="pt-1 text-[11px] italic leading-snug text-[#6B6B60]">
+                {intel.dental_note}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {(intel.housing_summary ||
+        intel.housing_status ||
+        intel.median_home_price != null ||
+        intel.home_price_trend ||
+        intel.pop_growth_signals ||
+        intel.commercial_status) && (
+        <section>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+            Demographics &amp; Real Estate
+          </h3>
+          <div className="mt-2 space-y-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 text-[12px]">
+            {intel.housing_summary && (
+              <p className="flex items-start gap-1.5 text-[#1A1A1A]">
+                <Home className="mt-0.5 h-3 w-3 shrink-0 text-[#707064]" />
+                <span>{intel.housing_summary}</span>
+              </p>
+            )}
+            {intel.median_home_price != null && (
+              <DetailRow
+                label="Median home price"
+                value={formatCurrency(intel.median_home_price)}
+                hint={
+                  intel.home_price_yoy_pct != null
+                    ? `${intel.home_price_yoy_pct >= 0 ? "+" : ""}${formatNumber(intel.home_price_yoy_pct)}% YoY`
+                    : intel.home_price_trend ?? undefined
+                }
+              />
+            )}
+            {intel.pop_growth_signals && (
+              <DetailRow label="Population growth" value={intel.pop_growth_signals} />
+            )}
+            {intel.commercial_status && (
+              <DetailRow label="Commercial development" value={intel.commercial_status} />
+            )}
+            {intel.major_employers && (
+              <DetailRow label="Major employers" value={intel.major_employers} />
+            )}
+          </div>
+        </section>
+      )}
+
+      {(intel.school_district || intel.school_rating) && (
+        <section>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-[#707064]">
+            Schools
+          </h3>
+          <div className="mt-2 space-y-1 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 text-[12px]">
+            {intel.school_district && (
+              <DetailRow label="District" value={intel.school_district} />
+            )}
+            {intel.school_rating && (
+              <DetailRow label="Rating" value={intel.school_rating} />
+            )}
+            {intel.school_note && (
+              <p className="pt-1 text-[11px] italic leading-snug text-[#6B6B60]">
+                {intel.school_note}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+
+      {(intel.model_used || intel.cost_usd != null) && (
+        <footer className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[#E8E5DE] pt-3 text-[10px] uppercase tracking-wider text-[#9C9C90]">
+          {intel.model_used && <span>Model: {intel.model_used}</span>}
+          {intel.cost_usd != null && (
+            <span className="inline-flex items-center gap-1">
+              <DollarSign className="h-2.5 w-2.5" />
+              {intel.cost_usd.toFixed(3)}
+            </span>
+          )}
+        </footer>
+      )}
+    </div>
+  )
+}
+
 export function ZipDossierDrawer({
   zipCode,
   zipScore,
@@ -168,6 +464,12 @@ export function ZipDossierDrawer({
   onIntentRequest,
 }: ZipDossierDrawerProps) {
   const isOpen = zipCode != null
+
+  const {
+    data: zipIntel,
+    isLoading: zipIntelLoading,
+    isError: zipIntelError,
+  } = useZipIntel(zipCode)
 
   const activeFlags = useMemo(() => {
     if (!zipSignal) return []
@@ -288,6 +590,14 @@ export function ZipDossierDrawer({
               {zipTargets.length > 0 && (
                 <span className="ml-1.5 rounded-full bg-[#2D8B4E]/20 px-1.5 py-0.5 font-mono text-[10px] text-[#2D8B4E]">
                   {zipTargets.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="intel" className="text-[13px]">
+              Intel
+              {zipIntel && (
+                <span className="ml-1.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#B8860B]/15">
+                  <Sparkles className="h-2.5 w-2.5 text-[#B8860B]" />
                 </span>
               )}
             </TabsTrigger>
@@ -486,14 +796,6 @@ export function ZipDossierDrawer({
                   }
                 />
                 <DetailRow
-                  label="Intel / quant disagreements"
-                  value={
-                    zipSignal?.intel_quant_disagreement_count != null
-                      ? formatNumber(zipSignal.intel_quant_disagreement_count)
-                      : null
-                  }
-                />
-                <DetailRow
                   label="Deals (24mo catchment)"
                   value={
                     zipSignal?.deal_catchment_sum_24mo != null
@@ -578,6 +880,14 @@ export function ZipDossierDrawer({
                   </ul>
                 </div>
               )}
+            </TabsContent>
+
+            <TabsContent value="intel" className="m-0">
+              <ZipIntelSection
+                intel={zipIntel ?? null}
+                loading={zipIntelLoading}
+                error={zipIntelError}
+              />
             </TabsContent>
 
             <TabsContent value="evidence" className="m-0 space-y-4">

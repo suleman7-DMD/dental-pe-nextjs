@@ -14,9 +14,9 @@ describe("parseIntent", () => {
     expect(result.chips).toHaveLength(0)
   })
 
-  it("recognizes 'mirror pair' as zip_mirror_pair_flag", () => {
-    const result = parseIntent("show me practices with mirror pair")
-    expect(result.filter.requireFlags).toContain("zip_mirror_pair_flag")
+  it("recognizes 'family dynasty' as family_dynasty_flag", () => {
+    const result = parseIntent("show me practices with family dynasty")
+    expect(result.filter.requireFlags).toContain("family_dynasty_flag")
   })
 
   it("recognizes 'near retirement' as retirement_combo_flag", () => {
@@ -66,8 +66,8 @@ describe("parseIntent", () => {
   })
 
   it("normalizes whitespace and case", () => {
-    const a = parseIntent("  Mirror  Pair  ")
-    const b = parseIntent("mirror pair")
+    const a = parseIntent("  Family  Dynasty  ")
+    const b = parseIntent("family dynasty")
     expect(a.filter.requireFlags).toEqual(b.filter.requireFlags)
   })
 

@@ -37,9 +37,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     label: "Modes",
     rows: [
-      { keys: ["1"], description: "Sitrep — situation snapshot" },
       { keys: ["2"], description: "Hunt — target prospecting" },
-      { keys: ["3"], description: "Profile — deep dive on one target" },
       { keys: ["4"], description: "Investigate — signal patterns" },
     ],
   },

@@ -175,7 +175,7 @@ function MarketIntelShellInner({
 
         <WarroomCrossLink
           context="See consolidation, targets, and signals together — with scope, lens, and intent in one command surface."
-          hrefSuffix="?mode=sitrep&lens=consolidation"
+          hrefSuffix="?mode=hunt&lens=consolidation"
         />
 
         {/* Data freshness bar */}

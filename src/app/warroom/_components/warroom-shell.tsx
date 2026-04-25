@@ -563,11 +563,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                     {activeLensLabel}
                   </span>
                   <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
-                    {scope.kind === "us"
-                      ? "All US practices"
-                      : scope.zipCount === 1
-                        ? "1 ZIP"
-                        : `${scope.zipCount} ZIPs`}
+                    {scope.zipCount === 1 ? "1 ZIP" : `${scope.zipCount} ZIPs`}
                   </span>
                   {rankedTargets.length > 0 && (
                     <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
