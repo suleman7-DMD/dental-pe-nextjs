@@ -310,12 +310,14 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             icon={<Clock className="h-4 w-4" />}
             label="Retirement Risk"
             value={summary.retirementRisk.toLocaleString()}
+            tooltip="Independent practices in watched ZIPs established before 1995 (30+ years old). Internal succession or sale risk."
             accentColor="#D4920B"
           />
           <KpiCard
             icon={<Zap className="h-4 w-4" />}
             label="Acquisition Targets"
             value={acquisitionTargets.toLocaleString()}
+            tooltip="Strict definition: independents with buyability_score ≥ 50 in watched ZIPs. Buyability page uses a broader 4-category framework (~177 targets including lower-score independents)."
             accentColor="#2D8B4E"
           />
           <KpiCard
@@ -351,7 +353,7 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             deals tracked
           </span>
           <span className="text-[#E8E5DE]">|</span>
-          <span>
+          <span title="Counts practices with data_axle_import_date set (any Data Axle enrichment). System page shows ~481 with data_source='data_axle' (literal source attribution). Both correct, different definitions.">
             <span className="text-[#1A1A1A] font-medium">
               {summary.enrichedCount.toLocaleString()}
             </span>{' '}

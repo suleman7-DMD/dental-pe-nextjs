@@ -26,6 +26,11 @@ export function DataCoverage({ sources }: DataCoverageProps) {
               <tr
                 key={src.source}
                 className="border-b border-[#E8E5DE]/50 hover:bg-[#E8E5DE]/20 transition-colors"
+                title={
+                  src.source === 'data_axle' || src.source.toLowerCase() === 'data axle'
+                    ? "Counts practices with data_source='data_axle' (literal source attribution, ~481). Home / Market Intel / Job Market show ~2,990 enriched (data_axle_import_date IS NOT NULL — broader: any Data Axle enrichment regardless of source attribution)."
+                    : undefined
+                }
               >
                 <td className="px-4 py-2.5 text-[#1A1A1A] font-medium">{src.source}</td>
                 <td className="px-4 py-2.5 text-[#6B6B60] font-mono tabular-nums">

@@ -90,7 +90,7 @@ const PAGE_SIZE = 25
 
 const CATEGORIES: { label: string; value: BuyabilityCategory | 'all' }[] = [
   { label: 'All Categories', value: 'all' },
-  { label: 'Acquisition Targets', value: 'acquisition_target' },
+  { label: 'Acquisition Targets (broad)', value: 'acquisition_target' },
   { label: 'Dead Ends', value: 'dead_end' },
   { label: 'Job Targets', value: 'job_target' },
   { label: 'Specialists', value: 'specialist' },
@@ -292,8 +292,10 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
           <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">Buyability Scanner</h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
             {analyzed.length} practices scored by acquisition likelihood. Acquisition Targets =
-            independent with high buyability. Dead Ends = corporate/DSO. Job Targets = good
-            associate opportunities. Specialists = ortho, perio, endo, etc.
+            any independent practice (broad framework — includes lower-score independents; the
+            Home page&apos;s KPI uses a stricter buyability_score ≥ 50 cutoff). Dead Ends =
+            corporate/DSO. Job Targets = good associate opportunities. Specialists = ortho,
+            perio, endo, etc.
           </p>
         </div>
 
@@ -303,6 +305,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
             icon={<Target className="h-4 w-4" />}
             label="Acquisition Targets"
             value={kpis.acq.toLocaleString()}
+            tooltip="Broad definition: any independent practice (entity_classification ∈ solo/family/group). Includes lower-buyability targets. Home page uses strict definition (independents with buyability_score ≥ 50, ~34 practices)."
             accentColor="#2D8B4E"
           />
           <KpiCard
