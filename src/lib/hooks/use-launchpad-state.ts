@@ -351,24 +351,6 @@ export function useLaunchpadState() {
     commitState(createDefaultLaunchpadState())
   }, [commitState])
 
-  const loadSavedSearch = useCallback(
-    (input: {
-      scope: LaunchpadScope
-      track: LaunchpadTrack
-      pinnedNpis: string[]
-    }) => {
-      updateState((current) => ({
-        ...current,
-        scope: input.scope,
-        track: input.track,
-        pinnedNpis: uniqueLimited(input.pinnedNpis, LAUNCHPAD_PIN_LIMIT),
-        selectedNpi: null,
-        selectedZip: null,
-      }))
-    },
-    [updateState]
-  )
-
   const clearPins = useCallback(() => {
     updateState((current) => ({ ...current, pinnedNpis: [] }))
   }, [updateState])
@@ -385,7 +367,6 @@ export function useLaunchpadState() {
     setView,
     setMapView,
     setSelectedZip,
-    loadSavedSearch,
     resetLaunchpadState,
   }
 }

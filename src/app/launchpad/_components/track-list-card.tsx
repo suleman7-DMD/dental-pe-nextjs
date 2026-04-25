@@ -9,6 +9,7 @@ import {
   type LaunchpadRankedTarget,
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
+import { CompoundThesis } from "./compound-thesis"
 
 interface TrackListCardProps {
   target: LaunchpadRankedTarget
@@ -106,6 +107,45 @@ export function TrackListCard({
   // Confidence capped check
   const trackKey = resolveTrackKey(track, target.bestTrack)
   const confidenceCapped = target.trackScores[trackKey]?.confidenceCapped ?? false
+
+  // Prepare CompoundThesis props
+  const concreteTrack: ConcreteLaunchpadTrack =
+    track === "all" || !CONCRETE_TRACKS.has(track)
+      ? target.bestTrack
+      : (track as ConcreteLaunchpadTrack)
+
+  const practiceSnapshot = {
+    npi: target.npi,
+    name:
+      practice.practice_name ??
+      practice.doing_business_as ??
+      `NPI ${target.npi}`,
+    dba: practice.doing_business_as,
+    entity_classification: practice.entity_classification,
+    city: practice.city,
+    state: practice.state,
+    zip: practice.zip,
+    year_established: practice.year_established,
+    employee_count: practice.employee_count,
+    num_providers: practice.num_providers,
+    estimated_revenue: practice.estimated_revenue,
+    buyability_score: practice.buyability_score,
+    website: practice.website,
+    affiliated_dso: practice.affiliated_dso,
+    ownership_status: practice.ownership_status,
+    classification_confidence: practice.classification_confidence,
+  }
+
+  const trackScores = {
+    succession: Math.round(target.trackScores.succession.score),
+    high_volume: Math.round(target.trackScores.high_volume.score),
+    dso: Math.round(target.trackScores.dso.score),
+  }
+
+  const allSignalIds = [
+    ...target.activeSignalIds,
+    ...target.warningSignalIds,
+  ]
 
   return (
     <li
@@ -207,6 +247,15 @@ export function TrackListCard({
               Thin data — capped at 70
             </p>
           )}
+
+          {/* AI compound thesis (lazy-loaded on expand) */}
+          <CompoundThesis
+            npi={target.npi}
+            signals={allSignalIds}
+            scores={trackScores}
+            track={concreteTrack}
+            practice={practiceSnapshot}
+          />
         </div>
 
         {/* Score column */}

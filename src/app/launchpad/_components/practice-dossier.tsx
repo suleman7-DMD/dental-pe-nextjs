@@ -3,6 +3,7 @@
 import { useState } from "react"
 import {
   AlertTriangle,
+  Brain,
   Building2,
   CheckCircle2,
   Copy,
@@ -43,6 +44,9 @@ import {
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
 import { NarrativeCard } from "./narrative-card"
+import { AskIntelDrawer } from "./ask-intel-drawer"
+import { InterviewPrepAi } from "./interview-prep-ai"
+import { ContractParser } from "./contract-parser"
 
 // ---------------------------------------------------------------------------
 // Props
@@ -250,7 +254,7 @@ function SnapshotTab({
         </div>
       </div>
 
-      {/* AI narrative — "Why this practice for you?" */}
+      {/* AI narrative */}
       <NarrativeCard target={target} track={track} />
 
       {/* Active signals */}
@@ -453,7 +457,6 @@ function IndependentCompSection({
     "Request a 6-month guaranteed base + production review clause — protects you while building your patient base.",
   ]
 
-  // Add targeted prompt if FFS signal is active
   if (target.activeSignalIds.includes("ffs_concierge_signal")) {
     negotiationPrompts.push(
       "FFS / concierge detected — ask about planned payer changes and whether fee schedules are reviewed annually."
@@ -557,7 +560,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
     (c) => c.signalId === "mentor_rich_signal"
   )
 
-  // Reason mentor-rich did NOT fire
   let notMentorRichReason = ""
   if (!isMentorRich) {
     const cls = practice.entity_classification ?? ""
@@ -575,7 +577,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
 
   return (
     <div className="space-y-4">
-      {/* Mentor-rich status */}
       {isMentorRich ? (
         <Banner variant="green">
           <div className="flex items-start gap-2">
@@ -597,7 +598,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
         </div>
       )}
 
-      {/* Succession published */}
       {isSuccessionPublished && (
         <Banner variant="green">
           <div className="flex items-start gap-2">
@@ -613,7 +613,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
         </Banner>
       )}
 
-      {/* Family dynasty */}
       {isFamilyDynasty && (
         <Banner variant="amber">
           <div className="flex items-start gap-2">
@@ -629,7 +628,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
         </Banner>
       )}
 
-      {/* Ownership runway */}
       {age != null && age >= 25 && practice.entity_classification?.startsWith("solo") && (
         <div>
           <SectionHeading>Ownership runway</SectionHeading>
@@ -640,7 +638,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
         </div>
       )}
 
-      {/* Provider count context */}
       <div>
         <SectionHeading>Provider setup</SectionHeading>
         {practice.num_providers == null || practice.num_providers === 1 ? (
@@ -660,7 +657,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
         )}
       </div>
 
-      {/* Staff context */}
       {practice.employee_count != null && (
         <div>
           <SectionHeading>Staff count</SectionHeading>
@@ -673,7 +669,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
         </div>
       )}
 
-      {/* Practice intel mentorship signals */}
       {intel ? (
         <div className="space-y-3">
           {intel.owner_career_stage && (
@@ -750,7 +745,6 @@ function RedFlagsTab({ target }: { target: LaunchpadRankedTarget }) {
 
   return (
     <div className="space-y-4">
-      {/* AVOID DSO banner */}
       {dsoEntry && (
         <Banner variant="red">
           <div className="flex items-start gap-2">
@@ -782,7 +776,6 @@ function RedFlagsTab({ target }: { target: LaunchpadRankedTarget }) {
         </Banner>
       )}
 
-      {/* Warning signal cards */}
       {warnings.map((signalId) => {
         const def = LAUNCHPAD_SIGNALS[signalId]
         const contribution = target.trackScores[target.bestTrack].contributions.find(
@@ -816,7 +809,6 @@ function RedFlagsTab({ target }: { target: LaunchpadRankedTarget }) {
         )
       })}
 
-      {/* AI red flags */}
       {aiRedFlags && (
         <div>
           <SectionHeading>AI-researched red flags</SectionHeading>
@@ -835,169 +827,6 @@ function RedFlagsTab({ target }: { target: LaunchpadRankedTarget }) {
 }
 
 // ---------------------------------------------------------------------------
-// Tab: Interview Prep
-// ---------------------------------------------------------------------------
-
-const BASELINE_QUESTIONS = [
-  "What does your onboarding look like for a new graduate?",
-  "Can you walk me through the compensation structure — base, production %, and threshold?",
-  "What's the non-compete clause — radius, duration, and which locations does it cover?",
-]
-
-function buildInterviewQuestions(
-  target: LaunchpadRankedTarget,
-  dsoEntry: DsoTierEntry | null
-): string[] {
-  const { activeSignalIds, practice } = target
-  const questions: string[] = [...BASELINE_QUESTIONS]
-
-  if (activeSignalIds.includes("mentor_rich_signal")) {
-    questions.push(
-      "How many hours per week are you personally present in the practice? Will you be available for chairside mentorship?"
-    )
-  }
-  if (activeSignalIds.includes("succession_track_signal")) {
-    questions.push(
-      "Are you open to a structured partnership buy-in? What is the typical timeline from associate to ownership?"
-    )
-  }
-  if (activeSignalIds.includes("succession_published_signal")) {
-    questions.push(
-      "I saw signals that you may be considering a succession plan — can you share your timeline and ideal transition structure?"
-    )
-  }
-  if (activeSignalIds.includes("hiring_now_signal")) {
-    questions.push(
-      "What happened to the previous associate? Why is the position currently open?"
-    )
-  }
-  if (activeSignalIds.includes("community_dso_signal")) {
-    questions.push(
-      "Walk me through the CE budget and annual review process — are production metrics transparent and shared with associates?"
-    )
-  }
-  if (activeSignalIds.includes("high_volume_ethical_signal")) {
-    questions.push(
-      "What is your average patient volume per day, and how is it distributed across providers? Do you have hygienists on every operatory?"
-    )
-  }
-  if (activeSignalIds.includes("ffs_concierge_signal")) {
-    questions.push(
-      "What is your insurance mix — FFS, PPO, HMO, Medicaid? Are you planning to drop or add any payers in the next year?"
-    )
-  }
-  if (activeSignalIds.includes("dso_avoid_warning")) {
-    const dsoName = practice.affiliated_dso ?? "this organization"
-    questions.push(
-      `What are the documented patient-care concerns raised about ${dsoName}? How has the practice leadership responded to them?`
-    )
-  }
-  if (activeSignalIds.includes("non_compete_radius_warning")) {
-    questions.push(
-      "Can I see the exact non-compete language before signing? Is the radius or duration negotiable?"
-    )
-  }
-  if (activeSignalIds.includes("family_dynasty_warning")) {
-    questions.push(
-      "What is your long-term succession plan? Is the practice open to a non-family associate ownership transition?"
-    )
-  }
-  if (activeSignalIds.includes("associate_saturated_signal")) {
-    questions.push(
-      "How is patient flow distributed among associates? What is the new-patient acquisition strategy to support additional providers?"
-    )
-  }
-  if (activeSignalIds.includes("pe_recap_volatility_warning")) {
-    questions.push(
-      "What is the PE sponsor's current hold period? Are there plans for a recap or secondary transaction in the next 12–18 months?"
-    )
-  }
-
-  // DSO-tier-specific prep
-  if (dsoEntry) {
-    if (dsoEntry.tier === "tier1") {
-      questions.push(
-        "Confirm the equity path for partnership-track positions — can you provide an example term sheet or equity timeline?"
-      )
-    } else if (dsoEntry.tier === "tier2") {
-      questions.push(
-        "Validate the owner-dentist or partner track — what does the earn-out structure look like and over what timeframe?"
-      )
-    } else if (dsoEntry.tier === "tier3") {
-      questions.push(
-        "Request the full associate agreement upfront — confirm the non-compete radius, non-solicit clauses, and any clawback provisions."
-      )
-    } else if (dsoEntry.tier === "avoid") {
-      questions.push(
-        "Request current patient-complaint data and any regulatory action history. Ask for references from at least 3 current or former associates."
-      )
-    }
-  }
-
-  return questions
-}
-
-function InterviewPrepTab({ target }: { target: LaunchpadRankedTarget }) {
-  const [copied, setCopied] = useState(false)
-
-  const dsoEntry =
-    target.practice.affiliated_dso
-      ? resolveDsoTierEntry(
-          target.practice.affiliated_dso,
-          target.practice.parent_company,
-          target.practice.franchise_name
-        )
-      : null
-
-  const questions = buildInterviewQuestions(target, dsoEntry)
-
-  function handleCopyAll() {
-    const text = questions.map((q, i) => `${i + 1}. ${q}`).join("\n")
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-[#9C9C90]">
-          {questions.length} questions · tailored to active signals
-        </p>
-        <button
-          onClick={handleCopyAll}
-          className="flex items-center gap-1.5 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] px-2.5 py-1 text-xs font-medium text-[#6B6B60] transition-colors hover:border-[#B8860B] hover:text-[#B8860B]"
-        >
-          {copied ? (
-            <>
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Copied
-            </>
-          ) : (
-            <>
-              <Copy className="h-3.5 w-3.5" />
-              Copy all
-            </>
-          )}
-        </button>
-      </div>
-
-      <ol className="space-y-3">
-        {questions.map((q, i) => (
-          <li key={i} className="flex items-start gap-3">
-            <span className="mt-0.5 shrink-0 font-mono text-xs font-bold text-[#B8860B]">
-              {String(i + 1).padStart(2, "0")}
-            </span>
-            <span className="text-sm text-[#1A1A1A]">{q}</span>
-          </li>
-        ))}
-      </ol>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -1010,9 +839,11 @@ export function PracticeDossier({
   isPinned = false,
   onTogglePin,
 }: PracticeDossierProps) {
+  const [askIntelOpen, setAskIntelOpen] = useState(false)
+
   if (!target || !open) return null
 
-  const { practice } = target
+  const { practice, intel } = target
   const displayName =
     practice.practice_name ?? practice.doing_business_as ?? `NPI ${target.npi}`
   const dba =
@@ -1032,144 +863,224 @@ export function PracticeDossier({
 
   const locationLine = [practice.city, practice.state].filter(Boolean).join(", ")
 
+  const practiceSnapshot = {
+    name: displayName,
+    dba: practice.doing_business_as,
+    entity_classification: practice.entity_classification,
+    city: practice.city,
+    state: practice.state,
+    zip: practice.zip,
+    year_established: practice.year_established,
+    employee_count: practice.employee_count,
+    num_providers: practice.num_providers,
+    estimated_revenue: practice.estimated_revenue,
+    buyability_score: practice.buyability_score,
+    website: practice.website,
+    affiliated_dso: practice.affiliated_dso,
+    dso_tier: dsoEntry ? DSO_TIER_LABELS[dsoEntry.tier] : null,
+    ownership_status: practice.ownership_status,
+    classification_confidence: practice.classification_confidence,
+  }
+
+  const intelContext = intel
+    ? {
+        overall_assessment: intel.overall_assessment,
+        acquisition_readiness: intel.acquisition_readiness,
+        confidence: intel.confidence,
+        green_flags: intel.green_flags,
+        red_flags: intel.red_flags,
+        raw_json: intel.raw_json,
+      }
+    : null
+
+  const signalIds = [
+    ...target.activeSignalIds,
+    ...target.warningSignalIds,
+  ] as string[]
+
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
-      <SheetContent
-        side="right"
-        showCloseButton={false}
-        className="flex w-full flex-col gap-0 border-l border-[#E8E5DE] bg-[#FFFFFF] p-0 sm:max-w-[520px]"
-      >
-        {/* Header */}
-        <SheetHeader className="shrink-0 border-b border-[#E8E5DE] bg-[#FAFAF7] px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <SheetTitle className="truncate text-base font-semibold text-[#1A1A1A]">
-                {displayName}
-              </SheetTitle>
-              {dba && (
-                <div className="mt-0.5 truncate text-xs text-[#9C9C90]">
-                  dba {dba}
+    <>
+      <Sheet open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+        <SheetContent
+          side="right"
+          showCloseButton={false}
+          className="flex w-full flex-col gap-0 border-l border-[#E8E5DE] bg-[#FFFFFF] p-0 sm:max-w-[520px]"
+        >
+          {/* Header */}
+          <SheetHeader className="shrink-0 border-b border-[#E8E5DE] bg-[#FAFAF7] px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <SheetTitle className="truncate text-base font-semibold text-[#1A1A1A]">
+                  {displayName}
+                </SheetTitle>
+                {dba && (
+                  <div className="mt-0.5 truncate text-xs text-[#9C9C90]">
+                    dba {dba}
+                  </div>
+                )}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {locationLine && (
+                    <span className="flex items-center gap-1 text-xs text-[#6B6B60]">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      {locationLine}
+                    </span>
+                  )}
+                  {dsoEntry && (
+                    <span
+                      className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                      style={{
+                        backgroundColor: `${DSO_TIER_COLORS[dsoEntry.tier]}18`,
+                        color: DSO_TIER_COLORS[dsoEntry.tier],
+                        border: `1px solid ${DSO_TIER_COLORS[dsoEntry.tier]}40`,
+                      }}
+                    >
+                      {DSO_TIER_LABELS[dsoEntry.tier]}
+                    </span>
+                  )}
                 </div>
-              )}
-              <div className="mt-1 flex flex-wrap items-center gap-2">
-                {locationLine && (
-                  <span className="flex items-center gap-1 text-xs text-[#6B6B60]">
-                    <MapPin className="h-3 w-3 shrink-0" />
-                    {locationLine}
-                  </span>
-                )}
-                {dsoEntry && (
-                  <span
-                    className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                    style={{
-                      backgroundColor: `${DSO_TIER_COLORS[dsoEntry.tier]}18`,
-                      color: DSO_TIER_COLORS[dsoEntry.tier],
-                      border: `1px solid ${DSO_TIER_COLORS[dsoEntry.tier]}40`,
-                    }}
-                  >
-                    {DSO_TIER_LABELS[dsoEntry.tier]}
-                  </span>
-                )}
               </div>
-            </div>
-            <div className="flex items-start gap-1">
-              {onTogglePin && (
+              <div className="flex items-start gap-1">
                 <button
                   type="button"
-                  onClick={() => onTogglePin(target.npi)}
-                  aria-label={isPinned ? "Unpin practice" : "Pin practice"}
-                  aria-pressed={isPinned}
-                  title={isPinned ? "Unpin from pinboard" : "Pin to pinboard"}
-                  className={cn(
-                    "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
-                    isPinned
-                      ? "border-[#B8860B]/40 bg-[#B8860B]/10 text-[#B8860B] hover:bg-[#B8860B]/15"
-                      : "border-transparent text-[#9C9C90] hover:bg-[#F5F5F0] hover:text-[#1A1A1A]"
-                  )}
+                  onClick={() => setAskIntelOpen(true)}
+                  aria-label="Ask Intel about this practice"
+                  title="Ask AI a question about this practice"
+                  className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-transparent text-[#9C9C90] transition-colors hover:border-[#B8860B]/30 hover:bg-[#B8860B]/5 hover:text-[#B8860B]"
                 >
-                  {isPinned ? (
-                    <PinOff className="h-4 w-4" />
-                  ) : (
-                    <Pin className="h-4 w-4" />
-                  )}
+                  <Brain className="h-4 w-4" />
                 </button>
-              )}
-              <button
-                onClick={onClose}
-                className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#9C9C90] transition-colors hover:bg-[#F5F5F0] hover:text-[#1A1A1A]"
-                aria-label="Close dossier"
+                {onTogglePin && (
+                  <button
+                    type="button"
+                    onClick={() => onTogglePin(target.npi)}
+                    aria-label={isPinned ? "Unpin practice" : "Pin practice"}
+                    aria-pressed={isPinned}
+                    title={isPinned ? "Unpin from pinboard" : "Pin to pinboard"}
+                    className={cn(
+                      "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors",
+                      isPinned
+                        ? "border-[#B8860B]/40 bg-[#B8860B]/10 text-[#B8860B] hover:bg-[#B8860B]/15"
+                        : "border-transparent text-[#9C9C90] hover:bg-[#F5F5F0] hover:text-[#1A1A1A]"
+                    )}
+                  >
+                    {isPinned ? (
+                      <PinOff className="h-4 w-4" />
+                    ) : (
+                      <Pin className="h-4 w-4" />
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[#9C9C90] transition-colors hover:bg-[#F5F5F0] hover:text-[#1A1A1A]"
+                  aria-label="Close dossier"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </SheetHeader>
+
+          {/* Tabs */}
+          <Tabs
+            defaultValue="snapshot"
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <div className="shrink-0 border-b border-[#E8E5DE] bg-[#FAFAF7] px-4">
+              <TabsList
+                variant="line"
+                className="h-10 w-full justify-start gap-0 rounded-none bg-transparent p-0"
               >
-                <X className="h-4 w-4" />
-              </button>
+                {(
+                  [
+                    { value: "snapshot", label: "Snapshot" },
+                    { value: "compensation", label: "Comp" },
+                    { value: "mentorship", label: "Mentor" },
+                    { value: "redflags", label: "Red Flags" },
+                    { value: "interview", label: "Interview" },
+                    { value: "contract", label: "Contract" },
+                  ] as const
+                ).map((tab) => (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className="h-full rounded-none border-0 px-3 text-xs font-medium text-[#6B6B60] data-active:text-[#B8860B] data-active:after:bg-[#B8860B]"
+                  >
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              <TabsContent value="snapshot" className="p-4">
+                <SnapshotTab target={target} track={track} />
+              </TabsContent>
+              <TabsContent value="compensation" className="p-4">
+                <CompensationTab target={target} bundle={bundle} />
+              </TabsContent>
+              <TabsContent value="mentorship" className="p-4">
+                <MentorshipTab target={target} />
+              </TabsContent>
+              <TabsContent value="redflags" className="p-4">
+                <RedFlagsTab target={target} />
+              </TabsContent>
+              <TabsContent value="interview" className="p-4">
+                <InterviewPrepAi
+                  npi={target.npi}
+                  practiceSnapshot={practiceSnapshot}
+                  signals={signalIds}
+                  intel={intelContext}
+                  track={track}
+                />
+              </TabsContent>
+              <TabsContent value="contract" className="p-4">
+                <ContractParser />
+              </TabsContent>
+            </div>
+          </Tabs>
+
+          {/* Footer */}
+          <div className="shrink-0 border-t border-[#E8E5DE] bg-[#FAFAF7] px-4 py-2">
+            <div className="flex items-center gap-2 text-[10px] text-[#9C9C90]">
+              <GraduationCap className="h-3 w-3 shrink-0" />
+              <span>
+                Active track:{" "}
+                <span className="font-medium text-[#6B6B60]">
+                  {LAUNCHPAD_TRACK_LABELS[track]}
+                </span>
+              </span>
+              <span className="mx-1 opacity-40">·</span>
+              <span>NPI {target.npi}</span>
             </div>
           </div>
-        </SheetHeader>
+        </SheetContent>
+      </Sheet>
 
-        {/* Tabs */}
-        <Tabs
-          defaultValue="snapshot"
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <div className="shrink-0 border-b border-[#E8E5DE] bg-[#FAFAF7] px-4">
-            <TabsList
-              variant="line"
-              className="h-10 w-full justify-start gap-0 rounded-none bg-transparent p-0"
-            >
-              {(
-                [
-                  { value: "snapshot", label: "Snapshot" },
-                  { value: "compensation", label: "Comp" },
-                  { value: "mentorship", label: "Mentor" },
-                  { value: "redflags", label: "Red Flags" },
-                  { value: "interview", label: "Interview" },
-                ] as const
-              ).map((tab) => (
-                <TabsTrigger
-                  key={tab.value}
-                  value={tab.value}
-                  className="h-full rounded-none border-0 px-3 text-xs font-medium text-[#6B6B60] data-active:text-[#B8860B] data-active:after:bg-[#B8860B]"
-                >
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-
-          {/* Scrollable tab content area */}
-          <div className="flex-1 overflow-y-auto">
-            <TabsContent value="snapshot" className="p-4">
-              <SnapshotTab target={target} track={track} />
-            </TabsContent>
-            <TabsContent value="compensation" className="p-4">
-              <CompensationTab target={target} bundle={bundle} />
-            </TabsContent>
-            <TabsContent value="mentorship" className="p-4">
-              <MentorshipTab target={target} />
-            </TabsContent>
-            <TabsContent value="redflags" className="p-4">
-              <RedFlagsTab target={target} />
-            </TabsContent>
-            <TabsContent value="interview" className="p-4">
-              <InterviewPrepTab target={target} />
-            </TabsContent>
-          </div>
-        </Tabs>
-
-        {/* Footer with track context */}
-        <div className="shrink-0 border-t border-[#E8E5DE] bg-[#FAFAF7] px-4 py-2">
-          <div className="flex items-center gap-2 text-[10px] text-[#9C9C90]">
-            <GraduationCap className="h-3 w-3 shrink-0" />
-            <span>
-              Active track:{" "}
-              <span className="font-medium text-[#6B6B60]">
-                {LAUNCHPAD_TRACK_LABELS[track]}
-              </span>
-            </span>
-            <span className="mx-1 opacity-40">·</span>
-            <span>NPI {target.npi}</span>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+      {askIntelOpen && (
+        <AskIntelDrawer
+          open={askIntelOpen}
+          onClose={() => setAskIntelOpen(false)}
+          npi={target.npi}
+          practiceSnapshot={practiceSnapshot}
+          zipContext={
+            target.zipScore
+              ? {
+                  metro: target.zipScore.metro_area,
+                  market_type: target.zipScore.market_type,
+                  corporate_share_pct: target.zipScore.corporate_share_pct,
+                  dld_gp_per_10k: target.zipScore.dld_gp_per_10k,
+                  buyable_practice_ratio: target.zipScore.buyable_practice_ratio,
+                  commutable: target.commutable,
+                  metrics_confidence: target.zipScore.metrics_confidence,
+                  population: target.zipScore.population,
+                  median_household_income: target.zipScore.median_household_income,
+                }
+              : null
+          }
+          intelContext={intelContext}
+        />
+      )}
+    </>
   )
 }

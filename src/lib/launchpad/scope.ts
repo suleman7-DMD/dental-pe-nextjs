@@ -5,6 +5,11 @@ export const LAUNCHPAD_SCOPE_IDS = [
   "west_loop_south_loop",
   "woodridge",
   "bolingbrook",
+  // Boston Metro sub-presets
+  "boston_core",
+  "cambridge_somerville",
+  "brookline_fenway",
+  "newton_waltham",
 ] as const
 
 export type LaunchpadScope = (typeof LAUNCHPAD_SCOPE_IDS)[number]
@@ -70,6 +75,31 @@ export const LAUNCHPAD_SCOPES: LaunchpadScopeOption[] = [
     "Bolingbrook",
     "Bolingbrook",
     "Will County / southwest corridor, 127 ZIPs"
+  ),
+  // Boston Metro sub-presets
+  toOption(
+    "boston_core",
+    "Boston Core",
+    "Boston Core",
+    "Back Bay, South End, Roxbury, Mission Hill, Fenway, Allston, Brighton — 8 ZIPs"
+  ),
+  toOption(
+    "cambridge_somerville",
+    "Cambridge + Somerville",
+    "Cambridge",
+    "Cambridge + Somerville — 6 ZIPs"
+  ),
+  toOption(
+    "brookline_fenway",
+    "Brookline + Fenway",
+    "Brookline",
+    "Brookline, Chestnut Hill — 3 ZIPs"
+  ),
+  toOption(
+    "newton_waltham",
+    "Newton + Waltham",
+    "Newton",
+    "Newton, Waltham — 4 ZIPs"
   ),
 ]
 

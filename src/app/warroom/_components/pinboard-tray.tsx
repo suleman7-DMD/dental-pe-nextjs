@@ -2,18 +2,33 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
+  Columns2,
   Download,
   Flame,
   GripVertical,
   Pin,
+  StickyNote,
   ThermometerSnowflake,
   ThermometerSun,
   Trash2,
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import type { RankedTarget } from "@/lib/warroom/signals"
+import {
+  PIN_NOTE_MAX_LENGTH,
+  useWarroomPinNotes,
+} from "@/lib/hooks/use-warroom-pin-notes"
+import { PinCompareDrawer } from "./pin-compare-drawer"
 
 interface PinboardTrayProps {
   pins: string[]
@@ -100,6 +115,86 @@ function buildPinsCsv(
   return [header, ...rows].join("\n")
 }
 
+interface PinNoteEditorProps {
+  npi: string
+  initialValue: string
+  onSave: (value: string) => void
+  onClose: () => void
+}
+
+function PinNoteEditor({ initialValue, onSave, onClose }: PinNoteEditorProps) {
+  const [draft, setDraft] = useState(initialValue)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    setDraft(initialValue)
+  }, [initialValue])
+
+  useEffect(() => {
+    textareaRef.current?.focus()
+    textareaRef.current?.setSelectionRange(
+      textareaRef.current.value.length,
+      textareaRef.current.value.length
+    )
+  }, [])
+
+  const handleCommit = useCallback(() => {
+    if (draft !== initialValue) onSave(draft)
+    onClose()
+  }, [draft, initialValue, onClose, onSave])
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        setDraft(initialValue)
+        onClose()
+        return
+      }
+      if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        handleCommit()
+      }
+    },
+    [handleCommit, initialValue, onClose]
+  )
+
+  const remaining = PIN_NOTE_MAX_LENGTH - draft.length
+
+  return (
+    <div
+      className="rounded-md border border-[#B8860B]/30 bg-[#FFFFFF] p-2"
+      onClick={(event) => event.stopPropagation()}
+    >
+      <textarea
+        ref={textareaRef}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value.slice(0, PIN_NOTE_MAX_LENGTH))}
+        onBlur={handleCommit}
+        onKeyDown={handleKeyDown}
+        placeholder="e.g., Called 3/15 — owner retiring 2027, wants $1.2M"
+        className="block w-full resize-y rounded border border-[#E8E5DE] bg-[#FAFAF7] px-2 py-1.5 text-[12px] text-[#1A1A1A] placeholder:text-[#9C9C90] focus:border-[#B8860B]/60 focus:outline-none focus:ring-2 focus:ring-[#B8860B]/20"
+        rows={3}
+        maxLength={PIN_NOTE_MAX_LENGTH}
+      />
+      <div className="mt-1 flex items-center justify-between text-[10px] text-[#707064]">
+        <span>
+          ⌘+Enter to save · Esc to cancel · saved to this device
+        </span>
+        <span
+          className={cn(
+            "font-mono tabular-nums",
+            remaining < 100 ? "text-[#D4920B]" : "text-[#9C9C90]"
+          )}
+        >
+          {remaining}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+
 export function PinboardTray({
   pins,
   selectedEntity,
@@ -113,8 +208,13 @@ export function PinboardTray({
   const selectedIsPinned = selectedEntity ? pins.includes(selectedEntity) : false
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [openNoteNpi, setOpenNoteNpi] = useState<string | null>(null)
   const gripRefs = useRef(new Map<string, HTMLButtonElement>())
   const pendingFocusNpi = useRef<string | null>(null)
+  const { notes, getNote, hasNote, setNote } = useWarroomPinNotes()
+  const canCompare = pins.length >= 2
 
   useEffect(() => {
     if (!pendingFocusNpi.current) return
@@ -233,6 +333,23 @@ export function PinboardTray({
             type="button"
             variant="outline"
             size="sm"
+            disabled={!canCompare}
+            onClick={() => setCompareOpen(true)}
+            className="h-8 border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
+            aria-label={
+              canCompare
+                ? `Compare ${pins.length} pinned practices side-by-side`
+                : "Pin at least 2 practices to compare"
+            }
+            title={canCompare ? "Compare side-by-side" : "Need 2+ pins"}
+          >
+            <Columns2 className="h-3.5 w-3.5" />
+            Compare
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             disabled={pins.length === 0}
             onClick={handleExport}
             className="h-8 border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
@@ -247,7 +364,7 @@ export function PinboardTray({
               variant="outline"
               size="sm"
               disabled={pins.length === 0}
-              onClick={onClearPins}
+              onClick={() => setConfirmClearOpen(true)}
               className="h-8 border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#C23B3B]"
               aria-label="Clear all pins"
             >
@@ -295,7 +412,7 @@ export function PinboardTray({
                   onDrop={() => handleDrop(index)}
                   onDragEnd={handleDragEnd}
                   className={cn(
-                    "group relative flex items-start gap-2 rounded-md border p-2 transition-colors",
+                    "group relative flex flex-col gap-2 rounded-md border p-2 transition-colors",
                     active
                       ? "border-[#B8860B]/40 bg-[#B8860B]/10"
                       : "border-[#E8E5DE] bg-[#FAFAF7] hover:bg-[#FFFFFF]",
@@ -303,6 +420,7 @@ export function PinboardTray({
                     isDropTarget && "ring-2 ring-[#B8860B]/40 ring-offset-1"
                   )}
                 >
+                  <div className="flex items-start gap-2">
                   {onReorderPins && (
                     <button
                       type="button"
@@ -374,23 +492,116 @@ export function PinboardTray({
                     )}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      onRemovePin(npi)
-                    }}
-                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[#707064] transition-colors hover:bg-[#FFFFFF] hover:text-[#C23B3B]"
-                    aria-label={`Remove ${target?.practiceName ?? npi}`}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
+                  <div className="flex shrink-0 flex-col items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setOpenNoteNpi((current) => (current === npi ? null : npi))
+                      }}
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-md transition-colors",
+                        hasNote(npi)
+                          ? "bg-[#B8860B]/15 text-[#B8860B] hover:bg-[#B8860B]/25"
+                          : "text-[#707064] hover:bg-[#FFFFFF] hover:text-[#1A1A1A]",
+                        openNoteNpi === npi && "ring-1 ring-[#B8860B]/40"
+                      )}
+                      aria-label={
+                        openNoteNpi === npi
+                          ? `Close note for ${target?.practiceName ?? npi}`
+                          : hasNote(npi)
+                            ? `Edit note for ${target?.practiceName ?? npi}`
+                            : `Add note for ${target?.practiceName ?? npi}`
+                      }
+                      aria-expanded={openNoteNpi === npi}
+                      title={hasNote(npi) ? "Edit note" : "Add note"}
+                    >
+                      <StickyNote className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onRemovePin(npi)
+                      }}
+                      className="flex h-6 w-6 items-center justify-center rounded-md text-[#707064] transition-colors hover:bg-[#FFFFFF] hover:text-[#C23B3B]"
+                      aria-label={`Remove ${target?.practiceName ?? npi}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  </div>
+                  {openNoteNpi === npi ? (
+                    <PinNoteEditor
+                      npi={npi}
+                      initialValue={getNote(npi)}
+                      onSave={(value) => setNote(npi, value)}
+                      onClose={() => setOpenNoteNpi(null)}
+                    />
+                  ) : hasNote(npi) ? (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setOpenNoteNpi(npi)
+                      }}
+                      className="-mt-1 truncate rounded bg-[#B8860B]/8 px-2 py-1 text-left text-[11px] italic text-[#1A1A1A] hover:bg-[#B8860B]/15"
+                      aria-label={`Edit note for ${target?.practiceName ?? npi}`}
+                      title="Click to edit note"
+                    >
+                      <StickyNote className="mr-1 inline h-3 w-3 text-[#B8860B]" />
+                      {getNote(npi)}
+                    </button>
+                  ) : null}
                 </li>
               )
             })}
           </ul>
         )}
       </div>
+
+      <Dialog open={confirmClearOpen} onOpenChange={setConfirmClearOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Clear all pins?</DialogTitle>
+            <DialogDescription>
+              {pins.length} pinned {pins.length === 1 ? "practice" : "practices"} will be removed from the
+              pinboard. This cannot be undone — re-pin them individually if you change your mind.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmClearOpen(false)}
+              className="border-[#E8E5DE]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                onClearPins?.()
+                setConfirmClearOpen(false)
+              }}
+              className="bg-[#C23B3B] text-white hover:bg-[#A82F2F]"
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Clear {pins.length} {pins.length === 1 ? "pin" : "pins"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <PinCompareDrawer
+        open={compareOpen}
+        onOpenChange={setCompareOpen}
+        pins={pins}
+        pinTargets={pinTargets}
+        pinNotes={notes}
+        onSelectEntity={onSelectEntity}
+        onRemovePin={onRemovePin}
+      />
     </section>
   )
 }

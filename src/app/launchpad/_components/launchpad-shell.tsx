@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils"
 import { useLaunchpadState } from "@/lib/hooks/use-launchpad-state"
 import type { LaunchpadView } from "@/lib/hooks/use-launchpad-state"
 import { useLaunchpadData } from "@/lib/hooks/use-launchpad-data"
-import { useLaunchpadSavedSearches } from "@/lib/hooks/use-launchpad-saved-searches"
 import type { LaunchpadBundle } from "@/lib/launchpad/signals"
 import { LaunchpadScopeSelector } from "./scope-selector"
 import { TrackSwitcher } from "./track-switcher"
@@ -18,7 +17,7 @@ import { LaunchpadLivingMap } from "./living-map"
 import { LaunchpadZipDossierDrawer } from "./zip-dossier-drawer"
 import { RedFlagPatterns } from "./red-flag-patterns"
 import { PinboardPanel } from "./pinboard-panel"
-import { SavedSearchesMenu } from "./saved-searches-menu"
+import { SmartBriefingBuilder } from "./smart-briefing-builder"
 
 interface LaunchpadShellProps {
   initialBundle?: LaunchpadBundle | null
@@ -48,15 +47,8 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
     setView,
     setMapView,
     setSelectedZip,
-    loadSavedSearch,
     resetLaunchpadState,
   } = useLaunchpadState()
-
-  const {
-    searches: savedSearches,
-    save: saveSearch,
-    remove: removeSearch,
-  } = useLaunchpadSavedSearches()
 
   const { data: bundle, isFetching, error } = useLaunchpadData({
     scope: state.scope,
@@ -153,22 +145,10 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
                       })}
                     </span>
                   )}
-                  <SavedSearchesMenu
-                    searches={savedSearches}
-                    currentScope={state.scope}
-                    currentTrack={state.track}
-                    currentPinnedCount={state.pinnedNpis.length}
-                    onSave={(name) =>
-                      saveSearch(name, state.scope, state.track, state.pinnedNpis)
-                    }
-                    onDelete={removeSearch}
-                    onLoad={(search) =>
-                      loadSavedSearch({
-                        scope: search.scope,
-                        track: search.track,
-                        pinnedNpis: search.pinnedNpis,
-                      })
-                    }
+                  <SmartBriefingBuilder
+                    pinnedNpis={state.pinnedNpis}
+                    bundle={effectiveBundle}
+                    track={state.track}
                   />
                   <Button
                     type="button"

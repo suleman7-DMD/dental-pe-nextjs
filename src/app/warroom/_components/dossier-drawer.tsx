@@ -62,6 +62,12 @@ import {
 import { safeExternalUrl } from "@/lib/utils/safe-url"
 import { getEntityClassificationLabel } from "@/lib/constants/entity-classifications"
 import { usePracticeIntel } from "@/lib/hooks/use-warroom-intel"
+import {
+  LIFECYCLE_STAGES,
+  LIFECYCLE_STAGE_COLORS,
+  LIFECYCLE_STAGE_LABELS,
+  type LifecycleStage,
+} from "@/lib/hooks/use-warroom-pin-lifecycle"
 import type { PracticeIntel } from "@/lib/types/intel"
 import {
   filterNearbyDealsWithin,
@@ -86,6 +92,8 @@ interface DossierDrawerProps {
   onIntentRequest?: (intentText: string) => void
   nearbyDeals?: WarroomDealRecord[]
   recentChanges?: WarroomChangeRecord[]
+  currentStage?: LifecycleStage
+  onStageChange?: (npi: string, stage: LifecycleStage) => void
 }
 
 const TIER_STYLES: Record<
@@ -500,6 +508,8 @@ export function DossierDrawer({
   onIntentRequest,
   nearbyDeals = [],
   recentChanges = [],
+  currentStage = "untouched",
+  onStageChange,
 }: DossierDrawerProps) {
   const isOpen = target != null
 
@@ -632,6 +642,48 @@ export function DossierDrawer({
               </button>
             )}
           </div>
+          {isPinned && onStageChange && (
+            <div className="flex items-center gap-2 pt-1">
+              <label
+                htmlFor={`lifecycle-${target.npi}`}
+                className="text-[11px] font-medium uppercase tracking-wider text-[#707064]"
+              >
+                Stage
+              </label>
+              <div
+                className={cn(
+                  "flex items-center gap-2 rounded-md border px-2 py-1 transition-colors",
+                  LIFECYCLE_STAGE_COLORS[currentStage].bg,
+                  LIFECYCLE_STAGE_COLORS[currentStage].border
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    LIFECYCLE_STAGE_COLORS[currentStage].dot
+                  )}
+                  aria-hidden="true"
+                />
+                <select
+                  id={`lifecycle-${target.npi}`}
+                  value={currentStage}
+                  onChange={(event) =>
+                    onStageChange(target.npi, event.target.value as LifecycleStage)
+                  }
+                  className={cn(
+                    "h-6 cursor-pointer appearance-none border-0 bg-transparent pr-5 text-[12px] font-semibold outline-none focus:ring-0",
+                    LIFECYCLE_STAGE_COLORS[currentStage].text
+                  )}
+                >
+                  {LIFECYCLE_STAGES.map((stage) => (
+                    <option key={stage} value={stage}>
+                      {LIFECYCLE_STAGE_LABELS[stage]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
           <p className="text-[11px] italic text-[#6B6B60]">{target.headline}</p>
         </SheetHeader>
 

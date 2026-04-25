@@ -1,9 +1,9 @@
 "use client"
 
 import {
+  Brain,
   BriefcaseBusiness,
   Building2,
-  DollarSign,
   GraduationCap,
   ShieldAlert,
   Sparkles,
@@ -25,14 +25,23 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
       summary.dsoCandidates.bestFit
     : 0
 
-  const compLow = summary ? summary.medianCompRange.low : null
-  const compHigh = summary ? summary.medianCompRange.high : null
-  const compValue =
-    compLow != null && compHigh != null
-      ? `$${(compLow / 1000).toFixed(0)}k – $${(compHigh / 1000).toFixed(0)}k`
+  const intelCoveragePct = bundle?.dataHealth?.intelCoveragePct ?? null
+
+  // Intel coverage count
+  const withIntelCount = bundle?.rankedTargets
+    ? bundle.rankedTargets.filter((t) => t.intel != null).length
+    : null
+  const totalCount = bundle?.rankedTargets ? bundle.rankedTargets.length : null
+
+  const intelValue =
+    withIntelCount != null && totalCount != null
+      ? `${withIntelCount} / ${totalCount}`
       : "--"
 
-  const intelCoveragePct = bundle?.dataHealth?.intelCoveragePct ?? null
+  const intelPct =
+    withIntelCount != null && totalCount != null && totalCount > 0
+      ? ((withIntelCount / totalCount) * 100).toFixed(0)
+      : null
 
   return (
     <div className={className}>
@@ -100,15 +109,21 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
         />
 
         <KpiCard
-          icon={<DollarSign className="h-4 w-4" />}
-          label="Comp range (IL)"
-          value={compValue}
+          icon={<Brain className="h-4 w-4" />}
+          label="Intel coverage"
+          value={intelValue}
           subtitle={
-            summary ? (
-              <span className="text-[11px] text-[#6B6B60]">{summary.medianCompRange.source}</span>
-            ) : undefined
+            intelPct != null ? (
+              <span className="text-[11px] text-[#6B6B60]">{intelPct}% of ranked targets</span>
+            ) : (
+              <span className="text-[11px] text-[#9C9C90]">No intel data loaded</span>
+            )
           }
-          tooltip="Estimated associate compensation range for Illinois based on market data"
+          tooltip={
+            withIntelCount === 0
+              ? "0% intel coverage — scores are capped at 70 for all practices. Run the weekly research pipeline to populate AI dossiers."
+              : "Practices with an AI research dossier attached. Higher coverage → fewer confidence caps on scores."
+          }
           accentColor="#7C3AED"
         />
       </div>

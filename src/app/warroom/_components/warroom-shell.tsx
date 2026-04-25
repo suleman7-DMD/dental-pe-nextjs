@@ -29,6 +29,7 @@ import {
   type WarroomSignalFilter,
 } from "@/lib/hooks/use-warroom-state"
 import { useWarroomData } from "@/lib/hooks/use-warroom-data"
+import { useWarroomPinLifecycle } from "@/lib/hooks/use-warroom-pin-lifecycle"
 import type {
   RankedTarget,
   WarroomIntent,
@@ -237,6 +238,11 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   }, [activeIntent])
 
   const rankLimit = useMemo(() => activeIntent?.filter.limit ?? 40, [activeIntent])
+
+  const {
+    getStage: getLifecycleStage,
+    setStage: setLifecycleStage,
+  } = useWarroomPinLifecycle()
 
   const { data: bundle, isFetching, error } = useWarroomData({
     scope: state.scope,
@@ -775,6 +781,10 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
         onIntentRequest={handleDossierIntentRequest}
         nearbyDeals={nearbyDeals}
         recentChanges={changesForSelected}
+        currentStage={
+          selectedTarget ? getLifecycleStage(selectedTarget.npi) : undefined
+        }
+        onStageChange={setLifecycleStage}
       />
 
       <ZipDossierDrawer

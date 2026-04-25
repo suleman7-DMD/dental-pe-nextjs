@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { AlertTriangle, Info, Layers } from "lucide-react"
 import { Marker, Popup } from "react-map-gl/mapbox"
 import { MapContainer } from "@/components/maps/map-container"
 import { ZIP_CENTROIDS } from "@/lib/constants/zip-centroids"
@@ -17,6 +18,43 @@ import { getLaunchpadScopeOption, type LaunchpadScope } from "@/lib/launchpad/sc
 
 export type LaunchpadMapView = "practices" | "zips"
 
+// ---------------------------------------------------------------------------
+// Lens types
+// ---------------------------------------------------------------------------
+
+export type LaunchpadMapLens =
+  | "tier"
+  | "mentor_density"
+  | "dso_avoid"
+
+interface LensOption {
+  id: LaunchpadMapLens
+  label: string
+  description: string
+}
+
+const LENS_OPTIONS: LensOption[] = [
+  {
+    id: "tier",
+    label: "Fit Tier",
+    description: "ZIP or practice colored by dominant fit tier",
+  },
+  {
+    id: "mentor_density",
+    label: "Mentor Density",
+    description: "ZIPs with more mentor-rich practices shine brighter",
+  },
+  {
+    id: "dso_avoid",
+    label: "DSO Avoid",
+    description: "ZIPs with more avoid-tier DSO practices highlighted",
+  },
+]
+
+// ---------------------------------------------------------------------------
+// Component props
+// ---------------------------------------------------------------------------
+
 interface LaunchpadLivingMapProps {
   bundle: LaunchpadBundle | null
   scope: LaunchpadScope
@@ -30,6 +68,10 @@ interface LaunchpadLivingMapProps {
   height?: number
   className?: string
 }
+
+// ---------------------------------------------------------------------------
+// Tier colors (unchanged from Phase 2)
+// ---------------------------------------------------------------------------
 
 const TIER_COLORS: Record<LaunchpadTier, string> = {
   best_fit: "#2D8B4E",
@@ -47,7 +89,35 @@ const TIER_PRIORITY: Record<LaunchpadTier, number> = {
   avoid: 1,
 }
 
+// Mentor density color ramp (green tones, brighter = more mentors)
+const MENTOR_COLORS = ["#D1FAE5", "#6EE7B7", "#34D399", "#10B981", "#059669", "#047857"]
+
+// DSO avoid color ramp (red-orange tones, brighter = more avoid-tier)
+const AVOID_COLORS = ["#FEE2E2", "#FCA5A5", "#F87171", "#EF4444", "#DC2626", "#B91C1C"]
+
+function mentorColor(count: number, maxCount: number): string {
+  if (maxCount === 0 || count === 0) return "#E8E5DE"
+  const idx = Math.min(
+    Math.floor((count / maxCount) * MENTOR_COLORS.length),
+    MENTOR_COLORS.length - 1
+  )
+  return MENTOR_COLORS[idx]
+}
+
+function avoidColor(count: number, maxCount: number): string {
+  if (maxCount === 0 || count === 0) return "#E8E5DE"
+  const idx = Math.min(
+    Math.floor((count / maxCount) * AVOID_COLORS.length),
+    AVOID_COLORS.length - 1
+  )
+  return AVOID_COLORS[idx]
+}
+
 const PRACTICE_DOT_LIMIT = 250
+
+// ---------------------------------------------------------------------------
+// Aggregation types
+// ---------------------------------------------------------------------------
 
 interface ZipAggregate {
   zip: string
@@ -60,9 +130,13 @@ interface ZipAggregate {
   maybe: number
   low: number
   avoid: number
+  mentorCount: number
+  dsoAvoidCount: number
   dominantTier: LaunchpadTier
   bestScore: number
   topTargets: LaunchpadRankedTarget[]
+  /** From zipScore.metrics_confidence */
+  metricsConfidence: string | null
 }
 
 function dominantTierOf(counts: Record<LaunchpadTier, number>): LaunchpadTier {
@@ -85,6 +159,10 @@ function dominantTierOf(counts: Record<LaunchpadTier, number>): LaunchpadTier {
   return best
 }
 
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function LaunchpadLivingMap({
   bundle,
   scope,
@@ -100,6 +178,7 @@ export function LaunchpadLivingMap({
 }: LaunchpadLivingMapProps) {
   const [hoveredZip, setHoveredZip] = useState<string | null>(null)
   const [hoveredNpi, setHoveredNpi] = useState<string | null>(null)
+  const [activeLens, setActiveLens] = useState<LaunchpadMapLens>("tier")
 
   const scopeOption = getLaunchpadScopeOption(scope)
   const rankedTargets = bundle?.rankedTargets ?? []
@@ -111,6 +190,9 @@ export function LaunchpadLivingMap({
 
   const mapZoom = scope === "all_chicagoland" ? 9 : 10
 
+  // ---------------------------------------------------------------------------
+  // ZIP aggregation
+  // ---------------------------------------------------------------------------
   const zipAggregates = useMemo(() => {
     const map = new Map<string, ZipAggregate>()
     for (const target of rankedTargets) {
@@ -131,9 +213,12 @@ export function LaunchpadLivingMap({
           maybe: 0,
           low: 0,
           avoid: 0,
+          mentorCount: 0,
+          dsoAvoidCount: 0,
           dominantTier: "low",
           bestScore: 0,
           topTargets: [],
+          metricsConfidence: target.zipScore?.metrics_confidence ?? null,
         }
         map.set(zip, agg)
       }
@@ -144,6 +229,14 @@ export function LaunchpadLivingMap({
       else if (target.displayTier === "low") agg.low += 1
       else if (target.displayTier === "avoid") agg.avoid += 1
       if (target.displayScore > agg.bestScore) agg.bestScore = target.displayScore
+
+      // Mentor density — count mentor_rich_signal or practices with num_providers >= 3
+      const hasMentorSignal = target.activeSignalIds.includes("mentor_rich_signal")
+      const isMultiProvider = (target.practice.num_providers ?? 0) >= 3
+      if (hasMentorSignal || isMultiProvider) agg.mentorCount += 1
+
+      // DSO avoid — count dso_avoid_warning signal
+      if (target.warningSignalIds.includes("dso_avoid_warning")) agg.dsoAvoidCount += 1
     }
 
     for (const agg of map.values()) {
@@ -173,6 +266,9 @@ export function LaunchpadLivingMap({
     return Array.from(map.values())
   }, [rankedTargets])
 
+  // ---------------------------------------------------------------------------
+  // Practice markers
+  // ---------------------------------------------------------------------------
   const practiceMarkers = useMemo(() => {
     return rankedTargets
       .filter(
@@ -187,6 +283,16 @@ export function LaunchpadLivingMap({
 
   const maxZipTotal = useMemo(
     () => zipAggregates.reduce((m, z) => Math.max(m, z.total), 0) || 1,
+    [zipAggregates]
+  )
+
+  const maxMentorCount = useMemo(
+    () => zipAggregates.reduce((m, z) => Math.max(m, z.mentorCount), 0) || 1,
+    [zipAggregates]
+  )
+
+  const maxAvoidCount = useMemo(
+    () => zipAggregates.reduce((m, z) => Math.max(m, z.dsoAvoidCount), 0) || 1,
     [zipAggregates]
   )
 
@@ -209,6 +315,23 @@ export function LaunchpadLivingMap({
     return zipAggregates.find((z) => z.zip === selectedZip) ?? null
   }, [selectedZip, zipAggregates])
 
+  // ---------------------------------------------------------------------------
+  // Low metrics confidence warning
+  // ---------------------------------------------------------------------------
+  const selectedZipLowConfidence =
+    selectedZipAgg?.metricsConfidence === "low"
+
+  // ---------------------------------------------------------------------------
+  // Lens color resolver for ZIP circles
+  // ---------------------------------------------------------------------------
+  function getZipColor(agg: ZipAggregate): string {
+    if (activeLens === "mentor_density") return mentorColor(agg.mentorCount, maxMentorCount)
+    if (activeLens === "dso_avoid") return avoidColor(agg.dsoAvoidCount, maxAvoidCount)
+    return TIER_COLORS[agg.dominantTier]
+  }
+
+  const activeLensOption = LENS_OPTIONS.find((l) => l.id === activeLens) ?? LENS_OPTIONS[0]
+
   return (
     <section
       className={cn(
@@ -217,44 +340,120 @@ export function LaunchpadLivingMap({
       )}
       aria-label="Launchpad living map"
     >
+      {/* Low confidence warning banner */}
+      {selectedZipLowConfidence && (
+        <div
+          className="flex items-center gap-2 border-b border-[#D4920B]/30 bg-[#D4920B]/10 px-4 py-2"
+          role="alert"
+        >
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#D4920B]" aria-hidden="true" />
+          <p className="text-xs text-[#D4920B]">
+            <span className="font-semibold">Low metrics confidence</span> for ZIP {selectedZip} —
+            interpretations may be unreliable due to insufficient classification data.
+          </p>
+        </div>
+      )}
+
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E8E5DE] px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-[#1A1A1A]">Living Map</h2>
           <p className="text-xs text-[#707064]">
             {view === "practices"
               ? `Top ${practiceMarkers.length.toLocaleString()} practices colored by fit tier`
-              : `${zipAggregates.length.toLocaleString()} ZIPs colored by dominant tier · sized by practice count`}
+              : activeLens === "tier"
+                ? `${zipAggregates.length.toLocaleString()} ZIPs colored by dominant tier · sized by practice count`
+                : activeLens === "mentor_density"
+                  ? `${zipAggregates.length.toLocaleString()} ZIPs colored by mentor-rich practice density`
+                  : `${zipAggregates.length.toLocaleString()} ZIPs colored by avoid-tier DSO presence`}
           </p>
         </div>
-        <div className="inline-flex overflow-hidden rounded-md border border-[#E8E5DE]">
-          <button
-            type="button"
-            onClick={() => onViewChange("practices")}
-            aria-pressed={view === "practices"}
-            className={cn(
-              "h-7 px-3 text-[11px] font-medium transition-colors",
-              view === "practices"
-                ? "bg-[#B8860B]/10 text-[#B8860B]"
-                : "bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#FAFAF7] hover:text-[#1A1A1A]"
-            )}
-          >
-            Practices
-          </button>
-          <button
-            type="button"
-            onClick={() => onViewChange("zips")}
-            aria-pressed={view === "zips"}
-            className={cn(
-              "h-7 px-3 text-[11px] font-medium transition-colors border-l border-[#E8E5DE]",
-              view === "zips"
-                ? "bg-[#B8860B]/10 text-[#B8860B]"
-                : "bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#FAFAF7] hover:text-[#1A1A1A]"
-            )}
-          >
-            ZIPs
-          </button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Lens selector — only shown in ZIP view */}
+          {view === "zips" && (
+            <div
+              className="inline-flex overflow-hidden rounded-md border border-[#E8E5DE]"
+              role="group"
+              aria-label="Map lens"
+            >
+              <span className="flex items-center gap-1 border-r border-[#E8E5DE] bg-[#FAFAF7] px-2 text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                <Layers className="h-3 w-3" aria-hidden="true" />
+                Lens
+              </span>
+              {LENS_OPTIONS.map((lens) => (
+                <button
+                  key={lens.id}
+                  type="button"
+                  onClick={() => setActiveLens(lens.id)}
+                  aria-pressed={activeLens === lens.id}
+                  title={lens.description}
+                  className={cn(
+                    "h-7 px-2.5 text-[11px] font-medium transition-colors",
+                    lens.id !== "tier" && "border-l border-[#E8E5DE]",
+                    activeLens === lens.id
+                      ? lens.id === "dso_avoid"
+                        ? "bg-[#C23B3B]/10 text-[#C23B3B]"
+                        : lens.id === "mentor_density"
+                          ? "bg-[#2D8B4E]/10 text-[#2D8B4E]"
+                          : "bg-[#B8860B]/10 text-[#B8860B]"
+                      : "bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#FAFAF7] hover:text-[#1A1A1A]"
+                  )}
+                >
+                  {lens.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* View toggle */}
+          <div className="inline-flex overflow-hidden rounded-md border border-[#E8E5DE]">
+            <button
+              type="button"
+              onClick={() => onViewChange("practices")}
+              aria-pressed={view === "practices"}
+              className={cn(
+                "h-7 px-3 text-[11px] font-medium transition-colors",
+                view === "practices"
+                  ? "bg-[#B8860B]/10 text-[#B8860B]"
+                  : "bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#FAFAF7] hover:text-[#1A1A1A]"
+              )}
+            >
+              Practices
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewChange("zips")}
+              aria-pressed={view === "zips"}
+              className={cn(
+                "h-7 px-3 text-[11px] font-medium transition-colors border-l border-[#E8E5DE]",
+                view === "zips"
+                  ? "bg-[#B8860B]/10 text-[#B8860B]"
+                  : "bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#FAFAF7] hover:text-[#1A1A1A]"
+              )}
+            >
+              ZIPs
+            </button>
+          </div>
         </div>
       </header>
+
+      {/* Practices view hint */}
+      {view === "practices" && (
+        <div className="flex items-center gap-2 border-b border-[#E8E5DE] bg-[#FAFAF7] px-4 py-1.5">
+          <Info className="h-3 w-3 shrink-0 text-[#9C9C90]" aria-hidden="true" />
+          <p className="text-[11px] text-[#9C9C90]">
+            Tip: Switch to{" "}
+            <button
+              type="button"
+              onClick={() => onViewChange("zips")}
+              className="font-medium text-[#6B6B60] underline-offset-2 hover:underline"
+            >
+              ZIP view
+            </button>{" "}
+            to see market-level patterns and use the mentor density / DSO avoid lenses.
+          </p>
+        </div>
+      )}
 
       <div className="relative">
         <MapContainer height={height} zoom={mapZoom} center={mapCenter}>
@@ -264,7 +463,7 @@ export function LaunchpadLivingMap({
               const hovered = hoveredZip === agg.zip
               const sizeBase = 16 + Math.sqrt(agg.total / maxZipTotal) * 28
               const size = selected ? sizeBase + 4 : sizeBase
-              const color = TIER_COLORS[agg.dominantTier]
+              const color = getZipColor(agg)
               return (
                 <Marker
                   key={agg.zip}
@@ -291,8 +490,8 @@ export function LaunchpadLivingMap({
                       borderColor: "#FFFFFF",
                       opacity: 0.85,
                     }}
-                    aria-label={`ZIP ${agg.zip} — ${agg.total} practices, dominant tier ${LAUNCHPAD_TIER_LABELS[agg.dominantTier]}`}
-                    title={`${agg.zip} · ${agg.total} practices · ${LAUNCHPAD_TIER_LABELS[agg.dominantTier]}`}
+                    aria-label={`ZIP ${agg.zip} — ${agg.total} practices${activeLens === "mentor_density" ? `, ${agg.mentorCount} mentor-rich` : activeLens === "dso_avoid" ? `, ${agg.dsoAvoidCount} avoid-tier DSO` : `, dominant tier ${LAUNCHPAD_TIER_LABELS[agg.dominantTier]}`}`}
+                    title={`${agg.zip} · ${agg.total} practices · ${activeLens === "mentor_density" ? `${agg.mentorCount} mentor-rich` : activeLens === "dso_avoid" ? `${agg.dsoAvoidCount} avoid-tier DSO` : LAUNCHPAD_TIER_LABELS[agg.dominantTier]}`}
                   />
                 </Marker>
               )
@@ -321,6 +520,19 @@ export function LaunchpadLivingMap({
                       {Math.round(hovered.bestScore)}
                     </span>
                   </p>
+                  {activeLens === "mentor_density" && (
+                    <p className="text-[#2D8B4E]">
+                      <span className="font-semibold">{hovered.mentorCount}</span> mentor-rich
+                    </p>
+                  )}
+                  {activeLens === "dso_avoid" && (
+                    <p className="text-[#C23B3B]">
+                      <span className="font-semibold">{hovered.dsoAvoidCount}</span> avoid-tier DSO
+                    </p>
+                  )}
+                  {hovered.metricsConfidence === "low" && (
+                    <p className="text-[10px] text-[#D4920B]">⚠ Low metrics confidence</p>
+                  )}
                   <div className="flex flex-wrap gap-1 pt-0.5">
                     {hovered.bestFit > 0 && (
                       <span className="rounded-full bg-[#2D8B4E]/10 px-1.5 py-0.5 text-[10px] text-[#2D8B4E]">
@@ -437,27 +649,78 @@ export function LaunchpadLivingMap({
           })()}
         </MapContainer>
 
+        {/* Legend */}
         <div className="pointer-events-none absolute bottom-3 left-3 flex min-w-[240px] flex-col gap-1.5 rounded-md border border-[#E8E5DE] bg-[#FFFFFF]/95 px-3 py-2 text-[11px] shadow-sm">
-          <p className="font-semibold uppercase tracking-wider text-[#707064]">
-            {view === "practices" ? "Practice tier" : "Dominant tier in ZIP"}
-          </p>
-          <div className="grid grid-cols-5 gap-1">
-            {LAUNCHPAD_TIERS.map((tier) => (
-              <div key={tier} className="flex flex-col items-center gap-0.5">
-                <span
-                  className="h-3 w-3 rounded-full border border-white"
-                  style={{ backgroundColor: TIER_COLORS[tier] }}
-                  aria-hidden="true"
-                />
-                <span className="text-[10px] leading-tight text-[#6B6B60]">
-                  {LAUNCHPAD_TIER_LABELS[tier]}
-                </span>
-                <span className="font-mono text-[10px] text-[#9C9C90]">
-                  {formatNumber(tierCounts[tier] ?? 0)}
-                </span>
+          {activeLens === "tier" || view === "practices" ? (
+            <>
+              <p className="font-semibold uppercase tracking-wider text-[#707064]">
+                {view === "practices" ? "Practice tier" : "Dominant tier in ZIP"}
+              </p>
+              <div className="grid grid-cols-5 gap-1">
+                {LAUNCHPAD_TIERS.map((tier) => (
+                  <div key={tier} className="flex flex-col items-center gap-0.5">
+                    <span
+                      className="h-3 w-3 rounded-full border border-white"
+                      style={{ backgroundColor: TIER_COLORS[tier] }}
+                      aria-hidden="true"
+                    />
+                    <span className="text-[10px] leading-tight text-[#6B6B60]">
+                      {LAUNCHPAD_TIER_LABELS[tier]}
+                    </span>
+                    <span className="font-mono text-[10px] text-[#9C9C90]">
+                      {formatNumber(tierCounts[tier] ?? 0)}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : activeLens === "mentor_density" ? (
+            <>
+              <p className="font-semibold uppercase tracking-wider text-[#707064]">
+                Mentor density
+              </p>
+              <div className="flex items-center gap-1">
+                {MENTOR_COLORS.map((c, i) => (
+                  <span
+                    key={i}
+                    className="h-3 flex-1 rounded-sm"
+                    style={{ backgroundColor: c }}
+                    aria-hidden="true"
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between text-[10px] text-[#9C9C90]">
+                <span>Few mentors</span>
+                <span>Many mentors</span>
+              </div>
+              <p className="text-[10px] text-[#707064]">
+                Mentor-rich = mentor_rich signal or 3+ providers
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-semibold uppercase tracking-wider text-[#707064]">
+                DSO avoid presence
+              </p>
+              <div className="flex items-center gap-1">
+                {AVOID_COLORS.map((c, i) => (
+                  <span
+                    key={i}
+                    className="h-3 flex-1 rounded-sm"
+                    style={{ backgroundColor: c }}
+                    aria-hidden="true"
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between text-[10px] text-[#9C9C90]">
+                <span>None</span>
+                <span>High</span>
+              </div>
+              <p className="text-[10px] text-[#707064]">
+                Aspen, Sage, Western, Smile Brands, Risas
+              </p>
+            </>
+          )}
           <p className="text-[10px] text-[#707064]">
             {view === "practices"
               ? `Showing up to ${PRACTICE_DOT_LIMIT} geocoded practices`
@@ -465,6 +728,7 @@ export function LaunchpadLivingMap({
           </p>
         </div>
 
+        {/* Selected ZIP panel */}
         {selectedZipAgg && view === "zips" && (
           <div className="absolute right-3 top-3 w-[272px] space-y-2 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] p-3 text-xs shadow-sm">
             <div className="flex items-start justify-between">
@@ -517,6 +781,40 @@ export function LaunchpadLivingMap({
                   {LAUNCHPAD_TIER_LABELS[selectedZipAgg.dominantTier]}
                 </span>
               </div>
+              {activeLens === "mentor_density" && (
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-[#6B6B60]">Mentor-rich</span>
+                  <span className="font-mono font-semibold text-[#2D8B4E]">
+                    {selectedZipAgg.mentorCount}
+                  </span>
+                </div>
+              )}
+              {activeLens === "dso_avoid" && (
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-[#6B6B60]">Avoid-tier DSO</span>
+                  <span className="font-mono font-semibold text-[#C23B3B]">
+                    {selectedZipAgg.dsoAvoidCount}
+                  </span>
+                </div>
+              )}
+              {selectedZipAgg.metricsConfidence && (
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-[#6B6B60]">Data confidence</span>
+                  <span
+                    className="font-mono font-semibold"
+                    style={{
+                      color:
+                        selectedZipAgg.metricsConfidence === "high"
+                          ? "#2D8B4E"
+                          : selectedZipAgg.metricsConfidence === "medium"
+                            ? "#D4920B"
+                            : "#C23B3B",
+                    }}
+                  >
+                    {selectedZipAgg.metricsConfidence}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap gap-1">
               {selectedZipAgg.bestFit > 0 && (

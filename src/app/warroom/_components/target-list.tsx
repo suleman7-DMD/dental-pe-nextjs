@@ -2,12 +2,14 @@
 
 import { useMemo, useState } from "react"
 import {
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Download,
   Flame,
   MapPin,
   Pin,
+  Sparkles,
   Star,
   ThermometerSnowflake,
   ThermometerSun,
@@ -28,6 +30,10 @@ interface TargetListProps {
   pinnedNpis?: Set<string>
   onPin?: (npi: string) => void
   onUnpin?: (npi: string) => void
+  intelAvailable?: Set<string>
+  reviewedNpis?: Set<string>
+  onMarkReviewed?: (npi: string) => void
+  onUnmarkReviewed?: (npi: string) => void
   className?: string
 }
 
@@ -204,10 +210,16 @@ export function TargetList({
   pinnedNpis,
   onPin,
   onUnpin,
+  intelAvailable,
+  reviewedNpis,
+  onMarkReviewed,
+  onUnmarkReviewed,
   className,
 }: TargetListProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [tierFilter, setTierFilter] = useState<TierFilter>("all")
+  const [intelOnly, setIntelOnly] = useState(false)
+  const [hideReviewed, setHideReviewed] = useState(false)
 
   const tierCounts = useMemo(() => {
     const counts: Record<RankedTarget["tier"], number> = {
@@ -222,10 +234,23 @@ export function TargetList({
     return counts
   }, [targets])
 
+  const intelCount = useMemo(() => {
+    if (!intelAvailable || intelAvailable.size === 0) return 0
+    return targets.reduce((acc, target) => acc + (intelAvailable.has(target.npi) ? 1 : 0), 0)
+  }, [targets, intelAvailable])
+
+  const reviewedCount = useMemo(() => {
+    if (!reviewedNpis || reviewedNpis.size === 0) return 0
+    return targets.reduce((acc, target) => acc + (reviewedNpis.has(target.npi) ? 1 : 0), 0)
+  }, [targets, reviewedNpis])
+
   const filtered = useMemo(() => {
-    if (tierFilter === "all") return targets
-    return targets.filter((target) => target.tier === tierFilter)
-  }, [targets, tierFilter])
+    let out = targets
+    if (tierFilter !== "all") out = out.filter((target) => target.tier === tierFilter)
+    if (intelOnly && intelAvailable) out = out.filter((target) => intelAvailable.has(target.npi))
+    if (hideReviewed && reviewedNpis) out = out.filter((target) => !reviewedNpis.has(target.npi))
+    return out
+  }, [targets, tierFilter, intelOnly, intelAvailable, hideReviewed, reviewedNpis])
 
   const toggleExpanded = (npi: string) => {
     setExpanded((current) => {

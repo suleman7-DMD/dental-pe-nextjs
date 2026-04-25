@@ -65,6 +65,28 @@ export async function getPracticeIntelByNpi(
   return data as PracticeIntel;
 }
 
+export async function getPracticeIntelAvailability(
+  supabase: SupabaseClient,
+  npis: string[]
+): Promise<Set<string>> {
+  if (npis.length === 0) return new Set();
+  const available = new Set<string>();
+  const CHUNK = 200;
+  for (let i = 0; i < npis.length; i += CHUNK) {
+    const slice = npis.slice(i, i + CHUNK);
+    const { data, error } = await supabase
+      .from("practice_intel")
+      .select("npi")
+      .in("npi", slice);
+    if (error) throw error;
+    (data ?? []).forEach((row) => {
+      const npi = (row as { npi?: string | null }).npi;
+      if (npi) available.add(npi);
+    });
+  }
+  return available;
+}
+
 export async function getIntelStats(
   supabase: SupabaseClient
 ): Promise<IntelStats> {

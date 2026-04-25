@@ -123,4 +123,33 @@ export const LIVING_LOCATIONS: Record<string, LivingLocation> = {
       "60714", "60803", "60804", "60805", "60827",
     ],
   },
+  // ---- Boston Metro sub-presets (21 watched ZIPs from Supabase, verified 2026-04-24) ----
+  "Boston Core": {
+    // Back Bay, South End, Roxbury, Mission Hill, Fenway, Allston, Brighton
+    center_zip: "02116",
+    center_lat: 42.35,
+    center_lon: -71.09,
+    commutable_zips: ["02115", "02116", "02118", "02119", "02120", "02134", "02135", "02215"],
+  },
+  "Cambridge + Somerville": {
+    // Cambridge (5 ZIPs) + Somerville
+    center_zip: "02139",
+    center_lat: 42.37,
+    center_lon: -71.10,
+    commutable_zips: ["02138", "02139", "02140", "02141", "02142", "02144"],
+  },
+  "Brookline + Fenway": {
+    // Brookline, Chestnut Hill
+    center_zip: "02446",
+    center_lat: 42.34,
+    center_lon: -71.13,
+    commutable_zips: ["02445", "02446", "02467"],
+  },
+  "Newton + Waltham": {
+    // Newton, Waltham
+    center_zip: "02458",
+    center_lat: 42.36,
+    center_lon: -71.22,
+    commutable_zips: ["02451", "02453", "02458", "02459"],
+  },
 };

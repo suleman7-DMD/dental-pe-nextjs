@@ -39,13 +39,27 @@ const DEFAULT_WEIGHTS: ComponentWeights = {
   enrichment: 10,
   recentChange: -10,
   corporatePenalty: -30,
-  phantomInventory: 10,
+  phantomInventory: -12,
   familyDynastyPenalty: -12,
   peerPercentile: 12,
   marketTailwind: 8,
   dealCatchment: -10,
   stealthDsoPenalty: -15,
 };
+
+const CONFIDENCE_CAP = 70;
+const CONFIDENCE_FLOOR = 40;
+
+function hasThinData(practice: WarroomPracticeRecord): boolean {
+  if ((practice.classification_confidence ?? 0) < CONFIDENCE_FLOOR) return true;
+  const enrichmentSignals = [
+    practice.data_axle_import_date,
+    practice.year_established,
+    practice.employee_count,
+    practice.estimated_revenue,
+  ].filter((value) => value != null).length;
+  return enrichmentSignals === 0;
+}
 
 const LENS_WEIGHT_MULTIPLIERS: Record<WarroomLens, Partial<ComponentWeights>> = {
   consolidation: {
@@ -237,7 +251,7 @@ function phantomInventoryComponent(
     label: "Phantom inventory",
     weight,
     contribution,
-    reasoning: "Listed but missing digital footprint — verify status before outreach.",
+    reasoning: "Listed but no phone/website — likely inactive or stale data, dampening score.",
   };
 }
 
@@ -574,6 +588,7 @@ export interface RankTargetsOptions {
   lens?: WarroomLens;
   weights?: Partial<ComponentWeights>;
   excludeCorporate?: boolean;
+  excludeNonGp?: boolean;
   requireFlags?: string[];
   excludeFlags?: string[];
   confidence?: "all" | "high" | "medium" | "low";
@@ -600,6 +615,10 @@ export function rankTargets(
   const weights: ComponentWeights = { ...baseWeights, ...options.weights };
   const requireFlagSet = new Set(options.requireFlags ?? []);
   const excludeFlagSet = new Set(options.excludeFlags ?? []);
+  const intentEntityFilter = options.intentFilter?.entityClassifications ?? [];
+  const intentRequestsSpecialist = intentEntityFilter.includes("specialist");
+  const intentRequestsNonClinical = intentEntityFilter.includes("non_clinical");
+  const excludeNonGp = options.excludeNonGp !== false;
 
   const ranked = candidates
     .map<RankedTarget | null>((candidate) => {
@@ -609,6 +628,10 @@ export function rankTargets(
       const matchFlags = [...flags, `ownership:${ownership}`];
 
       if (options.excludeCorporate && ownership === "corporate") return null;
+      if (excludeNonGp) {
+        if (practice.entity_classification === "specialist" && !intentRequestsSpecialist) return null;
+        if (practice.entity_classification === "non_clinical" && !intentRequestsNonClinical) return null;
+      }
       if (!matchesConfidenceFilter(practice.classification_confidence, options.confidence)) return null;
       if (!candidateMatchesIntentFilter(candidate, ownership, flags, options.intentFilter)) return null;
 
@@ -635,7 +658,17 @@ export function rankTargets(
       ];
 
       const raw = components.reduce((sum, component) => sum + component.contribution, 0);
-      const score = clamp(raw + 50, 0, 100);
+      let score = clamp(raw + 50, 0, 100);
+      const thinData = hasThinData(practice);
+      if (thinData && score > CONFIDENCE_CAP) {
+        score = CONFIDENCE_CAP;
+        components.push({
+          label: "Confidence cap",
+          weight: 0,
+          contribution: 0,
+          reasoning: `Capped at ${CONFIDENCE_CAP} — thin data (low classification confidence and no enrichment).`,
+        });
+      }
       const tier = tierFromScore(score);
 
       if (!tierMeetsFloor(tier, options.intentFilter?.minTier ?? null)) return null;

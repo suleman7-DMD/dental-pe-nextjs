@@ -35,6 +35,7 @@ import {
   type LaunchpadTier,
 } from "@/lib/launchpad/signals"
 import { isZipCommutable } from "@/lib/launchpad/scope"
+import { ZipMoodBadge } from "./zip-mood-badge"
 
 interface ZipDossierDrawerProps {
   zipCode: string | null
@@ -211,6 +212,26 @@ export function LaunchpadZipDossierDrawer({
               Confidence: {confidenceLabel}
             </span>
           </div>
+          {/* ZIP mood badge — AI market sentiment */}
+          <ZipMoodBadge
+            zipCode={zipCode}
+            zipContext={{
+              metro: metro,
+              market_type: marketType,
+              corporate_share_pct: corporateSharePct,
+              dld_gp_per_10k: density,
+              buyable_practice_ratio: buyableRatio,
+              commutable: commutable,
+              metrics_confidence: zipScore?.metrics_confidence ?? null,
+              population: population,
+              median_household_income: medianIncome,
+            }}
+            practiceStats={{
+              total: totalInZip,
+              mentor_rich_count:
+                tierCounts.best_fit + tierCounts.strong,
+            }}
+          />
           <div>
             <SheetTitle className="text-xl font-bold text-[#1A1A1A]">
               {locationLine}

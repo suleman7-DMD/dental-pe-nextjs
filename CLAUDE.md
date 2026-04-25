@@ -489,6 +489,70 @@ Phase 1 MVP of Launchpad (first-job finder for new dental grads) shipped on 2026
 - `PinboardPanel` MUST render nothing when pin list is empty (don't show an empty "no pins" placeholder above the red-flag matrix).
 - Red-flag heatmap uses `presentSignals` (only rendered warnings with at least one hit), not the full 8-item `WARNING_SIGNALS` set — keeps matrix dense when signals are rare.
 
+### Phase 3 shipped (2026-04-25) — qualitative-intel-driven first-job copilot
+
+Six Claude API routes layered onto the existing rank-and-score scaffold, plus a signal-firing audit that fixed several silently-broken signals.
+
+| Area | Delivered |
+|------|-----------|
+| Shared types | `src/lib/launchpad/ai-types.ts` — 6 request/response pairs (PracticeSnapshot, ZipContext, IntelContext, TrackScores, AskIntel, CompoundNarrative, InterviewPrep, ZipMood, SmartBriefing, ContractParse). Single source of truth for both routes and clients. |
+| Routes | 6 new POST routes under `src/app/api/launchpad/`. All Node runtime, force-dynamic, raw HTTP fetch (no SDK), 503 on missing `ANTHROPIC_API_KEY`. Models: Haiku 4.5 for `ask`, `compound-narrative`, `interview-prep`, `zip-mood`, `contract-parse`; Sonnet 4.6 for `smart-briefing`. `contract-parse` has 5/hr per-IP rate limit. |
+| Ask Intel drawer | `ask-intel-drawer.tsx` — Sheet triggered from dossier header. Free-form Q&A about a practice/ZIP. 3 starter chips. Model attribution badge. |
+| Interview Prep AI | `interview-prep-ai.tsx` — replaces the static Phase 1 Interview Prep tab. `useQuery` cached per `(npi, track)`, 5min staleTime. Categorized questions with bold Q + italic listenFor. Regenerate button. |
+| Contract Parser | `contract-parser.tsx` — new 6th dossier tab. Textarea (≥500 chars to submit, matches route minimum), structured output (non-compete, comp, termination, CE, restrictive covenants, severity-color flags). 429 → "Rate limit reached, retry in N min". Lock disclaimer ("text is not saved"). |
+| Compound Thesis | `compound-thesis.tsx` — collapsible 2-3-sentence thesis embedded in each track-list card. Lazy fetch on expand only. AI badge. |
+| ZIP Mood badge | `zip-mood-badge.tsx` — auto-fetches in ZIP dossier header. 2-sentence vibe + colored confidence dot. 30min cache. |
+| Smart Briefing | `smart-briefing-builder.tsx` — Sheet triggered when ≥2 NPIs pinned. Multi-select up to 5 (matches route cap). Sonnet 4.6 returns side-by-side strengths/risks/questions + top-pick recommendation with rationale. |
+| DSO Tier card | `dso-tier-card.tsx` — extracted reusable card showing tier badge, comp band, rationale, citations. Graceful fallback with mailto for unknown DSOs. |
+| Living Map upgrade | Default ZIP view, 2 new lenses (Mentor Density, DSO Avoid) with color ramps, data-quality amber banner when `metrics_confidence === 'low'` for selected ZIP. |
+| Boston Metro presets | 4 new scopes added to `LAUNCHPAD_SCOPES`: `boston_core` (8 ZIPs), `cambridge_somerville` (6), `brookline_fenway` (3), `newton_waltham` (4). All 21 ZIPs verified against `watched_zips` table. |
+| Intel Coverage KPI | `launchpad-kpi-strip.tsx` — replaced "comp range" KPI (always-flat) with `withIntelCount / totalCount` Brain-icon KPI. Tooltip explains 0% case → run `python3 scrapers/practice_deep_dive.py`. |
+| Saved searches removed | `saved-searches-menu.tsx` + `use-launchpad-saved-searches.ts` deleted. Pinboard + Smart Briefing replaced its job with stronger UX. |
+
+### Signal-firing audit fixes (Phase 3)
+
+| File | Bug | Fix |
+|------|-----|-----|
+| `queries/launchpad.ts:269` | `recent_acquisition_warning` SQL filter `.ilike("change_type", "%ownership%")` matched 0 rows because actual column values are `acquisition` | `.ilike("change_type", "%acquisition%")` — 4,258 rows now fire |
+| `ranking.ts:239` | `ffs_concierge` only checked `intel?.ppo_heavy === false` — missed practices that take Medicaid (which is the FFS-killer signal) | `intel?.ppo_heavy === false && intel?.accepts_medicaid === false` |
+| `ranking.ts:273` | `mentor_density` threshold `>= 5` too high for the dataset's actual provider distribution | Threshold `>= 3` (still meaningful, fires more often) |
+| `ranking.ts:334` | `pe_recap_volatility` had a ZIP-proximity check that blocked it from firing on the actual practice with PE sponsorship | Removed the proximity check; fires on `practice.affiliated_pe_sponsor` truthy |
+| `signals.ts:191` | `succession_published` baseWeight `35` was overweight — it's a strong signal but not 35-points strong | Baseline `15` |
+| `signals.ts:270` | New export `SIGNALS_REQUIRING_INTEL` (5 IDs: `hiring_now`, `succession_published`, `tech_modern`, `ffs_concierge`, `medicaid_mill`) — gates these signals from firing on practices without `practice_intel` row, preventing false positives in the absence of qualitative research |
+| `red-flag-patterns.tsx` | Heatmap matrix wasn't earning its complexity — most ZIPs had sparse co-occurrence, so the matrix rendered as a near-empty grid | Removed heatmap (293 → 172 lines), kept compound-targets list which is the actually-useful part |
+
+### Backend (Python scrapers)
+
+- `research_engine.py` — added `JOB_HUNT_SYSTEM` + `JOB_HUNT_PRACTICE_USER` prompts, `research_practice_jobhunt()` method, `build_batch_requests_jobhunt()` for batch API
+- `database.py` — 7 new `PracticeIntel` columns (`succession_intent_detected`, `new_grad_friendly_score`, `mentorship_signals`, `associate_runway`, `compensation_signals`, `red_flags_for_grad`, `green_flags_for_grad`)
+- `intel_database.py` — `store_practice_intel()` updated to map new columns
+- `migrations/2026_04_24_launchpad_jobhunt_columns.sql` — Postgres DDL for Supabase mirror (must be applied manually before first sync)
+
+### Cost reality (verified, supersedes earlier estimates)
+
+- Haiku per ZIP: ~$0.024 (NOT $0.04-0.06 as CLAUDE.md previously claimed)
+- Haiku per practice: ~$0.011 (NOT $0.08-0.12)
+- $30 budget → ~2,000 practice deep dives (NOT 300)
+- 258 of 290 `zip_qualitative_intel` rows are synthetic placeholders (cost_usd=0) — only 32 ZIPs are actually researched
+- 23 of 401k practices have real `practice_intel` — Intel Coverage KPI honestly reflects this small denominator
+
+### Do not regress (Phase 3)
+
+- All 6 AI routes MUST return 503 (not 500) when `ANTHROPIC_API_KEY` missing; the UI surfaces the message verbatim.
+- All 6 AI routes MUST use raw HTTP `fetch` (not `@anthropic-ai/sdk`). Matches `narrative/route.ts` pattern. Fewer dependencies, faster cold starts.
+- `contract-parse` MUST keep the 5/hr per-IP rate limit. Sonnet/Haiku contract analysis is expensive AND the input is large; rate-limit prevents a single user spending the whole monthly budget.
+- `smart-briefing` cap is 5 practices server-side AND client-side — keep them in sync (`MAX_SELECTED = 5` in client, `> 5` reject in route).
+- `contract-parser` `MIN_CHARS = 500` MUST match route's `MIN_CONTRACT_LEN = 500` — the button shouldn't enable until the route would accept the input.
+- `SIGNALS_REQUIRING_INTEL` MUST gate the 5 named signals from firing without intel — prevents false positives on the 99.99% of practices without research.
+- `recent_acquisition_warning` SQL filter MUST use `%acquisition%` — `%ownership%` matches 0 rows in `practice_changes.change_type`.
+- Boston Metro 4 presets MUST cover the 21 watched ZIPs — `boston_core` (8) + `cambridge_somerville` (6) + `brookline_fenway` (3) + `newton_waltham` (4) = 21 ✓
+
+### User actions required after deploy
+
+1. Add `ANTHROPIC_API_KEY` to Vercel env vars (production + preview environments)
+2. Apply `dental-pe-tracker/scrapers/migrations/2026_04_24_launchpad_jobhunt_columns.sql` to Supabase Postgres (SQL editor → paste → run)
+3. Authorize an initial seeding run: `python3 scrapers/weekly_research.py --budget 30 --jobhunt`
+
 ## Development
 
 ```bash
