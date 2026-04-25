@@ -88,6 +88,47 @@ function ConfidenceBadge({ confidence }: { confidence: string | null | undefined
   )
 }
 
+// ── Verification badge (anti-hallucination evidence quality) ──────────────────
+
+function VerificationBadge({
+  quality,
+  searches,
+}: {
+  quality: string | null | undefined
+  searches?: number | null
+}) {
+  const q = (quality ?? '').toLowerCase()
+  let bg = 'bg-gray-500/10 text-[#707064]'
+  let label = quality ?? '—'
+  let title = 'Evidence quality not recorded'
+  if (q === 'verified') {
+    bg = 'bg-green-500/10 text-[#2D8B4E]'
+    label = 'Verified'
+    title = `Verified: every claim cited (${searches ?? '?'} web searches)`
+  } else if (q === 'partial') {
+    bg = 'bg-amber-500/10 text-[#D4920B]'
+    label = 'Partial'
+    title = `Partial: some claims cited (${searches ?? '?'} web searches)`
+  } else if (q === 'insufficient') {
+    bg = 'bg-red-500/10 text-[#C23B3B]'
+    label = 'Insufficient'
+    title = 'Insufficient evidence — would have been quarantined'
+  } else if (q === 'high') {
+    // Pre-§16 enum-drift coercion already happens server-side; show neutrally if it leaks through
+    bg = 'bg-amber-500/10 text-[#D4920B]'
+    label = 'Partial'
+    title = `Coerced from "high" (${searches ?? '?'} web searches)`
+  }
+  return (
+    <span
+      className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${bg}`}
+      title={title}
+    >
+      {label}
+    </span>
+  )
+}
+
 // ── Readiness badge ──────────────────────────────────────────────────────────
 
 function ReadinessBadge({ readiness }: { readiness: string | null | undefined }) {
@@ -262,6 +303,16 @@ export function IntelligenceShell({
         key: 'confidence',
         header: 'Confidence',
         render: (val: string | null) => <ConfidenceBadge confidence={val} />,
+      },
+      {
+        key: 'verification_quality',
+        header: 'Evidence',
+        render: (val: string | null, row?: PracticeIntel) => (
+          <VerificationBadge
+            quality={val}
+            searches={row && typeof row === 'object' ? row.verification_searches : null}
+          />
+        ),
       },
       {
         key: 'google_rating',
@@ -790,6 +841,18 @@ export function IntelligenceShell({
                 </span>
                 <span>
                   Confidence: <ConfidenceBadge confidence={selectedPractice.confidence} />
+                </span>
+                <span>
+                  Evidence:{' '}
+                  <VerificationBadge
+                    quality={selectedPractice.verification_quality}
+                    searches={selectedPractice.verification_searches}
+                  />
+                  {selectedPractice.verification_searches != null && (
+                    <span className="ml-1 text-[#707064]">
+                      ({selectedPractice.verification_searches} searches)
+                    </span>
+                  )}
                 </span>
                 <span>Method: {selectedPractice.research_method ?? '\u2014'}</span>
                 <span>Model: {selectedPractice.model_used ?? '\u2014'}</span>
