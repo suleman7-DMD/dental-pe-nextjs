@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { CompoundNarrativeRequest, CompoundNarrativeResponse } from "@/lib/launchpad/ai-types"
 import { getSupabaseServerClient } from "@/lib/supabase/server"
-import { getPracticeIntelByNpi } from "@/lib/supabase/queries/intel"
-import type { PracticeIntel } from "@/lib/types/intel"
+import { getPracticeIntelByNpi, getZipIntelByZip } from "@/lib/supabase/queries/intel"
+import type { PracticeIntel, ZipQualitativeIntel } from "@/lib/types/intel"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -77,15 +77,18 @@ const SYSTEM_PROMPT = [
   "You are a dental private-equity pattern analyst writing a verified investment thesis for a new graduate evaluating this practice.",
   "",
   "NON-NEGOTIABLE RULES:",
-  "- Every claim must come from either (a) a structural fact stated in the user message, or (b) a verified URL with [source: domain] citation pulled from the supplied URL list.",
+  "- Every claim must come from either (a) a structural fact stated in the user message, or (b) a verified URL with [source: domain] citation pulled from the supplied URL list (practice-level URLs and ZIP-level URLs both qualify).",
   "- If neither (a) nor (b) supports a claim, OMIT the claim. Never produce filler analysis to hit a word count.",
   "- Never paraphrase a signal ID into a fact. \"mentor_density\" is a signal label, not evidence of mentorship.",
   "- Never invent doctor names, ages, retirement intent, review counts, or technology lists.",
+  "- Never invent market-level claims (population growth, home price trends, new competitors, employer presence). These require a ZIP-source URL citation from the cite-able ZIP list. If no ZIP intel is provided, omit market-level commentary entirely.",
   "- Reviews/ratings: only cite if a Google or Healthgrades URL is in the source list.",
+  "- When ZIP market intelligence is provided, integrate at least one substantive market-level fact alongside practice-level evidence so the thesis reflects both supply/demand context and target-specific structure.",
   "",
   "FORMAT:",
   "- Plain prose, no headers, no bullets.",
-  "- 100-150 words when evidence quality is verified.",
+  "- 120-170 words when evidence quality is verified AND ZIP intel is provided.",
+  "- 100-150 words when evidence quality is verified WITHOUT ZIP intel.",
   "- ≤80 words when evidence quality is partial — recite verified facts only.",
   "- Frame the conclusion in terms of fit for the requested track (succession / high_volume / dso).",
 ].join("\n")
@@ -93,6 +96,7 @@ const SYSTEM_PROMPT = [
 function buildUserPrompt(
   body: CompoundNarrativeRequest,
   intel: PracticeIntel,
+  zipIntel: ZipQualitativeIntel | null,
   evidenceQuality: "verified" | "partial" | "high"
 ): string {
   const { practice: p, signals, scores, track } = body
@@ -104,6 +108,7 @@ function buildUserPrompt(
   const verUrls = parseUrls(intel.verification_urls).slice(0, 8)
   const services = parseList(intel.services_listed).slice(0, 6)
   const techs = parseList(intel.technology_listed).slice(0, 6)
+  const zipUrls = zipIntel ? parseUrls(zipIntel.sources).slice(0, 6) : []
 
   const lines: string[] = [
     `# Practice`,
@@ -142,6 +147,57 @@ function buildUserPrompt(
     redFlags.length > 0 ? `- Red flags: ${redFlags.slice(0, 5).join("; ")}` : "",
     ``,
   ]
+
+  if (zipIntel) {
+    lines.push(
+      `# ZIP market intelligence (zip ${zipIntel.zip_code}, researched ${zipIntel.research_date ?? "unknown date"})`,
+      `- Demand outlook: ${zipIntel.demand_outlook ?? "n/a"}`,
+      `- Supply outlook: ${zipIntel.supply_outlook ?? "n/a"}`,
+      `- Investment thesis (analyst-curated): ${zipIntel.investment_thesis ?? "n/a"}`,
+      `- Confidence: ${zipIntel.confidence ?? "n/a"}`
+    )
+    const realEstateBits: string[] = []
+    if (zipIntel.median_home_price != null)
+      realEstateBits.push(`median home $${zipIntel.median_home_price.toLocaleString()}`)
+    if (zipIntel.home_price_yoy_pct != null)
+      realEstateBits.push(`${zipIntel.home_price_yoy_pct}% YoY`)
+    if (zipIntel.home_price_trend) realEstateBits.push(`trend ${zipIntel.home_price_trend}`)
+    if (realEstateBits.length > 0) lines.push(`- Real estate: ${realEstateBits.join(", ")}`)
+    if (zipIntel.pop_growth_signals)
+      lines.push(`- Population growth: ${zipIntel.pop_growth_signals}`)
+    if (zipIntel.pop_demographics) lines.push(`- Demographics: ${zipIntel.pop_demographics}`)
+    if (zipIntel.major_employers) lines.push(`- Major employers: ${zipIntel.major_employers}`)
+    if (zipIntel.dental_new_offices)
+      lines.push(`- New dental offices nearby: ${zipIntel.dental_new_offices}`)
+    if (zipIntel.dental_dso_moves) lines.push(`- Recent DSO moves: ${zipIntel.dental_dso_moves}`)
+    if (zipIntel.competitor_new) lines.push(`- New competitors: ${zipIntel.competitor_new}`)
+    if (zipIntel.competitor_closures)
+      lines.push(`- Recent closures: ${zipIntel.competitor_closures}`)
+    if (zipIntel.housing_status || zipIntel.housing_summary) {
+      lines.push(
+        `- Housing: ${[zipIntel.housing_status, zipIntel.housing_summary].filter(Boolean).join(" — ")}`
+      )
+    }
+    if (zipIntel.school_district || zipIntel.school_rating) {
+      lines.push(
+        `- Schools: ${[zipIntel.school_district, zipIntel.school_rating].filter(Boolean).join(" rated ")}`
+      )
+    }
+    if (zipUrls.length > 0) {
+      lines.push(
+        ``,
+        `# Cite-able ZIP source URLs (use [source: domain] for market-level claims):`,
+        ...zipUrls.map((u) => `- ${u} (cite as [source: ${shortDomain(u)}])`),
+        `Substantive market-level claims (population, home prices, employers, competitors) require [source: ...] from this list.`
+      )
+    } else {
+      lines.push(
+        ``,
+        `# ZIP source URLs: (none on file — market-level claims must be omitted unless covered by the demand/supply/investment_thesis fields above)`
+      )
+    }
+    lines.push(``)
+  }
 
   if (verUrls.length > 0) {
     lines.push(
@@ -235,6 +291,7 @@ function getNumericVariants(rawClaim: string, numStr: string): string[] {
 
 function buildValidationHaystack(
   intel: PracticeIntel,
+  zipIntel: ZipQualitativeIntel | null,
   practice: CompoundNarrativeRequest["practice"]
 ): string {
   const currentYear = new Date().getFullYear()
@@ -258,6 +315,19 @@ function buildValidationHaystack(
     const year = parseInt(ym[1], 10)
     const age = currentYear - year
     if (age > 0 && age < 100) parts.push(String(age))
+  }
+
+  if (zipIntel) {
+    parts.push(JSON.stringify(zipIntel))
+    if (zipIntel.median_home_price != null) parts.push(String(zipIntel.median_home_price))
+    if (zipIntel.home_price_yoy_pct != null) parts.push(String(zipIntel.home_price_yoy_pct))
+    const zipJson = JSON.stringify(zipIntel)
+    const zipYearMatches = zipJson.matchAll(/\b(19\d{2}|20\d{2})\b/g)
+    for (const ym of zipYearMatches) {
+      const year = parseInt(ym[1], 10)
+      const age = currentYear - year
+      if (age > 0 && age < 100) parts.push(String(age))
+    }
   }
 
   return parts.join(" ")
@@ -375,15 +445,37 @@ export async function POST(
   }
 
   let intel: PracticeIntel | null = null
+  let zipIntel: ZipQualitativeIntel | null = null
   try {
     const supabase = getSupabaseServerClient()
-    intel = await getPracticeIntelByNpi(supabase, body.practice.npi)
+    const [intelResult, zipIntelResult] = await Promise.allSettled([
+      getPracticeIntelByNpi(supabase, body.practice.npi),
+      body.practice.zip
+        ? getZipIntelByZip(supabase, body.practice.zip)
+        : Promise.resolve(null),
+    ])
+    if (intelResult.status === "fulfilled") {
+      intel = intelResult.value
+    } else {
+      console.warn(
+        `[compound-narrative] practice_intel fetch failed for npi=${body.practice.npi}:`,
+        intelResult.reason instanceof Error ? intelResult.reason.message : intelResult.reason
+      )
+    }
+    if (zipIntelResult.status === "fulfilled") {
+      zipIntel = zipIntelResult.value
+    } else {
+      console.warn(
+        `[compound-narrative] zip_qualitative_intel fetch failed for zip=${body.practice.zip}:`,
+        zipIntelResult.reason instanceof Error ? zipIntelResult.reason.message : zipIntelResult.reason
+      )
+    }
   } catch (err) {
     console.warn(
-      `[compound-narrative] practice_intel fetch failed for npi=${body.practice.npi}:`,
+      `[compound-narrative] supabase client init failed:`,
       err instanceof Error ? err.message : err
     )
-    // Fall through with intel=null — handled by gate below
+    // Fall through with intel=null and zipIntel=null — handled by gate below
   }
 
   const intelQuality = intel?.verification_quality ?? null
@@ -419,8 +511,8 @@ export async function POST(
         ? MAX_TOKENS_PARTIAL // no-URL path is also short
         : MAX_TOKENS_VERIFIED
 
-  const userPrompt = buildUserPrompt(body, intel!, evidenceQuality)
-  const haystack = buildValidationHaystack(intel!, body.practice)
+  const userPrompt = buildUserPrompt(body, intel!, zipIntel, evidenceQuality)
+  const haystack = buildValidationHaystack(intel!, zipIntel, body.practice)
 
   const r1 = await callAnthropic(apiKey, userPrompt, maxTokens)
   if (!r1.ok) {
