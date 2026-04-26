@@ -99,6 +99,13 @@ function MarketIntelShellInner({
 
   // Compute KPI values
   const kpis = useMemo(() => {
+    // Location-deduped clinic count (sum of total_gp_locations across active ZIPs).
+    // Collapses NPI-1 + NPI-2 + suite-variant rows at the same physical building.
+    const totalGpLocations = zipScores
+      .map((z) => z.total_gp_locations)
+      .filter((v): v is number => v != null && !isNaN(v))
+      .reduce((a, b) => a + b, 0)
+
     if (selectedMetro === 'All Watched ZIPs') {
       const { total, corporate, corporateHighConf, independent, unknown } = classificationCounts
       if (total === 0) return null
@@ -106,6 +113,7 @@ function MarketIntelShellInner({
       const allSignalsPct = (corporate / total) * 100
       return {
         totalP: total,
+        totalGpLocations,
         corporateHighConf,
         corporateAll: corporate,
         indepCount: independent,
@@ -139,6 +147,7 @@ function MarketIntelShellInner({
 
     return {
       totalP,
+      totalGpLocations,
       corporateHighConf,
       corporateAll: corporateCount,
       indepCount,
@@ -217,7 +226,22 @@ function MarketIntelShellInner({
           {kpis ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard label="Total Practices" value={formatNumber(kpis.totalP)} />
+                <KpiCard
+                  label="Tracked Clinics"
+                  value={
+                    kpis.totalGpLocations > 0
+                      ? formatNumber(kpis.totalGpLocations)
+                      : formatNumber(kpis.totalP)
+                  }
+                  subtitle={
+                    kpis.totalGpLocations > 0 ? (
+                      <span className="text-xs text-[#6B6B60]">
+                        {formatNumber(kpis.totalP)} NPI rows
+                      </span>
+                    ) : undefined
+                  }
+                  tooltip="Physical clinic count after deduping by address — the honest 'how many clinics' denominator. Subtitle shows raw NPI rows from federal NPPES (counts individual dentists + organization rows registered separately at the same address)."
+                />
                 <KpiCard
                   label="Known Corporate"
                   value={formatPct(kpis.highConfPct)}

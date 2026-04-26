@@ -318,16 +318,20 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <KpiCard
             icon={<Hospital className="h-4 w-4" />}
-            label="Total Practices"
-            value={summary.totalPractices.toLocaleString()}
+            label="Tracked Clinics"
+            value={
+              summary.totalGpLocations && summary.totalGpLocations > 0
+                ? summary.totalGpLocations.toLocaleString()
+                : summary.totalPractices.toLocaleString()
+            }
             subtitle={
               summary.totalGpLocations && summary.totalGpLocations > 0 ? (
                 <span className="text-xs text-[#6B6B60]">
-                  {summary.totalGpLocations.toLocaleString()} GP clinics in watched ZIPs
+                  {summary.totalPractices.toLocaleString()} NPI rows in watched ZIPs
                 </span>
               ) : undefined
             }
-            tooltip="NPI-row count from federal NPPES data (includes individual dentists + organization rows registered separately at the same building). The subtitle shows physical-clinic count after deduping by address — the honest 'how many clinics' number for watched ZIPs."
+            tooltip="Physical clinic count in watched ZIPs after deduping by address — the honest 'how many clinics' denominator. Subtitle shows raw NPI-row count from federal NPPES (includes individual dentists + organization rows registered separately at the same building)."
           />
           <KpiCard
             icon={<BarChart3 className="h-4 w-4" />}

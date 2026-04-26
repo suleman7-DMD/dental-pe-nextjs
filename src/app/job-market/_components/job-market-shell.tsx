@@ -569,16 +569,20 @@ function JobMarketShellInner({
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <KpiCard
               icon={<Hospital className="h-5 w-5" />}
-              label="Total Practices"
-              value={kpiDisplay.total_p.toLocaleString()}
+              label="Tracked Clinics"
+              value={
+                kpiDisplay.gpLocations > 0
+                  ? kpiDisplay.gpLocations.toLocaleString()
+                  : kpiDisplay.total_p.toLocaleString()
+              }
               subtitle={
                 kpiDisplay.gpLocations > 0 ? (
                   <span className="text-xs text-[#6B6B60]">
-                    {kpiDisplay.gpLocations.toLocaleString()} GP clinics
+                    {kpiDisplay.total_p.toLocaleString()} NPI rows
                   </span>
                 ) : undefined
               }
-              tooltip="Top number is raw NPI rows from federal NPPES (counts individual dentists + organization rows registered separately at the same address). Subtitle shows physical-clinic count after deduping by address — the honest 'how many clinics' number for this living location."
+              tooltip="Physical clinic count in this living location after deduping by address — the honest 'how many clinics' denominator. Subtitle shows raw NPI rows from federal NPPES (counts individual dentists + organization rows registered separately at the same address)."
             />
             <KpiCard
               icon={<CircleCheck className="h-5 w-5" />}
