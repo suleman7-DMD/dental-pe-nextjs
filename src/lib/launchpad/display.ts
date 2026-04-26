@@ -2,7 +2,7 @@ import type { LaunchpadPracticeRecord } from "./signals"
 
 type DisplayInput = Pick<
   LaunchpadPracticeRecord,
-  "doing_business_as" | "practice_name" | "provider_first_name" | "provider_last_name" | "npi"
+  "doing_business_as" | "practice_name" | "provider_last_name" | "npi"
 >
 
 function clean(value: string | null | undefined): string | null {
@@ -21,8 +21,7 @@ export function getPracticeDisplayName(practice: DisplayInput): string {
   if (name) return name
 
   const last = clean(practice.provider_last_name)
-  const first = clean(practice.provider_first_name)
-  if (last) return first ? `Dr. ${first} ${last}` : `Dr. ${last}`
+  if (last) return `Dr. ${last}`
 
   return `NPI ${practice.npi}`
 }
