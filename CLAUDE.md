@@ -421,6 +421,39 @@ Monthly NPPES refresh (first Sunday 6am): downloads federal provider data update
 
 Paired with `scrapers/sync_to_supabase.py` per-row savepoint fix so deals with `uix_deal_no_dup` IntegrityError hits don't abort the whole batch transaction. Before this pair of fixes, a single duplicate in the deals sync would roll back every queued row — so recent deal scrapes never reached Supabase.
 
+## Bug Fixes Applied (2026-04-26 Cross-Page KPI Audit) — Do Not Regress
+
+User reported "each page is showing different numbers for the same chicagoland zip" across Home, Job Market, Market Intel, Warroom, Launchpad, and Buyability. Root cause: each surface defined "scope" differently AND several headlines counted raw NPI rows instead of physical clinics. Five surgical fixes restore agreement; commit `0e67fc5`.
+
+| File | Fix |
+|------|-----|
+| `src/app/job-market/page.tsx` | `defaultLocationKey` now resolves to `"All Chicagoland"` (269 ZIPs) via explicit lookup. Was `Object.keys(LIVING_LOCATIONS)[0]` which silently returned `"West Loop / South Loop"` (142 ZIPs) — Job Market's KPIs disagreed with every other "Chicagoland" surface |
+| `src/lib/supabase/queries/practices.ts::getBuyabilityPractices` | New optional `zips?: string[]` parameter. When provided, scopes the query via `.in("zip", zips)`. Backward compatible — omitting `zips` preserves the global behavior |
+| `src/app/buyability/page.tsx` | Now fetches `getWatchedZips()` and passes the ZIP set into `getBuyabilityPractices`. Was pulling a global 500-row sample that ignored scope entirely |
+| `src/lib/launchpad/signals.ts` | `LaunchpadSummary` interface gains `totalGpLocations: number \| null` — location-deduped GP count (sum of `zip_scores.total_gp_locations` across scope ZIPs) |
+| `src/lib/supabase/queries/launchpad.ts` | `getLaunchpadBundle` now sums `total_gp_locations` from the existing `zipScores` fetch — no extra Supabase query needed. `null` when no scope ZIPs have a `zip_scores` row |
+| `src/app/launchpad/_components/launchpad-kpi-strip.tsx` | "GP clinics in scope" KPI displays `totalGpLocations` as the headline value with `totalPracticesInScope` as a subtitle ("X NPI rows"). Was showing the NPI count as the headline (~11,894 for All Chicagoland — ~2.7× the actual ~5,265 clinics) |
+| `src/lib/supabase/queries/warroom.ts::getScopedPractices` | Wired the previously-orphaned `dedupPracticesByLocation()` helper into the fetch path (after polygon filter, before sort/slice). Hunt mode was showing 14k NPI rows for Chicagoland while the Sitrep KPI strip (sourced from `practice_locations`) showed ~5.5k — same prospect appeared 2-3× in the target list |
+
+### Headline-denominator policy (do not regress)
+
+All "practice count" headline KPIs MUST use the location-deduped count as the primary number. Acceptable sources:
+- `zip_scores.total_gp_locations` (summed across scope ZIPs) — cheapest, used by Home / Market Intel / Job Market / Launchpad
+- `practice_locations` count query — used by Warroom Sitrep + Job Market server KPIs
+- `dedupPracticesByLocation(rows)` — used in-memory by Warroom Hunt list AFTER fetching raw `practices` rows
+
+The raw NPI row count belongs in subtitles only (e.g., "5,265 GP clinics · 14,053 NPI rows"). Phase A pattern from `732894f` is the model — read that commit if extending this to a new surface.
+
+### Scope-default policy (do not regress)
+
+Any page surfacing a Chicagoland headline KPI MUST resolve "Chicagoland" to the canonical 269-ZIP set. Acceptable resolutions:
+- `getWatchedZips()` filtered to `state IN ('IL')` (Home + Buyability)
+- `LIVING_LOCATIONS["All Chicagoland"].commutable_zips` (Job Market — explicit named lookup, NEVER `Object.keys(...)[0]`)
+- `LAUNCHPAD_SCOPES["chicagoland"]` resolved through `resolveLaunchpadZipCodes()` (Launchpad)
+- `WARROOM_SCOPES["chicagoland"]` (Warroom default scope)
+
+Single-subzone defaults (West Loop, Naperville, Bolingbrook, etc.) are valid for explicit user selection but MUST NOT be the page-load default.
+
 ## NPI vs Practice Conflation Fix (2026-04-25) — Do Not Regress
 
 A 3-part fix for the long-running NPI-row-as-practice vs physical-clinic-location confusion. NPPES emits 1 row per provider (NPI-1) AND 1 row per organization (NPI-2) at the same address — counting NPI rows as "practices" was inflating the watched-ZIP total ~2.7× (14,053 NPIs vs 5,265 GP clinic locations). Compounding this, the legacy `dso_classifier.py` Pass 3 was over-counting providers at shared phone numbers, classifying ~1,072 small/large/family groups as `dso_regional` purely because they shared a switchboard.
