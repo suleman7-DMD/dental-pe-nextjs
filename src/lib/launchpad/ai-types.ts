@@ -80,10 +80,21 @@ export interface CompoundNarrativeRequest {
   track: "succession" | "high_volume" | "dso" | "all"
 }
 
+export type LedgerCategory = "structural" | "operational" | "financial" | "market" | "signal"
+
+export interface LedgerAtom {
+  label: string
+  value: string
+  source_label: string
+  category: LedgerCategory
+  confidence: "high" | "medium" | "low"
+}
+
 export interface CompoundNarrativeResponse {
   thesis: string | null
   reason?: "no_verified_research" | "validation_failed"
   evidence_quality?: "verified" | "partial" | "high"
+  ledger?: LedgerAtom[]
   structural_summary?: {
     name: string
     entity_classification: string | null

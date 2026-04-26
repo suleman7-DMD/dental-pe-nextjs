@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import type { CompoundNarrativeRequest, CompoundNarrativeResponse } from "@/lib/launchpad/ai-types"
+import type {
+  CompoundNarrativeRequest,
+  CompoundNarrativeResponse,
+  LedgerAtom,
+} from "@/lib/launchpad/ai-types"
 import { getSupabaseServerClient } from "@/lib/supabase/server"
 import { getPracticeIntelByNpi, getZipIntelByZip } from "@/lib/supabase/queries/intel"
 import type { PracticeIntel, ZipQualitativeIntel } from "@/lib/types/intel"
@@ -32,15 +36,7 @@ interface AnthropicResponse {
   error?: { type: string; message: string }
 }
 
-type LedgerCategory = "structural" | "operational" | "financial" | "market" | "signal"
-
-interface LedgerAtom {
-  label: string
-  value: string
-  source_label: string
-  category: LedgerCategory
-  confidence: "high" | "medium" | "low"
-}
+// LedgerAtom + LedgerCategory imported from "@/lib/launchpad/ai-types" — shared with client
 
 function validateBody(raw: unknown): CompoundNarrativeRequest | null {
   if (!raw || typeof raw !== "object") return null
@@ -708,7 +704,7 @@ export async function POST(
     }
   }
   if (v1.ok) {
-    return NextResponse.json({ thesis: r1.text, evidence_quality: evidenceQuality })
+    return NextResponse.json({ thesis: r1.text, evidence_quality: evidenceQuality, ledger })
   }
 
   console.warn(
@@ -746,7 +742,7 @@ export async function POST(
     }
   }
   if (v2.ok) {
-    return NextResponse.json({ thesis: r2.text, evidence_quality: evidenceQuality })
+    return NextResponse.json({ thesis: r2.text, evidence_quality: evidenceQuality, ledger })
   }
 
   console.warn(

@@ -17,6 +17,7 @@ import type {
   TrackScores,
 } from "@/lib/launchpad/ai-types"
 import type { LaunchpadTrack } from "@/lib/launchpad/signals"
+import { LedgerCards } from "./ledger-cards"
 
 interface CompoundThesisProps {
   npi: string
@@ -268,16 +269,20 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
                 </p>
                 <RegenerateButton onClick={() => void refetch()} />
               </div>
+              {data.ledger && data.ledger.length > 0 && <LedgerCards atoms={data.ledger} />}
             </div>
           )}
 
           {isVerified && data && !isFetching && (
-            <div className="relative rounded-md border border-[#B8860B]/20 bg-gradient-to-br from-[#FEF9E7] to-[#FFFFFF] p-3 pr-12">
-              <AiBadge />
-              <p className="whitespace-pre-line text-[12px] leading-relaxed text-[#1A1A1A]">
-                {data.thesis}
-              </p>
-              <RegenerateButton onClick={() => void refetch()} />
+            <div className="space-y-2">
+              <div className="relative rounded-md border border-[#B8860B]/20 bg-gradient-to-br from-[#FEF9E7] to-[#FFFFFF] p-3 pr-12">
+                <AiBadge />
+                <p className="whitespace-pre-line text-[12px] leading-relaxed text-[#1A1A1A]">
+                  {data.thesis}
+                </p>
+                <RegenerateButton onClick={() => void refetch()} />
+              </div>
+              {data.ledger && data.ledger.length > 0 && <LedgerCards atoms={data.ledger} />}
             </div>
           )}
         </div>
