@@ -5,6 +5,7 @@ import type mapboxgl from 'mapbox-gl'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { MapContainer } from '@/components/maps/map-container'
 import { ZIP_CENTROIDS } from '@/lib/constants/zip-centroids'
+import { classifyPractice, getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
 
 import type { Practice } from '@/lib/types'
 
@@ -38,19 +39,22 @@ interface MapPractice {
 // Color constants
 // ────────────────────────────────────────────────────────────────────────────
 
+// Color buckets keyed by classifyPractice() return value (canonical EC-first helper).
+// "specialist" + "non_clinical" rendered separately so the headline GP dot map isn't
+// polluted by ortho/endo/labs.
 const STATUS_COLORS: Record<string, [number, number, number, number]> = {
   independent: [34, 197, 94, 180],
-  likely_independent: [34, 197, 94, 180],
-  dso_affiliated: [239, 68, 68, 200],
-  pe_backed: [239, 68, 68, 200],
+  corporate: [239, 68, 68, 200],
+  specialist: [13, 148, 136, 180], // teal
+  non_clinical: [156, 163, 175, 100], // muted gray
   unknown: [100, 116, 139, 80],
 }
 
 const STATUS_LABELS: Record<string, string> = {
   independent: 'Independent',
-  likely_independent: 'Likely Independent',
-  dso_affiliated: 'DSO Affiliated',
-  pe_backed: 'PE-Backed',
+  corporate: 'Corporate (DSO/PE)',
+  specialist: 'Specialist',
+  non_clinical: 'Non-Clinical',
   unknown: 'Unknown',
 }
 
@@ -253,13 +257,10 @@ export function PracticeDensityMap({
     const results: MapPractice[] = []
 
     for (const p of practices) {
-      // Use entity_classification to detect corporate practices that ownership_status misses
-      // dso_regional/dso_national from classifier are more accurate than ownership_status
+      // Canonical classification: entity_classification primary, ownership_status fallback.
+      // classifyPractice() returns "independent" | "corporate" | "specialist" | "non_clinical" | "unknown".
       const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      const isCorporateByEC = ec === 'dso_regional' || ec === 'dso_national'
-      const isIndependentByEC = ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group'].includes(ec)
-      const rawStatus = (p.ownership_status ?? 'unknown').trim().toLowerCase()
-      const status_clean = isCorporateByEC ? 'dso_affiliated' : isIndependentByEC ? 'independent' : rawStatus
+      const status_clean = classifyPractice(p.entity_classification, p.ownership_status)
       if (hideUnknown && status_clean === 'unknown') continue
 
       let lat: number | null = null
@@ -306,7 +307,9 @@ export function PracticeDensityMap({
         practice_name: p.practice_name ?? 'Unknown Practice',
         address: p.address ?? '--',
         city_zip: `${p.city ?? ''}, ${p.state ?? ''} ${(p.zip ?? '').toString().slice(0, 5)}`,
-        status_label: isCorporateByEC ? (ec === 'dso_national' ? 'DSO National' : 'DSO Regional') : (STATUS_LABELS[rawStatus] ?? 'Unknown'),
+        // Surface the granular EC label when present (e.g. "Solo High Volume", "DSO National");
+        // fall back to the bucket label for unclassified rows.
+        status_label: ec ? getEntityClassificationLabel(ec) ?? STATUS_LABELS[status_clean] : STATUS_LABELS[status_clean] ?? 'Unknown',
         dso: p.affiliated_dso ?? '--',
         employees: emp ? emp.toString() : '--',
         year:
@@ -321,11 +324,11 @@ export function PracticeDensityMap({
     return results
   }, [practices, hideUnknown])
 
-  // Split into independent and consolidated for hex layers
+  // Split into independent and consolidated for hex layers using canonical buckets.
   const independentData = useMemo(
     () =>
       geocoded
-        .filter((d) => d.status_clean === 'independent' || d.status_clean === 'likely_independent')
+        .filter((d) => d.status_clean === 'independent')
         .map((d) => ({ lat: d.map_lat, lon: d.map_lon })),
     [geocoded]
   )
@@ -333,7 +336,7 @@ export function PracticeDensityMap({
   const consolidatedData = useMemo(
     () =>
       geocoded
-        .filter((d) => d.status_clean === 'dso_affiliated' || d.status_clean === 'pe_backed')
+        .filter((d) => d.status_clean === 'corporate')
         .map((d) => ({ lat: d.map_lat, lon: d.map_lon })),
     [geocoded]
   )

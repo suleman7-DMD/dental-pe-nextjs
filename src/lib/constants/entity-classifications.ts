@@ -1,6 +1,6 @@
 /**
- * All 11 entity classification values with display labels and descriptions.
- * Matches the system defined in scrapers/dso_classifier.py.
+ * All 12 entity classification values with display labels and descriptions.
+ * Matches the system defined in scrapers/dso_classifier.py + scrapers/reclassify_locations.py.
  */
 
 export interface EntityClassificationInfo {
@@ -38,6 +38,13 @@ export const ENTITY_CLASSIFICATIONS: EntityClassificationInfo[] = [
     description:
       "Single-provider with 5+ employees or $800k+ revenue -- likely needs associate help",
     category: "solo",
+  },
+  {
+    value: "org_only_npi",
+    label: "Org-Only NPI",
+    description:
+      "Organization NPI registered at address but no individual providers practice there -- often a billing-only, admin-only, or closed location. Distinct from solo_inactive (which is a real solo with no contact info).",
+    category: "other",
   },
   {
     value: "family_practice",
@@ -101,7 +108,11 @@ export function getEntityClassificationLabel(value: string | null): string {
   return ENTITY_CLASSIFICATION_MAP.get(value)?.label ?? value;
 }
 
-/** Check if an entity_classification value represents an independent practice. */
+/**
+ * Check if an entity_classification value represents an independent practice.
+ * Note: `org_only_npi` is intentionally excluded — it's a billing-only / closed
+ * location with no operator and is not a buyable independent practice.
+ */
 export function isIndependentClassification(ec: string | null | undefined): boolean {
   if (!ec) return false;
   const v = ec.trim().toLowerCase();
@@ -159,7 +170,12 @@ export const DSO_REGIONAL_STRONG_SIGNAL_FILTER =
   'classification_reasoning.ilike.%franchise%,' +
   'classification_reasoning.ilike.%branch%';
 
-/** Classify a practice using entity_classification with ownership_status fallback. */
+/**
+ * Classify a practice using entity_classification with ownership_status fallback.
+ * `org_only_npi` rolls into "unknown" — it's not a real solo practice and
+ * shouldn't inflate the independent count. Surfaces only via the granular
+ * label helper for transparency.
+ */
 export function classifyPractice(
   entityClassification: string | null | undefined,
   ownershipStatus: string | null | undefined
@@ -169,6 +185,7 @@ export function classifyPractice(
   if (isIndependentClassification(ec)) return "independent";
   if (ec === "specialist") return "specialist";
   if (ec === "non_clinical") return "non_clinical";
+  if (ec === "org_only_npi") return "unknown";
 
   // Fallback to ownership_status when entity_classification is empty
   if (ec) return "unknown"; // ec is set but unrecognized
