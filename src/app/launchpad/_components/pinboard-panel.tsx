@@ -9,6 +9,7 @@ import {
   type LaunchpadRankedTarget,
 } from "@/lib/launchpad/signals"
 import { DSO_TIER_LABELS, resolveDsoTierEntry } from "@/lib/launchpad/dso-tiers"
+import { getPracticeDisplayName } from "@/lib/launchpad/display"
 
 interface PinboardPanelProps {
   bundle: LaunchpadBundle | null
@@ -105,10 +106,7 @@ export function PinboardPanel({
         <div className="overflow-x-auto">
           <ul className="flex min-w-full gap-2 px-4 py-3">
             {pinnedTargets.map((target) => {
-              const displayName =
-                target.practice.doing_business_as ??
-                target.practice.practice_name ??
-                `NPI ${target.npi}`
+              const displayName = getPracticeDisplayName(target.practice)
               const location = [target.practice.city, target.practice.state]
                 .filter(Boolean)
                 .join(", ")

@@ -280,6 +280,8 @@ export interface LaunchpadPracticeRecord {
   npi: string
   practice_name: string | null
   doing_business_as: string | null
+  provider_first_name: string | null
+  provider_last_name: string | null
   address: string | null
   city: string | null
   state: string | null

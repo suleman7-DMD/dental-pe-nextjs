@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { AskIntelRequest, AskIntelResponse } from "@/lib/launchpad/ai-types"
+import { coerceStringArray } from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -77,18 +78,24 @@ function buildPrompt(body: AskIntelRequest): { system: string; user: string } {
 
   if (body.intel_context) {
     const intel = body.intel_context
+    const greenFlags = coerceStringArray(intel.green_flags)
+    const redFlags = coerceStringArray(intel.red_flags)
     const intelBits = [
       intel.overall_assessment ? `assessment: ${intel.overall_assessment}` : null,
       intel.acquisition_readiness ? `readiness: ${intel.acquisition_readiness}` : null,
       intel.confidence ? `confidence: ${intel.confidence}` : null,
-      intel.green_flags?.length ? `green flags: ${intel.green_flags.join(", ")}` : null,
-      intel.red_flags?.length ? `red flags: ${intel.red_flags.join(", ")}` : null,
+      greenFlags.length > 0 ? `green flags: ${greenFlags.join(", ")}` : null,
+      redFlags.length > 0 ? `red flags: ${redFlags.join(", ")}` : null,
     ]
       .filter(Boolean)
       .join("; ")
     if (intelBits) parts.push(`Intel: ${intelBits}`)
     if (intel.raw_json) {
-      parts.push(`Raw intel summary: ${JSON.stringify(intel.raw_json).slice(0, 800)}`)
+      try {
+        parts.push(`Raw intel summary: ${JSON.stringify(intel.raw_json).slice(0, 800)}`)
+      } catch {
+        // raw_json contains a circular ref or non-serializable value — skip silently
+      }
     }
   }
 

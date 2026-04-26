@@ -5,6 +5,7 @@ import type {
   SmartBriefingPractice,
   SmartBriefingPracticeResult,
 } from "@/lib/launchpad/ai-types"
+import { coerceStringArray, safeParseJson } from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -59,8 +60,10 @@ function formatPractice(p: SmartBriefingPractice): string {
   ]
   if (p.intel) {
     if (p.intel.overall_assessment) lines.push(`Intel: ${p.intel.overall_assessment}`)
-    if (p.intel.green_flags?.length) lines.push(`Green flags: ${p.intel.green_flags.join(", ")}`)
-    if (p.intel.red_flags?.length) lines.push(`Red flags: ${p.intel.red_flags.join(", ")}`)
+    const greenFlags = coerceStringArray(p.intel.green_flags)
+    const redFlags = coerceStringArray(p.intel.red_flags)
+    if (greenFlags.length > 0) lines.push(`Green flags: ${greenFlags.join(", ")}`)
+    if (redFlags.length > 0) lines.push(`Red flags: ${redFlags.join(", ")}`)
   }
   return lines.join("\n")
 }
@@ -89,15 +92,8 @@ interface RawBriefingResult {
 }
 
 function parseBriefing(text: string): SmartBriefingResponse | null {
-  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
-  let obj: unknown
-  try {
-    obj = JSON.parse(cleaned)
-  } catch {
-    return null
-  }
-  if (!obj || typeof obj !== "object") return null
-  const root = obj as RawBriefingResult
+  const root = safeParseJson<RawBriefingResult>(text)
+  if (!root || typeof root !== "object") return null
 
   if (!Array.isArray(root.practices) || root.practices.length === 0) return null
   if (!root.recommendation || typeof root.recommendation !== "object") return null
@@ -110,21 +106,20 @@ function parseBriefing(text: string): SmartBriefingResponse | null {
 
   const practices: SmartBriefingPracticeResult[] = []
   for (const item of root.practices) {
-    if (!item || typeof item !== "object") return null
+    if (!item || typeof item !== "object") continue
     const p = item as Record<string, unknown>
-    if (typeof p.npi !== "string") return null
-    if (typeof p.name !== "string") return null
-    if (!Array.isArray(p.strengths) || !Array.isArray(p.risks) || !Array.isArray(p.questions)) {
-      return null
-    }
+    if (typeof p.npi !== "string") continue
+    const name = typeof p.name === "string" ? p.name : `NPI ${p.npi}`
     practices.push({
       npi: p.npi,
-      name: p.name,
-      strengths: p.strengths as string[],
-      risks: p.risks as string[],
-      questions: p.questions as string[],
+      name,
+      strengths: coerceStringArray(p.strengths),
+      risks: coerceStringArray(p.risks),
+      questions: coerceStringArray(p.questions),
     })
   }
+
+  if (practices.length === 0) return null
 
   return {
     practices,

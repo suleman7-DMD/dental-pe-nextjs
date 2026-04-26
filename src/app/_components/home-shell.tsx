@@ -227,7 +227,7 @@ function RecentActivityFeed({ changes }: { changes?: PracticeChange[] }) {
   return (
     <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden h-full flex flex-col">
       <div className="px-4 py-3 border-b border-[#E8E5DE] flex items-center justify-between bg-[#F7F7F4]">
-        <h3 className="font-semibold text-[#1A1A1A] text-sm">Recent Activity</h3>
+        <h3 className="font-semibold text-[#1A1A1A] text-sm">Recent Activity <span className="font-normal text-[11px] text-[#9C9C90] ml-1">· Watched ZIPs</span></h3>
         <Link
           href="/market-intel"
           className="text-xs text-[#B8860B] hover:text-[#8B6508] transition-colors flex items-center gap-1"

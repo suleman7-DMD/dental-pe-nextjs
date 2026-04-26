@@ -4,6 +4,7 @@ import type {
   InterviewPrepResponse,
   InterviewCategory,
 } from "@/lib/launchpad/ai-types"
+import { coerceStringArray, safeParseJson } from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -62,8 +63,10 @@ function buildPrompt(body: InterviewPrepRequest): { system: string; user: string
   if (intel) {
     if (intel.overall_assessment) practiceLines.push(`Intel assessment: ${intel.overall_assessment}`)
     if (intel.acquisition_readiness) practiceLines.push(`Readiness: ${intel.acquisition_readiness}`)
-    if (intel.green_flags?.length) practiceLines.push(`Green flags: ${intel.green_flags.join(", ")}`)
-    if (intel.red_flags?.length) practiceLines.push(`Red flags: ${intel.red_flags.join(", ")}`)
+    const greenFlags = coerceStringArray(intel.green_flags)
+    const redFlags = coerceStringArray(intel.red_flags)
+    if (greenFlags.length > 0) practiceLines.push(`Green flags: ${greenFlags.join(", ")}`)
+    if (redFlags.length > 0) practiceLines.push(`Red flags: ${redFlags.join(", ")}`)
   }
 
   const user = `Practice context:\n${practiceLines.map((l) => `- ${l}`).join("\n")}\n\nGenerate exactly 10 questions across 4 categories as JSON.`
@@ -72,25 +75,16 @@ function buildPrompt(body: InterviewPrepRequest): { system: string; user: string
 }
 
 function parseCategories(text: string): InterviewCategory[] | null {
-  // Strip optional markdown fences
-  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
-  let obj: unknown
-  try {
-    obj = JSON.parse(cleaned)
-  } catch {
-    return null
-  }
+  const obj = safeParseJson<Record<string, unknown>>(text)
   if (!obj || typeof obj !== "object") return null
-  const root = obj as Record<string, unknown>
-  if (!Array.isArray(root.categories)) return null
-  // Validate shape loosely — each entry needs name + questions array
-  for (const cat of root.categories) {
+  if (!Array.isArray(obj.categories)) return null
+  for (const cat of obj.categories) {
     if (!cat || typeof cat !== "object") return null
     const c = cat as Record<string, unknown>
     if (typeof c.name !== "string") return null
     if (!Array.isArray(c.questions)) return null
   }
-  return root.categories as InterviewCategory[]
+  return obj.categories as InterviewCategory[]
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse<InterviewPrepResponse | { error: string }>> {

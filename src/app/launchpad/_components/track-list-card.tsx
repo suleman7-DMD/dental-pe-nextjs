@@ -5,11 +5,13 @@ import { cn } from "@/lib/utils"
 import {
   LAUNCHPAD_SIGNALS,
   LAUNCHPAD_TIER_LABELS,
+  LAUNCHPAD_TRACK_SHORT_LABELS,
   type ConcreteLaunchpadTrack,
   type LaunchpadRankedTarget,
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
 import { getPracticeDisplayName } from "@/lib/launchpad/display"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { CompoundThesis } from "./compound-thesis"
 
 interface TrackListCardProps {
@@ -108,6 +110,12 @@ export function TrackListCard({
   const trackKey = resolveTrackKey(track, target.bestTrack)
   const confidenceCapped = target.trackScores[trackKey]?.confidenceCapped ?? false
 
+  // Top contributions for hover tooltip
+  const topContributions =
+    [...(target.trackScores?.[trackKey]?.contributions ?? [])]
+      .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+      .slice(0, 4)
+
   // Prepare CompoundThesis props
   const concreteTrack: ConcreteLaunchpadTrack =
     track === "all" || !CONCRETE_TRACKS.has(track)
@@ -134,9 +142,9 @@ export function TrackListCard({
   }
 
   const trackScores = {
-    succession: Math.round(target.trackScores.succession.score),
-    high_volume: Math.round(target.trackScores.high_volume.score),
-    dso: Math.round(target.trackScores.dso.score),
+    succession: Math.round(target.trackScores?.succession?.score ?? 0),
+    high_volume: Math.round(target.trackScores?.high_volume?.score ?? 0),
+    dso: Math.round(target.trackScores?.dso?.score ?? 0),
   }
 
   const allSignalIds = [
@@ -282,12 +290,65 @@ export function TrackListCard({
                 )}
               </button>
             )}
-            <span
-              className="font-mono text-[28px] font-bold leading-none tracking-tight text-[#1A1A1A]"
-              style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)" }}
-            >
-              {Math.round(target.displayScore)}
-            </span>
+            <Tooltip>
+              <TooltipTrigger
+                onClick={(e) => e.stopPropagation()}
+                className="cursor-help"
+                aria-label="Score breakdown"
+              >
+                <span
+                  className="font-mono text-[28px] font-bold leading-none tracking-tight text-[#1A1A1A]"
+                  style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)" }}
+                >
+                  {Math.round(target.displayScore)}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="max-w-xs px-3 py-2">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-3 text-[11px]">
+                    <span className="font-semibold uppercase tracking-wider opacity-70">
+                      {LAUNCHPAD_TRACK_SHORT_LABELS[trackKey]} · base 50
+                    </span>
+                    <span className="font-mono font-bold">
+                      → {Math.round(target.displayScore)}
+                    </span>
+                  </div>
+                  {topContributions.length === 0 ? (
+                    <div className="text-[11px] opacity-70">No active signals.</div>
+                  ) : (
+                    <ul className="space-y-0.5 text-[11px]">
+                      {topContributions.map((c) => (
+                        <li
+                          key={c.signalId}
+                          className="flex items-start justify-between gap-3"
+                        >
+                          <span className="truncate">{c.label}</span>
+                          <span
+                            className={cn(
+                              "shrink-0 font-mono",
+                              c.contribution > 0
+                                ? "text-[#7DCB99]"
+                                : "text-[#FF8A8A]"
+                            )}
+                          >
+                            {c.contribution > 0 ? "+" : ""}
+                            {c.contribution.toFixed(1)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {confidenceCapped && (
+                    <div className="border-t border-white/15 pt-1 text-[10px] opacity-80">
+                      Capped at 70 — thin data
+                    </div>
+                  )}
+                  <div className="border-t border-white/15 pt-1 text-[10px] opacity-70">
+                    Open dossier → Score for full math
+                  </div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
           </div>
           <span className="text-[10px] font-medium uppercase tracking-wider text-[#9C9C90]">
             {tierLabel}

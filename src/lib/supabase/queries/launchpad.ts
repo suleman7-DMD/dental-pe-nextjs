@@ -44,6 +44,8 @@ async function fetchAllPracticesByZips(
             "npi",
             "practice_name",
             "doing_business_as",
+            "provider_first_name",
+            "provider_last_name",
             "address",
             "city",
             "state",

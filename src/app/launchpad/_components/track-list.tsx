@@ -13,6 +13,7 @@ import {
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
 import { TrackListCard } from "./track-list-card"
+import { getPracticeDisplayName } from "@/lib/launchpad/display"
 
 interface TrackListProps {
   bundle: LaunchpadBundle | null
@@ -41,7 +42,7 @@ function exportRankedCsv(targets: LaunchpadRankedTarget[], track: LaunchpadTrack
   const rows = targets.map((t) => ({
     rank: t.rank,
     npi: t.npi,
-    practice: t.practice.practice_name ?? t.practice.doing_business_as ?? "",
+    practice: getPracticeDisplayName(t.practice),
     city: t.practice.city ?? "",
     state: t.practice.state ?? "",
     zip: t.practice.zip ?? "",

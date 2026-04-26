@@ -35,6 +35,7 @@ import {
   type LaunchpadTier,
 } from "@/lib/launchpad/signals"
 import { isZipCommutable } from "@/lib/launchpad/scope"
+import { getPracticeDisplayName } from "@/lib/launchpad/display"
 import { ZipMoodBadge } from "./zip-mood-badge"
 
 interface ZipDossierDrawerProps {
@@ -426,10 +427,7 @@ export function LaunchpadZipDossierDrawer({
               ) : (
                 <ul className="space-y-2">
                   {zipTargets.map((target) => {
-                    const displayName =
-                      target.practice.doing_business_as ??
-                      target.practice.practice_name ??
-                      `NPI ${target.npi}`
+                    const displayName = getPracticeDisplayName(target.practice)
                     const tierColor = TIER_COLORS[target.displayTier]
                     return (
                       <li key={target.npi}>

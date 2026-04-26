@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { AlertTriangle, Brain, MessageCircle, RotateCcw, Send } from "lucide-react"
 import {
@@ -106,6 +106,7 @@ export function AskIntelDrawer({
     const trimmed = q.trim()
     if (!trimmed || isLoading) return
     setSubmittedQuestion(trimmed)
+    setQuestion("")
     mutation.reset()
     mutation.mutate(trimmed)
   }
@@ -114,8 +115,25 @@ export function AskIntelDrawer({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(question)
+    } else if (e.key === "Escape") {
+      e.preventDefault()
+      onClose()
     }
   }
+
+  // Robust ESC close — the Sheet's built-in ESC handler doesn't always fire
+  // when the textarea is focused and capturing the key.
+  useEffect(() => {
+    if (!open) return
+    function onWindowKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener("keydown", onWindowKey)
+    return () => window.removeEventListener("keydown", onWindowKey)
+  }, [open, onClose])
 
   function handleRetry() {
     if (submittedQuestion) {

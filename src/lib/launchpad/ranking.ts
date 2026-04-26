@@ -1,4 +1,5 @@
 import { resolveDsoTier, resolveDsoTierEntry } from "./dso-tiers"
+import { getPracticeDisplayName } from "./display"
 import {
   isZipCommutable,
   type LaunchpadScope,
@@ -421,7 +422,7 @@ function buildHeadline(
   bestScore: number,
   active: ActiveSignal[]
 ): string {
-  const name = practice.practice_name ?? practice.doing_business_as ?? `NPI ${practice.npi}`
+  const name = getPracticeDisplayName(practice)
   const location = [practice.city, practice.state].filter(Boolean).join(", ")
   const opportunityNames = active
     .filter((s) => LAUNCHPAD_SIGNALS[s.id].category === "opportunity")

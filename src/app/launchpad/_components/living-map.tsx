@@ -1,9 +1,10 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { AlertTriangle, Info, Layers } from "lucide-react"
+import { AlertTriangle, Info, Layers, MapPinOff } from "lucide-react"
 import { Marker, Popup } from "react-map-gl/mapbox"
 import { MapContainer } from "@/components/maps/map-container"
+import { PanelErrorBoundary } from "@/components/ui/panel-error-boundary"
 import { ZIP_CENTROIDS } from "@/lib/constants/zip-centroids"
 import { cn } from "@/lib/utils"
 import { formatNumber } from "@/lib/utils/formatting"
@@ -15,6 +16,9 @@ import {
   type LaunchpadTier,
 } from "@/lib/launchpad/signals"
 import { getLaunchpadScopeOption, type LaunchpadScope } from "@/lib/launchpad/scope"
+import { getPracticeDisplayName } from "@/lib/launchpad/display"
+
+const HAS_MAPBOX_TOKEN = Boolean(process.env.NEXT_PUBLIC_MAPBOX_TOKEN)
 
 export type LaunchpadMapView = "practices" | "zips"
 
@@ -456,6 +460,7 @@ export function LaunchpadLivingMap({
       )}
 
       <div className="relative">
+        <PanelErrorBoundary panelName="Living Map">
         <MapContainer height={height} zoom={mapZoom} center={mapCenter}>
           {view === "zips" &&
             zipAggregates.map((agg) => {
@@ -597,8 +602,8 @@ export function LaunchpadLivingMap({
                       borderWidth: 1.5,
                       opacity: 0.9,
                     }}
-                    aria-label={`${target.practice.practice_name ?? target.practice.doing_business_as ?? `NPI ${target.npi}`} — score ${Math.round(target.displayScore)}`}
-                    title={`${target.practice.practice_name ?? target.practice.doing_business_as ?? target.npi} · ${Math.round(target.displayScore)} · ${LAUNCHPAD_TIER_LABELS[target.displayTier]}`}
+                    aria-label={`${getPracticeDisplayName(target.practice)} — score ${Math.round(target.displayScore)}`}
+                    title={`${getPracticeDisplayName(target.practice)} · ${Math.round(target.displayScore)} · ${LAUNCHPAD_TIER_LABELS[target.displayTier]}`}
                   />
                 </Marker>
               )
@@ -610,10 +615,7 @@ export function LaunchpadLivingMap({
             const lat = hovered.practice.latitude
             const lng = hovered.practice.longitude
             if (lat == null || lng == null) return null
-            const displayName =
-              hovered.practice.doing_business_as ??
-              hovered.practice.practice_name ??
-              `NPI ${hovered.npi}`
+            const displayName = getPracticeDisplayName(hovered.practice)
             return (
               <Popup
                 longitude={lng}
@@ -648,6 +650,36 @@ export function LaunchpadLivingMap({
             )
           })()}
         </MapContainer>
+        </PanelErrorBoundary>
+
+        {/* Empty-data overlay — only when token is present (otherwise MapContainer shows its own fallback) */}
+        {HAS_MAPBOX_TOKEN &&
+          ((view === "zips" && zipAggregates.length === 0) ||
+            (view === "practices" && practiceMarkers.length === 0)) && (
+            <div
+              className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#FAFAF7]/70 backdrop-blur-[1px]"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="pointer-events-auto flex max-w-[280px] flex-col items-center gap-2 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-4 py-3 text-center shadow-sm">
+                <MapPinOff className="h-5 w-5 text-[#9C9C90]" aria-hidden="true" />
+                <p className="text-sm font-semibold text-[#1A1A1A]">
+                  {bundle === null
+                    ? "Map data unavailable"
+                    : view === "practices"
+                      ? "No geocoded practices in scope"
+                      : "No ZIP-level data in scope"}
+                </p>
+                <p className="text-[11px] text-[#6B6B60]">
+                  {bundle === null
+                    ? "Couldn't load the practice ranking. Try refreshing the page."
+                    : view === "practices"
+                      ? "Try the ZIP view, switch scope, or relax filters to see results."
+                      : "Try a wider scope or switch to the practices view."}
+                </p>
+              </div>
+            </div>
+          )}
 
         {/* Legend */}
         <div className="pointer-events-none absolute bottom-3 left-3 flex min-w-[240px] flex-col gap-1.5 rounded-md border border-[#E8E5DE] bg-[#FFFFFF]/95 px-3 py-2 text-[11px] shadow-sm">
@@ -850,10 +882,7 @@ export function LaunchpadLivingMap({
                 </p>
                 <ul className="space-y-1">
                   {selectedZipAgg.topTargets.map((target) => {
-                    const name =
-                      target.practice.doing_business_as ??
-                      target.practice.practice_name ??
-                      `NPI ${target.npi}`
+                    const name = getPracticeDisplayName(target.practice)
                     return (
                       <li key={target.npi}>
                         <button

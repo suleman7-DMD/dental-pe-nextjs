@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { ContractParseRequest, ContractParseResponse } from "@/lib/launchpad/ai-types"
+import { safeParseJson } from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -104,23 +105,14 @@ interface RawContractResult {
 }
 
 function parseContractResult(text: string): ContractParseResponse | null {
-  const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
-  let obj: unknown
-  try {
-    obj = JSON.parse(cleaned)
-  } catch {
-    return null
-  }
+  const obj = safeParseJson<RawContractResult>(text)
   if (!obj || typeof obj !== "object") return null
-  const r = obj as RawContractResult
+  const r = obj
 
-  // Validate required top-level keys exist
   if (!r.non_compete || !r.compensation || !r.termination || !r.ce_reimbursement) return null
   if (typeof r.overall_assessment !== "string") return null
   if (!Array.isArray(r.restrictive_covenants) || !Array.isArray(r.flags)) return null
 
-  // Return as-is — the outer type contract matches; invalid numeric fields
-  // come back as null per the system prompt instruction
   return obj as ContractParseResponse
 }
 

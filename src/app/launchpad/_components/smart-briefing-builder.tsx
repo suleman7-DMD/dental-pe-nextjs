@@ -29,6 +29,7 @@ import type {
 } from "@/lib/launchpad/ai-types"
 import type { LaunchpadBundle, LaunchpadRankedTarget, LaunchpadTrack } from "@/lib/launchpad/signals"
 import { resolveDsoTierEntry, DSO_TIER_LABELS } from "@/lib/launchpad/dso-tiers"
+import { getPracticeDisplayName } from "@/lib/launchpad/display"
 
 const MAX_SELECTED = 5
 
@@ -54,7 +55,7 @@ function buildBriefingPractice(
   return {
     npi: target.npi,
     snapshot: {
-      name: practice.practice_name ?? practice.doing_business_as ?? `NPI ${target.npi}`,
+      name: getPracticeDisplayName(practice),
       dba: practice.doing_business_as,
       entity_classification: practice.entity_classification,
       city: practice.city,
@@ -295,10 +296,7 @@ export function SmartBriefingBuilder({
                   <ul className="space-y-2">
                     {pinnedTargets.map((target) => {
                       const checked = selectedNpis.has(target.npi)
-                      const displayName =
-                        target.practice.doing_business_as ??
-                        target.practice.practice_name ??
-                        `NPI ${target.npi}`
+                      const displayName = getPracticeDisplayName(target.practice)
                       const canToggle = checked || selectedNpis.size < MAX_SELECTED
                       return (
                         <li key={target.npi}>

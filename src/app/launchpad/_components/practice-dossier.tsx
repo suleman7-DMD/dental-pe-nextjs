@@ -43,6 +43,7 @@ import {
   type LaunchpadSignalId,
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
+import { getPracticeDisplayName, getPracticeSecondaryName } from "@/lib/launchpad/display"
 import { AskIntelDrawer } from "./ask-intel-drawer"
 import { InterviewPrepAi } from "./interview-prep-ai"
 import { ContractParser } from "./contract-parser"
@@ -84,6 +85,7 @@ function tierColor(tier: string): string {
 
 function SignalPill({ signalId }: { signalId: LaunchpadSignalId }) {
   const def = LAUNCHPAD_SIGNALS[signalId]
+  if (!def) return null
   const base =
     def.category === "opportunity"
       ? "bg-[#B8860B]/10 text-[#B8860B] border-[#B8860B]/30"
@@ -156,11 +158,11 @@ function SnapshotTab({
     : null
 
   const trackScoreLabels = (["succession", "high_volume", "dso"] as const).map((t) => {
-    const ts = target.trackScores[t]
-    return `${LAUNCHPAD_TRACK_SHORT_LABELS[t]}: ${Math.round(ts.score)}`
+    const ts = target.trackScores?.[t]
+    return `${LAUNCHPAD_TRACK_SHORT_LABELS[t]}: ${Math.round(ts?.score ?? 0)}`
   })
 
-  const isCapped = target.trackScores[target.bestTrack].confidenceCapped
+  const isCapped = target.trackScores?.[target.bestTrack]?.confidenceCapped ?? false
 
   return (
     <div className="space-y-5">
@@ -332,6 +334,189 @@ function SnapshotTab({
           <p className="text-sm text-[#6B6B60]">{intel.overall_assessment}</p>
         </div>
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tab: Score
+// ---------------------------------------------------------------------------
+
+const CONCRETE_TRACKS_FOR_SCORE = ["succession", "high_volume", "dso"] as const
+
+function ScoreTab({ target }: { target: LaunchpadRankedTarget }) {
+  const initialTrack = (CONCRETE_TRACKS_FOR_SCORE as readonly string[]).includes(target.bestTrack)
+    ? target.bestTrack
+    : "succession"
+  const [selectedTrack, setSelectedTrack] = useState<typeof CONCRETE_TRACKS_FOR_SCORE[number]>(
+    initialTrack as typeof CONCRETE_TRACKS_FOR_SCORE[number]
+  )
+
+  const trackScore = target.trackScores?.[selectedTrack]
+  const contributions = trackScore?.contributions ?? []
+  const sortedContributions = [...contributions].sort(
+    (a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)
+  )
+  const rawScore = trackScore?.rawScore ?? 50
+  const finalScore = Math.round(trackScore?.score ?? 0)
+  const tier = trackScore?.tier ?? "low"
+  const capped = trackScore?.confidenceCapped ?? false
+  const wasClamped = rawScore !== Math.max(0, Math.min(100, rawScore))
+
+  return (
+    <div className="space-y-4">
+      {/* Track selector */}
+      <div>
+        <SectionHeading>Score for track</SectionHeading>
+        <div className="flex gap-1.5">
+          {CONCRETE_TRACKS_FOR_SCORE.map((t) => {
+            const isActive = selectedTrack === t
+            const isBest = target.bestTrack === t
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setSelectedTrack(t)}
+                className={cn(
+                  "flex-1 rounded-md border px-2 py-1.5 text-xs font-medium transition-colors",
+                  isActive
+                    ? "border-[#B8860B] bg-[#B8860B]/10 text-[#B8860B]"
+                    : "border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:border-[#D4D0C8]"
+                )}
+              >
+                <div>{LAUNCHPAD_TRACK_SHORT_LABELS[t]}</div>
+                <div className="mt-0.5 font-mono text-[10px] opacity-75">
+                  {Math.round(target.trackScores?.[t]?.score ?? 0)}
+                  {isBest && " ★"}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Final score block */}
+      <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-4">
+        <div className="flex items-end justify-between">
+          <div>
+            <div
+              className="font-mono text-4xl font-bold leading-none"
+              style={{ color: tierColor(tier) }}
+            >
+              {finalScore}
+            </div>
+            <div
+              className="mt-1 text-[11px] font-medium uppercase tracking-wider"
+              style={{ color: tierColor(tier) }}
+            >
+              {LAUNCHPAD_TIER_LABELS[tier]}
+            </div>
+          </div>
+          <div className="text-right text-[10px] text-[#9C9C90]">
+            <div>Track: {LAUNCHPAD_TRACK_SHORT_LABELS[selectedTrack]}</div>
+            <div className="mt-0.5">Final score · 0–100</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Math breakdown */}
+      <div>
+        <SectionHeading>How the score was built</SectionHeading>
+        <div className="space-y-1 rounded-md border border-[#E8E5DE] bg-[#FFFFFF]">
+          {/* Base */}
+          <div className="flex items-center justify-between border-b border-[#E8E5DE] px-3 py-2">
+            <div>
+              <div className="text-sm font-medium text-[#1A1A1A]">Base score</div>
+              <div className="text-[10px] text-[#9C9C90]">Starting point for every practice</div>
+            </div>
+            <div className="font-mono text-sm font-semibold text-[#1A1A1A]">+50</div>
+          </div>
+
+          {/* Contributions */}
+          {sortedContributions.length === 0 ? (
+            <div className="px-3 py-3 text-center text-xs text-[#9C9C90]">
+              No active signals for this track
+            </div>
+          ) : (
+            sortedContributions.map((c) => {
+              const positive = c.contribution > 0
+              const accent =
+                c.category === "warning" || c.contribution < 0
+                  ? "text-[#C23B3B]"
+                  : c.category === "opportunity"
+                    ? "text-[#2D8B4E]"
+                    : "text-[#6B6B60]"
+              return (
+                <div
+                  key={c.signalId}
+                  className="border-b border-[#E8E5DE] px-3 py-2 last:border-0"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-[#1A1A1A]">{c.label}</div>
+                      <div className="mt-0.5 text-[11px] text-[#6B6B60]">{c.reasoning}</div>
+                      <div className="mt-1 font-mono text-[10px] text-[#9C9C90]">
+                        base {c.baseWeight > 0 ? `+${c.baseWeight}` : c.baseWeight} ×{" "}
+                        {c.multiplier.toFixed(2)} = {c.contribution > 0 ? "+" : ""}
+                        {c.contribution.toFixed(1)}
+                      </div>
+                    </div>
+                    <div className={cn("shrink-0 font-mono text-sm font-semibold", accent)}>
+                      {positive ? "+" : ""}
+                      {c.contribution.toFixed(1)}
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+
+          {/* Subtotal */}
+          <div className="flex items-center justify-between bg-[#F5F5F0] px-3 py-2">
+            <div className="text-xs font-medium uppercase tracking-wider text-[#6B6B60]">
+              Raw subtotal
+            </div>
+            <div className="font-mono text-sm font-semibold text-[#1A1A1A]">
+              {Math.round(rawScore)}
+            </div>
+          </div>
+
+          {/* Clamp / cap notice */}
+          {wasClamped && (
+            <div className="border-t border-[#E8E5DE] bg-[#FFFFFF] px-3 py-2 text-[11px] text-[#6B6B60]">
+              Clamped to 0–100 range from {rawScore.toFixed(1)}.
+            </div>
+          )}
+          {capped && (
+            <div className="border-t border-[#E8E5DE] bg-[#D4920B]/8 px-3 py-2 text-[11px] text-[#D4920B]">
+              Thin data — capped at 70. Run practice deep-dive to lift the cap.
+            </div>
+          )}
+
+          {/* Final */}
+          <div
+            className="flex items-center justify-between border-t-2 border-[#1A1A1A] px-3 py-2"
+            style={{ backgroundColor: `${tierColor(tier)}10` }}
+          >
+            <div className="text-xs font-semibold uppercase tracking-wider text-[#1A1A1A]">
+              Final
+            </div>
+            <div
+              className="font-mono text-base font-bold"
+              style={{ color: tierColor(tier) }}
+            >
+              {finalScore}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footnote */}
+      <div className="rounded-md border border-[#E8E5DE] bg-[#F5F5F0] px-3 py-2 text-[11px] text-[#6B6B60]">
+        Scores combine 20 launchpad signals weighted per track. Subtotal of contributions is added
+        to the base score, clamped to 0–100, then capped at 70 when the practice has thin data
+        (no AI intel + low classification confidence).
+      </div>
     </div>
   )
 }
@@ -550,7 +735,7 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
   const isSuccessionPublished = target.activeSignalIds.includes("succession_published_signal")
   const isFamilyDynasty = target.activeSignalIds.includes("family_dynasty_warning")
 
-  const mentorRichContribution = target.trackScores[target.bestTrack].contributions.find(
+  const mentorRichContribution = target.trackScores?.[target.bestTrack]?.contributions?.find(
     (c) => c.signalId === "mentor_rich_signal"
   )
 
@@ -772,7 +957,8 @@ function RedFlagsTab({ target }: { target: LaunchpadRankedTarget }) {
 
       {warnings.map((signalId) => {
         const def = LAUNCHPAD_SIGNALS[signalId]
-        const contribution = target.trackScores[target.bestTrack].contributions.find(
+        if (!def) return null
+        const contribution = target.trackScores?.[target.bestTrack]?.contributions?.find(
           (c) => c.signalId === signalId
         )
         const evidence = contribution?.reasoning ?? def.description
@@ -838,13 +1024,8 @@ export function PracticeDossier({
   if (!target || !open) return null
 
   const { practice, intel } = target
-  const displayName =
-    practice.practice_name ?? practice.doing_business_as ?? `NPI ${target.npi}`
-  const dba =
-    practice.doing_business_as &&
-    practice.doing_business_as !== practice.practice_name
-      ? practice.doing_business_as
-      : null
+  const displayName = getPracticeDisplayName(practice)
+  const dba = getPracticeSecondaryName(practice)
 
   const dsoEntry =
     practice.affiliated_dso
@@ -988,6 +1169,7 @@ export function PracticeDossier({
                 {(
                   [
                     { value: "snapshot", label: "Snapshot" },
+                    { value: "score", label: "Score" },
                     { value: "compensation", label: "Comp" },
                     { value: "mentorship", label: "Mentor" },
                     { value: "redflags", label: "Red Flags" },
@@ -1009,6 +1191,9 @@ export function PracticeDossier({
             <div className="flex-1 overflow-y-auto">
               <TabsContent value="snapshot" className="p-4">
                 <SnapshotTab target={target} />
+              </TabsContent>
+              <TabsContent value="score" className="p-4">
+                <ScoreTab target={target} />
               </TabsContent>
               <TabsContent value="compensation" className="p-4">
                 <CompensationTab target={target} bundle={bundle} />

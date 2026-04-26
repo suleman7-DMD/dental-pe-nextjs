@@ -9,6 +9,7 @@ import {
   type LaunchpadRankedTarget,
   type LaunchpadSignalId,
 } from "@/lib/launchpad/signals"
+import { getPracticeDisplayName } from "@/lib/launchpad/display"
 
 interface RedFlagPatternsProps {
   bundle: LaunchpadBundle | null
@@ -122,10 +123,7 @@ export function RedFlagPatterns({ bundle, onSelectNpi }: RedFlagPatternsProps) {
           ) : (
             <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
               {compoundTargets.map((target) => {
-                const displayName =
-                  target.practice.doing_business_as ??
-                  target.practice.practice_name ??
-                  `NPI ${target.npi}`
+                const displayName = getPracticeDisplayName(target.practice)
                 return (
                   <li key={target.npi}>
                     <button
