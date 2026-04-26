@@ -409,7 +409,7 @@ function buildHeadline(
   score: number
 ): string {
   const segments: string[] = [];
-  const name = practice.practice_name ?? practice.doing_business_as ?? `NPI ${practice.npi}`;
+  const name = practice.doing_business_as ?? practice.practice_name ?? `NPI ${practice.npi}`;
   segments.push(name);
   if (practice.city && practice.state) segments.push(`${practice.city}, ${practice.state}`);
   const age =
@@ -675,7 +675,7 @@ export function rankTargets(
 
       return {
         npi: practice.npi,
-        practiceName: practice.practice_name ?? practice.doing_business_as ?? `NPI ${practice.npi}`,
+        practiceName: practice.doing_business_as ?? practice.practice_name ?? `NPI ${practice.npi}`,
         city: practice.city,
         zip: practice.zip,
         ownershipGroup: ownership,

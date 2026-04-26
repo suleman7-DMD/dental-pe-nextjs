@@ -9,6 +9,7 @@ import {
   type LaunchpadRankedTarget,
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
+import { getPracticeDisplayName } from "@/lib/launchpad/display"
 import { CompoundThesis } from "./compound-thesis"
 
 interface TrackListCardProps {
@@ -81,8 +82,7 @@ export function TrackListCard({
   onTogglePin,
 }: TrackListCardProps) {
   const practice = target.practice
-  const displayName =
-    practice.doing_business_as ?? practice.practice_name ?? `NPI ${target.npi}`
+  const displayName = getPracticeDisplayName(practice)
 
   const locationParts: string[] = []
   if (practice.city && practice.state) locationParts.push(`${practice.city}, ${practice.state}`)
@@ -116,10 +116,7 @@ export function TrackListCard({
 
   const practiceSnapshot = {
     npi: target.npi,
-    name:
-      practice.practice_name ??
-      practice.doing_business_as ??
-      `NPI ${target.npi}`,
+    name: displayName,
     dba: practice.doing_business_as,
     entity_classification: practice.entity_classification,
     city: practice.city,

@@ -455,7 +455,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                       }`}
                     >
                       <td className="px-4 py-2.5 text-[#1A1A1A] max-w-[200px] truncate">
-                        {p.practice_name ?? '--'}
+                        {p.doing_business_as ?? p.practice_name ?? '--'}
                       </td>
                       <td className="px-4 py-2.5 text-[#6B6B60] max-w-[180px] truncate text-xs">
                         {p.address ?? '--'}

@@ -58,7 +58,7 @@ function matchesSearch(p: Practice, term: string): boolean {
   )
 }
 
-function sortPractices(list: Practice[], sortBy: SortOption): Practice[] {
+function sortPractices<T extends Practice>(list: T[], sortBy: SortOption): T[] {
   const sorted = [...list]
   switch (sortBy) {
     case 'job_score':
@@ -81,7 +81,7 @@ function sortPractices(list: Practice[], sortBy: SortOption): Practice[] {
       )
     case 'name':
       return sorted.sort((a, b) =>
-        (a.practice_name ?? '').localeCompare(b.practice_name ?? '')
+        (a.doing_business_as ?? a.practice_name ?? '').localeCompare(b.doing_business_as ?? b.practice_name ?? '')
       )
     default:
       return sorted
@@ -115,7 +115,7 @@ function renderDataQualityStars(v: string): React.ReactElement {
 // ────────────────────────────────────────────────────────────────────────────
 
 const EMPLOYMENT_COLUMNS = [
-  { key: 'practice_name', header: 'Practice Name' },
+  { key: 'display_name', header: 'Practice Name' },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   { key: 'city', header: 'City' },
@@ -131,7 +131,7 @@ const EMPLOYMENT_COLUMNS = [
 ]
 
 const OWNERSHIP_COLUMNS = [
-  { key: 'practice_name', header: 'Practice Name' },
+  { key: 'display_name', header: 'Practice Name' },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   { key: 'city', header: 'City' },
@@ -159,7 +159,7 @@ const OWNERSHIP_COLUMNS = [
 ]
 
 const ENRICHED_COLUMNS = [
-  { key: 'practice_name', header: 'Practice Name' },
+  { key: 'display_name', header: 'Practice Name' },
   { key: 'address', header: 'Address' },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
@@ -192,7 +192,7 @@ const ENRICHED_COLUMNS = [
 ]
 
 const ALL_COLUMNS = [
-  { key: 'practice_name', header: 'Practice Name' },
+  { key: 'display_name', header: 'Practice Name' },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   {
@@ -237,25 +237,34 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     setSelectedSources(['All'])
   }, [practices.length])
 
-  const totalPractices = practices.length
-  const enrichedCount = useMemo(
-    () => practices.filter(isDataAxle).length,
+  const withDisplayName = useMemo(
+    () =>
+      practices.map((p) => ({
+        ...p,
+        display_name: p.doing_business_as ?? p.practice_name ?? '--',
+      })),
     [practices]
+  )
+
+  const totalPractices = withDisplayName.length
+  const enrichedCount = useMemo(
+    () => withDisplayName.filter(isDataAxle).length,
+    [withDisplayName]
   )
   const enrichmentPct = totalPractices > 0 ? (enrichedCount / totalPractices) * 100 : 0
 
   // Get unique classification values for filter
   const classificationOptions = useMemo(() => {
     const set = new Set<string>()
-    for (const p of practices) {
+    for (const p of withDisplayName) {
       set.add((p.entity_classification ?? '').trim().toLowerCase() || 'unknown')
     }
     return Array.from(set).sort()
-  }, [practices])
+  }, [withDisplayName])
 
   // Apply filters
   const filtered = useMemo(() => {
-    let result = practices
+    let result = withDisplayName
 
     // Search
     if (searchTerm) {
@@ -286,7 +295,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       ...p,
       data_quality: computeDataQuality(p),
     }))
-  }, [practices, searchTerm, selectedStatuses, selectedSources, sortBy])
+  }, [withDisplayName, searchTerm, selectedStatuses, selectedSources, sortBy])
 
   const filteredEnriched = useMemo(
     () => filtered.filter(isDataAxle).length,
@@ -335,7 +344,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
   const handleDownloadCsv = () => {
     const downloadCols = [
-      'practice_name',
+      'display_name',
       'address',
       'city',
       'zip',
@@ -351,7 +360,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       'data_source',
     ]
     const headerMap: Record<string, string> = {
-      practice_name: 'Practice Name',
+      display_name: 'Practice Name',
       address: 'Address',
       city: 'City',
       zip: 'ZIP',

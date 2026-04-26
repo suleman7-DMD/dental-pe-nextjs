@@ -32,13 +32,23 @@ export async function getZipIntel(
 export async function getPracticeIntel(
   supabase: SupabaseClient
 ): Promise<PracticeIntel[]> {
-  const { data, error } = await supabase
-    .from("practice_intel")
-    .select("*")
-    .order("research_date", { ascending: false });
+  const PAGE = 1000;
+  const all: PracticeIntel[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("practice_intel")
+      .select("*")
+      .order("research_date", { ascending: false })
+      .range(from, from + PAGE - 1);
 
-  if (error) throw error;
-  return (data as PracticeIntel[]) ?? [];
+    if (error) throw error;
+    const rows = (data ?? []) as PracticeIntel[];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
 }
 
 export async function getZipIntelByZip(
