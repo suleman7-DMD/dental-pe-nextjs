@@ -57,6 +57,10 @@ export interface ZipQualitativeIntel {
   raw_json: string | null
   cost_usd: number | null
   model_used: string | null
+  // is_synthetic=true: row was inserted as a placeholder before the bulletproofed
+  // research protocol with forced web_search. Filter these out of any "verified
+  // intel" surface. Live composition (2026-04-26): 287 synthetic / 3 real.
+  is_synthetic: boolean | null
   created_at: string | null
   updated_at: string | null
 }

@@ -8,13 +8,23 @@ import type {
 export type { ZipQualitativeIntel, PracticeIntel, IntelStats };
 
 export async function getZipIntel(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  options: { includeSynthetic?: boolean } = {}
 ): Promise<ZipQualitativeIntel[]> {
-  const { data, error } = await supabase
+  const query = supabase
     .from("zip_qualitative_intel")
     .select("*")
     .order("zip_code", { ascending: true });
 
+  // Default: hide the 287 placeholder rows that were inserted before the
+  // bulletproofed protocol with forced web_search. Pass includeSynthetic=true
+  // for diagnostic surfaces (e.g. /system or /data-breakdown) that want to
+  // show coverage gaps.
+  if (!options.includeSynthetic) {
+    query.eq("is_synthetic", false);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
   return (data as ZipQualitativeIntel[]) ?? [];
 }
@@ -33,19 +43,25 @@ export async function getPracticeIntel(
 
 export async function getZipIntelByZip(
   supabase: SupabaseClient,
-  zipCode: string
+  zipCode: string,
+  options: { includeSynthetic?: boolean } = {}
 ): Promise<ZipQualitativeIntel | null> {
-  const { data, error } = await supabase
+  const query = supabase
     .from("zip_qualitative_intel")
     .select("*")
-    .eq("zip_code", zipCode)
-    .single();
+    .eq("zip_code", zipCode);
+
+  if (!options.includeSynthetic) {
+    query.eq("is_synthetic", false);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     if (error.code === "PGRST116") return null; // not found
     throw error;
   }
-  return data as ZipQualitativeIntel;
+  return data as ZipQualitativeIntel | null;
 }
 
 export async function getPracticeIntelByNpi(
@@ -90,7 +106,9 @@ export async function getPracticeIntelAvailability(
 export async function getIntelStats(
   supabase: SupabaseClient
 ): Promise<IntelStats> {
-  // Run all queries in parallel for speed
+  // Run all queries in parallel for speed.
+  // Real ZIP intel only — exclude synthetic placeholders so the "ZIPs researched"
+  // KPI on /intelligence reflects bulletproofed coverage, not the 287 stale stubs.
   const [
     { count: zipCount },
     { count: practiceCount },
@@ -98,9 +116,16 @@ export async function getIntelStats(
     { data: practiceCosts },
     { count: highReadiness },
   ] = await Promise.all([
-    supabase.from("zip_qualitative_intel").select("zip_code", { count: "exact", head: true }),
+    supabase
+      .from("zip_qualitative_intel")
+      .select("zip_code", { count: "exact", head: true })
+      .eq("is_synthetic", false),
     supabase.from("practice_intel").select("npi", { count: "exact", head: true }),
-    supabase.from("zip_qualitative_intel").select("cost_usd").not("cost_usd", "is", null),
+    supabase
+      .from("zip_qualitative_intel")
+      .select("cost_usd")
+      .eq("is_synthetic", false)
+      .not("cost_usd", "is", null),
     supabase.from("practice_intel").select("cost_usd").not("cost_usd", "is", null),
     supabase.from("practice_intel").select("npi", { count: "exact", head: true }).eq("acquisition_readiness", "high"),
   ]);

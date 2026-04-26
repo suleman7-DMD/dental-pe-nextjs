@@ -76,7 +76,7 @@ Key tables (mirrored from Python pipeline's SQLite via `sync_to_supabase.py`):
 
 ### Current Data Stats
 - 402,004 practices (14,053 NPI rows in watched ZIPs, all with entity_classification — live 2026-04-25)
-- **5,265 GP clinic locations in watched ZIPs** (`SUM(zip_scores.total_gp_locations)`) — the location-deduped denominator after collapsing NPI-1 + NPI-2 + suite-variant rows at the same physical building. ~2.7× smaller than the raw NPI count. Surfaced as a subtitle on Home + Job Market "Total Practices" KPI cards (Phase A, 2026-04-25, commit `732894f`).
+- **4,889 GP clinic locations in watched ZIPs** (CHI 4,575 + BOS 314 — `SUM(zip_scores.total_gp_locations)`, post-`dc18d24` ULTRA-FIX dedup classifier rewrite, verified live Supabase 2026-04-26) — the location-deduped denominator after collapsing NPI-1 + NPI-2 + suite-variant rows at the same physical building. ~2.7× smaller than the raw NPI count. Surfaced as a subtitle on Home + Job Market "Total Practices" KPI cards (Phase A, 2026-04-25, commit `732894f`). **Pre-`dc18d24` baseline was 5,265** — the dedup pipeline collapsed an additional ~376 stale residential/duplicate rows out of zip_scores; quote 4,889 in all current docs.
 - 2,895 deals (coverage Oct 2020 – 2026-03-02; per Supabase live 2026-04-25). GDN's April roundup was 404 as of 2026-04-25, so 03-02 is current per source. SQLite has 2,861 (+34 ghost rows in Supabase, audit §15 #11).
 - 2,992 Data Axle enriched practices (with lat/lon, revenue, employees, year established)
 - 290 scored ZIPs (279 with saturation metrics)
@@ -245,7 +245,7 @@ The `entity_classification` field on practices provides granular practice-type l
 | `specialist` | other | Specialist practice (Ortho, Endo, Perio, OMS, Pedo) |
 | `non_clinical` | other | Dental lab, supply company, billing entity |
 
-### Watched ZIP Coverage (14,053 NPI rows / 5,265 GP clinic locations — post-Phase B 2026-04-25)
+### Watched ZIP Coverage (14,053 NPI rows / 4,889 GP clinic locations — post-`dc18d24` 2026-04-26)
 All practices in watched ZIPs have entity_classification set (0 null). Distribution:
 - solo_established: 3,575 | solo_new: 17 | solo_inactive: 170 | solo_high_volume: 709
 - family_practice: 1,708 | small_group: 2,727 | large_group: 2,456
@@ -432,7 +432,7 @@ User reported "each page is showing different numbers for the same chicagoland z
 | `src/app/buyability/page.tsx` | Now fetches `getWatchedZips()` and passes the ZIP set into `getBuyabilityPractices`. Was pulling a global 500-row sample that ignored scope entirely |
 | `src/lib/launchpad/signals.ts` | `LaunchpadSummary` interface gains `totalGpLocations: number \| null` — location-deduped GP count (sum of `zip_scores.total_gp_locations` across scope ZIPs) |
 | `src/lib/supabase/queries/launchpad.ts` | `getLaunchpadBundle` now sums `total_gp_locations` from the existing `zipScores` fetch — no extra Supabase query needed. `null` when no scope ZIPs have a `zip_scores` row |
-| `src/app/launchpad/_components/launchpad-kpi-strip.tsx` | "GP clinics in scope" KPI displays `totalGpLocations` as the headline value with `totalPracticesInScope` as a subtitle ("X NPI rows"). Was showing the NPI count as the headline (~11,894 for All Chicagoland — ~2.7× the actual ~5,265 clinics) |
+| `src/app/launchpad/_components/launchpad-kpi-strip.tsx` | "GP clinics in scope" KPI displays `totalGpLocations` as the headline value with `totalPracticesInScope` as a subtitle ("X NPI rows"). Was showing the NPI count as the headline (~11,894 for All Chicagoland — ~2.7× the actual ~4,575 CHI / 4,889 combined CHI+BOS clinics) |
 | `src/lib/supabase/queries/warroom.ts::getScopedPractices` | Wired the previously-orphaned `dedupPracticesByLocation()` helper into the fetch path (after polygon filter, before sort/slice). Hunt mode was showing 14k NPI rows for Chicagoland while the Sitrep KPI strip (sourced from `practice_locations`) showed ~5.5k — same prospect appeared 2-3× in the target list |
 
 ### Headline-denominator policy (do not regress)
@@ -442,7 +442,7 @@ All "practice count" headline KPIs MUST use the location-deduped count as the pr
 - `practice_locations` count query — used by Warroom Sitrep + Job Market server KPIs
 - `dedupPracticesByLocation(rows)` — used in-memory by Warroom Hunt list AFTER fetching raw `practices` rows
 
-The raw NPI row count belongs in subtitles only (e.g., "5,265 GP clinics · 14,053 NPI rows"). Phase A pattern from `732894f` is the model — read that commit if extending this to a new surface.
+The raw NPI row count belongs in subtitles only (e.g., "4,889 GP clinics · 14,053 NPI rows"). Phase A pattern from `732894f` is the model — read that commit if extending this to a new surface.
 
 ### Scope-default policy (do not regress)
 
@@ -477,7 +477,7 @@ The variance between 4,575 (Launchpad) ↔ 4,889 (Home) ↔ 5,491 (Warroom) is e
 
 ## NPI vs Practice Conflation Fix (2026-04-25) — Do Not Regress
 
-A 3-part fix for the long-running NPI-row-as-practice vs physical-clinic-location confusion. NPPES emits 1 row per provider (NPI-1) AND 1 row per organization (NPI-2) at the same address — counting NPI rows as "practices" was inflating the watched-ZIP total ~2.7× (14,053 NPIs vs 5,265 GP clinic locations). Compounding this, the legacy `dso_classifier.py` Pass 3 was over-counting providers at shared phone numbers, classifying ~1,072 small/large/family groups as `dso_regional` purely because they shared a switchboard.
+A 3-part fix for the long-running NPI-row-as-practice vs physical-clinic-location confusion. NPPES emits 1 row per provider (NPI-1) AND 1 row per organization (NPI-2) at the same address — counting NPI rows as "practices" was inflating the watched-ZIP total ~2.7× (14,053 NPIs vs 4,889 GP clinic locations post-`dc18d24` / 5,265 pre-dedup). Compounding this, the legacy `dso_classifier.py` Pass 3 was over-counting providers at shared phone numbers, classifying ~1,072 small/large/family groups as `dso_regional` purely because they shared a switchboard.
 
 ### Foundational — Location-as-practice schema (parallel agent, commit `dc18d24`)
 
