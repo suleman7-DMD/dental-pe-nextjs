@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebarContext } from "@/providers/sidebar-provider";
@@ -61,6 +62,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Deal Flow", href: "/deal-flow", icon: TrendingUp },
       { label: "Research", href: "/research", icon: Search },
       { label: "Intelligence", href: "/intelligence", icon: Brain },
+      { label: "Data Breakdown", href: "/data-breakdown", icon: BarChart3 },
     ],
   },
   {
