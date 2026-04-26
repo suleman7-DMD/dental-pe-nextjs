@@ -17,9 +17,31 @@ export default async function DataBreakdownPage() {
   let error: string | null = null;
   try {
     bundle = await getDataBreakdownBundle(supabase);
-  } catch (e) {
-    error = e instanceof Error ? e.message : String(e);
+  } catch (e: unknown) {
+    error = serializeError(e);
+    console.error("[/data-breakdown] getDataBreakdownBundle threw:", e);
   }
 
   return <DataBreakdownShell bundle={bundle} error={error} />;
+}
+
+function serializeError(e: unknown): string {
+  if (!e) return "Unknown error (null/undefined thrown)";
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  if (typeof e === "object") {
+    const obj = e as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof obj.message === "string") parts.push(obj.message);
+    if (typeof obj.code === "string" || typeof obj.code === "number") parts.push(`(code: ${obj.code})`);
+    if (typeof obj.details === "string") parts.push(`details: ${obj.details}`);
+    if (typeof obj.hint === "string") parts.push(`hint: ${obj.hint}`);
+    if (parts.length > 0) return parts.join(" — ");
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return Object.prototype.toString.call(obj);
+    }
+  }
+  return String(e);
 }

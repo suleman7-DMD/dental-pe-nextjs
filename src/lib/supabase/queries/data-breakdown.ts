@@ -577,10 +577,37 @@ export async function getWatchedPracticesByZipPrefix(
 }
 
 /** Top-level: fetch all blocks in parallel. */
+export interface BlockError {
+  title: string;
+  error: string;
+}
+
 export interface DataBreakdownBundle {
   blocks: BreakdownBlock[];
+  blockErrors: BlockError[];
   watchedZipCount: number;
   fetchedAt: string;
+}
+
+function describeError(e: unknown): string {
+  if (!e) return "Unknown error";
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  if (typeof e === "object") {
+    const obj = e as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof obj.message === "string") parts.push(obj.message);
+    if (obj.code != null) parts.push(`(code: ${String(obj.code)})`);
+    if (typeof obj.details === "string") parts.push(`details: ${obj.details}`);
+    if (typeof obj.hint === "string") parts.push(`hint: ${obj.hint}`);
+    if (parts.length > 0) return parts.join(" — ");
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return Object.prototype.toString.call(obj);
+    }
+  }
+  return String(e);
 }
 
 export async function getDataBreakdownBundle(
@@ -592,23 +619,37 @@ export async function getDataBreakdownBundle(
   if (zipErr) throw zipErr;
   const watchedZips = (zipRows as { zip_code: string }[] | null)?.map((r) => r.zip_code) ?? [];
 
-  const blocks = await Promise.all([
-    getGlobalPracticesByEntityClass(supabase),
-    getWatchedPracticesByEntityClass(supabase, watchedZips),
-    getWatchedLocationsByEntityClass(supabase),
-    getWatchedPracticesByDataSource(supabase, watchedZips),
-    getWatchedPracticesByOwnership(supabase, watchedZips),
-    getWatchedZipsByState(supabase),
-    getWatchedPracticesByZipPrefix(supabase, watchedZips),
-    getRetirementRiskByEntityClass(supabase, watchedZips),
-    getDealsBySource(supabase),
-    getDealsByType(supabase),
-    getDealsByYear(supabase),
-    getPracticeIntelByVerification(supabase),
-  ]);
+  const blockSpecs: Array<{ title: string; fetch: () => Promise<BreakdownBlock> }> = [
+    { title: "All Practices (Global, NPI rows)", fetch: () => getGlobalPracticesByEntityClass(supabase) },
+    { title: "Watched-ZIP Practices (NPI rows)", fetch: () => getWatchedPracticesByEntityClass(supabase, watchedZips) },
+    { title: "Watched-ZIP GP Clinic Locations (deduped)", fetch: () => getWatchedLocationsByEntityClass(supabase) },
+    { title: "Watched-ZIP Practices by Data Source", fetch: () => getWatchedPracticesByDataSource(supabase, watchedZips) },
+    { title: "Watched-ZIP Practices by ownership_status (LEGACY)", fetch: () => getWatchedPracticesByOwnership(supabase, watchedZips) },
+    { title: "Watched ZIPs by State", fetch: () => getWatchedZipsByState(supabase) },
+    { title: "Watched-ZIP Practices by ZIP Prefix", fetch: () => getWatchedPracticesByZipPrefix(supabase, watchedZips) },
+    { title: "Retirement Risk Practices", fetch: () => getRetirementRiskByEntityClass(supabase, watchedZips) },
+    { title: "Deals by Source", fetch: () => getDealsBySource(supabase) },
+    { title: "Deals by Deal Type", fetch: () => getDealsByType(supabase) },
+    { title: "Deals by Year", fetch: () => getDealsByYear(supabase) },
+    { title: "Practice Intel Dossiers by Verification Quality", fetch: () => getPracticeIntelByVerification(supabase) },
+  ];
+
+  const settled = await Promise.allSettled(blockSpecs.map((s) => s.fetch()));
+  const blocks: BreakdownBlock[] = [];
+  const blockErrors: BlockError[] = [];
+  settled.forEach((result, i) => {
+    if (result.status === "fulfilled") {
+      blocks.push(result.value);
+    } else {
+      const msg = describeError(result.reason);
+      console.error(`[data-breakdown] block "${blockSpecs[i].title}" failed:`, result.reason);
+      blockErrors.push({ title: blockSpecs[i].title, error: msg });
+    }
+  });
 
   return {
     blocks,
+    blockErrors,
     watchedZipCount: watchedZips.length,
     fetchedAt: new Date().toISOString(),
   };

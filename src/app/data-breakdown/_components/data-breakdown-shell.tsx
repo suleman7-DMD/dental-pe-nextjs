@@ -194,6 +194,22 @@ export function DataBreakdownShell({ bundle, error }: DataBreakdownShellProps) {
         </button>
       </div>
 
+      {/* Per-block errors (rendered above blocks so users see what failed) */}
+      {bundle.blockErrors && bundle.blockErrors.length > 0 && (
+        <div className="mt-4 rounded-md border border-[#D4920B]/40 bg-[#D4920B]/5 px-4 py-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8B6508]">
+            {bundle.blockErrors.length} of {bundle.blocks.length + bundle.blockErrors.length} blocks failed to load
+          </div>
+          <ul className="mt-2 space-y-1 text-[12px] text-[#1A1A1A]">
+            {bundle.blockErrors.map((be, i) => (
+              <li key={i}>
+                <strong>{be.title}:</strong> <span className="font-mono text-[11px] text-[#6B6B60]">{be.error}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Blocks */}
       <div className="mt-4 space-y-3">
         {filteredBlocks.length === 0 ? (
