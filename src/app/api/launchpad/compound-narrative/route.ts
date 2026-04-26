@@ -7,10 +7,20 @@ import type { PracticeIntel, ZipQualitativeIntel } from "@/lib/types/intel"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-const NARRATIVE_MODEL = "claude-sonnet-4-6"
-const TEMPERATURE = 0.3
+// ---------------------------------------------------------------------------
+// Two-pass extract→synthesize architecture (#26)
+// Pass 1: Haiku 4.5 reads full intel dump → emits JSON evidence ledger
+// Pass 2: Sonnet 4.6 receives ONLY ledger + header → writes thesis
+// ---------------------------------------------------------------------------
+
+const SYNTHESIZER_MODEL = "claude-sonnet-4-6"
+const EXTRACTOR_MODEL = "claude-haiku-4-5-20251001"
+const TEMPERATURE_SYNTH = 0.3
+const TEMPERATURE_EXTRACT = 0.0
 const MAX_TOKENS_VERIFIED = 350
 const MAX_TOKENS_PARTIAL = 200
+const EXTRACTOR_MAX_TOKENS = 2000
+const MIN_LEDGER_ATOMS = 3
 
 interface AnthropicContentBlock {
   type: string
@@ -20,6 +30,16 @@ interface AnthropicContentBlock {
 interface AnthropicResponse {
   content?: AnthropicContentBlock[]
   error?: { type: string; message: string }
+}
+
+type LedgerCategory = "structural" | "operational" | "financial" | "market" | "signal"
+
+interface LedgerAtom {
+  label: string
+  value: string
+  source_label: string
+  category: LedgerCategory
+  confidence: "high" | "medium" | "low"
 }
 
 function validateBody(raw: unknown): CompoundNarrativeRequest | null {
@@ -73,9 +93,6 @@ function shortDomain(url: string): string {
   }
 }
 
-// ZIP `sources` field stores either URLs OR plain-text source labels like
-// "Redfin (January 2026 housing data)". This extracts a short cite-able label
-// from each entry — short domain for URLs, leading non-paren token(s) for text.
 function parseZipSourceLabels(s: string | null): string[] {
   if (!s) return []
   let raw: string[] = []
@@ -93,48 +110,54 @@ function parseZipSourceLabels(s: string | null): string[] {
       labels.add(shortDomain(entry))
       continue
     }
-    // Take everything before the first paren / dash / comma — that's the source name
     const head = entry.split(/[(,\-–—]/)[0]?.trim()
     if (head && head.length > 0 && head.length < 60) labels.add(head)
   }
   return Array.from(labels).slice(0, 8)
 }
 
-// `<cite index="...">x</cite>` artifacts leak in from synthetic ZIP intel rows.
-// Strip the wrapper but keep the content.
 function stripCiteTags(s: string | null | undefined): string | null {
   if (s == null) return null
   return s.replace(/<cite\s+index="[^"]*"\s*>([\s\S]*?)<\/cite>/gi, "$1").trim()
 }
 
-const SYSTEM_PROMPT = [
-  "You are a dental private-equity pattern analyst writing a verified investment thesis for a new graduate evaluating this practice.",
+// ---------------------------------------------------------------------------
+// EXTRACTOR (Pass 1): full intel dump → JSON ledger of atoms
+// ---------------------------------------------------------------------------
+
+const EXTRACTOR_SYSTEM_PROMPT = [
+  "You are an evidence extractor for a dental private-equity analyst. You read raw practice and ZIP intel, then emit a JSON ledger of discrete, source-attributed evidence atoms. NO PROSE.",
   "",
-  "NON-NEGOTIABLE RULES:",
-  "- Every claim must come from either (a) a structural fact stated in the user message, or (b) a verified source with [source: ...] citation pulled from the supplied source list. Sources may be URLs (cite by domain) or named research providers (cite by provider name, e.g. [source: Redfin]).",
-  "- The demand_outlook, supply_outlook, and investment_thesis fields under '# ZIP market intelligence' are themselves structural facts (rule a). Paraphrasing or quoting from them is allowed without a separate citation, though attaching [source: ZIP intel] to such paraphrases is encouraged for transparency.",
-  "- Net-new market claims that go BEYOND those structural fields (specific dollar figures, named employers, named competitors, school rankings, etc.) require a [source: ...] citation from the cite-able ZIP source list.",
-  "- If neither (a) nor (b) supports a claim, OMIT the claim. Never produce filler analysis to hit a word count.",
-  "- Never paraphrase a signal ID into a fact. \"mentor_density\" is a signal label, not evidence of mentorship.",
-  "- Never invent doctor names, ages, retirement intent, review counts, or technology lists.",
-  "- Reviews/ratings: only cite if a Google or Healthgrades URL is in the source list.",
-  "- When ZIP market intelligence is provided, integrate at least one substantive market-level fact alongside practice-level evidence so the thesis reflects both supply/demand context and target-specific structure.",
+  "OUTPUT CONTRACT:",
+  "- Emit ONLY a JSON array. No code fences, no commentary, no preamble.",
+  "- Each element is an atom: {\"label\": string, \"value\": string, \"source_label\": string, \"category\": string, \"confidence\": string}",
+  "- label: short noun phrase (≤6 words) describing what the atom is. e.g. \"Years in operation\", \"Owner career stage\", \"Median home price\"",
+  "- value: concrete value, ≤25 words. Numbers stay as in source (don't round). e.g. \"22 years\", \"late-career, near retirement\", \"$680,000\"",
+  "- source_label: where the value comes from. For URLs use the bare domain (e.g. \"yelp.com\"). For named providers use the provider name (e.g. \"Redfin\", \"Healthgrades\", \"NPPES\", \"Data Axle\"). For structural facts in the practice header use \"structural\". For ZIP intel synthesis fields use \"ZIP intel\".",
+  "- category: one of {\"structural\", \"operational\", \"financial\", \"market\", \"signal\"}",
+  "  - structural: years in operation, providers, employees, entity classification, location",
+  "  - operational: services, technology, hiring activity, owner career stage, reviews",
+  "  - financial: revenue, comp signals, buyability score, ownership status",
+  "  - market: ZIP-level demand/supply outlook, demographics, real estate, employers, dental landscape",
+  "  - signal: red flags, green flags, acquisition rumors, succession intent",
+  "- confidence: \"high\" if value is from a verified web source (URL or named provider), \"medium\" if from analyst-curated synthesis (demand_outlook, supply_outlook, investment_thesis, structural fields), \"low\" if from inference or partial evidence.",
   "",
-  "FORMAT:",
-  "- Plain prose, no headers, no bullets.",
-  "- 120-170 words when evidence quality is verified AND ZIP intel is provided.",
-  "- 100-150 words when evidence quality is verified WITHOUT ZIP intel.",
-  "- ≤80 words when evidence quality is partial — recite verified facts only.",
-  "- Frame the conclusion in terms of fit for the requested track (succession / high_volume / dso).",
+  "EXTRACTION RULES:",
+  "- Extract EVERY material fact. Do not editorialize. Do not summarize.",
+  "- If a field is null or missing, skip it — never invent a value.",
+  "- One atom per discrete fact. Don't combine \"5 employees and $800k revenue\" into one atom — emit two.",
+  "- Reviews/ratings: only emit if the source is Google or Healthgrades. Skip otherwise.",
+  "- Signal IDs (e.g. \"mentor_density\") are NOT facts — never emit them as atoms.",
+  "- Doctor names, ages, retirement intent: only emit if explicitly stated in source. Never infer.",
+  "- If the entire intel is empty / says \"n/a\" / has no usable values, return [] (empty array).",
 ].join("\n")
 
-function buildUserPrompt(
+function buildExtractorPrompt(
   body: CompoundNarrativeRequest,
   intel: PracticeIntel,
-  zipIntel: ZipQualitativeIntel | null,
-  evidenceQuality: "verified" | "partial" | "high"
+  zipIntel: ZipQualitativeIntel | null
 ): string {
-  const { practice: p, signals, scores, track } = body
+  const { practice: p, signals } = body
   const age =
     p.year_established != null ? new Date().getFullYear() - p.year_established : null
 
@@ -143,22 +166,14 @@ function buildUserPrompt(
   const verUrls = parseUrls(intel.verification_urls).slice(0, 8)
   const services = parseList(intel.services_listed).slice(0, 6)
   const techs = parseList(intel.technology_listed).slice(0, 6)
-  const zipUrls = zipIntel ? parseUrls(zipIntel.sources).slice(0, 6) : []
-  const zipSourceLabels = zipIntel ? parseZipSourceLabels(zipIntel.sources) : []
-  // Combined cite-able set: prefer URLs (cite by domain) but fall through to plain-text labels.
-  const zipCiteList: { display: string; label: string }[] = [
-    ...zipUrls.map((u) => ({ display: u, label: shortDomain(u) })),
-    ...zipSourceLabels
-      .filter((label) => !zipUrls.some((u) => shortDomain(u) === label))
-      .map((label) => ({ display: label, label })),
-  ].slice(0, 8)
 
   const lines: string[] = [
-    `# Practice`,
+    `# Practice header (structural facts — source_label = "structural")`,
     `- Name: ${p.name || "Unknown"}${p.dba ? ` (dba ${p.dba})` : ""}`,
     `- Location: ${p.city ?? "?"}, ${p.state ?? "?"} ${p.zip ?? ""}`,
     `- Entity classification: ${p.entity_classification ?? "unclassified"}`,
     `- Years in operation: ${age != null ? age : "unknown"}`,
+    `- Year established: ${p.year_established ?? "unknown"}`,
     `- Providers: ${p.num_providers ?? "unknown"}`,
     `- Employees: ${p.employee_count ?? "unknown"}`,
     `- Estimated revenue: ${p.estimated_revenue != null ? `$${p.estimated_revenue.toLocaleString()}` : "unknown"}`,
@@ -166,17 +181,10 @@ function buildUserPrompt(
     `- Affiliated DSO: ${p.affiliated_dso ?? "none"}`,
     `- Website on file: ${p.website ?? "none"}`,
     ``,
-    `# Active structural signals (${signals.length})`,
+    `# Active structural signal IDs (DO NOT extract as atoms — these are pattern labels, not facts)`,
     signals.length > 0 ? signals.map((s) => `- ${s}`).join("\n") : "- (none)",
     ``,
-    `# Track scores (0-100)`,
-    `- succession: ${scores.succession}`,
-    `- high_volume: ${scores.high_volume}`,
-    `- dso: ${scores.dso}`,
-    `- Requested track: ${track}`,
-    ``,
-    `# Verified web research`,
-    `- Evidence quality (gated): ${evidenceQuality} (${intel.verification_searches ?? 0} web searches)`,
+    `# Verified web research (source_label = bare URL domain or provider name)`,
     `- Overall assessment: ${intel.overall_assessment ?? "n/a"}`,
     `- Acquisition readiness: ${intel.acquisition_readiness ?? "n/a"}`,
     `- Confidence: ${intel.confidence ?? "n/a"}`,
@@ -188,6 +196,7 @@ function buildUserPrompt(
     techs.length > 0 ? `- Technology: ${techs.join(", ")}` : "",
     greenFlags.length > 0 ? `- Green flags: ${greenFlags.slice(0, 5).join("; ")}` : "",
     redFlags.length > 0 ? `- Red flags: ${redFlags.slice(0, 5).join("; ")}` : "",
+    verUrls.length > 0 ? `- Verification URLs: ${verUrls.join(", ")}` : "",
     ``,
   ]
 
@@ -195,20 +204,22 @@ function buildUserPrompt(
     const demand = stripCiteTags(zipIntel.demand_outlook)
     const supply = stripCiteTags(zipIntel.supply_outlook)
     const thesis = stripCiteTags(zipIntel.investment_thesis)
+    const zipUrls = parseUrls(zipIntel.sources).slice(0, 6)
+    const zipLabels = parseZipSourceLabels(zipIntel.sources)
     lines.push(
-      `# ZIP market intelligence (zip ${zipIntel.zip_code}, researched ${zipIntel.research_date ?? "unknown date"})`,
+      `# ZIP market intelligence (source_label = "ZIP intel" for synthesis fields, or named provider for net-new specifics)`,
+      `- ZIP: ${zipIntel.zip_code}`,
+      `- Researched: ${zipIntel.research_date ?? "unknown"}`,
+      `- Confidence: ${zipIntel.confidence ?? "n/a"}`,
       `- Demand outlook: ${demand ?? "n/a"}`,
       `- Supply outlook: ${supply ?? "n/a"}`,
-      `- Investment thesis (analyst-curated): ${thesis ?? "n/a"}`,
-      `- Confidence: ${zipIntel.confidence ?? "n/a"}`
+      `- Investment thesis: ${thesis ?? "n/a"}`
     )
-    const realEstateBits: string[] = []
     if (zipIntel.median_home_price != null)
-      realEstateBits.push(`median home $${zipIntel.median_home_price.toLocaleString()}`)
+      lines.push(`- Median home price: $${zipIntel.median_home_price.toLocaleString()} (source: Redfin)`)
     if (zipIntel.home_price_yoy_pct != null)
-      realEstateBits.push(`${zipIntel.home_price_yoy_pct}% YoY`)
-    if (zipIntel.home_price_trend) realEstateBits.push(`trend ${zipIntel.home_price_trend}`)
-    if (realEstateBits.length > 0) lines.push(`- Real estate: ${realEstateBits.join(", ")}`)
+      lines.push(`- Home price YoY change: ${zipIntel.home_price_yoy_pct}% (source: Redfin)`)
+    if (zipIntel.home_price_trend) lines.push(`- Home price trend: ${zipIntel.home_price_trend}`)
     if (zipIntel.pop_growth_signals)
       lines.push(`- Population growth: ${stripCiteTags(zipIntel.pop_growth_signals)}`)
     if (zipIntel.pop_demographics)
@@ -216,87 +227,120 @@ function buildUserPrompt(
     if (zipIntel.major_employers)
       lines.push(`- Major employers: ${stripCiteTags(zipIntel.major_employers)}`)
     if (zipIntel.dental_new_offices)
-      lines.push(`- New dental offices nearby: ${stripCiteTags(zipIntel.dental_new_offices)}`)
+      lines.push(`- New dental offices: ${stripCiteTags(zipIntel.dental_new_offices)}`)
     if (zipIntel.dental_dso_moves)
       lines.push(`- Recent DSO moves: ${stripCiteTags(zipIntel.dental_dso_moves)}`)
-    if (zipIntel.competitor_new)
-      lines.push(`- New competitors: ${stripCiteTags(zipIntel.competitor_new)}`)
+    if (zipIntel.competitor_new) lines.push(`- New competitors: ${stripCiteTags(zipIntel.competitor_new)}`)
     if (zipIntel.competitor_closures)
       lines.push(`- Recent closures: ${stripCiteTags(zipIntel.competitor_closures)}`)
-    if (zipIntel.housing_status || zipIntel.housing_summary) {
+    if (zipIntel.housing_status || zipIntel.housing_summary)
       lines.push(
         `- Housing: ${[stripCiteTags(zipIntel.housing_status), stripCiteTags(zipIntel.housing_summary)].filter(Boolean).join(" — ")}`
       )
-    }
-    if (zipIntel.school_district || zipIntel.school_rating) {
+    if (zipIntel.school_district || zipIntel.school_rating)
       lines.push(
         `- Schools: ${[zipIntel.school_district, zipIntel.school_rating].filter(Boolean).join(" rated ")}`
       )
-    }
-    if (zipCiteList.length > 0) {
-      lines.push(
-        ``,
-        `# Cite-able ZIP sources (use [source: label] for net-new market-level claims):`,
-        ...zipCiteList.map((c) =>
-          c.display === c.label
-            ? `- ${c.label} (cite as [source: ${c.label}])`
-            : `- ${c.display} (cite as [source: ${c.label}])`
-        ),
-        `Citation guidance: paraphrasing demand_outlook / supply_outlook / investment_thesis above is allowed without citation (they ARE the structural facts). Net-new specifics (dollar figures, named employers, named competitors) require [source: ...] from this list.`
-      )
-    } else {
-      lines.push(
-        ``,
-        `# ZIP sources: (none on file — restrict ZIP commentary to paraphrasing the demand_outlook / supply_outlook / investment_thesis fields above; do not introduce new market specifics)`
-      )
-    }
+    if (zipUrls.length > 0) lines.push(`- ZIP URLs: ${zipUrls.join(", ")}`)
+    if (zipLabels.length > 0) lines.push(`- ZIP source labels: ${zipLabels.join(", ")}`)
     lines.push(``)
   }
 
-  if (verUrls.length > 0) {
-    lines.push(
-      `# Cite-able source URLs (use [source: domain]):`,
-      ...verUrls.map((u) => `- ${u} (cite as [source: ${shortDomain(u)}])`),
-      ``,
-      `Citation requirement: include at least 2 [source: ...] citations bound to URLs above. Never invent a domain not on this list.`
-    )
-  } else {
-    lines.push(
-      `# Cite-able source URLs`,
-      `- (none — verified intel without URLs)`,
-      ``,
-      `No URLs available. Stay strictly inside structural facts above. Cap output at 100 words. No [source: ...] citations required since none can be supported.`
-    )
-  }
-
-  if (evidenceQuality === "partial") {
-    lines.push(
-      ``,
-      `EVIDENCE QUALITY IS PARTIAL — recite verified facts only. ≤80 words. No analytical leaps.`
-    )
-  }
+  lines.push(
+    `Emit the JSON ledger now. JSON array only — no code fences, no preamble.`
+  )
 
   return lines.filter(Boolean).join("\n")
 }
 
-function buildStructuralSummary(body: CompoundNarrativeRequest): NonNullable<
-  CompoundNarrativeResponse["structural_summary"]
-> {
-  const { practice: p, signals, scores } = body
-  const age =
-    p.year_established != null ? new Date().getFullYear() - p.year_established : null
+function isLedgerAtom(x: unknown): x is LedgerAtom {
+  if (!x || typeof x !== "object") return false
+  const o = x as Record<string, unknown>
+  if (typeof o.label !== "string" || o.label.trim().length === 0) return false
+  if (typeof o.value !== "string" || o.value.trim().length === 0) return false
+  if (typeof o.source_label !== "string" || o.source_label.trim().length === 0) return false
+  if (typeof o.category !== "string") return false
+  if (!["structural", "operational", "financial", "market", "signal"].includes(o.category)) return false
+  if (typeof o.confidence !== "string") return false
+  if (!["high", "medium", "low"].includes(o.confidence)) return false
+  return true
+}
 
-  return {
-    name: p.name,
-    entity_classification: p.entity_classification ?? null,
-    years_in_operation: age,
-    providers: p.num_providers ?? null,
-    employees: p.employee_count ?? null,
-    buyability_score: p.buyability_score ?? null,
-    active_signals: signals,
-    track_scores: scores,
+function parseLedger(raw: string): LedgerAtom[] {
+  // Strip markdown code fences if model ignored the no-fence rule
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
+  const candidate = fenced ? fenced[1] : raw
+  // Find first [ and last ]
+  const start = candidate.indexOf("[")
+  const end = candidate.lastIndexOf("]")
+  if (start === -1 || end === -1 || end < start) return []
+  const slice = candidate.slice(start, end + 1)
+  try {
+    const parsed = JSON.parse(slice)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isLedgerAtom)
+  } catch {
+    return []
   }
 }
+
+// ---------------------------------------------------------------------------
+// SYNTHESIZER (Pass 2): ledger + practice header → thesis prose
+// ---------------------------------------------------------------------------
+
+const SYNTHESIZER_SYSTEM_PROMPT = [
+  "You are a dental private-equity pattern analyst writing a verified investment thesis for a new graduate evaluating this practice.",
+  "",
+  "INPUT CONTRACT:",
+  "You receive a JSON evidence ledger of atoms — each atom is {label, value, source_label, category, confidence}. The ledger is the ONLY source of facts you may use. You also receive a minimal practice header (name, city, state, requested track) and track scores. Do not invent any fact that is not in the ledger.",
+  "",
+  "NON-NEGOTIABLE RULES:",
+  "- Every claim in your thesis must be supported by an atom in the ledger.",
+  "- Cite by source_label using bracket notation: [source: <source_label>]. e.g. [source: yelp.com], [source: Redfin], [source: structural], [source: ZIP intel].",
+  "- Numbers must match the atom value EXACTLY. Don't round, don't convert units, don't compose new figures from atoms.",
+  "- If the ledger lacks evidence to support a claim, OMIT the claim. Never produce filler analysis to hit a word count.",
+  "- Never invent doctor names, ages, retirement intent, review counts, technology lists, or financial figures.",
+  "- Reviews/ratings: only cite when the atom's source_label is google.com / healthgrades.com / similar.",
+  "",
+  "FORMAT:",
+  "- Plain prose, no headers, no bullets.",
+  "- 120-170 words when the ledger contains BOTH practice-level and market-level atoms.",
+  "- 100-150 words when the ledger contains only practice-level atoms.",
+  "- ≤80 words when the ledger has fewer than 6 atoms.",
+  "- Open with the structural snapshot. Weave in operational, financial, and (if present) market signals. Close with one sentence framing fit for the requested track (succession / high_volume / dso).",
+  "- Use at minimum 2 distinct [source: ...] citations across the thesis. If only one source_label is available, use it more than once.",
+].join("\n")
+
+function buildSynthesizerPrompt(
+  body: CompoundNarrativeRequest,
+  ledger: LedgerAtom[]
+): string {
+  const { practice: p, scores, track } = body
+  const lines: string[] = [
+    `# Practice header (minimal — for framing only)`,
+    `- Name: ${p.name || "Unknown"}`,
+    `- City/State: ${p.city ?? "?"}, ${p.state ?? "?"}`,
+    `- Requested track: ${track}`,
+    ``,
+    `# Track scores (0-100, for fit framing)`,
+    `- succession: ${scores.succession}`,
+    `- high_volume: ${scores.high_volume}`,
+    `- dso: ${scores.dso}`,
+    ``,
+    `# Evidence ledger (${ledger.length} atoms — the ONLY facts you may cite)`,
+    JSON.stringify(ledger, null, 2),
+    ``,
+    `# Available source_labels for citation`,
+    ...Array.from(new Set(ledger.map((a) => a.source_label))).map((s) => `- ${s}`),
+    ``,
+    `Write the thesis now. Plain prose. Paraphrase from atoms only. Cite with [source: <source_label>].`,
+  ]
+  return lines.join("\n")
+}
+
+// ---------------------------------------------------------------------------
+// Numeric claim validation (defense in depth)
+// ---------------------------------------------------------------------------
 
 function extractNumericClaims(prose: string): { raw: string; num: string }[] {
   const claims: { raw: string; num: string }[] = []
@@ -343,7 +387,11 @@ function getNumericVariants(rawClaim: string, numStr: string): string[] {
   return Array.from(variants)
 }
 
-function buildValidationHaystack(
+function buildLedgerHaystack(ledger: LedgerAtom[]): string {
+  return JSON.stringify(ledger)
+}
+
+function buildFallbackHaystack(
   intel: PracticeIntel,
   zipIntel: ZipQualitativeIntel | null,
   practice: CompoundNarrativeRequest["practice"]
@@ -405,11 +453,18 @@ function validateClaims(
   return { ok: missing.length === 0, missing }
 }
 
+// ---------------------------------------------------------------------------
+// Generic Anthropic caller (used by both passes)
+// ---------------------------------------------------------------------------
+
 async function callAnthropic(
   apiKey: string,
+  model: string,
+  systemPrompt: string,
   userPrompt: string,
-  maxTokens: number
-): Promise<{ ok: true; thesis: string } | { ok: false; status: number; error: string }> {
+  maxTokens: number,
+  temperature: number
+): Promise<{ ok: true; text: string } | { ok: false; status: number; error: string }> {
   let upstream: Response
   try {
     upstream = await fetch("https://api.anthropic.com/v1/messages", {
@@ -420,13 +475,13 @@ async function callAnthropic(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: NARRATIVE_MODEL,
+        model,
         max_tokens: maxTokens,
-        temperature: TEMPERATURE,
+        temperature,
         system: [
           {
             type: "text",
-            text: SYSTEM_PROMPT,
+            text: systemPrompt,
             cache_control: { type: "ephemeral" },
           },
         ],
@@ -455,19 +510,42 @@ async function callAnthropic(
     return { ok: false, status: 502, error: `Anthropic API error: ${data.error.message}` }
   }
 
-  const thesis =
+  const text =
     data.content
       ?.filter((c) => c.type === "text")
       .map((c) => c.text ?? "")
       .join("\n")
       .trim() ?? ""
 
-  if (!thesis) {
-    return { ok: false, status: 502, error: "Empty thesis returned by Anthropic" }
+  if (!text) {
+    return { ok: false, status: 502, error: "Empty response returned by Anthropic" }
   }
 
-  return { ok: true, thesis }
+  return { ok: true, text }
 }
+
+function buildStructuralSummary(body: CompoundNarrativeRequest): NonNullable<
+  CompoundNarrativeResponse["structural_summary"]
+> {
+  const { practice: p, signals, scores } = body
+  const age =
+    p.year_established != null ? new Date().getFullYear() - p.year_established : null
+
+  return {
+    name: p.name,
+    entity_classification: p.entity_classification ?? null,
+    years_in_operation: age,
+    providers: p.num_providers ?? null,
+    employees: p.employee_count ?? null,
+    buyability_score: p.buyability_score ?? null,
+    active_signals: signals,
+    track_scores: scores,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Route handler
+// ---------------------------------------------------------------------------
 
 export async function POST(
   req: NextRequest
@@ -529,11 +607,9 @@ export async function POST(
       `[compound-narrative] supabase client init failed:`,
       err instanceof Error ? err.message : err
     )
-    // Fall through with intel=null and zipIntel=null — handled by gate below
   }
 
   const intelQuality = intel?.verification_quality ?? null
-  // "high" is enum drift from the model — treat as verified for gating
   const reliable = !!intel && (intelQuality === "verified" || intelQuality === "high")
   const partial = !!intel && intelQuality === "partial"
   const noUsable =
@@ -557,26 +633,76 @@ export async function POST(
         ? "verified"
         : "partial"
 
-  const verUrlsCount = parseUrls(intel!.verification_urls).length
+  // ----------------------------------------------------------------
+  // Pass 1: Extract evidence ledger via Haiku
+  // ----------------------------------------------------------------
+  const extractorPrompt = buildExtractorPrompt(body, intel!, zipIntel)
+  const extractResult = await callAnthropic(
+    apiKey,
+    EXTRACTOR_MODEL,
+    EXTRACTOR_SYSTEM_PROMPT,
+    extractorPrompt,
+    EXTRACTOR_MAX_TOKENS,
+    TEMPERATURE_EXTRACT
+  )
+  if (!extractResult.ok) {
+    console.warn(
+      `[compound-narrative] extractor (Pass 1) failed for npi=${body.practice.npi}: ${extractResult.error}`
+    )
+    return NextResponse.json({ error: extractResult.error }, { status: extractResult.status })
+  }
+
+  const ledger = parseLedger(extractResult.text)
+
+  if (ledger.length < MIN_LEDGER_ATOMS) {
+    console.warn(
+      `[compound-narrative] ledger below floor for npi=${body.practice.npi}: atoms=${ledger.length} (min=${MIN_LEDGER_ATOMS}) — refusing`
+    )
+    return NextResponse.json({
+      thesis: null,
+      reason: "no_verified_research",
+      structural_summary: buildStructuralSummary(body),
+    })
+  }
+
+  // ----------------------------------------------------------------
+  // Pass 2: Synthesize thesis from ledger only
+  // ----------------------------------------------------------------
+  const synthesizerPrompt = buildSynthesizerPrompt(body, ledger)
   const maxTokens =
-    evidenceQuality === "partial"
+    evidenceQuality === "partial" || ledger.length < 6
       ? MAX_TOKENS_PARTIAL
-      : verUrlsCount === 0
-        ? MAX_TOKENS_PARTIAL // no-URL path is also short
-        : MAX_TOKENS_VERIFIED
+      : MAX_TOKENS_VERIFIED
 
-  const userPrompt = buildUserPrompt(body, intel!, zipIntel, evidenceQuality)
-  const haystack = buildValidationHaystack(intel!, zipIntel, body.practice)
+  const ledgerHaystack = buildLedgerHaystack(ledger)
+  const fallbackHaystack = buildFallbackHaystack(intel!, zipIntel, body.practice)
 
-  const r1 = await callAnthropic(apiKey, userPrompt, maxTokens)
+  const r1 = await callAnthropic(
+    apiKey,
+    SYNTHESIZER_MODEL,
+    SYNTHESIZER_SYSTEM_PROMPT,
+    synthesizerPrompt,
+    maxTokens,
+    TEMPERATURE_SYNTH
+  )
   if (!r1.ok) {
     return NextResponse.json({ error: r1.error }, { status: r1.status })
   }
 
-  const claims1 = extractNumericClaims(r1.thesis)
-  const v1 = validateClaims(claims1, haystack)
+  const claims1 = extractNumericClaims(r1.text)
+  // Primary haystack: ledger. Fallback: raw intel (prevents over-rejection during rollout).
+  let v1 = validateClaims(claims1, ledgerHaystack)
+  if (!v1.ok) {
+    const fallback1 = validateClaims(claims1, fallbackHaystack)
+    if (fallback1.ok) {
+      console.warn(
+        `[compound-narrative] pass 1 ledger-validation failed but fallback OK for npi=${body.practice.npi}: missing=[${v1.missing.join(" | ")}]`
+      )
+      v1 = fallback1
+    }
+  }
   if (v1.ok) {
-    return NextResponse.json({ thesis: r1.thesis, evidence_quality: evidenceQuality })
+    return NextResponse.json({ thesis: r1.text, evidence_quality: evidenceQuality })
   }
 
   console.warn(
@@ -586,19 +712,35 @@ export async function POST(
   const retryAddendum = [
     ``,
     ``,
-    `PRIOR ATTEMPT FAILED VALIDATION. The following numeric claims in your prior thesis do not appear anywhere in the verified intel above: ${v1.missing.join(", ")}.`,
-    `Regenerate the thesis. Remove or replace any number that cannot be sourced from the structural facts or verified intel sections above. Do NOT introduce new numeric claims to compensate. If you cannot meet the citation requirement without those numbers, write a shorter thesis using only claims you can source.`,
+    `PRIOR ATTEMPT FAILED VALIDATION. The following numeric claims in your prior thesis are not supported by any atom in the ledger: ${v1.missing.join(", ")}.`,
+    `Regenerate the thesis. Remove or replace any number that does not match an atom value exactly. Do NOT introduce new numeric claims to compensate. If you cannot meet the citation requirement without those numbers, write a shorter thesis using only atoms you can cite.`,
   ].join("\n")
 
-  const r2 = await callAnthropic(apiKey, userPrompt + retryAddendum, maxTokens)
+  const r2 = await callAnthropic(
+    apiKey,
+    SYNTHESIZER_MODEL,
+    SYNTHESIZER_SYSTEM_PROMPT,
+    synthesizerPrompt + retryAddendum,
+    maxTokens,
+    TEMPERATURE_SYNTH
+  )
   if (!r2.ok) {
     return NextResponse.json({ error: r2.error }, { status: r2.status })
   }
 
-  const claims2 = extractNumericClaims(r2.thesis)
-  const v2 = validateClaims(claims2, haystack)
+  const claims2 = extractNumericClaims(r2.text)
+  let v2 = validateClaims(claims2, ledgerHaystack)
+  if (!v2.ok) {
+    const fallback2 = validateClaims(claims2, fallbackHaystack)
+    if (fallback2.ok) {
+      console.warn(
+        `[compound-narrative] pass 2 ledger-validation failed but fallback OK for npi=${body.practice.npi}: missing=[${v2.missing.join(" | ")}]`
+      )
+      v2 = fallback2
+    }
+  }
   if (v2.ok) {
-    return NextResponse.json({ thesis: r2.thesis, evidence_quality: evidenceQuality })
+    return NextResponse.json({ thesis: r2.text, evidence_quality: evidenceQuality })
   }
 
   console.warn(
