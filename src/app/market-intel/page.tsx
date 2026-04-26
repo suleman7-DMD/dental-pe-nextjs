@@ -41,20 +41,20 @@ export default async function MarketIntelPage() {
     supabase.from('practices').select('npi', { count: 'exact', head: true }),
     supabase.from('practices').select('npi', { count: 'exact', head: true }).not('data_axle_import_date', 'is', null),
     supabase.from('practices').select('updated_at').order('updated_at', { ascending: false }).limit(1).single(),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).in('entity_classification', ['dso_regional', 'dso_national']),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).in('ownership_status', ['dso_affiliated', 'pe_backed']).is('entity_classification', null),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).in('entity_classification', ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group']),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).in('ownership_status', ['independent', 'likely_independent']).is('entity_classification', null),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('entity_classification', 'dso_national').not('affiliated_dso', 'in', `(${taxonomyLeaks.join(',')})`),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('entity_classification', 'dso_regional').or('classification_reasoning.ilike.%EIN=%,classification_reasoning.ilike.%generic brand%,classification_reasoning.ilike.%parent_company%,classification_reasoning.ilike.%franchise%,classification_reasoning.ilike.%branch%'),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('entity_classification', 'specialist').in('ownership_status', ['dso_affiliated', 'pe_backed']),
+    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false),
+    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).in('entity_classification', ['dso_regional', 'dso_national']),
+    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).in('ownership_status', ['dso_affiliated', 'pe_backed']).is('entity_classification', null),
+    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).in('entity_classification', ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group']),
+    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).in('ownership_status', ['independent', 'likely_independent']).is('entity_classification', null),
+    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).eq('entity_classification', 'dso_national').not('affiliated_dso', 'in', `(${taxonomyLeaks.join(',')})`),
+    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).eq('entity_classification', 'dso_regional').or('classification_reasoning.ilike.%EIN=%,classification_reasoning.ilike.%generic brand%,classification_reasoning.ilike.%parent_company%,classification_reasoning.ilike.%franchise%,classification_reasoning.ilike.%branch%'),
+    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).eq('entity_classification', 'specialist').in('ownership_status', ['dso_affiliated', 'pe_backed']),
   ])
 
   // FIX 4: Per-entity-classification counts for Ownership tab
   const ecValues = ['solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group','dso_regional','dso_national','specialist','non_clinical'] as const
   const ecCountResults = await Promise.all(
-    ecValues.map(ec => supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('entity_classification', ec))
+    ecValues.map(ec => supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).eq('entity_classification', ec))
   )
   const entityCounts: Record<string, number> = {}
   ecValues.forEach((ec, i) => { entityCounts[ec] = ecCountResults[i].count ?? 0 })

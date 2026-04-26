@@ -535,27 +535,54 @@ async function countPracticeRows(
   );
 }
 
+// Counts location rows (practice_locations) — collapses NPI-1 + NPI-2 + suite
+// variants at the same physical address. Filters out residential (home-office)
+// rows by default. Use this for Sitrep KPIs that reflect "how many clinics."
+function basePracticeLocationCountQuery(
+  supabase: SupabaseClient,
+  zipChunk: string[] | null
+): CountFilterQuery {
+  let query = supabase
+    .from("practice_locations")
+    .select("location_id", { count: "exact", head: true })
+    .eq("is_likely_residential", false) as unknown as CountFilterQuery;
+  if (zipChunk) query = query.in("zip", zipChunk);
+  return query;
+}
+
+async function countPracticeLocationRows(
+  supabase: SupabaseClient,
+  zipCodes: string[] | null,
+  applyFilters: (query: CountFilterQuery) => CountQuery = (query) => query
+): Promise<number> {
+  return countRowsByZipScope(zipCodes, (zipChunk) =>
+    applyFilters(basePracticeLocationCountQuery(supabase, zipChunk))
+  );
+}
+
 async function getOwnershipCountsByQuery(
   supabase: SupabaseClient,
   zipCodes: string[] | null
 ): Promise<WarroomOwnershipCounts> {
-  const total = await countPracticeRows(supabase, zipCodes);
-  const independentByClassification = await countPracticeRows(supabase, zipCodes, (query) =>
+  // Source counts from practice_locations (address-deduped, non-residential)
+  // so KPIs reflect physical clinics, not raw NPI rows.
+  const total = await countPracticeLocationRows(supabase, zipCodes);
+  const independentByClassification = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query.in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS])
   );
-  const independentByFallback = await countPracticeRows(supabase, zipCodes, (query) =>
+  const independentByFallback = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query.is("entity_classification", null).in("ownership_status", ["independent", "likely_independent"])
   );
-  const corporateByClassification = await countPracticeRows(supabase, zipCodes, (query) =>
+  const corporateByClassification = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query.in("entity_classification", ["dso_regional", "dso_national"])
   );
-  const corporateByFallback = await countPracticeRows(supabase, zipCodes, (query) =>
+  const corporateByFallback = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query.is("entity_classification", null).in("ownership_status", ["dso_affiliated", "pe_backed"])
   );
-  const specialist = await countPracticeRows(supabase, zipCodes, (query) =>
+  const specialist = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query.eq("entity_classification", "specialist")
   );
-  const nonClinical = await countPracticeRows(supabase, zipCodes, (query) =>
+  const nonClinical = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query.eq("entity_classification", "non_clinical")
   );
 
@@ -582,8 +609,10 @@ async function countEnrichedPractices(
   supabase: SupabaseClient,
   zipCodes: string[] | null
 ): Promise<number> {
-  return countPracticeRows(supabase, zipCodes, (query) =>
-    query.not("data_axle_import_date", "is", null)
+  // practice_locations exposes a `data_axle_enriched` boolean instead of a
+  // timestamp — true if any underlying NPI was Data Axle-enriched.
+  return countPracticeLocationRows(supabase, zipCodes, (query) =>
+    query.eq("data_axle_enriched", true)
   );
 }
 
@@ -591,7 +620,7 @@ async function countAcquisitionTargets(
   supabase: SupabaseClient,
   zipCodes: string[] | null
 ): Promise<number> {
-  return countPracticeRows(supabase, zipCodes, (query) =>
+  return countPracticeLocationRows(supabase, zipCodes, (query) =>
     query.not("buyability_score", "is", null).gte("buyability_score", 50)
   );
 }
@@ -600,13 +629,13 @@ async function countRetirementRisk(
   supabase: SupabaseClient,
   zipCodes: string[] | null
 ): Promise<number> {
-  const byClassification = await countPracticeRows(supabase, zipCodes, (query) =>
+  const byClassification = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query
       .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS])
       .not("year_established", "is", null)
       .lt("year_established", 1995)
   );
-  const byFallback = await countPracticeRows(supabase, zipCodes, (query) =>
+  const byFallback = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query
       .is("entity_classification", null)
       .in("ownership_status", ["independent", "likely_independent"])
@@ -814,15 +843,19 @@ async function countCorporateHighConfidence(
   supabase: SupabaseClient,
   zipCodes: string[] | null
 ): Promise<number> {
-  const dsoNational = await countPracticeRows(supabase, zipCodes, (query) =>
+  // Post-Phase B (2026-04-25): dso_regional in practice_locations is already
+  // strict (phone-only signal demoted to a flag in classification_reasoning).
+  // strongRegional now keeps the ein/parent_company guard but drops
+  // franchise_name (column not in practice_locations schema).
+  const dsoNational = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query.eq("entity_classification", "dso_national")
   );
-  const strongRegional = await countPracticeRows(supabase, zipCodes, (query) =>
+  const strongRegional = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query
       .eq("entity_classification", "dso_regional")
-      .or("ein.not.is.null,parent_company.not.is.null,franchise_name.not.is.null")
+      .or("ein.not.is.null,parent_company.not.is.null")
   );
-  const dsoSpecialists = await countPracticeRows(supabase, zipCodes, (query) =>
+  const dsoSpecialists = await countPracticeLocationRows(supabase, zipCodes, (query) =>
     query
       .eq("entity_classification", "specialist")
       .in("ownership_status", ["dso_affiliated", "pe_backed"])

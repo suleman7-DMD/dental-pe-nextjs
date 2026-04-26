@@ -70,21 +70,29 @@ export async function getPracticeCountsByStatus(
 ): Promise<Record<string, number>> {
   // Use entity_classification as PRIMARY field for ownership counts,
   // with ownership_status as fallback only when entity_classification is null.
+  // Sourced from practice_locations (address-deduped, non-residential).
 
   // Build all queries first, then run in parallel
-  let indepQ = supabase.from("practices").select("npi", { count: "exact", head: true })
+  let indepQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
+    .eq("is_likely_residential", false)
     .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS]);
-  let indepFallbackQ = supabase.from("practices").select("npi", { count: "exact", head: true })
+  let indepFallbackQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
+    .eq("is_likely_residential", false)
     .is("entity_classification", null).in("ownership_status", ["independent", "likely_independent"]);
-  let corpQ = supabase.from("practices").select("npi", { count: "exact", head: true })
+  let corpQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
+    .eq("is_likely_residential", false)
     .in("entity_classification", ["dso_regional", "dso_national"]);
-  let corpFallbackQ = supabase.from("practices").select("npi", { count: "exact", head: true })
+  let corpFallbackQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
+    .eq("is_likely_residential", false)
     .is("entity_classification", null).in("ownership_status", ["dso_affiliated", "pe_backed"]);
-  let specQ = supabase.from("practices").select("npi", { count: "exact", head: true })
+  let specQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
+    .eq("is_likely_residential", false)
     .eq("entity_classification", "specialist");
-  let ncQ = supabase.from("practices").select("npi", { count: "exact", head: true })
+  let ncQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
+    .eq("is_likely_residential", false)
     .eq("entity_classification", "non_clinical");
-  let totalQ = supabase.from("practices").select("npi", { count: "exact", head: true });
+  let totalQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
+    .eq("is_likely_residential", false);
 
   // Apply ZIP filter if provided
   if (zips && zips.length > 0) {
@@ -216,29 +224,37 @@ export async function getPracticeStats(
     };
   }
 
+  // ── Source watched-ZIP counts from practice_locations (address-deduped) ─
+  // practice_locations collapses NPI-1 + NPI-2 + suite-variant rows at the
+  // same physical address into ONE canonical row. Filter is_likely_residential
+  // = false so home offices and academic ZIP trainees don't inflate counts.
+
   // ── Phase 2: Batch A — fast queries with narrow filters (3 concurrent) ─
   const [allDsoRegional, allDsoNational, dsoSpecialists] = await Promise.all([
     safeCount(
       supabase
-        .from("practices")
-        .select("npi", { count: "exact", head: true })
+        .from("practice_locations")
+        .select("location_id", { count: "exact", head: true })
         .in("zip", watchedZips)
+        .eq("is_likely_residential", false)
         .eq("entity_classification", "dso_regional"),
       "allDsoRegional"
     ),
     safeCount(
       supabase
-        .from("practices")
-        .select("npi", { count: "exact", head: true })
+        .from("practice_locations")
+        .select("location_id", { count: "exact", head: true })
         .in("zip", watchedZips)
+        .eq("is_likely_residential", false)
         .eq("entity_classification", "dso_national"),
       "allDsoNational"
     ),
     safeCount(
       supabase
-        .from("practices")
-        .select("npi", { count: "exact", head: true })
+        .from("practice_locations")
+        .select("location_id", { count: "exact", head: true })
         .in("zip", watchedZips)
+        .eq("is_likely_residential", false)
         .eq("entity_classification", "specialist")
         .in("ownership_status", ["dso_affiliated", "pe_backed"]),
       "dsoSpecialists"
@@ -249,9 +265,10 @@ export async function getPracticeStats(
   const [dsoNationalReal, dsoRegionalStrong] = await Promise.all([
     safeCount(
       supabase
-        .from("practices")
-        .select("npi", { count: "exact", head: true })
+        .from("practice_locations")
+        .select("location_id", { count: "exact", head: true })
         .in("zip", watchedZips)
+        .eq("is_likely_residential", false)
         .eq("entity_classification", "dso_national")
         .not(
           "affiliated_dso",
@@ -262,9 +279,10 @@ export async function getPracticeStats(
     ),
     safeCount(
       supabase
-        .from("practices")
-        .select("npi", { count: "exact", head: true })
+        .from("practice_locations")
+        .select("location_id", { count: "exact", head: true })
         .in("zip", watchedZips)
+        .eq("is_likely_residential", false)
         .eq("entity_classification", "dso_regional")
         .or(DSO_REGIONAL_STRONG_SIGNAL_FILTER),
       "dsoRegionalStrong"
@@ -272,22 +290,24 @@ export async function getPracticeStats(
   ]);
 
   // ── Phase 4: Expensive broad scans — run sequentially to avoid ─────────
-  // Supabase Postgres statement_timeout (error 57014). These queries scan
-  // large portions of the 400k-row practices table and timeout when
-  // competing for DB resources with concurrent queries.
+  // Supabase Postgres statement_timeout (error 57014). practice_locations
+  // is much smaller than practices (5,732 vs 14,053 watched-ZIP rows) so
+  // these scans complete in well under the timeout window.
   const watchedTotal = await safeCount(
     supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .in("zip", watchedZips),
+      .from("practice_locations")
+      .select("location_id", { count: "exact", head: true })
+      .in("zip", watchedZips)
+      .eq("is_likely_residential", false),
     "watchedTotal"
   );
 
   const independentByEC = await safeCount(
     supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
+      .from("practice_locations")
+      .select("location_id", { count: "exact", head: true })
       .in("zip", watchedZips)
+      .eq("is_likely_residential", false)
       .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS]),
     "independentByEC"
   );
@@ -370,9 +390,10 @@ export async function getPracticeStats(
 }
 
 /**
- * Count practices at retirement risk: independent, established before 1995.
+ * Count locations at retirement risk: independent, established before 1995.
  * Scoped to watched ZIPs only. Uses entity_classification (7 independent types).
- * Ground truth: 226.
+ * Sourced from practice_locations (address-deduped) so a single physical
+ * clinic with NPI-1 + NPI-2 rows at the same address counts ONCE.
  */
 export async function getRetirementRiskCount(
   supabase: SupabaseClient
@@ -388,9 +409,10 @@ export async function getRetirementRiskCount(
   if (watchedZips.length === 0) return 0;
 
   const { count, error } = await supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true })
+    .from("practice_locations")
+    .select("location_id", { count: "exact", head: true })
     .in("zip", watchedZips)
+    .eq("is_likely_residential", false)
     .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS])
     .not("year_established", "is", null)
     .lt("year_established", 1995);
@@ -400,9 +422,10 @@ export async function getRetirementRiskCount(
 }
 
 /**
- * Count practices that are high-value acquisition targets in watched ZIPs.
+ * Count locations that are high-value acquisition targets in watched ZIPs.
  * Criteria: buyability_score >= 50.
- * Ground truth: 34.
+ * Sourced from practice_locations (address-deduped) so multi-NPI clinics
+ * count once instead of inflating the target list.
  */
 export async function getAcquisitionTargetCount(
   supabase: SupabaseClient
@@ -418,9 +441,10 @@ export async function getAcquisitionTargetCount(
   if (watchedZips.length === 0) return 0;
 
   const { count, error } = await supabase
-    .from("practices")
-    .select("npi", { count: "exact", head: true })
+    .from("practice_locations")
+    .select("location_id", { count: "exact", head: true })
     .in("zip", watchedZips)
+    .eq("is_likely_residential", false)
     .not("buyability_score", "is", null)
     .gte("buyability_score", 50);
 

@@ -98,40 +98,45 @@ export default async function JobMarketPage() {
       // Total in default location
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
       ),
       // Independent count (7 types)
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .in('entity_classification', [...INDEPENDENT_CLASSIFICATIONS])
       ),
       // All dso_regional
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .eq('entity_classification', 'dso_regional')
       ),
       // All dso_national
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .eq('entity_classification', 'dso_national')
       ),
       // High-conf dso_national (exclude taxonomy leaks)
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .eq('entity_classification', 'dso_national')
           .not(
             'affiliated_dso',
@@ -142,43 +147,48 @@ export default async function JobMarketPage() {
       // High-conf dso_regional (strong signals only)
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .eq('entity_classification', 'dso_regional')
           .or(DSO_REGIONAL_STRONG_SIGNAL_FILTER)
       ),
       // DSO-owned specialists
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .eq('entity_classification', 'specialist')
           .in('ownership_status', ['dso_affiliated', 'pe_backed'])
       ),
       // High-volume solos
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .eq('entity_classification', 'solo_high_volume')
       ),
       // Large staff (10+ employees)
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .gte('employee_count', 10)
       ),
       // Retirement risk (independent + established before 1995)
       safeCount(
         supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
+          .from('practice_locations')
+          .select('location_id', { count: 'exact', head: true })
           .in('zip', defaultZips)
+          .eq('is_likely_residential', false)
           .in('entity_classification', [...INDEPENDENT_CLASSIFICATIONS])
           .not('year_established', 'is', null)
           .lt('year_established', 1995)

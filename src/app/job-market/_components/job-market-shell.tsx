@@ -371,18 +371,18 @@ function JobMarketShellInner({
         { count: largeStaffCount },
         { count: retireCount },
       ] = await Promise.all([
-        supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', zipList),
-        supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', zipList)
+        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false),
+        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
           .in('entity_classification', ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group']),
-        supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', zipList)
+        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
           .eq('entity_classification', 'dso_regional'),
-        supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', zipList)
+        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
           .eq('entity_classification', 'dso_national'),
-        supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', zipList)
+        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
           .eq('entity_classification', 'solo_high_volume'),
-        supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', zipList)
+        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
           .gte('employee_count', 10),
-        supabase.from('practices').select('npi', { count: 'exact', head: true }).in('zip', zipList)
+        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
           .in('entity_classification', ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group'])
           .not('year_established', 'is', null)
           .lt('year_established', 1995),

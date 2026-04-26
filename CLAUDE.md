@@ -75,14 +75,14 @@ Key tables (mirrored from Python pipeline's SQLite via `sync_to_supabase.py`):
 - **platforms**: 69 known DSO platform profiles.
 
 ### Current Data Stats
-- 402,004 practices (14,053 in watched ZIPs, all with entity_classification — live 2026-04-25)
+- 402,004 practices (14,053 NPI rows in watched ZIPs, all with entity_classification — live 2026-04-25)
+- **5,265 GP clinic locations in watched ZIPs** (`SUM(zip_scores.total_gp_locations)`) — the location-deduped denominator after collapsing NPI-1 + NPI-2 + suite-variant rows at the same physical building. ~2.7× smaller than the raw NPI count. Surfaced as a subtitle on Home + Job Market "Total Practices" KPI cards (Phase A, 2026-04-25, commit `732894f`).
 - 2,895 deals (coverage Oct 2020 – 2026-03-02; per Supabase live 2026-04-25). GDN's April roundup was 404 as of 2026-04-25, so 03-02 is current per source. SQLite has 2,861 (+34 ghost rows in Supabase, audit §15 #11).
 - 2,992 Data Axle enriched practices (with lat/lon, revenue, employees, year established)
 - 290 scored ZIPs (279 with saturation metrics)
 - 226 retirement risk practices (independent, established before 1995, in watched ZIPs)
 - 34 buyability targets (buyability_score >= 50, in watched ZIPs)
-- 262 high-confidence corporate (1.9%): 199 real dso_national + 23 strong dso_regional + 40 DSO-owned specialists
-- 1,392 all-signals corporate (9.9%): all dso_regional + all dso_national
+- **322 corporate (~2.3%) post-Phase B (2026-04-25): 213 dso_national + 109 dso_regional**. Down from 1,392 (-1,072) after the phone-only `dso_regional` signal was demoted in `dso_classifier.py` Pass 3. The reclassified rows landed in `small_group` / `large_group` / `family_practice`. Phone-sharing is now a FLAG (`shared_phone_flag` in `classification_reasoning`), not a sole classification trigger.
 
 ## Environment Variables
 
@@ -240,36 +240,35 @@ The `entity_classification` field on practices provides granular practice-type l
 | `family_practice` | group | 2+ providers at same address share a last name |
 | `small_group` | group | 2-3 providers at same address, different last names |
 | `large_group` | group | 4+ providers at same address, not matching known DSO |
-| `dso_regional` | corporate | Shows corporate signals (parent company, shared EIN, franchise field). **NOTE: 92% are phone-only signals — see Tiered Consolidation below.** |
+| `dso_regional` | corporate | Shows STRONG corporate signals (parent company, shared EIN across 2+ ZIPs, real franchise, branch+parent_company). **Post-Phase B (2026-04-25): phone-sharing is no longer a sole signal — it's a flag in `classification_reasoning` (`shared_phone_flag`). Watched-ZIP count dropped from 1,181 → 109 (-91%).** |
 | `dso_national` | corporate | Known national/regional DSO brand (Aspen, Heartland, etc.) |
 | `specialist` | other | Specialist practice (Ortho, Endo, Perio, OMS, Pedo) |
 | `non_clinical` | other | Dental lab, supply company, billing entity |
 
-### Watched ZIP Coverage (14,027 practices)
+### Watched ZIP Coverage (14,053 NPI rows / 5,265 GP clinic locations — post-Phase B 2026-04-25)
 All practices in watched ZIPs have entity_classification set (0 null). Distribution:
-- solo_established: 3,959 | solo_new: 20 | solo_inactive: 172 | solo_high_volume: 757
-- family_practice: 1,243 | small_group: 2,443 | large_group: 1,678
-- dso_regional: 1,181 | dso_national: 211
-- specialist: 2,346 | non_clinical: 17
+- solo_established: 3,575 | solo_new: 17 | solo_inactive: 170 | solo_high_volume: 709
+- family_practice: 1,708 | small_group: 2,727 | large_group: 2,456
+- **dso_regional: 109 | dso_national: 213**
+- specialist: 2,353 | non_clinical: 16
 
-### Tiered Consolidation (critical — verified 2026-03-15)
+**Pre-Phase B baseline (for regression detection):** dso_regional was 1,181 (-91% drop). The classifier rewrite (commit `dc18d24` for the location-dedup pass + classifier audit `2026-04-25` for Phase B demotion of phone-only signal) reclassified ~1,072 rows into small_group / large_group / family_practice — see `NPI_VS_PRACTICE_AUDIT.md` Appendix C in the parent repo.
 
-The `dso_regional` classification has a signal quality problem: **92% (1,091 of 1,181)** were triggered by shared phone numbers alone, which often just means multiple dentists at the same address — NOT a DSO.
+### Tiered Consolidation (Phase B resolved 2026-04-25)
 
-**High-confidence corporate (~2.3% = 328 practices):**
-- dso_national with real DSO brands (199, excludes 12 taxonomy leaks like "General Dentistry")
-- dso_regional with shared EIN (67) or generic brand/parent company/franchise (22)
-- DSO-owned specialists (40, entity_classification=specialist + ownership_status=dso_affiliated/pe_backed)
+**Status: RESOLVED.** The pre-Phase B problem — 92% (1,091 of 1,181) of `dso_regional` classifications were triggered by shared phone numbers alone — has been fixed in `scrapers/dso_classifier.py` Pass 3. Phone-sharing is now a flag (`shared_phone_flag` in `classification_reasoning`), not a sole classification trigger.
 
-**All-signals corporate (~9.9% = 1,392 practices):**
-- Above + 1,091 dso_regional classified by shared phone alone (weak signal)
+**Headline corporate count (~2.3% = ~322 practices):**
+- dso_national with real DSO brands (213, includes some taxonomy leaks — frontend filter still excludes those)
+- dso_regional with STRONG signals (109) — parent_company, EIN-shared-across-2+-zips, real franchise, branch+parent_company
+- DSO-owned specialists (≈40, entity_classification=specialist + ownership_status=dso_affiliated/pe_backed)
 
-**Frontend shows both tiers:**
-- KPI card: "Known Corporate: 2.3%" (high-confidence)
-- Below: "Including shared-phone signals: 9.9%" (amber, with explanation)
-- Tooltip on KPI explains methodology
+**`getPracticeStats()` tier wiring still applies:**
+- `corporateHighConf`: high-confidence count for headline KPI
+- `corporate`: all dso_regional + dso_national (after Phase B these numbers are nearly identical — the gap collapsed)
+- KPI card "Known Corporate" subtitle now shows the convergence
 
-**FUTURE TODO:** Reclassify 1,091 phone-only dso_regional back to small_group/large_group. Shared phone should be a FLAG, not enough alone for dso_regional. See memory: project_dso_reclassify.md.
+**Backwards-compat note:** Some legacy KPI strings still reference "1.9% / 9.9%" — those numbers were the pre-Phase B all-signals tier. After this sync lands in Supabase, headline corporate % should drop to ~2.3% across Home, Market Intel, and Job Market.
 
 ### Classification Helpers (src/lib/constants/entity-classifications.ts)
 - `isIndependentClassification(ec)` — true for solo_*, family_practice, small_group, large_group
@@ -288,7 +287,7 @@ Practices are categorized from entity_classification + buyability_score (NOT fro
 ### Saturation Metrics (in zip_scores)
 - **DLD (Dentist Location Density):** dld_gp_per_10k = GP offices per 10,000 residents. National avg ~6.1.
 - **Buyable Practice Ratio:** buyable_practice_ratio = % of GP offices classified as solo_established, solo_inactive, or solo_high_volume.
-- **Corporate Share:** corporate_share_pct = % of GP offices classified as dso_regional or dso_national. (includes phone-only signals — see Tiered Consolidation)
+- **Corporate Share:** corporate_share_pct = % of GP offices classified as dso_regional or dso_national. Post-Phase B (2026-04-25), phone-only signals no longer inflate this — see Tiered Consolidation.
 - **Market Type:** market_type = computed classification (9 possible values). NULL when metrics_confidence is 'low'.
 - **People per GP Door:** people_per_gp_door = population / GP locations.
 - **Opportunity Score:** opportunity_score = pre-computed in DB, used by ZIP Score table.
@@ -421,6 +420,54 @@ Monthly NPPES refresh (first Sunday 6am): downloads federal provider data update
 | `system.ts::getSourceCoverage()` | Added `dso_locations` + `ada_hpi_benchmarks` head-count queries to the Promise.all and wired `adsoCount`/`adaCount` into `result["ADSO Scraper"].count` and `result["ADA HPI"].count`. Previously hardcoded `count: 0` on those two keys, so the Data Source Coverage panel rendered 0 rows for both even though 92 DSO locations and 918 ADA benchmark rows are live |
 
 Paired with `scrapers/sync_to_supabase.py` per-row savepoint fix so deals with `uix_deal_no_dup` IntegrityError hits don't abort the whole batch transaction. Before this pair of fixes, a single duplicate in the deals sync would roll back every queued row — so recent deal scrapes never reached Supabase.
+
+## NPI vs Practice Conflation Fix (2026-04-25) — Do Not Regress
+
+A 3-part fix for the long-running NPI-row-as-practice vs physical-clinic-location confusion. NPPES emits 1 row per provider (NPI-1) AND 1 row per organization (NPI-2) at the same address — counting NPI rows as "practices" was inflating the watched-ZIP total ~2.7× (14,053 NPIs vs 5,265 GP clinic locations). Compounding this, the legacy `dso_classifier.py` Pass 3 was over-counting providers at shared phone numbers, classifying ~1,072 small/large/family groups as `dso_regional` purely because they shared a switchboard.
+
+### Foundational — Location-as-practice schema (parallel agent, commit `dc18d24`)
+
+- New `practice_locations` SQLite table — one row per (normalized address, ZIP) tuple. Joins NPI rows back via `practice_to_location_xref`.
+- Classifier Pass 3 (`classify_entity_types()` in `scrapers/dso_classifier.py`) now counts DISTINCT providers per location via `practice_locations`, EXCLUDING NPI-2 organization rows. The provider count is the foundation for `family_practice` / `small_group` / `large_group` thresholds.
+- `merge_and_score.py::compute_saturation_metrics()` now reads `total_gp_locations` from `practice_locations`, not from `practices` row counts. The location-deduped count is the honest "how many GP clinics" denominator.
+
+### Phase A — Surface location-deduped count in Next.js (this commit `732894f`)
+
+| File | Change |
+|------|--------|
+| `src/lib/supabase/queries/practices.ts` | `getPracticeStats()` adds a `zip_scores` sub-query summing `total_gp_locations` for watched ZIPs and returns `totalGpLocations` on the result |
+| `src/lib/supabase/types.ts` | `PracticeStats` interface gets `totalGpLocations?: number` with docstring explaining the location-dedup semantics |
+| `src/lib/types/index.ts` | `PracticeStats` + `HomeSummary` interfaces both gain `totalGpLocations?: number` |
+| `src/app/page.tsx` | `summary.totalGpLocations = practiceStats.totalGpLocations`; inline error fallback returns `totalGpLocations: undefined` to match the union |
+| `src/app/_components/home-shell.tsx` | "Total Practices" KPI card adds a subtitle: `<n> GP clinics in watched ZIPs` (only when `totalGpLocations > 0`) |
+| `src/app/job-market/_components/job-market-shell.tsx` | KPI strip computes `gpLocations` from filtered `zip_scores` and renders the subtitle on the matching KPI |
+
+The raw NPI count stays as the headline number on each card; the location-deduped count is the subtitle, so we don't break any cross-references to existing dashboards while making the discrepancy legible.
+
+### Phase B — Demote phone-only dso_regional signal (commit chain into `main`)
+
+`scrapers/dso_classifier.py` Pass 3 was treating "≥3 NPIs share a phone number across the watched ZIPs" as sufficient to label ALL of them `dso_regional`. In practice this was usually a multi-dentist group practice or family practice — same building, shared front desk — NOT a DSO. The phone-sharing pattern now writes a `shared_phone_flag: phone=<n> shared with <m> practices across <k>+ buildings` line to `classification_reasoning` but no longer overrides the structural classification (provider count, last-name match, taxonomy code, real corporate signals).
+
+**Verified counts (SQLite, 2026-04-25 post-Phase B):**
+
+| Classification | Pre-Phase B | Post-Phase B | Δ |
+|---|---:|---:|---:|
+| dso_regional | 1,181 | **109** | -1,072 |
+| small_group | 2,443 | 2,727 | +284 |
+| large_group | 1,678 | 2,456 | +778 |
+| family_practice | 1,243 | 1,708 | +465 |
+| solo_established | 3,959 | 3,575 | -384 |
+| **Total watched-ZIP NPIs** | **14,027** | **14,053** | +26 |
+
+The +26 net total comes from a small NPPES delta unrelated to Phase B.
+
+### Phase B Supabase commit (sync resilience)
+
+`sync_to_supabase.py::_sync_watched_zips_only` wraps TRUNCATE CASCADE + 14k inserts in a single atomic `pg_engine.begin()` block. Direct connection (port 5432) drops after ~4-5 min of sustained inserts, rolling back the whole transaction. Verified twice in this session — practices stayed at the OLD (pre-Phase B) state in Supabase even after sync claimed completion.
+
+**Workaround shipped:** `scrapers/upsert_practices_phaseB.py` — per-batch transactions (each 500-row batch in its own `connect()` + `commit()`), `pool_pre_ping=True`, upsert ON CONFLICT(npi) DO UPDATE (no TRUNCATE). Pattern lifted from `scrapers/fast_sync_watched.py`. Survives SSL drops because each batch is independently committed.
+
+**Future:** rewrite `_sync_watched_zips_only` to use the per-batch pattern. The atomic TRUNCATE+INSERT design was inherited from fresh-install bootstrap; for incremental updates it's strictly worse than upsert.
 
 ## Warroom Ship Log (2026-04-24 → 2026-04-25) — Do Not Regress
 
