@@ -153,7 +153,7 @@ const EXTRACTOR_SYSTEM_PROMPT = [
   "- confidence: \"high\" if value is from a verified web source (URL or named provider), \"medium\" if from analyst-curated synthesis (demand_outlook, supply_outlook, investment_thesis, structural fields), \"low\" if from inference or partial evidence.",
   "",
   "EXTRACTION RULES:",
-  `- Cap the ledger at ${MAX_LEDGER_ATOMS_HINT} atoms. If you have more material than that, prioritize the highest-signal facts: structural snapshot, financial metrics, owner career stage, reviews, hiring/acquisition signals, then market context. Drop low-signal trivia (e.g. work-from-home %, mean travel time).`,
+  `- Cap the ledger at ${MAX_LEDGER_ATOMS_HINT} atoms. If you have more material than that, prioritize in this order: (1) structural snapshot, (2) peer-percentile signals (buyability/retirement vs ZIP+class peers — these atoms have source_label = "peer percentile"), (3) financial metrics, (4) owner career stage, (5) reviews, (6) hiring/acquisition signals, (7) deal comps, (8) ZIP demographic context. Drop low-signal trivia FIRST (e.g. work-from-home %, mean travel time, racial composition, generic median income). Never drop a peer-percentile or deal-comps atom to make room for ZIP demographics.`,
   "- Extract every material fact within the cap. Do not editorialize. Do not summarize.",
   "- If a field is null or missing, skip it — never invent a value.",
   "- One atom per discrete fact. Don't combine \"5 employees and $800k revenue\" into one atom — emit two.",
