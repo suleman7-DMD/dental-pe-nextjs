@@ -342,6 +342,8 @@ function isLedgerAtom(x: unknown): x is LedgerAtom {
   if (!x || typeof x !== "object") return false
   const o = x as Record<string, unknown>
   if (typeof o.label !== "string" || o.label.trim().length === 0) return false
+  // Haiku 4.5 occasionally emits numeric values for percentile/score atoms — coerce so the schema check passes.
+  if (typeof o.value === "number") o.value = String(o.value)
   if (typeof o.value !== "string" || o.value.trim().length === 0) return false
   if (typeof o.source_label !== "string" || o.source_label.trim().length === 0) return false
   if (typeof o.category !== "string") return false
@@ -350,6 +352,96 @@ function isLedgerAtom(x: unknown): x is LedgerAtom {
   if (!["high", "medium", "low"].includes(o.confidence)) return false
   if (o.snippet != null && typeof o.snippet !== "string") return false
   return true
+}
+
+// Build deterministic peer-percentile atoms directly from PracticePeerPercentiles.
+// Backstop for Haiku silently dropping these atoms or mislabeling source_label —
+// we own the source-of-truth math here, so we emit the atoms unconditionally.
+function buildPeerPercentileAtoms(
+  percentiles: PracticePeerPercentiles | null,
+  entityClassification: string | null | undefined
+): LedgerAtom[] {
+  if (!hasMeaningfulPercentile(percentiles) || !percentiles) return []
+  const klass = entityClassification ?? "same-class"
+  const atoms: LedgerAtom[] = []
+  if (percentiles.buyability_pctile_zip_class != null) {
+    atoms.push({
+      label: "Buyability percentile (ZIP + class)",
+      value: String(percentiles.buyability_pctile_zip_class),
+      source_label: "peer percentile",
+      category: "signal",
+      confidence: "high",
+      snippet: null,
+    })
+  }
+  if (percentiles.buyability_pctile_class != null) {
+    atoms.push({
+      label: "Buyability percentile (class, all ZIPs)",
+      value: String(percentiles.buyability_pctile_class),
+      source_label: "peer percentile",
+      category: "signal",
+      confidence: "high",
+      snippet: null,
+    })
+  }
+  if (percentiles.retirement_pctile_zip_class != null) {
+    atoms.push({
+      label: "Retirement-risk percentile (ZIP + class)",
+      value: String(percentiles.retirement_pctile_zip_class),
+      source_label: "peer percentile",
+      category: "signal",
+      confidence: "high",
+      snippet: null,
+    })
+  }
+  if (percentiles.retirement_pctile_class != null) {
+    atoms.push({
+      label: "Retirement-risk percentile (class, all ZIPs)",
+      value: String(percentiles.retirement_pctile_class),
+      source_label: "peer percentile",
+      category: "signal",
+      confidence: "high",
+      snippet: null,
+    })
+  }
+  if (percentiles.deal_catchment_24mo != null) {
+    atoms.push({
+      label: "Deal catchment score (24mo)",
+      value: String(percentiles.deal_catchment_24mo),
+      source_label: "peer percentile",
+      category: "signal",
+      confidence: "high",
+      snippet: null,
+    })
+  }
+  if (percentiles.high_peer_retirement_flag === true) {
+    atoms.push({
+      label: "High peer retirement flag",
+      value: `tripped (top decile retirement risk vs ${klass} peers)`,
+      source_label: "peer percentile",
+      category: "signal",
+      confidence: "high",
+      snippet: null,
+    })
+  }
+  return atoms
+}
+
+// Merge deterministic atoms into a Haiku-emitted ledger, preferring the
+// deterministic atom whenever Haiku produced an atom with the same label
+// AND source_label === "peer percentile" (we always trust our math over the
+// model's parsing). Haiku atoms with other source labels coexist.
+function mergePeerPercentileAtoms(
+  haikuAtoms: LedgerAtom[],
+  injectedAtoms: LedgerAtom[]
+): LedgerAtom[] {
+  if (injectedAtoms.length === 0) return haikuAtoms
+  const injectedKeys = new Set(injectedAtoms.map((a) => a.label.toLowerCase()))
+  const filtered = haikuAtoms.filter(
+    (a) =>
+      !(a.source_label === "peer percentile" && injectedKeys.has(a.label.toLowerCase()))
+  )
+  return [...filtered, ...injectedAtoms]
 }
 
 function parseLedger(raw: string): LedgerAtom[] {
@@ -1025,7 +1117,14 @@ export async function POST(
   }
 
   const rawLedger = parseLedger(extractResult.text)
-  const normalizedLedger = normalizeLedger(rawLedger)
+  // Inject deterministic peer-percentile atoms — Haiku has been silently dropping these
+  // even when hasMeaningfulPercentile() is true, so we own the math directly.
+  const injectedPercentileAtoms = buildPeerPercentileAtoms(
+    percentiles,
+    body.practice.entity_classification
+  )
+  const mergedLedger = mergePeerPercentileAtoms(rawLedger, injectedPercentileAtoms)
+  const normalizedLedger = normalizeLedger(mergedLedger)
   const stalenessInfo = computeStalenessInfo(intel, zipIntel)
   const ledger = annotateTriangulation(annotateStaleness(normalizedLedger, stalenessInfo))
   const contradictions = detectContradictions(ledger)
