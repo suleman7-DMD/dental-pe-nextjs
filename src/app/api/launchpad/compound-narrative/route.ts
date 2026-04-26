@@ -133,7 +133,13 @@ const EXTRACTOR_SYSTEM_PROMPT = [
   "- Each element is an atom: {\"label\": string, \"value\": string, \"source_label\": string, \"category\": string, \"confidence\": string}",
   "- label: short noun phrase (≤6 words) describing what the atom is. e.g. \"Years in operation\", \"Owner career stage\", \"Median home price\"",
   "- value: concrete value, ≤25 words. Numbers stay as in source (don't round). e.g. \"22 years\", \"late-career, near retirement\", \"$680,000\"",
-  "- source_label: where the value comes from. For URLs use the bare domain (e.g. \"yelp.com\"). For named providers use the provider name (e.g. \"Redfin\", \"Healthgrades\", \"NPPES\", \"Data Axle\"). For structural facts in the practice header use \"structural\". For ZIP intel synthesis fields use \"ZIP intel\".",
+  "- source_label: where the value comes from. Pick from this hierarchy:",
+  "  1. Bare URL domain (e.g. \"yelp.com\", \"google.com\", \"healthgrades.com\") — use when the value is sourced from a specific verification URL or known web platform (Google reviews → google.com, Healthgrades reviews → healthgrades.com, Yelp reviews → yelp.com).",
+  "  2. Named research provider (e.g. \"Redfin\", \"DataUSA\", \"NPPES\", \"Data Axle\") — use when the value is sourced from a named ZIP-level research provider listed in the source labels.",
+  "  3. \"structural\" — use ONLY for facts in the '# Practice header (structural facts)' section above.",
+  "  4. \"practice intel\" — use for facts in the '# Verified web research' section that DON'T have a specific URL or platform (overall_assessment, acquisition_readiness, owner_career_stage, hiring_active, services, technology, green/red flags, ppo_heavy, accepts_medicaid, etc.).",
+  "  5. \"ZIP intel\" — use ONLY for the ZIP synthesis fields demand_outlook / supply_outlook / investment_thesis. Net-new ZIP specifics (median home price, employer names, demographics, dental landscape) should cite the named provider when given (Redfin, etc.) — fall back to \"ZIP intel\" only if no provider was named in the source.",
+  "  CRITICAL: Do NOT tag practice-level intel facts as \"ZIP intel\" — that's the most common mislabel. ZIP intel is ONLY for market-level facts about the geography.",
   "- category: one of {\"structural\", \"operational\", \"financial\", \"market\", \"signal\"}",
   "  - structural: years in operation, providers, employees, entity classification, location",
   "  - operational: services, technology, hiring activity, owner career stage, reviews",
@@ -184,19 +190,19 @@ function buildExtractorPrompt(
     `# Active structural signal IDs (DO NOT extract as atoms — these are pattern labels, not facts)`,
     signals.length > 0 ? signals.map((s) => `- ${s}`).join("\n") : "- (none)",
     ``,
-    `# Verified web research (source_label = bare URL domain or provider name)`,
-    `- Overall assessment: ${intel.overall_assessment ?? "n/a"}`,
-    `- Acquisition readiness: ${intel.acquisition_readiness ?? "n/a"}`,
-    `- Confidence: ${intel.confidence ?? "n/a"}`,
-    `- Hiring active: ${intel.hiring_active === 1 ? "yes" : intel.hiring_active === 0 ? "no" : "unknown"}`,
-    `- Acquisition rumors found: ${intel.acquisition_found === 1 ? "yes" : intel.acquisition_found === 0 ? "no" : "unknown"}`,
-    `- Google reviews: ${intel.google_review_count ?? "?"} (rating ${intel.google_rating ?? "?"})`,
-    `- Owner career stage: ${intel.owner_career_stage ?? "unknown"}`,
-    services.length > 0 ? `- Services: ${services.join(", ")}` : "",
-    techs.length > 0 ? `- Technology: ${techs.join(", ")}` : "",
-    greenFlags.length > 0 ? `- Green flags: ${greenFlags.slice(0, 5).join("; ")}` : "",
-    redFlags.length > 0 ? `- Red flags: ${redFlags.slice(0, 5).join("; ")}` : "",
-    verUrls.length > 0 ? `- Verification URLs: ${verUrls.join(", ")}` : "",
+    `# Verified web research (source_label = "practice intel" for synthesis fields below; use specific URL domain ONLY for review counts/ratings tied to a known platform)`,
+    `- Overall assessment [source_label: practice intel]: ${intel.overall_assessment ?? "n/a"}`,
+    `- Acquisition readiness [source_label: practice intel]: ${intel.acquisition_readiness ?? "n/a"}`,
+    `- Confidence [source_label: practice intel]: ${intel.confidence ?? "n/a"}`,
+    `- Hiring active [source_label: practice intel]: ${intel.hiring_active === 1 ? "yes" : intel.hiring_active === 0 ? "no" : "unknown"}`,
+    `- Acquisition rumors found [source_label: practice intel]: ${intel.acquisition_found === 1 ? "yes" : intel.acquisition_found === 0 ? "no" : "unknown"}`,
+    `- Google reviews [source_label: google.com]: ${intel.google_review_count ?? "?"} (rating ${intel.google_rating ?? "?"})`,
+    `- Owner career stage [source_label: practice intel]: ${intel.owner_career_stage ?? "unknown"}`,
+    services.length > 0 ? `- Services [source_label: practice intel]: ${services.join(", ")}` : "",
+    techs.length > 0 ? `- Technology [source_label: practice intel]: ${techs.join(", ")}` : "",
+    greenFlags.length > 0 ? `- Green flags [source_label: practice intel]: ${greenFlags.slice(0, 5).join("; ")}` : "",
+    redFlags.length > 0 ? `- Red flags [source_label: practice intel]: ${redFlags.slice(0, 5).join("; ")}` : "",
+    verUrls.length > 0 ? `- Verification URLs (use these as source_label when a specific fact above ties to one): ${verUrls.join(", ")}` : "",
     ``,
   ]
 
@@ -207,42 +213,42 @@ function buildExtractorPrompt(
     const zipUrls = parseUrls(zipIntel.sources).slice(0, 6)
     const zipLabels = parseZipSourceLabels(zipIntel.sources)
     lines.push(
-      `# ZIP market intelligence (source_label = "ZIP intel" for synthesis fields, or named provider for net-new specifics)`,
+      `# ZIP market intelligence (source_label = "ZIP intel" for the 3 synthesis fields below; use named provider — Redfin, DataUSA, etc. — for net-new market specifics)`,
       `- ZIP: ${zipIntel.zip_code}`,
       `- Researched: ${zipIntel.research_date ?? "unknown"}`,
       `- Confidence: ${zipIntel.confidence ?? "n/a"}`,
-      `- Demand outlook: ${demand ?? "n/a"}`,
-      `- Supply outlook: ${supply ?? "n/a"}`,
-      `- Investment thesis: ${thesis ?? "n/a"}`
+      `- Demand outlook [source_label: ZIP intel]: ${demand ?? "n/a"}`,
+      `- Supply outlook [source_label: ZIP intel]: ${supply ?? "n/a"}`,
+      `- Investment thesis [source_label: ZIP intel]: ${thesis ?? "n/a"}`
     )
     if (zipIntel.median_home_price != null)
-      lines.push(`- Median home price: $${zipIntel.median_home_price.toLocaleString()} (source: Redfin)`)
+      lines.push(`- Median home price [source_label: Redfin]: $${zipIntel.median_home_price.toLocaleString()}`)
     if (zipIntel.home_price_yoy_pct != null)
-      lines.push(`- Home price YoY change: ${zipIntel.home_price_yoy_pct}% (source: Redfin)`)
-    if (zipIntel.home_price_trend) lines.push(`- Home price trend: ${zipIntel.home_price_trend}`)
+      lines.push(`- Home price YoY change [source_label: Redfin]: ${zipIntel.home_price_yoy_pct}%`)
+    if (zipIntel.home_price_trend) lines.push(`- Home price trend [source_label: Redfin]: ${zipIntel.home_price_trend}`)
     if (zipIntel.pop_growth_signals)
-      lines.push(`- Population growth: ${stripCiteTags(zipIntel.pop_growth_signals)}`)
+      lines.push(`- Population growth [source_label: pick named provider from sources, fallback ZIP intel]: ${stripCiteTags(zipIntel.pop_growth_signals)}`)
     if (zipIntel.pop_demographics)
-      lines.push(`- Demographics: ${stripCiteTags(zipIntel.pop_demographics)}`)
+      lines.push(`- Demographics [source_label: pick named provider from sources, fallback ZIP intel]: ${stripCiteTags(zipIntel.pop_demographics)}`)
     if (zipIntel.major_employers)
-      lines.push(`- Major employers: ${stripCiteTags(zipIntel.major_employers)}`)
+      lines.push(`- Major employers [source_label: pick named provider from sources, fallback ZIP intel]: ${stripCiteTags(zipIntel.major_employers)}`)
     if (zipIntel.dental_new_offices)
-      lines.push(`- New dental offices: ${stripCiteTags(zipIntel.dental_new_offices)}`)
+      lines.push(`- New dental offices [source_label: pick named provider from sources, fallback ZIP intel]: ${stripCiteTags(zipIntel.dental_new_offices)}`)
     if (zipIntel.dental_dso_moves)
-      lines.push(`- Recent DSO moves: ${stripCiteTags(zipIntel.dental_dso_moves)}`)
-    if (zipIntel.competitor_new) lines.push(`- New competitors: ${stripCiteTags(zipIntel.competitor_new)}`)
+      lines.push(`- Recent DSO moves [source_label: pick named provider from sources, fallback ZIP intel]: ${stripCiteTags(zipIntel.dental_dso_moves)}`)
+    if (zipIntel.competitor_new) lines.push(`- New competitors [source_label: pick named provider from sources, fallback ZIP intel]: ${stripCiteTags(zipIntel.competitor_new)}`)
     if (zipIntel.competitor_closures)
-      lines.push(`- Recent closures: ${stripCiteTags(zipIntel.competitor_closures)}`)
+      lines.push(`- Recent closures [source_label: pick named provider from sources, fallback ZIP intel]: ${stripCiteTags(zipIntel.competitor_closures)}`)
     if (zipIntel.housing_status || zipIntel.housing_summary)
       lines.push(
-        `- Housing: ${[stripCiteTags(zipIntel.housing_status), stripCiteTags(zipIntel.housing_summary)].filter(Boolean).join(" — ")}`
+        `- Housing [source_label: Redfin if specific, else ZIP intel]: ${[stripCiteTags(zipIntel.housing_status), stripCiteTags(zipIntel.housing_summary)].filter(Boolean).join(" — ")}`
       )
     if (zipIntel.school_district || zipIntel.school_rating)
       lines.push(
-        `- Schools: ${[zipIntel.school_district, zipIntel.school_rating].filter(Boolean).join(" rated ")}`
+        `- Schools [source_label: ZIP intel]: ${[zipIntel.school_district, zipIntel.school_rating].filter(Boolean).join(" rated ")}`
       )
-    if (zipUrls.length > 0) lines.push(`- ZIP URLs: ${zipUrls.join(", ")}`)
-    if (zipLabels.length > 0) lines.push(`- ZIP source labels: ${zipLabels.join(", ")}`)
+    if (zipUrls.length > 0) lines.push(`- ZIP URLs (cite by domain): ${zipUrls.join(", ")}`)
+    if (zipLabels.length > 0) lines.push(`- Named ZIP providers (use these as source_label, NOT "ZIP intel"): ${zipLabels.join(", ")}`)
     lines.push(``)
   }
 
