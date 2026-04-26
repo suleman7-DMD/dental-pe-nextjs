@@ -454,6 +454,27 @@ Any page surfacing a Chicagoland headline KPI MUST resolve "Chicagoland" to the 
 
 Single-subzone defaults (West Loop, Naperville, Bolingbrook, etc.) are valid for explicit user selection but MUST NOT be the page-load default.
 
+### Live deploy verification (2026-04-26 04:45 UTC, commit `9e3375c`)
+
+Three commits chained on `main` to land the audit:
+- `0e67fc5` — primary KPI consistency fixes (7 files)
+- `40f7056` — CLAUDE.md regression rules
+- `9e3375c` — Warroom signal layer chunked at 50 ZIPs to dodge Supabase 8s `statement_timeout`
+
+Vercel deploy `dpl_nSdvkjofARjt9ukxYbktq5dKTe4N` is live on https://dental-pe-nextjs.vercel.app — production alias updated. All 6 affected pages return 200. Live numeric verification:
+
+| Page | Headline | NPI count | Verified value |
+|------|----------|----------:|---------------:|
+| Home (290 watched ZIPs) | 4,889 GP clinics | 14,053 | 254 retirement risk · 22 acquisition targets · 2,861 deals |
+| Job Market (269 ZIPs default) | 14,053 NPIs | 14,053 | All Chicagoland resolved correctly (was 142-ZIP West Loop pre-fix) |
+| Market Intel (269 ZIPs) | 14,053 NPIs | 14,053 | matches Job Market |
+| Warroom Hunt (269 ZIPs) | **5,491 location-deduped** | 14,053 | dedup helper now wired in — was 14k pre-fix |
+| Warroom Sitrep | `signalsAvailable: true` | n/a | empty `warnings: []` — `practice_signals` chunked-50 dodge worked |
+| Launchpad (269 Chicagoland, excl specialists) | 4,575 GP clinics | 11,894 | 1,380 best-fit · 104 hiring (was 0/0 in user complaint) |
+| Buyability (watched ZIPs) | 308 acq targets · 87 dead ends · 531 jobs · 74 specialists | 1,000 (page cap) | scoped to watched ZIPs (was global 500-row sample pre-fix) |
+
+The variance between 4,575 (Launchpad) ↔ 4,889 (Home) ↔ 5,491 (Warroom) is expected: Home includes Boston (290 ZIPs), Launchpad excludes specialists/non-clinical, Warroom counts unique-by-(address,zip) with no taxonomy filter. All three are honest denominators for their respective scopes.
+
 ## NPI vs Practice Conflation Fix (2026-04-25) — Do Not Regress
 
 A 3-part fix for the long-running NPI-row-as-practice vs physical-clinic-location confusion. NPPES emits 1 row per provider (NPI-1) AND 1 row per organization (NPI-2) at the same address — counting NPI rows as "practices" was inflating the watched-ZIP total ~2.7× (14,053 NPIs vs 5,265 GP clinic locations). Compounding this, the legacy `dso_classifier.py` Pass 3 was over-counting providers at shared phone numbers, classifying ~1,072 small/large/family groups as `dso_regional` purely because they shared a switchboard.
