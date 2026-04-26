@@ -23,8 +23,9 @@ const TEMPERATURE_SYNTH = 0.3
 const TEMPERATURE_EXTRACT = 0.0
 const MAX_TOKENS_VERIFIED = 350
 const MAX_TOKENS_PARTIAL = 200
-const EXTRACTOR_MAX_TOKENS = 2000
+const EXTRACTOR_MAX_TOKENS = 4000
 const MIN_LEDGER_ATOMS = 3
+const MAX_LEDGER_ATOMS_HINT = 30
 
 interface AnthropicContentBlock {
   type: string
@@ -145,7 +146,8 @@ const EXTRACTOR_SYSTEM_PROMPT = [
   "- confidence: \"high\" if value is from a verified web source (URL or named provider), \"medium\" if from analyst-curated synthesis (demand_outlook, supply_outlook, investment_thesis, structural fields), \"low\" if from inference or partial evidence.",
   "",
   "EXTRACTION RULES:",
-  "- Extract EVERY material fact. Do not editorialize. Do not summarize.",
+  `- Cap the ledger at ${MAX_LEDGER_ATOMS_HINT} atoms. If you have more material than that, prioritize the highest-signal facts: structural snapshot, financial metrics, owner career stage, reviews, hiring/acquisition signals, then market context. Drop low-signal trivia (e.g. work-from-home %, mean travel time).`,
+  "- Extract every material fact within the cap. Do not editorialize. Do not summarize.",
   "- If a field is null or missing, skip it — never invent a value.",
   "- One atom per discrete fact. Don't combine \"5 employees and $800k revenue\" into one atom — emit two.",
   "- Reviews/ratings: only emit if the source is Google or Healthgrades. Skip otherwise.",
@@ -272,18 +274,42 @@ function parseLedger(raw: string): LedgerAtom[] {
   // Strip markdown code fences if model ignored the no-fence rule
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
   const candidate = fenced ? fenced[1] : raw
-  // Find first [ and last ]
   const start = candidate.indexOf("[")
+  if (start === -1) return []
+
+  // Fast path: response is well-formed and has a closing bracket we can use
   const end = candidate.lastIndexOf("]")
-  if (start === -1 || end === -1 || end < start) return []
-  const slice = candidate.slice(start, end + 1)
-  try {
-    const parsed = JSON.parse(slice)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(isLedgerAtom)
-  } catch {
-    return []
+  if (end > start) {
+    try {
+      const parsed = JSON.parse(candidate.slice(start, end + 1))
+      if (Array.isArray(parsed)) {
+        const atoms = parsed.filter(isLedgerAtom)
+        if (atoms.length > 0) return atoms
+      }
+    } catch {
+      // fall through to recovery path
+    }
   }
+
+  // Recovery path: response was truncated mid-atom (Haiku ran out of tokens).
+  // Find every `}` after the opening `[` and try to JSON.parse the prefix
+  // closed with `]` until one parses. Keeps the largest valid prefix.
+  const body = candidate.slice(start)
+  let lastValid: LedgerAtom[] = []
+  for (let i = 0; i < body.length; i++) {
+    if (body[i] !== "}") continue
+    const attempt = body.slice(0, i + 1) + "]"
+    try {
+      const parsed = JSON.parse(attempt)
+      if (Array.isArray(parsed)) {
+        const atoms = parsed.filter(isLedgerAtom)
+        if (atoms.length > lastValid.length) lastValid = atoms
+      }
+    } catch {
+      // keep scanning
+    }
+  }
+  return lastValid
 }
 
 // ---------------------------------------------------------------------------
