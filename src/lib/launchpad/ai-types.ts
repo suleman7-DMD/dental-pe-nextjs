@@ -88,6 +88,19 @@ export interface LedgerAtom {
   source_label: string
   category: LedgerCategory
   confidence: "high" | "medium" | "low"
+  snippet?: string | null
+  triangulated?: boolean
+  stale?: boolean
+}
+
+export interface ThesisContradiction {
+  label: string
+  values: { source_label: string; value: string }[]
+}
+
+export interface ThesisQuestion {
+  topic: string
+  question: string
 }
 
 export interface CompoundNarrativeResponse {
@@ -95,6 +108,11 @@ export interface CompoundNarrativeResponse {
   reason?: "no_verified_research" | "validation_failed"
   evidence_quality?: "verified" | "partial" | "high"
   ledger?: LedgerAtom[]
+  contradictions?: ThesisContradiction[]
+  questions?: ThesisQuestion[]
+  thesis_stale?: boolean
+  stale_reason?: string
+  intel_age_days?: number | null
   structural_summary?: {
     name: string
     entity_classification: string | null

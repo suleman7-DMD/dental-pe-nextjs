@@ -6,6 +6,8 @@ import {
   DollarSign,
   MapPin,
   Flag,
+  CheckCheck,
+  Clock,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { LedgerAtom, LedgerCategory } from "@/lib/launchpad/ai-types"
@@ -87,6 +89,30 @@ function SourceBadge({ label }: { label: string }) {
   )
 }
 
+function TriangulatedBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 rounded border border-[#2D8B4E]/30 bg-[#2D8B4E]/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#2D8B4E]"
+      title="Two or more sources independently report this value"
+    >
+      <CheckCheck className="h-2.5 w-2.5" aria-hidden="true" />
+      Corroborated
+    </span>
+  )
+}
+
+function StaleBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-0.5 rounded border border-[#D4920B]/30 bg-[#D4920B]/10 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-[#D4920B]"
+      title="Source intel is older than 180 days — confidence downgraded"
+    >
+      <Clock className="h-2.5 w-2.5" aria-hidden="true" />
+      Stale
+    </span>
+  )
+}
+
 export function LedgerCards({ atoms }: LedgerCardsProps) {
   if (!atoms || atoms.length === 0) return null
 
@@ -141,8 +167,15 @@ export function LedgerCards({ atoms }: LedgerCardsProps) {
                       </span>
                     </div>
                     <p className="text-[11px] leading-snug text-[#1A1A1A]">{atom.value}</p>
-                    <div className="mt-0.5">
+                    {atom.snippet && (
+                      <p className="border-l-2 border-[#E8E5DE] pl-1.5 text-[10px] italic leading-snug text-[#6B6B60]">
+                        &ldquo;{atom.snippet}&rdquo;
+                      </p>
+                    )}
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
                       <SourceBadge label={atom.source_label} />
+                      {atom.triangulated && <TriangulatedBadge />}
+                      {atom.stale && <StaleBadge />}
                     </div>
                   </li>
                 ))}

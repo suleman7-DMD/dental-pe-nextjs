@@ -3,6 +3,8 @@ import type {
   CompoundNarrativeRequest,
   CompoundNarrativeResponse,
   LedgerAtom,
+  ThesisContradiction,
+  ThesisQuestion,
 } from "@/lib/launchpad/ai-types"
 import { getSupabaseServerClient } from "@/lib/supabase/server"
 import { getPracticeIntelByNpi, getZipIntelByZip } from "@/lib/supabase/queries/intel"
@@ -132,9 +134,10 @@ const EXTRACTOR_SYSTEM_PROMPT = [
   "",
   "OUTPUT CONTRACT:",
   "- Emit ONLY a JSON array. No code fences, no commentary, no preamble.",
-  "- Each element is an atom: {\"label\": string, \"value\": string, \"source_label\": string, \"category\": string, \"confidence\": string}",
+  "- Each element is an atom: {\"label\": string, \"value\": string, \"source_label\": string, \"category\": string, \"confidence\": string, \"snippet\": string|null}",
   "- label: short noun phrase (≤6 words) describing what the atom is. e.g. \"Years in operation\", \"Owner career stage\", \"Median home price\"",
   "- value: concrete value, ≤25 words. Numbers stay as in source (don't round). e.g. \"22 years\", \"late-career, near retirement\", \"$680,000\"",
+  "- snippet: short verbatim quote (≤20 words) from the source supporting the value, OR null. Use null when the source is structural/synthetic (header facts, percentile math, deal comps math). Use a quote when the source is a verbatim narrative field like overall_assessment, demand_outlook, supply_outlook, investment_thesis, or a green/red flag string. Don't fabricate quotes — if no exact source text exists, return null.",
   "- source_label: where the value comes from. Pick from this hierarchy:",
   "  1. Bare URL domain (e.g. \"yelp.com\", \"google.com\", \"healthgrades.com\") — use when the value is sourced from a specific verification URL or known web platform (Google reviews → google.com, Healthgrades reviews → healthgrades.com, Yelp reviews → yelp.com).",
   "  2. Named research provider (e.g. \"Redfin\", \"DataUSA\", \"NPPES\", \"Data Axle\") — use when the value is sourced from a named ZIP-level research provider listed in the source labels.",
@@ -345,6 +348,7 @@ function isLedgerAtom(x: unknown): x is LedgerAtom {
   if (!["structural", "operational", "financial", "market", "signal"].includes(o.category)) return false
   if (typeof o.confidence !== "string") return false
   if (!["high", "medium", "low"].includes(o.confidence)) return false
+  if (o.snippet != null && typeof o.snippet !== "string") return false
   return true
 }
 
@@ -388,6 +392,244 @@ function parseLedger(raw: string): LedgerAtom[] {
     }
   }
   return lastValid
+}
+
+// ---------------------------------------------------------------------------
+// Tier 2: ledger normalization + staleness + triangulation + contradiction
+// + owner-question bank + thesis-killer freshness check
+// ---------------------------------------------------------------------------
+
+function normalizeLedger(atoms: LedgerAtom[]): LedgerAtom[] {
+  return atoms.map((a) => ({
+    ...a,
+    snippet: a.snippet != null ? a.snippet.trim() || null : null,
+  }))
+}
+
+const STALE_DAYS = 180
+
+interface StalenessInfo {
+  practice_age_days: number | null
+  zip_age_days: number | null
+  practice_stale: boolean
+  zip_stale: boolean
+}
+
+function daysSince(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null
+  const t = Date.parse(dateStr)
+  if (isNaN(t)) return null
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
+}
+
+function computeStalenessInfo(
+  intel: PracticeIntel | null,
+  zipIntel: ZipQualitativeIntel | null
+): StalenessInfo {
+  const practiceAge = daysSince(intel?.research_date ?? null)
+  const zipAge = daysSince(zipIntel?.research_date ?? null)
+  return {
+    practice_age_days: practiceAge,
+    zip_age_days: zipAge,
+    practice_stale: practiceAge != null && practiceAge > STALE_DAYS,
+    zip_stale: zipAge != null && zipAge > STALE_DAYS,
+  }
+}
+
+function downgradeConfidence(c: LedgerAtom["confidence"]): LedgerAtom["confidence"] {
+  return c === "high" ? "medium" : c === "medium" ? "low" : "low"
+}
+
+function annotateStaleness(atoms: LedgerAtom[], info: StalenessInfo): LedgerAtom[] {
+  if (!info.practice_stale && !info.zip_stale) return atoms
+  return atoms.map((a) => {
+    const isPracticeAtom =
+      a.source_label === "practice intel" ||
+      a.source_label === "structural" ||
+      ["google.com", "healthgrades.com", "yelp.com", "zocdoc.com"].includes(a.source_label)
+    const isZipAtom =
+      a.source_label === "ZIP intel" ||
+      ["redfin", "datausa", "data axle"].includes(a.source_label.toLowerCase())
+    const stale =
+      (info.practice_stale && isPracticeAtom) || (info.zip_stale && isZipAtom)
+    if (!stale) return a
+    return { ...a, stale: true, confidence: downgradeConfidence(a.confidence) }
+  })
+}
+
+function normalizeNumericKey(value: string): string | null {
+  const m = value.match(/(\$?\s?[\d,.]+\s?[KMB%]?)/i)
+  if (!m) return null
+  return m[1].replace(/\s+/g, "").toLowerCase()
+}
+
+function labelKey(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+}
+
+function annotateTriangulation(atoms: LedgerAtom[]): LedgerAtom[] {
+  const groups = new Map<string, Set<string>>()
+  for (const a of atoms) {
+    const key = `${labelKey(a.label)}|${normalizeNumericKey(a.value) ?? a.value.toLowerCase().slice(0, 60)}`
+    const sources = groups.get(key) ?? new Set<string>()
+    sources.add(a.source_label.toLowerCase())
+    groups.set(key, sources)
+  }
+  return atoms.map((a) => {
+    const key = `${labelKey(a.label)}|${normalizeNumericKey(a.value) ?? a.value.toLowerCase().slice(0, 60)}`
+    const sources = groups.get(key)
+    if (sources && sources.size >= 2) return { ...a, triangulated: true }
+    return a
+  })
+}
+
+function detectContradictions(atoms: LedgerAtom[]): ThesisContradiction[] {
+  const byLabel = new Map<string, LedgerAtom[]>()
+  for (const a of atoms) {
+    const k = labelKey(a.label)
+    const arr = byLabel.get(k) ?? []
+    arr.push(a)
+    byLabel.set(k, arr)
+  }
+  const contradictions: ThesisContradiction[] = []
+  for (const [, group] of byLabel) {
+    if (group.length < 2) continue
+    const numericValues = new Set<string>()
+    for (const a of group) {
+      const k = normalizeNumericKey(a.value)
+      if (k) numericValues.add(k)
+    }
+    if (numericValues.size >= 2) {
+      contradictions.push({
+        label: group[0].label,
+        values: group.map((a) => ({ source_label: a.source_label, value: a.value })),
+      })
+    }
+  }
+  return contradictions
+}
+
+const NULL_FIELD_QUESTIONS: { field: keyof PracticeIntel; topic: string; question: string }[] = [
+  {
+    field: "owner_career_stage",
+    topic: "Owner timeline",
+    question:
+      "How long do you plan to stay clinically active, and have you sketched a transition timeline?",
+  },
+  {
+    field: "hiring_active",
+    topic: "Hiring posture",
+    question:
+      "Are you currently hiring an associate, and what's your roadmap for staffing over the next 12-24 months?",
+  },
+  {
+    field: "acquisition_readiness",
+    topic: "Sale readiness",
+    question:
+      "Have you considered a sale or buy-in structure? If so, what would the right partner look like?",
+  },
+  {
+    field: "ppo_heavy",
+    topic: "Insurance mix",
+    question:
+      "What's your current PPO / FFS / Medicaid mix, and are you considering dropping any plans?",
+  },
+  {
+    field: "accepts_medicaid",
+    topic: "Medicaid posture",
+    question:
+      "Do you accept Medicaid patients, and how does that shape your scheduling and case mix?",
+  },
+  {
+    field: "technology_listed",
+    topic: "Tech stack",
+    question:
+      "What digital scanning, CAD/CAM, or imaging tech do you have in-house, and what's on your wishlist?",
+  },
+  {
+    field: "services_listed",
+    topic: "Service mix",
+    question:
+      "Which procedures do you handle in-house vs refer out — implants, ortho, endo, surgery?",
+  },
+  {
+    field: "google_review_count",
+    topic: "Patient sentiment",
+    question:
+      "How are you tracking patient satisfaction beyond Google reviews — net promoter, recall rates, written feedback?",
+  },
+  {
+    field: "provider_count_web",
+    topic: "Team size",
+    question:
+      "How many dentists, hygienists, and assistants do you have on staff, and where are the open seats?",
+  },
+  {
+    field: "doctor_publications",
+    topic: "Mentorship signals",
+    question:
+      "How does the lead dentist invest in associate growth — case review, CE, hands-on coaching?",
+  },
+]
+
+function buildOwnerQuestions(intel: PracticeIntel): ThesisQuestion[] {
+  const questions: ThesisQuestion[] = []
+  for (const { field, topic, question } of NULL_FIELD_QUESTIONS) {
+    const v = intel[field]
+    const missing =
+      v == null ||
+      v === "" ||
+      v === "unknown" ||
+      v === "n/a" ||
+      (typeof v === "string" && v.trim().length === 0)
+    if (missing) questions.push({ topic, question })
+  }
+  return questions.slice(0, 6)
+}
+
+interface ThesisStaleInfo {
+  thesis_stale: boolean
+  stale_reason: string | null
+  intel_age_days: number | null
+}
+
+async function computeThesisStale(
+  npi: string,
+  researchDate: string | null
+): Promise<ThesisStaleInfo> {
+  const intelAge = daysSince(researchDate)
+  if (intelAge != null && intelAge > STALE_DAYS) {
+    return {
+      thesis_stale: true,
+      stale_reason: `Research is ${intelAge} days old (>${STALE_DAYS}d).`,
+      intel_age_days: intelAge,
+    }
+  }
+  if (!researchDate) {
+    return { thesis_stale: false, stale_reason: null, intel_age_days: null }
+  }
+  try {
+    const supabase = getSupabaseServerClient()
+    const { data, error } = await supabase
+      .from("practice_changes")
+      .select("change_date, change_type")
+      .eq("npi", npi)
+      .gt("change_date", researchDate)
+      .order("change_date", { ascending: false })
+      .limit(1)
+    if (error) return { thesis_stale: false, stale_reason: null, intel_age_days: intelAge }
+    if (data && data.length > 0) {
+      const c = data[0] as { change_date: string; change_type: string | null }
+      return {
+        thesis_stale: true,
+        stale_reason: `New ${c.change_type ?? "change"} recorded ${c.change_date} after research.`,
+        intel_age_days: intelAge,
+      }
+    }
+  } catch {
+    // ignore — non-fatal
+  }
+  return { thesis_stale: false, stale_reason: null, intel_age_days: intelAge }
 }
 
 // ---------------------------------------------------------------------------
@@ -742,7 +984,6 @@ export async function POST(
 
   const intelQuality = intel?.verification_quality ?? null
   const reliable = !!intel && (intelQuality === "verified" || intelQuality === "high")
-  const partial = !!intel && intelQuality === "partial"
   const noUsable =
     !intel ||
     intelQuality === "insufficient" ||
@@ -783,7 +1024,16 @@ export async function POST(
     return NextResponse.json({ error: extractResult.error }, { status: extractResult.status })
   }
 
-  const ledger = parseLedger(extractResult.text)
+  const rawLedger = parseLedger(extractResult.text)
+  const normalizedLedger = normalizeLedger(rawLedger)
+  const stalenessInfo = computeStalenessInfo(intel, zipIntel)
+  const ledger = annotateTriangulation(annotateStaleness(normalizedLedger, stalenessInfo))
+  const contradictions = detectContradictions(ledger)
+  const questions = buildOwnerQuestions(intel!)
+  const thesisStaleInfo = await computeThesisStale(
+    body.practice.npi,
+    intel?.research_date ?? null
+  )
 
   if (ledger.length < MIN_LEDGER_ATOMS) {
     console.warn(
@@ -833,7 +1083,16 @@ export async function POST(
     }
   }
   if (v1.ok) {
-    return NextResponse.json({ thesis: r1.text, evidence_quality: evidenceQuality, ledger })
+    return NextResponse.json({
+      thesis: r1.text,
+      evidence_quality: evidenceQuality,
+      ledger,
+      contradictions,
+      questions,
+      thesis_stale: thesisStaleInfo.thesis_stale,
+      stale_reason: thesisStaleInfo.stale_reason ?? undefined,
+      intel_age_days: thesisStaleInfo.intel_age_days,
+    })
   }
 
   console.warn(
@@ -871,7 +1130,16 @@ export async function POST(
     }
   }
   if (v2.ok) {
-    return NextResponse.json({ thesis: r2.text, evidence_quality: evidenceQuality, ledger })
+    return NextResponse.json({
+      thesis: r2.text,
+      evidence_quality: evidenceQuality,
+      ledger,
+      contradictions,
+      questions,
+      thesis_stale: thesisStaleInfo.thesis_stale,
+      stale_reason: thesisStaleInfo.stale_reason ?? undefined,
+      intel_age_days: thesisStaleInfo.intel_age_days,
+    })
   }
 
   console.warn(

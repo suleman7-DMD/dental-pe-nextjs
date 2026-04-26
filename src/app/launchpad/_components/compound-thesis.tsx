@@ -9,12 +9,17 @@ import {
   AlertTriangle,
   RotateCcw,
   FileSearch,
+  Clock,
+  AlertCircle,
+  MessageCircleQuestion,
 } from "lucide-react"
 import type {
   CompoundNarrativeRequest,
   CompoundNarrativeResponse,
   PracticeSnapshot,
   TrackScores,
+  ThesisContradiction,
+  ThesisQuestion,
 } from "@/lib/launchpad/ai-types"
 import type { LaunchpadTrack } from "@/lib/launchpad/signals"
 import { LedgerCards } from "./ledger-cards"
@@ -68,6 +73,87 @@ function RegenerateButton({ onClick }: { onClick: () => void }) {
       <RotateCcw className="h-3 w-3" />
       Regenerate
     </button>
+  )
+}
+
+function ThesisStaleBanner({
+  reason,
+  intelAgeDays,
+}: {
+  reason: string | null | undefined
+  intelAgeDays: number | null | undefined
+}) {
+  return (
+    <div className="flex items-start gap-1.5 rounded border border-[#D4920B]/30 bg-[#D4920B]/10 px-2 py-1.5 text-[11px] text-[#D4920B]">
+      <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold uppercase tracking-wider text-[10px]">Thesis may be stale</p>
+        <p className="mt-0.5 text-[11px] text-[#6B6B60]">
+          {reason ?? "Underlying intel is older than 180 days."}
+          {intelAgeDays != null && reason && !reason.includes("days old")
+            ? ` Intel is ${intelAgeDays} days old.`
+            : ""}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function ContradictionsCard({ contradictions }: { contradictions: ThesisContradiction[] }) {
+  if (contradictions.length === 0) return null
+  return (
+    <div className="rounded-md border border-[#C23B3B]/30 bg-[#C23B3B]/5 p-2">
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <AlertCircle className="h-3 w-3 text-[#C23B3B]" aria-hidden="true" />
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#C23B3B]">
+          Conflicting signal {contradictions.length === 1 ? "" : `(${contradictions.length})`}
+        </p>
+      </div>
+      <ul className="space-y-1.5">
+        {contradictions.map((c, i) => (
+          <li key={i} className="text-[11px] text-[#1A1A1A]">
+            <span className="font-medium">{c.label}:</span>{" "}
+            <span className="text-[#6B6B60]">
+              {c.values.map((v, j) => (
+                <span key={j}>
+                  {j > 0 && <span className="text-[#9C9C90]"> vs </span>}
+                  <span>
+                    {v.value}{" "}
+                    <span className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
+                      [{v.source_label}]
+                    </span>
+                  </span>
+                </span>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function OwnerQuestionsCard({ questions }: { questions: ThesisQuestion[] }) {
+  if (questions.length === 0) return null
+  return (
+    <div className="rounded-md border border-[#2563EB]/20 bg-[#2563EB]/5 p-2">
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <MessageCircleQuestion className="h-3 w-3 text-[#2563EB]" aria-hidden="true" />
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-[#2563EB]">
+          Ask the owner ({questions.length})
+        </p>
+      </div>
+      <ul className="space-y-1.5">
+        {questions.map((q, i) => (
+          <li key={i} className="text-[11px] leading-snug text-[#1A1A1A]">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-[#6B6B60]">
+              {q.topic}
+            </span>
+            <p className="mt-0.5">{q.question}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -259,6 +345,12 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
 
           {isPartial && data && !isFetching && (
             <div className="space-y-2">
+              {data.thesis_stale && (
+                <ThesisStaleBanner
+                  reason={data.stale_reason}
+                  intelAgeDays={data.intel_age_days}
+                />
+              )}
               <div className="rounded border border-[#D4920B]/30 bg-[#D4920B]/5 px-2 py-1 text-[10px] font-medium text-[#D4920B]">
                 Limited evidence — partial verification only.
               </div>
@@ -270,11 +362,23 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
                 <RegenerateButton onClick={() => void refetch()} />
               </div>
               {data.ledger && data.ledger.length > 0 && <LedgerCards atoms={data.ledger} />}
+              {data.contradictions && data.contradictions.length > 0 && (
+                <ContradictionsCard contradictions={data.contradictions} />
+              )}
+              {data.questions && data.questions.length > 0 && (
+                <OwnerQuestionsCard questions={data.questions} />
+              )}
             </div>
           )}
 
           {isVerified && data && !isFetching && (
             <div className="space-y-2">
+              {data.thesis_stale && (
+                <ThesisStaleBanner
+                  reason={data.stale_reason}
+                  intelAgeDays={data.intel_age_days}
+                />
+              )}
               <div className="relative rounded-md border border-[#B8860B]/20 bg-gradient-to-br from-[#FEF9E7] to-[#FFFFFF] p-3 pr-12">
                 <AiBadge />
                 <p className="whitespace-pre-line text-[12px] leading-relaxed text-[#1A1A1A]">
@@ -283,6 +387,12 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
                 <RegenerateButton onClick={() => void refetch()} />
               </div>
               {data.ledger && data.ledger.length > 0 && <LedgerCards atoms={data.ledger} />}
+              {data.contradictions && data.contradictions.length > 0 && (
+                <ContradictionsCard contradictions={data.contradictions} />
+              )}
+              {data.questions && data.questions.length > 0 && (
+                <OwnerQuestionsCard questions={data.questions} />
+              )}
             </div>
           )}
         </div>
