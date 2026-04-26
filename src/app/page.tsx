@@ -55,6 +55,7 @@ export default async function HomePage() {
       return {
         totalPractices: 0,
         total: 0,
+        totalGpLocations: undefined as number | undefined,
         corporate: 0,
         corporateHighConf: 0,
         independent: 0,
@@ -123,6 +124,7 @@ export default async function HomePage() {
       ytdDeals: dealStats.ytdDeals,
       activeSponsors: dealStats.activeSponsors,
       totalPractices: practiceStats.totalPractices,
+      totalGpLocations: practiceStats.totalGpLocations,
       consolidatedPct: practiceStats.consolidatedPct,
       independentPct: practiceStats.independentPct,
       watchedZips,

@@ -167,10 +167,17 @@ export interface PipelineEvent {
 }
 
 export interface PracticeStats {
-  /** Global total practices (400k+) */
+  /** Global total practices (400k+) — RAW NPI-row count, includes NPI-1 + NPI-2 conflation */
   totalPractices: number
-  /** Total practices in watched ZIPs */
+  /** Total practices in watched ZIPs — RAW NPI-row count */
   total: number
+  /**
+   * Sum of `zip_scores.total_gp_locations` across watched ZIPs.
+   * Location-based dedup: collapses NPI-1 + NPI-2 + suite-variant rows at the
+   * same physical building to one clinic. Use this as the honest "how many
+   * clinics" denominator. ~5,700 vs ~14,000 NPI rows in watched ZIPs.
+   */
+  totalGpLocations?: number
   /** All dso_regional + dso_national in watched ZIPs */
   corporate: number
   /** High-confidence corporate: real dso_national + strong dso_regional + DSO-owned specialists */
@@ -197,7 +204,10 @@ export interface HomeSummary {
   totalDeals: number
   ytdDeals: number
   activeSponsors: number
+  /** Raw NPI-row count from `practices` table (includes NPI-1 + NPI-2 conflation) */
   totalPractices: number
+  /** Location-deduped clinic count — sum of zip_scores.total_gp_locations across watched ZIPs */
+  totalGpLocations?: number
   consolidatedPct: string
   independentPct: string
   watchedZips: number

@@ -308,6 +308,30 @@ export async function getPracticeStats(
     "enrichedCount"
   );
 
+  // Location-deduped GP clinic count: sum zip_scores.total_gp_locations
+  // across watched ZIPs. This is the honest "how many clinics" denominator —
+  // collapses NPI-1 + NPI-2 + suite-variant rows at the same physical
+  // building down to one. Pre-computed by merge_and_score.compute_saturation_metrics().
+  // Falls back to null if zip_scores hasn't been populated.
+  let totalGpLocations: number | null = null;
+  try {
+    const { data: zipRows, error: zsErr } = await supabase
+      .from("zip_scores")
+      .select("total_gp_locations")
+      .in("zip_code", watchedZips);
+    if (zsErr) {
+      console.warn("[getPracticeStats] zip_scores fetch failed:", zsErr.message);
+    } else if (zipRows) {
+      totalGpLocations = zipRows.reduce(
+        (sum: number, r: { total_gp_locations: number | null }) =>
+          sum + (r.total_gp_locations ?? 0),
+        0
+      );
+    }
+  } catch (e) {
+    console.warn("[getPracticeStats] zip_scores fetch threw:", e);
+  }
+
   // ── Compute derived stats ──────────────────────────────────────────────
   const t = watchedTotal ?? 0;
   const corporate = (allDsoRegional ?? 0) + (allDsoNational ?? 0);
@@ -332,6 +356,7 @@ export async function getPracticeStats(
   return {
     totalPractices: effectiveGlobalTotal,
     total: t,
+    totalGpLocations: totalGpLocations ?? undefined,
     corporate,
     corporateHighConf: highConfCorporate,
     independent,

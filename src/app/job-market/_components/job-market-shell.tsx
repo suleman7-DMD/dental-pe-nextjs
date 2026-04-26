@@ -494,6 +494,13 @@ function JobMarketShellInner({
       ? daEnrichVals.reduce((a, b) => a + b, 0) / daEnrichVals.length
       : 0
     const bprConfidence = avgDaEnrich > 50 ? 3 : avgDaEnrich > 20 ? 2 : 1
+    // Location-deduped clinic count (sum of total_gp_locations across active ZIPs).
+    // Collapses NPI-1 + NPI-2 + suite-variant rows at the same physical building
+    // to one clinic — the honest "how many clinics" denominator.
+    const gpLocations = filteredZs
+      .map((z) => z.total_gp_locations)
+      .filter((v): v is number => v != null && !isNaN(v))
+      .reduce((a, b) => a + b, 0)
 
     // Avg buyability — only available when full data is loaded
     let avg_buy = '--'
@@ -516,6 +523,7 @@ function JobMarketShellInner({
       avgDldVal,
       avgBpr,
       bprConfidence,
+      gpLocations,
     }
   }, [activeKpis, zipScores, loc.commutable_zips, practices])
 
@@ -563,6 +571,14 @@ function JobMarketShellInner({
               icon={<Hospital className="h-5 w-5" />}
               label="Total Practices"
               value={kpiDisplay.total_p.toLocaleString()}
+              subtitle={
+                kpiDisplay.gpLocations > 0 ? (
+                  <span className="text-xs text-[#6B6B60]">
+                    {kpiDisplay.gpLocations.toLocaleString()} GP clinics
+                  </span>
+                ) : undefined
+              }
+              tooltip="Top number is raw NPI rows from federal NPPES (counts individual dentists + organization rows registered separately at the same address). Subtitle shows physical-clinic count after deduping by address — the honest 'how many clinics' number for this living location."
             />
             <KpiCard
               icon={<CircleCheck className="h-5 w-5" />}

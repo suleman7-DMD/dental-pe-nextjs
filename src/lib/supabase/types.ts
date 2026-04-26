@@ -266,8 +266,17 @@ export interface DataFreshness {
 
 /** Tiered practice stats returned by getPracticeStats() */
 export interface PracticeStats {
+  /** Raw NPI-row count globally — includes NPI-1 + NPI-2 conflation */
   totalPractices: number;
+  /** Raw NPI-row count in watched ZIPs */
   total: number;
+  /**
+   * Sum of `zip_scores.total_gp_locations` across watched ZIPs.
+   * Location-based dedup: collapses NPI-1 + NPI-2 + suite-variant rows at the
+   * same physical building to one clinic. The honest "how many clinics"
+   * denominator. ~5,700 vs ~14,000 NPI rows in watched ZIPs.
+   */
+  totalGpLocations?: number;
   corporate: number;
   corporateHighConf: number;
   independent: number;

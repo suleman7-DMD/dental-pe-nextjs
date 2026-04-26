@@ -320,6 +320,14 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             icon={<Hospital className="h-4 w-4" />}
             label="Total Practices"
             value={summary.totalPractices.toLocaleString()}
+            subtitle={
+              summary.totalGpLocations && summary.totalGpLocations > 0 ? (
+                <span className="text-xs text-[#6B6B60]">
+                  {summary.totalGpLocations.toLocaleString()} GP clinics in watched ZIPs
+                </span>
+              ) : undefined
+            }
+            tooltip="NPI-row count from federal NPPES data (includes individual dentists + organization rows registered separately at the same building). The subtitle shows physical-clinic count after deduping by address — the honest 'how many clinics' number for watched ZIPs."
           />
           <KpiCard
             icon={<BarChart3 className="h-4 w-4" />}
@@ -381,12 +389,23 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#2D8B4E] opacity-75" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#2D8B4E]" />
           </span>
-          <span>
+          <span title="Raw NPI-row count from federal NPPES data (national).">
             <span className="text-[#1A1A1A] font-medium">
               {summary.totalPractices.toLocaleString()}
             </span>{' '}
-            practices
+            NPI records
           </span>
+          {summary.totalGpLocations && summary.totalGpLocations > 0 && (
+            <>
+              <span className="text-[#E8E5DE]">|</span>
+              <span title="Physical clinic count in watched ZIPs after location-based dedup (collapses NPI-1 + NPI-2 + suite variants at the same building).">
+                <span className="text-[#1A1A1A] font-medium">
+                  {summary.totalGpLocations.toLocaleString()}
+                </span>{' '}
+                GP clinics tracked
+              </span>
+            </>
+          )}
           <span className="text-[#E8E5DE]">|</span>
           <span>
             <span className="text-[#1A1A1A] font-medium">
