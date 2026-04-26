@@ -6,6 +6,11 @@ import type {
 } from "@/lib/launchpad/ai-types"
 import { getSupabaseServerClient } from "@/lib/supabase/server"
 import { getPracticeIntelByNpi, getZipIntelByZip } from "@/lib/supabase/queries/intel"
+import { getDealCompsForPractice, type DealCompsSummary } from "@/lib/supabase/queries/deals"
+import {
+  getPracticeSignalsByNpi,
+  type PracticePeerPercentiles,
+} from "@/lib/supabase/queries/warroom"
 import type { PracticeIntel, ZipQualitativeIntel } from "@/lib/types/intel"
 
 export const runtime = "nodejs"
@@ -21,8 +26,8 @@ const SYNTHESIZER_MODEL = "claude-sonnet-4-6"
 const EXTRACTOR_MODEL = "claude-haiku-4-5-20251001"
 const TEMPERATURE_SYNTH = 0.3
 const TEMPERATURE_EXTRACT = 0.0
-const MAX_TOKENS_VERIFIED = 350
-const MAX_TOKENS_PARTIAL = 200
+const MAX_TOKENS_VERIFIED = 500
+const MAX_TOKENS_PARTIAL = 280
 const EXTRACTOR_MAX_TOKENS = 4000
 const MIN_LEDGER_ATOMS = 3
 const MAX_LEDGER_ATOMS_HINT = 30
@@ -137,6 +142,8 @@ const EXTRACTOR_SYSTEM_PROMPT = [
   "  4. \"practice intel\" — use for facts in the '# Verified web research' section that DON'T have a specific URL or platform (overall_assessment, acquisition_readiness, owner_career_stage, hiring_active, services, technology, green/red flags, ppo_heavy, accepts_medicaid, etc.).",
   "  5. \"ZIP intel\" — use ONLY for the ZIP synthesis fields demand_outlook / supply_outlook / investment_thesis. Net-new ZIP specifics (median home price, employer names, demographics, dental landscape) should cite the named provider when given (Redfin, etc.) — fall back to \"ZIP intel\" only if no provider was named in the source.",
   "  CRITICAL: Do NOT tag practice-level intel facts as \"ZIP intel\" — that's the most common mislabel. ZIP intel is ONLY for market-level facts about the geography.",
+  "  6. \"deal comps\" — use ONLY for facts in the '# Deal comp signals' section (state-level recent-deal volume, top acquirer, freshest deal date, deal size/multiple medians).",
+  "  7. \"peer percentile\" — use ONLY for facts in the '# Peer percentile signals' section (this practice's relative position vs. entity_classification peers, with or without ZIP scope).",
   "- category: one of {\"structural\", \"operational\", \"financial\", \"market\", \"signal\"}",
   "  - structural: years in operation, providers, employees, entity classification, location",
   "  - operational: services, technology, hiring activity, owner career stage, reviews",
@@ -156,10 +163,23 @@ const EXTRACTOR_SYSTEM_PROMPT = [
   "- If the entire intel is empty / says \"n/a\" / has no usable values, return [] (empty array).",
 ].join("\n")
 
+function hasMeaningfulPercentile(p: PracticePeerPercentiles | null): boolean {
+  if (!p) return false
+  return (
+    p.buyability_pctile_zip_class != null ||
+    p.buyability_pctile_class != null ||
+    p.retirement_pctile_zip_class != null ||
+    p.retirement_pctile_class != null ||
+    p.deal_catchment_24mo != null
+  )
+}
+
 function buildExtractorPrompt(
   body: CompoundNarrativeRequest,
   intel: PracticeIntel,
-  zipIntel: ZipQualitativeIntel | null
+  zipIntel: ZipQualitativeIntel | null,
+  comps: DealCompsSummary | null,
+  percentiles: PracticePeerPercentiles | null
 ): string {
   const { practice: p, signals } = body
   const age =
@@ -247,6 +267,64 @@ function buildExtractorPrompt(
       )
     if (zipUrls.length > 0) lines.push(`- ZIP URLs (cite by domain): ${zipUrls.join(", ")}`)
     if (zipLabels.length > 0) lines.push(`- Named ZIP providers (use these as source_label, NOT "ZIP intel"): ${zipLabels.join(", ")}`)
+    lines.push(``)
+  }
+
+  if (comps) {
+    lines.push(
+      `# Deal comp signals (source_label = "deal comps"; category = "market")`,
+      `- State scope: ${comps.state}`,
+      `- Window: last ${comps.windowMonths} months`,
+      `- Total deals in state: ${comps.totalCount}`
+    )
+    if (comps.specialty && comps.specialtyCount != null) {
+      lines.push(`- ${comps.specialty} deals in state: ${comps.specialtyCount}`)
+    }
+    if (comps.topPlatform) {
+      lines.push(
+        `- Most active platform: ${comps.topPlatform.name} (${comps.topPlatform.count} deals)`
+      )
+    }
+    if (comps.topPeSponsor) {
+      lines.push(
+        `- Most active PE sponsor: ${comps.topPeSponsor.name} (${comps.topPeSponsor.count} deals)`
+      )
+    }
+    if (comps.freshestDate) lines.push(`- Freshest deal date: ${comps.freshestDate}`)
+    if (comps.medianSizeMM != null)
+      lines.push(`- Median deal size: $${comps.medianSizeMM}M`)
+    if (comps.medianEbitdaMultiple != null)
+      lines.push(`- Median EBITDA multiple: ${comps.medianEbitdaMultiple}x`)
+    lines.push(``)
+  }
+
+  if (hasMeaningfulPercentile(percentiles) && percentiles) {
+    lines.push(
+      `# Peer percentile signals (source_label = "peer percentile"; category = "signal")`,
+      `- Methodology: percentiles compare this practice to other ${p.entity_classification ?? "same-class"} practices, scoped within ZIP and across the full class. Higher = more attractive on that dimension.`
+    )
+    if (percentiles.buyability_pctile_zip_class != null)
+      lines.push(
+        `- Buyability percentile (within ZIP + class): ${percentiles.buyability_pctile_zip_class}`
+      )
+    if (percentiles.buyability_pctile_class != null)
+      lines.push(
+        `- Buyability percentile (within class, all ZIPs): ${percentiles.buyability_pctile_class}`
+      )
+    if (percentiles.retirement_pctile_zip_class != null)
+      lines.push(
+        `- Retirement-risk percentile (within ZIP + class): ${percentiles.retirement_pctile_zip_class}`
+      )
+    if (percentiles.retirement_pctile_class != null)
+      lines.push(
+        `- Retirement-risk percentile (within class, all ZIPs): ${percentiles.retirement_pctile_class}`
+      )
+    if (percentiles.high_peer_retirement_flag === true)
+      lines.push(`- High peer retirement flag: tripped (top decile retirement risk vs peers)`)
+    if (percentiles.deal_catchment_24mo != null)
+      lines.push(
+        `- Deal catchment score (24mo, normalized 0-1): ${percentiles.deal_catchment_24mo}`
+      )
     lines.push(``)
   }
 
@@ -606,14 +684,21 @@ export async function POST(
 
   let intel: PracticeIntel | null = null
   let zipIntel: ZipQualitativeIntel | null = null
+  let comps: DealCompsSummary | null = null
+  let percentiles: PracticePeerPercentiles | null = null
   try {
     const supabase = getSupabaseServerClient()
-    const [intelResult, zipIntelResult] = await Promise.allSettled([
-      getPracticeIntelByNpi(supabase, body.practice.npi),
-      body.practice.zip
-        ? getZipIntelByZip(supabase, body.practice.zip)
-        : Promise.resolve(null),
-    ])
+    const inferredSpecialty =
+      body.practice.entity_classification === "specialist" ? null : "general"
+    const [intelResult, zipIntelResult, compsResult, percentilesResult] =
+      await Promise.allSettled([
+        getPracticeIntelByNpi(supabase, body.practice.npi),
+        body.practice.zip
+          ? getZipIntelByZip(supabase, body.practice.zip)
+          : Promise.resolve(null),
+        getDealCompsForPractice(supabase, body.practice.state, inferredSpecialty),
+        getPracticeSignalsByNpi(body.practice.npi, supabase),
+      ])
     if (intelResult.status === "fulfilled") {
       intel = intelResult.value
     } else {
@@ -628,6 +713,24 @@ export async function POST(
       console.warn(
         `[compound-narrative] zip_qualitative_intel fetch failed for zip=${body.practice.zip}:`,
         zipIntelResult.reason instanceof Error ? zipIntelResult.reason.message : zipIntelResult.reason
+      )
+    }
+    if (compsResult.status === "fulfilled") {
+      comps = compsResult.value
+    } else {
+      console.warn(
+        `[compound-narrative] deal comps fetch failed for state=${body.practice.state}:`,
+        compsResult.reason instanceof Error ? compsResult.reason.message : compsResult.reason
+      )
+    }
+    if (percentilesResult.status === "fulfilled") {
+      percentiles = percentilesResult.value
+    } else {
+      console.warn(
+        `[compound-narrative] practice_signals fetch failed for npi=${body.practice.npi}:`,
+        percentilesResult.reason instanceof Error
+          ? percentilesResult.reason.message
+          : percentilesResult.reason
       )
     }
   } catch (err) {
@@ -664,7 +767,7 @@ export async function POST(
   // ----------------------------------------------------------------
   // Pass 1: Extract evidence ledger via Haiku
   // ----------------------------------------------------------------
-  const extractorPrompt = buildExtractorPrompt(body, intel!, zipIntel)
+  const extractorPrompt = buildExtractorPrompt(body, intel!, zipIntel, comps, percentiles)
   const extractResult = await callAnthropic(
     apiKey,
     EXTRACTOR_MODEL,

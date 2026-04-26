@@ -1003,4 +1003,38 @@ export async function getWarroomSummary(
   };
 }
 
+export interface PracticePeerPercentiles {
+  npi: string;
+  buyability_pctile_zip_class: number | null;
+  buyability_pctile_class: number | null;
+  retirement_pctile_zip_class: number | null;
+  retirement_pctile_class: number | null;
+  high_peer_retirement_flag: boolean | null;
+  peer_percentile_reasoning: string | null;
+  deal_catchment_24mo: number | null;
+  deal_catchment_reasoning: string | null;
+}
+
+const PEER_PERCENTILE_SELECT =
+  "npi,buyability_pctile_zip_class,buyability_pctile_class,retirement_pctile_zip_class,retirement_pctile_class,high_peer_retirement_flag,peer_percentile_reasoning,deal_catchment_24mo,deal_catchment_reasoning";
+
+/**
+ * Single-NPI fetch of peer-percentile + deal-catchment columns from practice_signals.
+ * Used by the compound-narrative route to inject peer atoms into the evidence ledger.
+ * Returns null when the NPI has no signal row (most non-watched-ZIP practices).
+ */
+export async function getPracticeSignalsByNpi(
+  npi: string,
+  supabaseClient?: SupabaseClient
+): Promise<PracticePeerPercentiles | null> {
+  const supabase = getClient(supabaseClient);
+  const { data, error } = await supabase
+    .from("practice_signals")
+    .select(PEER_PERCENTILE_SELECT)
+    .eq("npi", npi)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as PracticePeerPercentiles | null) ?? null;
+}
+
 export { getScopeLabel, resolveScopeZipCodes };

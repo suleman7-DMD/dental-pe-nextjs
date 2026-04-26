@@ -251,6 +251,106 @@ export async function getRecentDeals(
   return (data as Deal[]) ?? [];
 }
 
+export interface DealCompsSummary {
+  state: string;
+  windowMonths: number;
+  totalCount: number;
+  specialtyCount: number | null;
+  specialty: string | null;
+  topPlatform: { name: string; count: number } | null;
+  topPeSponsor: { name: string; count: number } | null;
+  freshestDate: string | null;
+  medianSizeMM: number | null;
+  medianEbitdaMultiple: number | null;
+}
+
+/**
+ * Aggregate deal-comp signals for a specific practice — used by the compound-narrative
+ * route to inject "deal comps" atoms into the evidence ledger.
+ *
+ * Returns null when state is missing or no deals match the window. Specialty filter is
+ * applied as an additional bucket but the headline count is always state-wide so the
+ * thesis can frame "X deals in IL last 24mo" even when specialty is unknown.
+ */
+export async function getDealCompsForPractice(
+  supabase: SupabaseClient,
+  state: string | null | undefined,
+  specialty: string | null | undefined,
+  windowMonths = 24
+): Promise<DealCompsSummary | null> {
+  if (!state) return null;
+
+  const since = new Date();
+  since.setMonth(since.getMonth() - windowMonths);
+  const sinceIso = since.toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("deals")
+    .select("deal_date, platform_company, pe_sponsor, specialty, deal_size_mm, ebitda_multiple")
+    .eq("target_state", state)
+    .gte("deal_date", sinceIso)
+    .order("deal_date", { ascending: false });
+
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{
+    deal_date: string | null;
+    platform_company: string | null;
+    pe_sponsor: string | null;
+    specialty: string | null;
+    deal_size_mm: number | null;
+    ebitda_multiple: number | null;
+  }>;
+  if (rows.length === 0) return null;
+
+  const platformCounts = new Map<string, number>();
+  const sponsorCounts = new Map<string, number>();
+  const sizes: number[] = [];
+  const multiples: number[] = [];
+  let specialtyCount = 0;
+  let freshestDate: string | null = null;
+
+  for (const r of rows) {
+    if (r.platform_company && r.platform_company !== "Unknown") {
+      platformCounts.set(r.platform_company, (platformCounts.get(r.platform_company) ?? 0) + 1);
+    }
+    if (r.pe_sponsor) {
+      sponsorCounts.set(r.pe_sponsor, (sponsorCounts.get(r.pe_sponsor) ?? 0) + 1);
+    }
+    if (specialty && r.specialty === specialty) specialtyCount++;
+    if (typeof r.deal_size_mm === "number") sizes.push(r.deal_size_mm);
+    if (typeof r.ebitda_multiple === "number") multiples.push(r.ebitda_multiple);
+    if (r.deal_date && (!freshestDate || r.deal_date > freshestDate)) freshestDate = r.deal_date;
+  }
+
+  const topEntry = (m: Map<string, number>) => {
+    let best: { name: string; count: number } | null = null;
+    for (const [k, v] of m) {
+      if (!best || v > best.count) best = { name: k, count: v };
+    }
+    return best;
+  };
+
+  const median = (arr: number[]): number | null => {
+    if (arr.length === 0) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+
+  return {
+    state,
+    windowMonths,
+    totalCount: rows.length,
+    specialtyCount: specialty ? specialtyCount : null,
+    specialty: specialty ?? null,
+    topPlatform: topEntry(platformCounts),
+    topPeSponsor: topEntry(sponsorCounts),
+    freshestDate,
+    medianSizeMM: median(sizes),
+    medianEbitdaMultiple: median(multiples),
+  };
+}
+
 /**
  * Paginated helper to fetch all rows of a single column from deals table.
  */
