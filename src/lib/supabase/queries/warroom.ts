@@ -71,6 +71,12 @@ interface CountFilterQuery extends CountQuery {
 interface PaginationOptions {
   pageSize?: number;
   maxRows?: number;
+  /**
+   * Override `ZIP_FILTER_CHUNK_SIZE` for this call. Smaller chunks avoid
+   * Supabase statement_timeout (8s on free tier) on heavy SELECT-many-cols
+   * queries against `practice_signals` (~14k rows × 40 cols across 269 ZIPs).
+   */
+  chunkSize?: number;
 }
 
 export interface ScopedPracticesOptions extends PaginationOptions {
@@ -175,7 +181,8 @@ async function fetchRowsByZipScope<T>(
   if (!zipCodes) return fetchAllWarroomPages(() => buildQuery(null), options);
 
   const rows: T[] = [];
-  const chunks = chunkArray(zipCodes, ZIP_FILTER_CHUNK_SIZE);
+  const effectiveChunkSize = options.chunkSize ?? ZIP_FILTER_CHUNK_SIZE;
+  const chunks = chunkArray(zipCodes, effectiveChunkSize);
 
   for (const chunk of chunks) {
     const remainingMaxRows =

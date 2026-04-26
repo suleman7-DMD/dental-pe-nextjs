@@ -79,8 +79,11 @@ async function loadSignalsSafely(
   error: string | null;
 }> {
   try {
+    // chunkSize: 50 keeps each practice_signals SELECT well under Supabase's
+    // 8s statement_timeout. The default ZIP_FILTER_CHUNK_SIZE=200 was sending
+    // ~10k rows × 40 columns per chunk for All Chicagoland and timing out.
     const [practiceSignals, zipSignals] = await Promise.all([
-      getScopedPracticeSignals(scope, {}, supabase),
+      getScopedPracticeSignals(scope, { chunkSize: 50 }, supabase),
       getScopedZipSignals(scope, {}, supabase),
     ]);
     return { practiceSignals, zipSignals, error: null };
