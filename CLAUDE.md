@@ -825,6 +825,18 @@ Multi-session work — a parallel session ran Phase 2 surgical cuts (modes 4→2
 - Reclassify 1,091 phone-only `dso_regional` practices in `dso_classifier.py` Pass 3. Shared phone becomes a flag, not enough alone for `dso_regional`. Need to backfill `entity_classification` and re-sync. Estimated 4-6 hours including validation
 - Bulk practice import via CSV upload on Warroom — would let user paste a target list from external research and pin them all at once. Net new feature. Estimated 1 day
 
+## Bug Fixes Applied (2026-04-26 Multi-Agent F-Fix Verification) — Do Not Regress
+
+A multi-agent (A-D) re-audit verified all 33 F-numbered fixes individually at the root level. Frontend-relevant outcomes:
+
+| F-# | File | Fix |
+|-----|------|-----|
+| F27 | `src/__tests__/classification-primary.test.ts` | NEW Vitest regression test that recursively walks src/ TypeScript files, strips strings/comments before grep, and fails the build if any file references `ownership_status` without an accompanying `entity_classification` / `classifyPractice` / `isIndependentClassification` / `isCorporateClassification` companion. CATEGORIZATION_HELPERS array drives the matcher. ALLOWLIST has 10 entries each with a justification comment. **Test 2** is a stale-allowlist guard — fails when an allowlisted file no longer needs the exception (catches removals so the allowlist doesn't accumulate dead entries). `npx vitest run` → 2 passed (2), 149ms. |
+| F28 | `.github/workflows/data-invariants.yml` | NEW weekly CI — cron `0 13 * * 1` (Mondays 13:00 UTC) + `workflow_dispatch`. Verifies `SUPABASE_URL` + `SUPABASE_ANON_KEY` secrets present, runs `python3 scripts/check_data_invariants.py`, mirrors output to `$GITHUB_STEP_SUMMARY` (always, success or fail), and posts to a Discord webhook on failure (non-blocking — webhook secret optional). Catches data-shape drift between Supabase and the Next.js type system that wouldn't surface until a user-facing render breaks. |
+| F31 | `src/app/data-breakdown/page.tsx` + `src/components/layout/sidebar.tsx` | NEW `/data-breakdown` page — force-dynamic Server Component calling `getDataBreakdownBundle(supabase)` with try/catch fallback. Per-KPI provenance: every "X practices in Chicagoland" type number traces back to its source query, table, ZIP scope, and timestamp. Small bar-chart visualizations decompose each KPI (corporate share by ZIP, etc.). Sidebar entry added under ANALYSIS group with `BarChart3` icon (line 65). Satisfies the verifiability requirement that every visible number must be auditable end-to-end. |
+
+The full F01–F33 roll-up table lives in the parent repo's `CLAUDE.md` under "Session Digest — 2026-04-26 Multi-Agent F-Fix Verification (33/33 PASS)". Read that for cross-cutting context (scraper-side fixes, cost calibration, multi-agent coexistence rules).
+
 ## Development
 
 ```bash
@@ -832,4 +844,5 @@ npm run dev     # Start dev server (localhost:3000)
 npm run build   # TypeScript check + production build
 npm start       # Production server
 npm run lint    # ESLint
+npx vitest run  # Run regression tests (includes F27 classification-primary.test.ts)
 ```
