@@ -1004,11 +1004,19 @@ export async function getWarroomSummary(
       return false;
     }).length;
   } else {
-    ownership = await getOwnershipCountsByQuery(supabase, resolution.zipCodes);
-    enrichedPractices = await countEnrichedPractices(supabase, resolution.zipCodes);
-    acquisitionTargets = await countAcquisitionTargets(supabase, resolution.zipCodes);
-    retirementRisk = await countRetirementRisk(supabase, resolution.zipCodes);
-    corporateHighConfidence = await countCorporateHighConfidence(supabase, resolution.zipCodes);
+    [
+      ownership,
+      enrichedPractices,
+      acquisitionTargets,
+      retirementRisk,
+      corporateHighConfidence,
+    ] = await Promise.all([
+      getOwnershipCountsByQuery(supabase, resolution.zipCodes),
+      countEnrichedPractices(supabase, resolution.zipCodes),
+      countAcquisitionTargets(supabase, resolution.zipCodes),
+      countRetirementRisk(supabase, resolution.zipCodes),
+      countCorporateHighConfidence(supabase, resolution.zipCodes),
+    ]);
   }
 
   const [dealCount, deals, zipScores, changes, changes90d, scoreAverages] = await Promise.all([

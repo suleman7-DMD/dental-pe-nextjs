@@ -101,18 +101,20 @@ function reconcile(total: number, segments: BreakdownSegment[]): BreakdownBlock[
 export async function getGlobalPracticesByEntityClass(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
-  const counts = await Promise.all(
-    ENTITY_CLASSIFICATIONS.map(async (ec) => ({
-      label: ec.label,
-      count: await countWhere(supabase, "practices", [
-        { type: "eq", column: "entity_classification", value: ec.value },
-      ]),
-      color: ENTITY_CLASSIFICATION_COLORS[ec.value] ?? "#9C9C90",
-      description: ec.description,
-    }))
-  );
-  const nullCount = await countWhere(supabase, "practices", [
-    { type: "is", column: "entity_classification", value: null },
+  const [counts, nullCount] = await Promise.all([
+    Promise.all(
+      ENTITY_CLASSIFICATIONS.map(async (ec) => ({
+        label: ec.label,
+        count: await countWhere(supabase, "practices", [
+          { type: "eq", column: "entity_classification", value: ec.value },
+        ]),
+        color: ENTITY_CLASSIFICATION_COLORS[ec.value] ?? "#9C9C90",
+        description: ec.description,
+      }))
+    ),
+    countWhere(supabase, "practices", [
+      { type: "is", column: "entity_classification", value: null },
+    ]),
   ]);
   const segments = [
     ...counts,
@@ -172,20 +174,22 @@ export async function getWatchedPracticesByEntityClass(
 export async function getWatchedLocationsByEntityClass(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
-  const counts = await Promise.all(
-    ENTITY_CLASSIFICATIONS.map(async (ec) => ({
-      label: ec.label,
-      count: await countWhere(supabase, "practice_locations", [
-        { type: "eq", column: "is_likely_residential", value: false },
-        { type: "eq", column: "entity_classification", value: ec.value },
-      ]),
-      color: ENTITY_CLASSIFICATION_COLORS[ec.value] ?? "#9C9C90",
-      description: ec.description,
-    }))
-  );
-  const nullCount = await countWhere(supabase, "practice_locations", [
-    { type: "eq", column: "is_likely_residential", value: false },
-    { type: "is", column: "entity_classification", value: null },
+  const [counts, nullCount] = await Promise.all([
+    Promise.all(
+      ENTITY_CLASSIFICATIONS.map(async (ec) => ({
+        label: ec.label,
+        count: await countWhere(supabase, "practice_locations", [
+          { type: "eq", column: "is_likely_residential", value: false },
+          { type: "eq", column: "entity_classification", value: ec.value },
+        ]),
+        color: ENTITY_CLASSIFICATION_COLORS[ec.value] ?? "#9C9C90",
+        description: ec.description,
+      }))
+    ),
+    countWhere(supabase, "practice_locations", [
+      { type: "eq", column: "is_likely_residential", value: false },
+      { type: "is", column: "entity_classification", value: null },
+    ]),
   ]);
   const segments = [
     ...counts,
@@ -221,20 +225,22 @@ export async function getWatchedPracticesByDataSource(
   watchedZips: string[]
 ): Promise<BreakdownBlock> {
   const sources = ["nppes", "data_axle", "manual"];
-  const counts = await Promise.all(
-    sources.map(async (s, i) => ({
-      label: s.toUpperCase().replace("_", " "),
-      count: await countWhere(supabase, "practices", [
-        { type: "in", column: "zip", value: watchedZips },
-        { type: "eq", column: "data_source", value: s },
-      ]),
-      color: CHART_COLORWAY[i % CHART_COLORWAY.length],
-      description: `data_source = '${s}'`,
-    }))
-  );
-  const nullCount = await countWhere(supabase, "practices", [
-    { type: "in", column: "zip", value: watchedZips },
-    { type: "is", column: "data_source", value: null },
+  const [counts, nullCount] = await Promise.all([
+    Promise.all(
+      sources.map(async (s, i) => ({
+        label: s.toUpperCase().replace("_", " "),
+        count: await countWhere(supabase, "practices", [
+          { type: "in", column: "zip", value: watchedZips },
+          { type: "eq", column: "data_source", value: s },
+        ]),
+        color: CHART_COLORWAY[i % CHART_COLORWAY.length],
+        description: `data_source = '${s}'`,
+      }))
+    ),
+    countWhere(supabase, "practices", [
+      { type: "in", column: "zip", value: watchedZips },
+      { type: "is", column: "data_source", value: null },
+    ]),
   ]);
   const segments = [
     ...counts,
@@ -334,18 +340,20 @@ export async function getDealsByType(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
   const types = Object.keys(DEAL_TYPE_COLORS);
-  const counts = await Promise.all(
-    types.map(async (t) => ({
-      label: t,
-      count: await countWhere(supabase, "deals", [
-        { type: "eq", column: "deal_type", value: t },
-      ]),
-      color: DEAL_TYPE_COLORS[t] ?? "#9C9C90",
-      description: `deal_type = '${t}'`,
-    }))
-  );
-  const nullCount = await countWhere(supabase, "deals", [
-    { type: "is", column: "deal_type", value: null },
+  const [counts, nullCount] = await Promise.all([
+    Promise.all(
+      types.map(async (t) => ({
+        label: t,
+        count: await countWhere(supabase, "deals", [
+          { type: "eq", column: "deal_type", value: t },
+        ]),
+        color: DEAL_TYPE_COLORS[t] ?? "#9C9C90",
+        description: `deal_type = '${t}'`,
+      }))
+    ),
+    countWhere(supabase, "deals", [
+      { type: "is", column: "deal_type", value: null },
+    ]),
   ]);
   const segments = [
     ...counts,
@@ -412,20 +420,22 @@ export async function getWatchedPracticesByOwnership(
   watchedZips: string[]
 ): Promise<BreakdownBlock> {
   const statuses = Object.keys(OWNERSHIP_STATUS_COLORS);
-  const counts = await Promise.all(
-    statuses.map(async (s) => ({
-      label: s,
-      count: await countWhere(supabase, "practices", [
-        { type: "in", column: "zip", value: watchedZips },
-        { type: "eq", column: "ownership_status", value: s },
-      ]),
-      color: OWNERSHIP_STATUS_COLORS[s] ?? "#9C9C90",
-      description: `ownership_status = '${s}'`,
-    }))
-  );
-  const nullCount = await countWhere(supabase, "practices", [
-    { type: "in", column: "zip", value: watchedZips },
-    { type: "is", column: "ownership_status", value: null },
+  const [counts, nullCount] = await Promise.all([
+    Promise.all(
+      statuses.map(async (s) => ({
+        label: s,
+        count: await countWhere(supabase, "practices", [
+          { type: "in", column: "zip", value: watchedZips },
+          { type: "eq", column: "ownership_status", value: s },
+        ]),
+        color: OWNERSHIP_STATUS_COLORS[s] ?? "#9C9C90",
+        description: `ownership_status = '${s}'`,
+      }))
+    ),
+    countWhere(supabase, "practices", [
+      { type: "in", column: "zip", value: watchedZips },
+      { type: "is", column: "ownership_status", value: null },
+    ]),
   ]);
   const segments = [
     ...counts,
@@ -488,18 +498,20 @@ export async function getPracticeIntelByVerification(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
   const qualities = ["verified", "partial", "insufficient", "high"];
-  const counts = await Promise.all(
-    qualities.map(async (q, i) => ({
-      label: q,
-      count: await countWhere(supabase, "practice_intel", [
-        { type: "eq", column: "verification_quality", value: q },
-      ]),
-      color: CHART_COLORWAY[i % CHART_COLORWAY.length],
-      description: `verification_quality = '${q}'`,
-    }))
-  );
-  const nullCount = await countWhere(supabase, "practice_intel", [
-    { type: "is", column: "verification_quality", value: null },
+  const [counts, nullCount] = await Promise.all([
+    Promise.all(
+      qualities.map(async (q, i) => ({
+        label: q,
+        count: await countWhere(supabase, "practice_intel", [
+          { type: "eq", column: "verification_quality", value: q },
+        ]),
+        color: CHART_COLORWAY[i % CHART_COLORWAY.length],
+        description: `verification_quality = '${q}'`,
+      }))
+    ),
+    countWhere(supabase, "practice_intel", [
+      { type: "is", column: "verification_quality", value: null },
+    ]),
   ]);
   const segments = [
     ...counts,

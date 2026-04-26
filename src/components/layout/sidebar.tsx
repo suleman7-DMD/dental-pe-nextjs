@@ -89,6 +89,7 @@ function NavLink({
   const link = (
     <Link
       href={item.href}
+      prefetch={false}
       onClick={onClick}
       className={cn(
         "group relative flex items-center gap-3 rounded-md text-[13px] font-medium transition-all duration-150",
