@@ -268,6 +268,49 @@ function compareNullableString(a: string | null, b: string | null): number {
   return (a ?? "").localeCompare(b ?? "");
 }
 
+// Collapse NPI-1 + NPI-2 + suite-variant rows at the same physical address into
+// one target row, mirroring the dedup that `practice_locations` already does on
+// the pipeline side. Without this, Warroom Hunt mode shows ~14k NPI rows for
+// Chicagoland while the Sitrep KPIs (sourced from practice_locations) show
+// ~5.5k locations — the same prospects appear 2-3× in the target list.
+//
+// Priority for which NPI row represents the location:
+//   1. Has data_axle_import_date (enriched > unenriched)
+//   2. Higher buyability_score
+//   3. Higher classification_confidence
+//   4. Lowest NPI as a deterministic tie-break
+function locationDedupKey(row: PracticeRow): string {
+  const address = (row.address ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const zip = (row.zip ?? "").trim();
+  return address && zip ? `${address}|${zip}` : `npi:${row.npi}`;
+}
+
+function preferRow(a: PracticeRow, b: PracticeRow): PracticeRow {
+  const aEnriched = a.data_axle_import_date != null ? 1 : 0;
+  const bEnriched = b.data_axle_import_date != null ? 1 : 0;
+  if (aEnriched !== bEnriched) return aEnriched > bEnriched ? a : b;
+
+  const aScore = a.buyability_score ?? -1;
+  const bScore = b.buyability_score ?? -1;
+  if (aScore !== bScore) return aScore > bScore ? a : b;
+
+  const aConf = a.classification_confidence ?? -1;
+  const bConf = b.classification_confidence ?? -1;
+  if (aConf !== bConf) return aConf > bConf ? a : b;
+
+  return (a.npi ?? "") <= (b.npi ?? "") ? a : b;
+}
+
+function dedupPracticesByLocation(rows: PracticeRow[]): PracticeRow[] {
+  const byKey = new Map<string, PracticeRow>();
+  for (const row of rows) {
+    const key = locationDedupKey(row);
+    const existing = byKey.get(key);
+    byKey.set(key, existing ? preferRow(existing, row) : row);
+  }
+  return Array.from(byKey.values());
+}
+
 function sortPracticeRows(
   rows: PracticeRow[],
   orderBy: ScopedPracticesOptions["orderBy"] = "practice_name",
@@ -325,6 +368,11 @@ export async function getScopedPractices(
   }
 
   rows = filterPracticeRowsByPolygon(rows, polygon);
+  // Collapse NPI-1 + NPI-2 + suite-variant rows at the same physical address
+  // BEFORE sorting and slicing — otherwise Hunt mode shows 14k NPI rows for
+  // Chicagoland while the Sitrep KPIs (sourced from practice_locations) show
+  // ~5.5k locations, and the same prospect appears 2-3× in the target list.
+  rows = dedupPracticesByLocation(rows);
   rows = sortPracticeRows(rows, options.orderBy, options.ascending ?? true);
 
   if (options.maxRows != null) rows = rows.slice(0, options.maxRows);

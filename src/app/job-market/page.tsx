@@ -36,8 +36,14 @@ const safeCount = async (
 export default async function JobMarketPage() {
   const supabase = await createServerClient()
 
-  // Get the default location's ZIP list
-  const defaultLocationKey = Object.keys(LIVING_LOCATIONS)[0]
+  // Default to "All Chicagoland" so headline KPIs match Home / Warroom / Launchpad.
+  // Pre-2026-04-26 this used `Object.keys(LIVING_LOCATIONS)[0]` which returned
+  // "West Loop / South Loop" (142 ZIPs) — Job Market's KPIs disagreed with every
+  // other page even though all surfaces meant "Chicagoland".
+  const defaultLocationKey =
+    "All Chicagoland" in LIVING_LOCATIONS
+      ? "All Chicagoland"
+      : Object.keys(LIVING_LOCATIONS)[0]
   const defaultZips = LIVING_LOCATIONS[defaultLocationKey].commutable_zips
 
   try {

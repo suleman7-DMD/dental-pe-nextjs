@@ -454,11 +454,18 @@ export async function getAcquisitionTargetCount(
 
 /**
  * Fetch practices that have a buyability score, ordered by score descending.
+ *
+ * If `zips` is provided, restricts to that ZIP set (use this for Chicagoland-
+ * scoped views). Without a ZIP filter, this pulls global rows — only the
+ * highest-scored 500 by default — which produces an unscoped table that
+ * doesn't agree with any other page on the platform.
  */
 export async function getBuyabilityPractices(
   supabase: SupabaseClient,
-  limit = 500
+  options: { zips?: string[]; limit?: number } = {}
 ): Promise<Practice[]> {
+  const { zips, limit = 1000 } = options;
+
   const buyabilityFields = [
     'npi', 'practice_name', 'doing_business_as', 'city', 'state', 'zip',
     'phone', 'website', 'entity_classification', 'ownership_status',
@@ -467,12 +474,18 @@ export async function getBuyabilityPractices(
     'estimated_revenue', 'num_providers', 'taxonomy_code',
   ].join(',')
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("practices")
     .select(buyabilityFields)
     .not("buyability_score", "is", null)
     .order("buyability_score", { ascending: false })
     .limit(limit);
+
+  if (zips && zips.length > 0) {
+    query = query.in("zip", zips);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data as unknown as Practice[]) ?? [];

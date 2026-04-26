@@ -400,6 +400,17 @@ export async function getLaunchpadBundle(options: {
   const withIntel = intelByNpi.size
   const intelPct = totalPractices > 0 ? Math.round((withIntel / totalPractices) * 100) : 0
 
+  // Location-deduped GP count — sums total_gp_locations across scope ZIPs.
+  // Matches the Home + Job Market Phase A denominator (commit `732894f`).
+  // Pre-2026-04-26 the Launchpad headline KPI was the raw NPI count
+  // (~11,894 in All Chicagoland), inflating ~2.7× over the actual GP-clinic
+  // total (5,265) and disagreeing with every other surface.
+  const gpLocationSum = zipScores.reduce(
+    (sum, zs) => sum + (zs.total_gp_locations ?? 0),
+    0
+  )
+  const totalGpLocations = gpLocationSum > 0 ? gpLocationSum : null
+
   if (intelPct < 10 && totalPractices > 0) {
     warnings.push(`Intel coverage is thin (${intelPct}%)`)
   }
@@ -412,6 +423,7 @@ export async function getLaunchpadBundle(options: {
     scopeZipCount: zipCodes.length,
     generatedAt,
     totalPracticesInScope: totalPractices,
+    totalGpLocations,
     mentorRichCount: allSummary.mentorRich,
     hiringNowCount: allSummary.hiringNow,
     avoidListCount: allSummary.avoidList,

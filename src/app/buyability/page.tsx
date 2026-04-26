@@ -1,5 +1,6 @@
 import { createServerClient } from '@/lib/supabase/server'
 import { getBuyabilityPractices } from '@/lib/supabase/queries/practices'
+import { getWatchedZips } from '@/lib/supabase/queries/watched-zips'
 import { BuyabilityShell } from './_components/buyability-shell'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +13,11 @@ export const metadata = {
 export default async function BuyabilityPage() {
   try {
     const supabase = await createServerClient()
-    const practices = await getBuyabilityPractices(supabase)
+    // Restrict to watched ZIPs so the table agrees with every other page.
+    // Pre-2026-04-26 this pulled 500 rows globally, ignoring scope entirely.
+    const watchedZips = await getWatchedZips(supabase)
+    const zips = watchedZips.map((z) => z.zip_code)
+    const practices = await getBuyabilityPractices(supabase, { zips })
     return <BuyabilityShell initialPractices={practices} />
   } catch (error) {
     console.error('BuyabilityPage error:', error)

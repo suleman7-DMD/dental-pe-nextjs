@@ -52,9 +52,26 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
       >
         <KpiCard
           icon={<Building2 className="h-4 w-4" />}
-          label="Practices in scope"
-          value={summary ? summary.totalPracticesInScope.toLocaleString() : "--"}
-          tooltip="GP + specialist + non-clinical practices in selected living location"
+          label="GP clinics in scope"
+          value={
+            summary && summary.totalGpLocations != null
+              ? summary.totalGpLocations.toLocaleString()
+              : summary
+                ? summary.totalPracticesInScope.toLocaleString()
+                : "--"
+          }
+          subtitle={
+            summary && summary.totalGpLocations != null ? (
+              <span className="text-[11px] text-[#6B6B60]">
+                {summary.totalPracticesInScope.toLocaleString()} NPI rows
+              </span>
+            ) : (
+              <span className="text-[11px] text-[#9C9C90]">
+                Location dedup unavailable
+              </span>
+            )
+          }
+          tooltip="Location-deduped GP clinic count (sum of zip_scores.total_gp_locations across the scope's ZIPs). Subtitle shows the raw NPPES NPI row count, which is ~2.7× larger because NPPES emits one row per provider AND one per organization at the same address."
           accentColor="#B8860B"
         />
 

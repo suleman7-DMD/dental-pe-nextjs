@@ -402,6 +402,14 @@ export interface LaunchpadSummary {
   scopeZipCount: number
   generatedAt: string
   totalPracticesInScope: number
+  /**
+   * Location-deduped count of GP clinics across scope ZIPs (sum of
+   * zip_scores.total_gp_locations). Phase A denominator that collapses
+   * NPI-1 + NPI-2 + suite-variant rows at the same physical building.
+   * ~2.7× smaller than `totalPracticesInScope`. Null when zip_scores
+   * has no rows for the scope.
+   */
+  totalGpLocations: number | null
   mentorRichCount: number
   hiringNowCount: number
   avoidListCount: number
