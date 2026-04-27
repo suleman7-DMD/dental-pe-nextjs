@@ -2,7 +2,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getDataBreakdownBundle } from "@/lib/supabase/queries/data-breakdown";
 import { DataBreakdownShell } from "./_components/data-breakdown-shell";
 
-export const revalidate = 1800;
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 export const metadata = {
   title: "Data Breakdown | Dental PE Intelligence",
   description:

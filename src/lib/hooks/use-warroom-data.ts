@@ -93,6 +93,7 @@ export function useWarroomData(options: UseWarroomDataOptions = {}): UseWarroomD
     excludeCorporate: options.excludeCorporate,
     confidence: options.confidence,
     intentFilter: options.intentFilter,
+    loadSignals: true,
   };
 
   const queryOptions: UseQueryOptions<WarroomSitrepBundle, Error, WarroomSitrepBundle> = {

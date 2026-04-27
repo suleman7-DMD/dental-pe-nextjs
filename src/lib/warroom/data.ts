@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "../supabase/client";
 import {
+  computeSignalCounts,
   extractTopPracticeSignals,
   getScopedChanges,
   getScopedDeals,
@@ -208,6 +209,10 @@ export async function getSitrepBundle(
 
   if (practices.length === 0) {
     warnings.push("No practices returned in scope — sync or scope may be empty.");
+  }
+
+  if (signalsAvailable) {
+    summary.signalCounts = computeSignalCounts(practiceSignals, zipSignals);
   }
 
   const topSignals = extractTopPracticeSignals(practiceSignals, topSignalLimit);

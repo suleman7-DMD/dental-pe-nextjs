@@ -6,7 +6,8 @@ import {
 } from '@/lib/supabase/queries/deals'
 import { ResearchShell } from './_components/research-shell'
 
-export const revalidate = 1800
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 export const metadata = {
   title: 'Research Tools | Dental PE Intelligence',
   description:

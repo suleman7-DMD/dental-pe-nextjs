@@ -37,6 +37,8 @@ export const TRACK_MULTIPLIERS: Record<
     community_dso_signal: 0.0,
     tech_modern_signal: 0.7,
     mentor_density_zip_signal: 1.3,
+    commutable_signal: 1.2,
+    growing_undersupplied_signal: 1.3,
     dso_avoid_warning: 1.0,
     family_dynasty_warning: 1.5,
     ghost_practice_warning: 1.0,
@@ -57,6 +59,8 @@ export const TRACK_MULTIPLIERS: Record<
     community_dso_signal: 0.5,
     tech_modern_signal: 1.0,
     mentor_density_zip_signal: 0.8,
+    commutable_signal: 1.0,
+    growing_undersupplied_signal: 1.5,
     dso_avoid_warning: 1.0,
     family_dynasty_warning: 1.0,
     ghost_practice_warning: 1.0,
@@ -77,6 +81,8 @@ export const TRACK_MULTIPLIERS: Record<
     community_dso_signal: 2.0,
     tech_modern_signal: 0.8,
     mentor_density_zip_signal: 0.5,
+    commutable_signal: 0.8,
+    growing_undersupplied_signal: 0.5,
     dso_avoid_warning: 1.5,
     family_dynasty_warning: 0.0,
     ghost_practice_warning: 1.0,
@@ -139,7 +145,6 @@ export interface SignalEvaluationContext {
   scopeCommutableZips: Set<string>
   mentorRichCountByZip: Map<string, number>
   nowYear: number
-  recentDealZips: Set<string>
   recentAcquisitionNpis: Set<string>
 }
 
@@ -191,7 +196,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
     })
   }
 
-  const successionIntent = stringFromRawJson(intel?.raw_json ?? null, "succession_intent")
+  const successionIntent = intel?.succession_intent_detected ?? stringFromRawJson(intel?.raw_json ?? null, "succession_intent")
   if (successionIntent && successionIntent.toLowerCase() === "active_seeking") {
     active.push({
       id: "succession_published_signal",
@@ -238,7 +243,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
 
   const ppoHeavy = isTruthyFlag(intel?.ppo_heavy ?? null)
   const medicaid = isTruthyFlag(intel?.accepts_medicaid ?? null)
-  if (intel?.ppo_heavy === false && intel?.accepts_medicaid === false) {
+  if (intel && !ppoHeavy && !medicaid && (intel.ppo_heavy != null || intel.accepts_medicaid != null)) {
     active.push({
       id: "ffs_concierge_signal",
       reasoning: "Not PPO-heavy and not Medicaid — likely FFS or concierge mix.",
@@ -465,9 +470,6 @@ export function rankTargets(ctx: RankContext): LaunchpadRankedTarget[] {
     mentorRichCountByZip.set(practice.zip, (mentorRichCountByZip.get(practice.zip) ?? 0) + 1)
   }
 
-  const recentDealZips = new Set(
-    ctx.recentDeals.map((deal) => deal.target_zip).filter((zip): zip is string => Boolean(zip))
-  )
 
   const ranked: LaunchpadRankedTarget[] = ctx.practices.map((practice) => {
     const intel = ctx.intelByNpi.get(practice.npi) ?? null
@@ -481,7 +483,6 @@ export function rankTargets(ctx: RankContext): LaunchpadRankedTarget[] {
       scopeCommutableZips,
       mentorRichCountByZip,
       nowYear,
-      recentDealZips,
       recentAcquisitionNpis: ctx.recentAcquisitionNpis,
     }
 

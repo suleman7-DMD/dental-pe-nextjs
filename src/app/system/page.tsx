@@ -7,7 +7,8 @@ import {
 import type { SourceCoverage } from '@/lib/supabase/queries/system'
 import { SystemShell } from './_components/system-shell'
 
-export const revalidate = 1800
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 export const metadata = {
   title: 'System Health | Dental PE Intelligence',
   description:

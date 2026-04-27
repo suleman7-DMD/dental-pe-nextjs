@@ -4,7 +4,8 @@ import { DEFAULT_WARROOM_SCOPE } from "@/lib/warroom/scope"
 import type { WarroomSitrepBundle } from "@/lib/warroom/signals"
 import { WarroomShell } from "./_components/warroom-shell"
 
-export const revalidate = 900
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 export const metadata = {
   title: "Warroom | Dental PE Intelligence",
@@ -18,7 +19,7 @@ export default async function WarroomPage() {
 
   try {
     const supabase = getSupabaseServerClient()
-    initialBundle = await getSitrepBundle(DEFAULT_WARROOM_SCOPE, {}, supabase)
+    initialBundle = await getSitrepBundle(DEFAULT_WARROOM_SCOPE, { loadSignals: true }, supabase)
   } catch (error) {
     initialBundleError =
       error instanceof Error ? error.message : "Failed to load warroom bundle"

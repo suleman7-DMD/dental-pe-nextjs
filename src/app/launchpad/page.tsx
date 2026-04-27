@@ -5,7 +5,8 @@ import { DEFAULT_LAUNCHPAD_TRACK } from "@/lib/launchpad/signals"
 import { LaunchpadShell } from "./_components/launchpad-shell"
 import { AiDisabledBanner } from "./_components/ai-disabled-banner"
 
-export const revalidate = 900
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 
 export const metadata = {
   title: "Launchpad | Dental PE Intelligence",

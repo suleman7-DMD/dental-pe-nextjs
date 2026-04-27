@@ -65,6 +65,7 @@ type CountQuery = PromiseLike<SupabaseCountResult>;
 interface CountFilterQuery extends CountQuery {
   in(column: string, values: readonly unknown[]): CountFilterQuery;
   eq(column: string, value: unknown): CountFilterQuery;
+  neq(column: string, value: unknown): CountFilterQuery;
   is(column: string, value: null): CountFilterQuery;
   not(column: string, operator: string, value: unknown): CountFilterQuery;
   gte(column: string, value: unknown): CountFilterQuery;
@@ -440,12 +441,15 @@ export async function getScopedZipScores(
 
 async function fetchPracticeIdentitiesForNpis(
   supabase: SupabaseClient,
-  npis: string[]
+  npis: string[],
+  zipCodes: string[] | null = null
 ): Promise<PracticeIdentityRow[]> {
   if (npis.length === 0) return [];
 
   const wanted = new Set(npis);
-  const locations = await fetchPracticeLocations(supabase, { includeResidential: true });
+  // Pass zipCodes to scope the fetch to watched ZIPs — avoids loading all 5,732
+  // practice_locations rows when the scope only covers a few hundred ZIPs.
+  const locations = await fetchPracticeLocations(supabase, { zips: zipCodes, includeResidential: true });
   const rows: PracticeIdentityRow[] = [];
 
   for (const location of locations) {
@@ -511,7 +515,8 @@ export async function getScopedChanges(
   );
 
   const npis = Array.from(new Set(changes.map((change) => change.npi).filter(Boolean)));
-  const practices = await fetchPracticeIdentitiesForNpis(supabase, npis);
+  // Pass zipCodes to scope the practice_locations lookup (avoids full 5,732-row scan).
+  const practices = await fetchPracticeIdentitiesForNpis(supabase, npis, zipCodes);
   const practiceMap = new Map(practices.map((practice) => [practice.npi, practice]));
   const includeMissingPractice = false;
 
@@ -607,10 +612,14 @@ function basePracticeLocationCountQuery(
   supabase: SupabaseClient,
   zipChunk: string[] | null
 ): CountFilterQuery {
+  // Exclude org_only_npi rows — these are NPI-2 organization-record artifacts
+  // from the location dedup pass that have no standalone clinical meaning.
+  // 584 such rows exist in practice_locations; leaking them inflates KPIs.
   let query = supabase
     .from("practice_locations")
     .select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false) as unknown as CountFilterQuery;
+    .eq("is_likely_residential", false)
+    .neq("entity_classification", "org_only_npi") as unknown as CountFilterQuery;
   if (zipChunk) query = query.in("zip", zipChunk);
   return query;
 }
@@ -975,67 +984,24 @@ export async function getWarroomSummary(
 ): Promise<WarroomSummary> {
   const supabase = getClient(supabaseClient);
   const resolution = resolveScope(scope);
-  const isPolygonScope = Boolean(resolution.polygon);
-
-  let ownership: WarroomOwnershipCounts;
-  let enrichedPractices: number;
-  let acquisitionTargets: number;
-  let retirementRisk: number;
-  let corporateHighConfidence: number;
-
-  if (isPolygonScope) {
-    const practices = await getScopedPractices(scope, {}, supabase);
-    ownership = computeOwnershipCountsFromPractices(practices);
-    enrichedPractices = practices.filter((practice) => practice.data_axle_import_date != null).length;
-    acquisitionTargets = practices.filter((practice) => (practice.buyability_score ?? 0) >= 50).length;
-    retirementRisk = practices.filter((practice) => {
-      const group = classifyPractice(practice.entity_classification, practice.ownership_status);
-      return group === "independent" && (practice.year_established ?? 9999) < 1995;
-    }).length;
-    corporateHighConfidence = practices.filter((practice) => {
-      if (practice.entity_classification === "dso_national") return true;
-      if (
-        practice.entity_classification === "dso_regional" &&
-        (practice.ein || practice.parent_company || practice.franchise_name)
-      ) {
-        return true;
-      }
-      if (
-        practice.entity_classification === "specialist" &&
-        (practice.ownership_status === "dso_affiliated" || practice.ownership_status === "pe_backed")
-      ) {
-        return true;
-      }
-      return false;
-    }).length;
-  } else {
-    const practices = await getScopedPractices(scope, {}, supabase);
-    ownership = computeOwnershipCountsFromPractices(practices);
-    enrichedPractices = practices.filter((practice) => practice.data_axle_import_date != null).length;
-    acquisitionTargets = practices.filter((practice) => (practice.buyability_score ?? 0) >= 50).length;
-    retirementRisk = practices.filter((practice) => {
-      const group = classifyPractice(practice.entity_classification, practice.ownership_status);
-      return group === "independent" && (practice.year_established ?? 9999) < 1995;
-    }).length;
-    corporateHighConfidence = practices.filter((practice) => {
-      if (practice.entity_classification === "dso_national") return true;
-      if (
-        practice.entity_classification === "dso_regional" &&
-        (practice.ein || practice.parent_company || practice.franchise_name)
-      ) {
-        return true;
-      }
-      if (
-        practice.entity_classification === "specialist" &&
-        (practice.ownership_status === "dso_affiliated" || practice.ownership_status === "pe_backed")
-      ) {
-        return true;
-      }
-      return false;
-    }).length;
-  }
-
-  const [dealCount, deals, zipScores, changes, changes90d, scoreAverages] = await Promise.all([
+  // Use lightweight HEAD-only count queries against practice_locations instead of
+  // fetching all practice rows (getScopedPractices was loading all 5,732 rows
+  // twice via an identical if/else block, causing Supabase 8-second timeouts).
+  // The isPolygonScope branch never fires in the real UI — all 11 scopes resolve
+  // to ZIP arrays — so the dead code has been collapsed into a single Promise.all.
+  const [
+    ownership,
+    enrichedPractices,
+    acquisitionTargets,
+    retirementRisk,
+    corporateHighConfidence,
+    dealCount, deals, zipScores, changes, changes90d, scoreAverages,
+  ] = await Promise.all([
+    getOwnershipCountsByQuery(supabase, resolution.zipCodes),
+    countEnrichedPractices(supabase, resolution.zipCodes),
+    countAcquisitionTargets(supabase, resolution.zipCodes),
+    countRetirementRisk(supabase, resolution.zipCodes),
+    countCorporateHighConfidence(supabase, resolution.zipCodes),
     countScopedDeals(supabase, resolution.zipCodes),
     getScopedDeals(scope, {}, supabase),
     getScopedZipScores(scope, {}, supabase),

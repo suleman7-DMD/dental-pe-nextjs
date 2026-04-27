@@ -423,13 +423,25 @@ export async function getDealsByType(
 export async function getDealsByYear(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
-  const { data, error } = await supabase
-    .from("deals")
-    .select("deal_date")
-    .not("deal_date", "is", null);
-  if (error) throw error;
+  const PAGE_SIZE = 1000;
+  const allRows: { deal_date: string }[] = [];
+  let page = 0;
+  while (true) {
+    const from = page * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("deals")
+      .select("deal_date")
+      .not("deal_date", "is", null)
+      .range(from, to);
+    if (error) throw error;
+    const rows = (data ?? []) as { deal_date: string }[];
+    allRows.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    page += 1;
+  }
   const byYear = new Map<string, number>();
-  for (const row of (data as { deal_date: string }[]) ?? []) {
+  for (const row of allRows) {
     const y = row.deal_date.slice(0, 4);
     byYear.set(y, (byYear.get(y) ?? 0) + 1);
   }

@@ -14,7 +14,8 @@ import {
 } from '@/lib/constants/data-snapshot'
 import { JobMarketShell } from './_components/job-market-shell'
 
-export const revalidate = 1800
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 export const metadata = {
   title: 'Job Market Intelligence | Dental PE Intelligence',
   description:

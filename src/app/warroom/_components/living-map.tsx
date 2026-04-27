@@ -50,7 +50,9 @@ const LENS_COMPUTATIONS: Record<WarroomLens, LensComputation> = {
     unit: "%",
     description: "dso_regional + dso_national share of GP locations.",
     get: ({ zipScore }) => zipScore?.corporate_share_pct ?? null,
-    format: (value) => (value == null ? "--" : formatPercent(value)),
+    // corporate_share_pct is stored as a decimal fraction (e.g. 0.0682 = 6.82%).
+    // Multiply by 100 before passing to formatPercent so tooltip shows "6.8%" not "0.1%".
+    format: (value) => (value == null ? "--" : formatPercent(value * 100)),
   },
   density: {
     label: "Density",
@@ -64,7 +66,9 @@ const LENS_COMPUTATIONS: Record<WarroomLens, LensComputation> = {
     unit: "%",
     description: "% of GP offices classified as solo_established/solo_inactive/solo_high_volume.",
     get: ({ zipScore }) => zipScore?.buyable_practice_ratio ?? null,
-    format: (value) => (value == null ? "--" : formatPercent(value)),
+    // buyable_practice_ratio is stored as a decimal fraction (e.g. 0.538 = 53.8%).
+    // Multiply by 100 before passing to formatPercent so tooltip shows "53.8%" not "0.5%".
+    format: (value) => (value == null ? "--" : formatPercent(value * 100)),
   },
   retirement: {
     label: "Retirement combos",
