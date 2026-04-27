@@ -267,13 +267,6 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
   },
 }
 
-export const SIGNALS_REQUIRING_INTEL: LaunchpadSignalId[] = [
-  "hiring_now_signal",
-  "succession_published_signal",
-  "tech_modern_signal",
-  "ffs_concierge_signal",
-  "medicaid_mill_warning",
-]
 
 export interface LaunchpadPracticeRecord {
   id: number
@@ -354,7 +347,7 @@ export interface LaunchpadPracticeIntelRecord {
 
 export interface LaunchpadIntelAudit {
   npi: string
-  status: "source_backed" | "rejected"
+  status: "source_backed" | "legacy" | "rejected"
   research_date: string | null
   verification_quality: string | null
   verification_searches: number | null

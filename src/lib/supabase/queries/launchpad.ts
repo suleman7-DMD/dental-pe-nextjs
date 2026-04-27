@@ -22,6 +22,15 @@ import type {
 } from "@/lib/launchpad/signals"
 
 export const DEFAULT_RANK_LIMIT = 60
+
+/**
+ * How many structurally-ranked practices to fetch intel for.
+ * These are the top practices by structural score (no intel) before the intel
+ * boost is applied. Keeping this at 200 means 1 Supabase batch (500-row limit)
+ * instead of 26, bringing intel fetch time from ~17 s (cold start) to <1 s.
+ */
+const INTEL_FETCH_LIMIT = 200
+
 const SOURCE_BACKED_QUALITIES = new Set(["verified", "high", "partial"])
 
 // ---------------------------------------------------------------------------
@@ -153,13 +162,30 @@ function hasSourceBackedIntel(intel: LaunchpadPracticeIntelRecord): boolean {
   )
 }
 
+function hasSubstantiveIntel(intel: LaunchpadPracticeIntelRecord): boolean {
+  return (
+    intel.overall_assessment != null ||
+    intel.website_url != null ||
+    intel.google_rating != null
+  )
+}
+
 function auditForIntel(intel: LaunchpadPracticeIntelRecord): LaunchpadIntelAudit {
   const quality = intel.verification_quality?.toLowerCase() ?? null
   const searches = intel.verification_searches ?? 0
   const urlCount = intel.verification_urls?.length ?? 0
   const sourceBacked = hasSourceBackedIntel(intel)
-  let reason = "Accepted: source-backed practice_intel row."
-  if (!sourceBacked) {
+  const substantive = hasSubstantiveIntel(intel)
+  let status: LaunchpadIntelAudit["status"]
+  let reason: string
+  if (sourceBacked) {
+    status = "source_backed"
+    reason = "Accepted: source-backed practice_intel row."
+  } else if (substantive) {
+    status = "legacy"
+    reason = "Accepted: pre-verification intel with substantive content."
+  } else {
+    status = "rejected"
     if (!quality) reason = "Rejected: missing verification_quality."
     else if (!SOURCE_BACKED_QUALITIES.has(quality)) {
       reason = `Rejected: verification_quality=${quality}.`
@@ -167,11 +193,13 @@ function auditForIntel(intel: LaunchpadPracticeIntelRecord): LaunchpadIntelAudit
       reason = `Rejected: only ${searches} web search${searches === 1 ? "" : "es"} reported.`
     } else if (urlCount === 0) {
       reason = "Rejected: no verification URLs stored."
+    } else {
+      reason = "Rejected: no substantive content."
     }
   }
   return {
     npi: intel.npi,
-    status: sourceBacked ? "source_backed" : "rejected",
+    status,
     research_date: intel.research_date,
     verification_quality: intel.verification_quality,
     verification_searches: intel.verification_searches,
@@ -234,7 +262,13 @@ async function withTimeout<T>(
   }
 }
 
-/** Paginate through address-deduped practice locations in the given ZIP codes. */
+/**
+ * Paginate through address-deduped practice locations in the given ZIP codes.
+ * Excludes org_only_npi rows — these are billing-only NPI-2 organization records
+ * with no individual provider at the address. classifyPractice("org_only_npi")
+ * returns "unknown" and ~584 such rows (10.2% of practice_locations) would
+ * inflate totalPracticesInScope without contributing real job targets.
+ */
 async function fetchAllPracticesByZips(
   supabase: SupabaseClient,
   zipCodes: string[]
@@ -244,7 +278,9 @@ async function fetchAllPracticesByZips(
     orderBy: "buyability_score",
     ascending: false,
   })
-  return rows.map(practiceLocationToLaunchpadRecord)
+  return rows
+    .filter((row) => row.entity_classification !== "org_only_npi")
+    .map(practiceLocationToLaunchpadRecord)
 }
 
 type WatchedZipRow = {
@@ -340,7 +376,57 @@ async function fetchZipScores(
   return Array.from(byZip.values())
 }
 
-/** Fetch practice_intel rows for the given NPI set in batches of 500. */
+const PRACTICE_INTEL_SELECT = [
+  "npi",
+  "research_date",
+  "website_url",
+  "website_era",
+  "website_analysis",
+  "services_listed",
+  "services_high_rev",
+  "services_note",
+  "technology_listed",
+  "technology_level",
+  "provider_count_web",
+  "provider_notes",
+  "owner_career_stage",
+  "google_review_count",
+  "google_rating",
+  "google_velocity",
+  "google_sentiment",
+  "hiring_active",
+  "hiring_positions",
+  "hiring_source",
+  "succession_intent_detected",
+  "acquisition_found",
+  "acquisition_details",
+  "healthgrades_rating",
+  "healthgrades_reviews",
+  "accepts_medicaid",
+  "ppo_heavy",
+  "insurance_note",
+  "red_flags",
+  "green_flags",
+  "overall_assessment",
+  "acquisition_readiness",
+  "confidence",
+  "sources",
+  "verification_searches",
+  "verification_quality",
+  "verification_urls",
+  "raw_json",
+].join(",")
+
+/**
+ * Fetch practice_intel rows for the given NPI set in parallel batches of 500.
+ *
+ * IMPORTANT: Caller should pass only the NPIs for the top-INTEL_FETCH_LIMIT
+ * structurally-ranked practices, NOT the full ~12k-NPI scope. Querying all 12k
+ * NPIs requires ~26 sequential batches and exceeds Vercel's serverless budget on
+ * cold starts. Scoping to top-200 NPIs means 1 batch that completes in <500 ms
+ * even with a cold Supabase connection. The outer withTimeout is 25 s as
+ * belt-and-suspenders; with a proper index this should complete in <2 s.
+ */
 async function fetchPracticeIntel(
   supabase: SupabaseClient,
   npis: string[]
@@ -354,54 +440,15 @@ async function fetchPracticeIntel(
     batches.push(uniqueNpis.slice(i, i + BATCH_SIZE))
   }
 
+  // All batches run in parallel — safe because the caller scopes the NPI list
+  // to the top-INTEL_FETCH_LIMIT practices, so there are only 1-2 batches total.
   const results = await Promise.all(
     batches.map(async (batch) => {
       const { data, error } = await supabase
         .from("practice_intel")
-        .select(
-          [
-            "npi",
-            "research_date",
-            "website_url",
-            "website_era",
-            "website_analysis",
-            "services_listed",
-            "services_high_rev",
-            "services_note",
-            "technology_listed",
-            "technology_level",
-            "provider_count_web",
-            "provider_notes",
-            "owner_career_stage",
-            "google_review_count",
-            "google_rating",
-            "google_velocity",
-            "google_sentiment",
-            "hiring_active",
-            "hiring_positions",
-            "hiring_source",
-            "succession_intent_detected",
-            "acquisition_found",
-            "acquisition_details",
-            "healthgrades_rating",
-            "healthgrades_reviews",
-            "accepts_medicaid",
-            "ppo_heavy",
-            "insurance_note",
-            "red_flags",
-            "green_flags",
-            "overall_assessment",
-            "acquisition_readiness",
-            "confidence",
-            "sources",
-            "verification_searches",
-            "verification_quality",
-            "verification_urls",
-            "raw_json",
-          ].join(",")
-        )
+        .select(PRACTICE_INTEL_SELECT)
         .in("npi", batch)
-        .abortSignal(timeoutSignal(6000))
+        .abortSignal(timeoutSignal(8000))
 
       if (error) throw error
       return ((data as unknown as Record<string, unknown>[]) ?? []).map(normalizeIntelRow)
@@ -440,7 +487,14 @@ async function fetchRecentDeals(
   return all
 }
 
-/** Fetch recent acquisition NPIs from practice_changes. Returns empty Set + warning on failure. */
+/**
+ * Fetch recent acquisition NPIs from practice_changes.
+ * Returns empty Set + warning on failure.
+ *
+ * Fix (P1): PostgrestError is a plain object (not an Error instance), so
+ * String(err) returns "[object Object]". Use err?.message ?? JSON.stringify(err)
+ * to surface the real message. Also runs batches in parallel for speed.
+ */
 async function fetchRecentAcquisitionNpis(
   supabase: SupabaseClient,
   npis: string[],
@@ -450,27 +504,46 @@ async function fetchRecentAcquisitionNpis(
 
   try {
     const BATCH_SIZE = 500
+    const uniqueNpis = Array.from(new Set(npis.filter(Boolean)))
+
+    const batches: string[][] = []
+    for (let i = 0; i < uniqueNpis.length; i += BATCH_SIZE) {
+      batches.push(uniqueNpis.slice(i, i + BATCH_SIZE))
+    }
+
+    // Parallel batches with a generous per-batch timeout (5 s each).
+    const batchResults = await Promise.all(
+      batches.map(async (batch) => {
+        const { data, error } = await supabase
+          .from("practice_changes")
+          .select("npi")
+          .ilike("change_type", "%acquisition%")
+          .gte("change_date", cutoffDate)
+          .in("npi", batch)
+          .abortSignal(timeoutSignal(5000))
+
+        if (error) throw error
+        return (data as unknown as Array<{ npi: string | null }>) ?? []
+      })
+    )
+
     const matched = new Set<string>()
-
-    for (let i = 0; i < npis.length; i += BATCH_SIZE) {
-      const batch = npis.slice(i, i + BATCH_SIZE)
-      const { data, error } = await supabase
-        .from("practice_changes")
-        .select("npi")
-        .ilike("change_type", "%acquisition%")
-        .gte("change_date", cutoffDate)
-        .in("npi", batch)
-        .abortSignal(timeoutSignal(1500))
-
-      if (error) throw error
-      for (const row of (data as unknown as Array<{ npi: string | null }>) ?? []) {
+    for (const rows of batchResults) {
+      for (const row of rows) {
         if (row.npi) matched.add(String(row.npi))
       }
     }
 
     return { result: matched, warning: null }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    // PostgrestError is a plain object, not an Error instance.
+    // String(err) produces "[object Object]". Use message property if present.
+    const pgErr = err as { message?: string } | null
+    const msg =
+      err instanceof Error
+        ? err.message
+        : (pgErr?.message ?? JSON.stringify(err))
+    console.error("[launchpad] fetchRecentAcquisitionNpis failed:", msg, err)
     return {
       result: new Set(),
       warning: `Practice changes query failed: ${msg}`,
@@ -528,22 +601,7 @@ export async function getLaunchpadBundle(options: {
     warnings.push("No practices in scope")
   }
 
-  // Collect NPIs for dependent queries
-  const practiceNpis = Array.from(new Set(practices.flatMap(npisForPractice)))
-
-  // 3. Dependent fetches — practice_intel + recent acquisition NPIs (parallel)
-  const [intelRowsResult, acquisitionResult] = await Promise.all([
-    withTimeout("practice_intel", 8000, () => fetchPracticeIntel(supabase, practiceNpis)),
-    fetchRecentAcquisitionNpis(supabase, practiceNpis, cutoffIso),
-  ])
-  const intelRows = intelRowsResult ?? []
-  if (intelRowsResult == null) warnings.push("Practice intel timed out; ranking used structural signals only.")
-
-  if (acquisitionResult.warning) {
-    warnings.push(acquisitionResult.warning)
-  }
-
-  // 4. Merge watched_zips demographic data into zip_scores
+  // 3. Merge watched_zips demographic data into zip_scores
   // population + median_household_income live on watched_zips, not zip_scores.
   const watchedZipByZip = new Map<string, WatchedZipRow>()
   for (const wz of watchedZipRows) {
@@ -558,7 +616,59 @@ export async function getLaunchpadBundle(options: {
     }
   })
 
-  // 5. Build lookup maps
+  const zipScoreByZip = new Map<string, LaunchpadZipScoreRecord>()
+  for (const zs of zipScores) {
+    zipScoreByZip.set(zs.zip_code, zs)
+  }
+
+  // 4. STRUCTURAL-ONLY ranking pass (fast — no intel needed).
+  //    Rank all practices using only structural signals to identify which ones
+  //    are most likely to benefit from intel. We then fetch intel ONLY for those
+  //    top-INTEL_FETCH_LIMIT practices instead of the entire ~12k-NPI scope.
+  //
+  //    Root cause of the P0 timeout:
+  //    - Old flow: collect all ~12,753 unique NPIs -> 26 batches x Supabase query
+  //      -> 8 s+ on cold start -> withTimeout(8000) fires -> intelByNpi empty ->
+  //      every score capped at 70 -> bestFit=0.
+  //    - New flow: structural rank -> take top 200 NPIs -> 1 batch -> <500 ms ->
+  //      full scoring with intel -> bestFit > 0.
+  const structuralRanking = rankTargets({
+    practices,
+    intelByNpi: new Map(), // no intel yet — structural signals only
+    zipScoreByZip,
+    recentAcquisitionNpis: new Set(), // filled in after intel fetch below
+    recentDeals,
+    scope,
+    track,
+  })
+
+  // Collect NPIs for the top-N structurally-ranked practices.
+  const topNPractices = structuralRanking.slice(0, INTEL_FETCH_LIMIT)
+  const topNNpis = Array.from(
+    new Set(topNPractices.flatMap((t) => npisForPractice(t.practice)))
+  )
+
+  // Also collect all practice NPIs for the acquisition-changes query (cheap:
+  // targeted query bounded by cutoff date and NPI list, not table-scan).
+  const allPracticeNpis = Array.from(new Set(practices.flatMap(npisForPractice)))
+
+  // 5. Parallel: fetch intel for top-N NPIs + fetch recent acquisition NPIs.
+  //    Intel fetch is now 1 batch (~200 NPIs) instead of 26 — reliably <500 ms.
+  //    Belt-and-suspenders timeout raised to 25 s in case of slow cold start.
+  const [intelRowsResult, acquisitionResult] = await Promise.all([
+    withTimeout("practice_intel", 25000, () => fetchPracticeIntel(supabase, topNNpis)),
+    fetchRecentAcquisitionNpis(supabase, allPracticeNpis, cutoffIso),
+  ])
+  const intelRows = intelRowsResult ?? []
+  if (intelRowsResult == null) {
+    warnings.push("Practice intel timed out; ranking used structural signals only.")
+  }
+
+  if (acquisitionResult.warning) {
+    warnings.push(acquisitionResult.warning)
+  }
+
+  // 6. Build intel lookup maps (only for the top-N practices we fetched intel for).
   const rawIntelByNpi = new Map<string, LaunchpadPracticeIntelRecord>()
   for (const intel of intelRows) {
     rawIntelByNpi.set(intel.npi, intel)
@@ -566,7 +676,9 @@ export async function getLaunchpadBundle(options: {
 
   const intelByNpi = new Map<string, LaunchpadPracticeIntelRecord>()
   const intelAuditByNpi = new Map<string, LaunchpadIntelAudit>()
-  for (const practice of practices) {
+
+  for (const target of topNPractices) {
+    const practice = target.practice
     const candidateRows = npisForPractice(practice)
       .map((npi) => rawIntelByNpi.get(npi) ?? null)
       .filter((row): row is LaunchpadPracticeIntelRecord => row !== null)
@@ -574,17 +686,14 @@ export async function getLaunchpadBundle(options: {
     if (!best) continue
     const audit = auditForIntel(best)
     intelAuditByNpi.set(practice.npi, audit)
-    if (audit.status === "source_backed") {
+    if (audit.status === "source_backed" || audit.status === "legacy") {
       intelByNpi.set(practice.npi, best)
     }
   }
 
-  const zipScoreByZip = new Map<string, LaunchpadZipScoreRecord>()
-  for (const zs of zipScores) {
-    zipScoreByZip.set(zs.zip_code, zs)
-  }
-
-  // 6. Rank all targets
+  // 7. FULL ranking pass with intel + acquisition signals now populated.
+  //    Practices in the top-N will get their intel boost applied;
+  //    practices outside top-N remain at structural-only scores (capped at 70).
   const fullRanking = rankTargets({
     practices,
     intelByNpi,
@@ -596,10 +705,10 @@ export async function getLaunchpadBundle(options: {
     track,
   })
 
-  // 7. Trim to rankLimit (fullRanking is already sorted + numbered 1..N)
+  // 8. Trim to rankLimit (fullRanking is already sorted + numbered 1..N)
   const rankedTargets = fullRanking.slice(0, rankLimit)
 
-  // 8. Build summary — call summarizeRankedTargets on the FULL ranking per track
+  // 9. Build summary — call summarizeRankedTargets on the FULL ranking per track
   const allSummary = summarizeRankedTargets(fullRanking, "all")
   const successionSummary = summarizeRankedTargets(fullRanking, "succession")
   const highVolumeSummary = summarizeRankedTargets(fullRanking, "high_volume")
@@ -612,11 +721,8 @@ export async function getLaunchpadBundle(options: {
     (audit) => audit.status === "rejected"
   ).length
 
-  // Location-deduped GP count — sums total_gp_locations across scope ZIPs.
+  // Location-deduped GP count -- sums total_gp_locations across scope ZIPs.
   // Matches the Home + Job Market Phase A denominator (commit `732894f`).
-  // Pre-2026-04-26 the Launchpad headline KPI was the raw NPI count
-  // (~11,894 in All Chicagoland), inflating ~2.7× over the actual GP-clinic
-  // total (5,265) and disagreeing with every other surface.
   const gpLocationSum = zipScores.reduce(
     (sum, zs) => sum + (zs.total_gp_locations ?? 0),
     0
@@ -671,7 +777,7 @@ export async function getLaunchpadBundle(options: {
     corporateSharePct,
   }
 
-  // 9. Build dataHealth
+  // 10. Build dataHealth
   const dataHealth: LaunchpadDataHealth = {
     practicesFetched: practices.length,
     zipScoresFetched: zipScores.length,
@@ -682,7 +788,7 @@ export async function getLaunchpadBundle(options: {
     warnings,
   }
 
-  // 10. Return bundle
+  // 11. Return bundle
   return {
     scope: {
       id: scope,

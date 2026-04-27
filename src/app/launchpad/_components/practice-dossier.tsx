@@ -166,6 +166,11 @@ function SnapshotTab({
   })
 
   const isCapped = target.trackScores?.[target.bestTrack]?.confidenceCapped ?? false
+  // intelAudit present + status=rejected + verification_quality is insufficient/null means
+  // a dossier WAS researched but failed the anti-hallucination gate — needs re-research.
+  const needsReresearch =
+    target.intelAudit?.status === "rejected" &&
+    (target.intelAudit.verification_quality === "insufficient" || target.intelAudit.verification_quality == null)
 
   return (
     <div className="space-y-5">
@@ -241,7 +246,12 @@ function SnapshotTab({
 
         {/* Confidence */}
         <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-          {isCapped ? (
+          {needsReresearch ? (
+            <>
+              <div className="text-sm font-semibold text-[#C23B3B]">Stale</div>
+              <div className="mt-1 text-[10px] text-[#C23B3B]">Re-research</div>
+            </>
+          ) : isCapped ? (
             <>
               <div className="text-sm font-semibold text-[#D4920B]">Capped</div>
               <div className="mt-1 text-[10px] text-[#D4920B]">Thin data</div>
@@ -414,16 +424,35 @@ function IntelList({
 function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
   const { intel, intelAudit } = target
 
+  const needsReresearch =
+    intelAudit?.status === "rejected" &&
+    (intelAudit.verification_quality === "insufficient" || intelAudit.verification_quality == null)
+
   if (!intel) {
     return (
       <div className="space-y-4">
-        <Banner variant="amber">
-          <div className="font-semibold">No source-backed practice dossier attached</div>
-          <div className="mt-1 text-xs opacity-90">
-            {intelAudit?.reason ??
-              "There is no practice_intel row for this location's provider NPIs."}
-          </div>
-        </Banner>
+        {needsReresearch ? (
+          <Banner variant="red">
+            <div className="font-semibold">Dossier needs re-research</div>
+            <div className="mt-1 text-xs opacity-90">
+              A dossier was researched for this practice but failed the anti-hallucination gate
+              (verification_quality=insufficient, searches=
+              {intelAudit?.verification_searches ?? 0}). Re-run{" "}
+              <code className="rounded bg-white/20 px-1 py-0.5 font-mono text-[11px]">
+                python3 scrapers/dossier_batch/launch.py --npi {target.npi}
+              </code>{" "}
+              to produce a source-backed dossier that will lift the scoring cap.
+            </div>
+          </Banner>
+        ) : (
+          <Banner variant="amber">
+            <div className="font-semibold">No source-backed practice dossier attached</div>
+            <div className="mt-1 text-xs opacity-90">
+              {intelAudit?.reason ??
+                "There is no practice_intel row for this location's provider NPIs."}
+            </div>
+          </Banner>
+        )}
         {intelAudit && (
           <div className="grid grid-cols-3 gap-3">
             <IntelFact label="Quality" value={intelAudit.verification_quality ?? "Missing"} />
@@ -445,8 +474,12 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
 
   return (
     <div className="space-y-5">
-      <Banner variant="green">
-        <div className="font-semibold">Source-backed practice dossier</div>
+      <Banner variant={intelAudit?.status === "legacy" ? "amber" : "green"}>
+        <div className="font-semibold">
+          {intelAudit?.status === "legacy"
+            ? "Practice dossier (pre-verification batch)"
+            : "Source-backed practice dossier"}
+        </div>
         <div className="mt-1 text-xs opacity-90">
           {intel.verification_quality ?? "verified"} · {intel.verification_searches ?? 0} searches ·{" "}
           {intel.verification_urls?.length ?? 0} URLs

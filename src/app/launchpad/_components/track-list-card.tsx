@@ -291,20 +291,20 @@ export function TrackListCard({
             </p>
           )}
 
-          {hasSourceBackedIntel ? (
+          {hasSourceBackedIntel && target.intelAudit?.status !== "legacy" ? (
             <p className="mt-1 text-[10px] text-[#2D8B4E]">
               Source-backed intel · {target.intel?.verification_quality ?? "verified"} ·{" "}
               {target.intel?.verification_urls?.length ?? 0} URLs
+            </p>
+          ) : hasSourceBackedIntel && target.intelAudit?.status === "legacy" ? (
+            <p className="mt-1 text-[10px] text-[#6B6B60]">
+              Research available · unverified
             </p>
           ) : target.intelAudit?.status === "rejected" ? (
             <p className="mt-1 text-[10px] text-[#D4920B]">
               Raw research rejected — {target.intelAudit.reason.replace(/^Rejected:\s*/i, "")}
             </p>
-          ) : (
-            <p className="mt-1 text-[10px] text-[#9C9C90]">
-              Structural record only — no source-backed dossier
-            </p>
-          )}
+          ) : null}
 
           {/* AI compound thesis (lazy-loaded on expand) */}
           <CompoundThesis
