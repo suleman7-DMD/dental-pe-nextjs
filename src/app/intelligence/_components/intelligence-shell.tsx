@@ -8,6 +8,7 @@ import { StickySectionNav } from '@/components/layout/sticky-section-nav'
 import { WarroomCrossLink } from '@/components/layout/warroom-cross-link'
 import { formatRelativeTime } from '@/lib/utils/formatting'
 import { safeExternalUrl } from '@/lib/utils/safe-url'
+import { stripCitations } from '@/lib/utils/strip-citations'
 import type { ZipQualitativeIntel, PracticeIntel, IntelStats } from '@/lib/types/intel'
 import {
   MapPin,
@@ -174,12 +175,16 @@ function SignalCard({
   )
 }
 
-/** Render a signal value, showing em-dash for null/empty. */
+/** Render a signal value, showing em-dash for null/empty.
+ * String values are stripped of AI citation markup (<cite ...>...</cite>)
+ * before rendering so model-emitted tags never appear as raw HTML text.
+ */
 function SignalValue({ value }: { value: string | number | null | undefined }) {
   if (value === null || value === undefined || value === '') {
     return <span className="text-[#8F8E82]">{'\u2014'}</span>
   }
-  return <span>{String(value)}</span>
+  const display = typeof value === 'string' ? (stripCitations(value) ?? value) : String(value)
+  return <span>{display}</span>
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -258,17 +263,17 @@ export function IntelligenceShell({
       {
         key: 'demand_outlook',
         header: 'Demand',
-        render: (val: string | null) => truncate(val, 60),
+        render: (val: string | null) => truncate(stripCitations(val), 60),
       },
       {
         key: 'supply_outlook',
         header: 'Supply',
-        render: (val: string | null) => truncate(val, 60),
+        render: (val: string | null) => truncate(stripCitations(val), 60),
       },
       {
         key: 'investment_thesis',
         header: 'Investment Thesis',
-        render: (val: string | null) => truncate(val, 80),
+        render: (val: string | null) => truncate(stripCitations(val), 80),
       },
       {
         key: 'research_date',
@@ -573,7 +578,7 @@ export function IntelligenceShell({
                     Demand Outlook
                   </h4>
                   <p className="text-[13px] text-[#3D3D35]">
-                    {selectedZip.demand_outlook || '\u2014'}
+                    {stripCitations(selectedZip.demand_outlook) || '\u2014'}
                   </p>
                 </div>
 
@@ -582,7 +587,7 @@ export function IntelligenceShell({
                     Supply Outlook
                   </h4>
                   <p className="text-[13px] text-[#3D3D35]">
-                    {selectedZip.supply_outlook || '\u2014'}
+                    {stripCitations(selectedZip.supply_outlook) || '\u2014'}
                   </p>
                 </div>
 
@@ -591,7 +596,7 @@ export function IntelligenceShell({
                     Investment Thesis
                   </h4>
                   <p className="text-[13px] text-[#3D3D35]">
-                    {selectedZip.investment_thesis || '\u2014'}
+                    {stripCitations(selectedZip.investment_thesis) || '\u2014'}
                   </p>
                 </div>
 

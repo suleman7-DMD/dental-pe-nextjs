@@ -216,7 +216,24 @@ export async function getPracticeStats(
       row.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
     )
   ).length
-  const enrichedCount = GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT
+  // Live enrichedCount: count of practices with a Data Axle import date.
+  // This replaces the stale hardcoded constant (was 2,992; SQLite truth is 2,983).
+  // Use a head-only count query — no rows fetched, just the count header.
+  // Falls back to the snapshot constant if the query fails (e.g. timeout).
+  let enrichedCount: number = GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT
+  try {
+    const { count: dataAxleCount, error: enrichErr } = await supabase
+      .from("practices")
+      .select("npi", { count: "exact", head: true })
+      .not("data_axle_import_date", "is", null)
+    if (!enrichErr && dataAxleCount !== null) {
+      enrichedCount = dataAxleCount
+    } else if (enrichErr) {
+      console.warn("[getPracticeStats] enrichedCount query failed:", enrichErr.message)
+    }
+  } catch (e) {
+    console.warn("[getPracticeStats] enrichedCount query threw:", e)
+  }
 
   // Location-deduped GP clinic count: sum zip_scores.total_gp_locations
   // across watched ZIPs. This is the honest "how many clinics" denominator —

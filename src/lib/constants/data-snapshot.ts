@@ -8,5 +8,8 @@
  * count scans.
  */
 export const GLOBAL_PRACTICE_NPI_COUNT = 381_598
+/** @deprecated getPracticeStats() now queries this live from Supabase;
+ * this constant is kept as a fallback for pages that have not yet migrated
+ * (job-market, market-intel, system, data-breakdown). SQLite truth: 2,983. */
 export const GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT = 2_992
 

@@ -29,7 +29,7 @@ import type { HomeSummary, PracticeChange } from '@/lib/types'
 interface HomeShellProps {
   summary: HomeSummary
   acquisitionTargets: number
-  recentChanges?: PracticeChange[]
+  recentChanges: PracticeChange[] | null
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -215,8 +215,16 @@ function formatChangeDescription(change: PracticeChange): string {
   return `${friendlyField} updated`
 }
 
-function RecentActivityFeed({ changes }: { changes?: PracticeChange[] }) {
-  if (!changes || changes.length === 0) {
+function RecentActivityFeed({ changes }: { changes: PracticeChange[] | null }) {
+  if (changes === null) {
+    // Fetch failed — surface the error instead of silently showing empty state
+    return (
+      <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 h-full flex items-center justify-center">
+        <p className="text-[#707064] text-sm">Activity feed unavailable</p>
+      </div>
+    )
+  }
+  if (changes.length === 0) {
     return (
       <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 h-full flex items-center justify-center">
         <p className="text-[#707064] text-sm">No recent activity</p>

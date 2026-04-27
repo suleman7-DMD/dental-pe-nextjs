@@ -1,6 +1,11 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { PracticeChange } from "../types";
 
+// Explicit column list — avoids pulling large text blobs (notes can be JSON)
+// and prevents select("*") statement_timeout (57014) on unindexed full scans.
+const CHANGE_COLS =
+  "id,npi,change_date,field_changed,old_value,new_value,change_type,notes,created_at";
+
 export async function getRecentChanges(
   supabase: SupabaseClient,
   zipCodes?: string[],
@@ -52,7 +57,7 @@ export async function getRecentChanges(
       const batch = npis.slice(i, i + batchSize);
       const { data, error } = await supabase
         .from("practice_changes")
-        .select("*")
+        .select(CHANGE_COLS)
         .in("npi", batch)
         .gte("change_date", sinceDateStr)
         .order("change_date", { ascending: false });
@@ -68,10 +73,12 @@ export async function getRecentChanges(
     });
   }
 
-  // No ZIP filter: get all recent changes
+  // No ZIP filter: get all recent changes.
+  // Explicit column list (not *) keeps the query fast and avoids pulling
+  // large text blobs that can cause statement_timeout (57014) in Supabase.
   const { data, error } = await supabase
     .from("practice_changes")
-    .select("*")
+    .select(CHANGE_COLS)
     .gte("change_date", sinceDateStr)
     .order("change_date", { ascending: false })
     .limit(500);

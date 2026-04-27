@@ -7,7 +7,8 @@ import { HomeShell } from './_components/home-shell'
 import type { HomeSummary } from '@/lib/types'
 import type { DealStats } from '@/lib/supabase/types'
 
-export const revalidate = 1800
+export const dynamic = "force-dynamic"
+export const revalidate = 0
 export const metadata = {
   title: 'Dental PE Intelligence Platform',
   description:
@@ -88,7 +89,9 @@ export default async function HomePage() {
           .then((changes) => changes.slice(0, 8))
           .catch((err) => {
             console.error('[HomePage] recentChanges error:', err)
-            return [] as import('@/lib/types').PracticeChange[]
+            // Return null to distinguish fetch-failure from genuinely empty data.
+            // HomeShell renders "Activity feed unavailable" for null vs empty-state for [].
+            return null as import('@/lib/types').PracticeChange[] | null
           }),
         (async () => {
           const { data } = await supabase
