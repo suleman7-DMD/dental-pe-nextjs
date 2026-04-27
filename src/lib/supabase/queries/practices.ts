@@ -264,7 +264,9 @@ export async function getPracticeStats(
     unknown: unknownCount,
     enriched: enrichedCount,
     consolidatedPct:
-      t > 0 ? ((highConfCorporate / t) * 100).toFixed(1) + "%" : "0.0%",
+      (totalGpLocations ?? t) > 0
+        ? ((corporate / (totalGpLocations ?? t)) * 100).toFixed(1) + "%"
+        : "0.0%",
     independentPct:
       t > 0 ? ((independent / t) * 100).toFixed(1) + "%" : "0.0%",
   };

@@ -94,6 +94,19 @@ function parseFirstTaxonomyCode(value: string | null): string | null {
   return value.split(",").map((s) => s.trim()).find(Boolean) ?? null
 }
 
+function parseStringArray(value: string | null): string[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === "string" && item.length > 0)
+    }
+  } catch {
+    // Fall through to comma-delimited fallback.
+  }
+  return value.split(",").map((s) => s.trim()).filter(Boolean)
+}
+
 function stableNumericId(value: string | null | undefined): number {
   const raw = value ?? ""
   let hash = 0
@@ -147,6 +160,7 @@ export function practiceLocationToLaunchpadRecord(
   return {
     id: stableNumericId(row.location_id),
     npi: row.primary_npi ?? row.location_id,
+    provider_npis: parseStringArray(row.provider_npis),
     practice_name: row.practice_name,
     doing_business_as: row.doing_business_as,
     provider_last_name: null,
@@ -195,4 +209,3 @@ export function practiceLocationToWarroomRecord(
     taxonomy_description: null,
   }
 }
-

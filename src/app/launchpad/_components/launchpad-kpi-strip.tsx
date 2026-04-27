@@ -102,9 +102,9 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           label="Hiring now"
           value={summary ? summary.hiringNowCount.toLocaleString() : "--"}
           subtitle={
-            <span className="text-[11px] text-[#6B6B60]">AI research confirmed openings</span>
+            <span className="text-[11px] text-[#6B6B60]">Source-backed openings</span>
           }
-          tooltip="Practices with active associate openings detected via website, Google listing, or AI research"
+          tooltip="Practices with active associate openings detected from source-backed practice_intel"
           accentColor="#2563EB"
         />
 
@@ -127,19 +127,19 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
 
         <KpiCard
           icon={<Brain className="h-4 w-4" />}
-          label="Intel coverage"
+          label="Evidence coverage"
           value={intelValue}
           subtitle={
             intelPct != null ? (
               <span className="text-[11px] text-[#6B6B60]">{intelPct}% of ranked targets</span>
             ) : (
-              <span className="text-[11px] text-[#9C9C90]">No intel data loaded</span>
+              <span className="text-[11px] text-[#9C9C90]">No source-backed intel</span>
             )
           }
           tooltip={
             withIntelCount === 0
-              ? "0% intel coverage — scores are capped at 70 for all practices. Run the weekly research pipeline to populate AI dossiers."
-              : "Practices with an AI research dossier attached. Higher coverage → fewer confidence caps on scores."
+              ? "0% source-backed evidence coverage — scores are capped at 70 for all practices. Run the weekly research pipeline to populate verified dossiers."
+              : "Practices with source-backed practice_intel attached. Rejected raw rows do not lift scores or populate thesis claims."
           }
           accentColor="#7C3AED"
         />
@@ -147,7 +147,7 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
 
       {intelCoveragePct !== null && intelCoveragePct < 10 && (
         <div className="mt-2 rounded-md border border-[#D4920B]/30 bg-[#D4920B]/5 px-3 py-2 text-xs text-[#6B6B60]">
-          Intel coverage thin ({intelCoveragePct.toFixed(0)}%) — scores capped at 70 for most
+          Source-backed intel coverage thin ({intelCoveragePct.toFixed(0)}%) — scores capped at 70 for most
           practices
         </div>
       )}

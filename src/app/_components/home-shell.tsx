@@ -327,7 +327,7 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             subtitle={
               summary.totalGpLocations && summary.totalGpLocations > 0 ? (
                 <span className="text-xs text-[#6B6B60]">
-                  {summary.totalPractices.toLocaleString()} NPI rows in watched ZIPs
+                  {summary.totalPractices.toLocaleString()} federal NPI records (national)
                 </span>
               ) : undefined
             }

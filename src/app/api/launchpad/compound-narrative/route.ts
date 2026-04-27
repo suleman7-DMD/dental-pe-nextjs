@@ -3,6 +3,7 @@ import type {
   CompoundNarrativeRequest,
   CompoundNarrativeResponse,
   LedgerAtom,
+  ResearchAudit,
   ThesisContradiction,
   ThesisQuestion,
 } from "@/lib/launchpad/ai-types"
@@ -33,6 +34,7 @@ const MAX_TOKENS_PARTIAL = 280
 const EXTRACTOR_MAX_TOKENS = 4000
 const MIN_LEDGER_ATOMS = 3
 const MAX_LEDGER_ATOMS_HINT = 30
+const SOURCE_BACKED_QUALITIES = new Set(["verified", "high", "partial"])
 
 interface AnthropicContentBlock {
   type: string
@@ -86,6 +88,64 @@ function parseUrls(s: string | null): string[] {
     .split(/[\s,]+/)
     .map((x) => x.trim())
     .filter((x) => x.startsWith("http"))
+}
+
+function uniqueUrls(urls: string[]): string[] {
+  return Array.from(new Set(urls.filter((url) => url.startsWith("http"))))
+}
+
+function buildResearchAudit(intel: PracticeIntel | null): ResearchAudit {
+  if (!intel) {
+    return {
+      status: "missing",
+      verification_quality: null,
+      verification_searches: null,
+      verification_urls: [],
+      research_date: null,
+      reason: "No practice_intel row exists for this NPI.",
+    }
+  }
+
+  const quality = intel.verification_quality?.toLowerCase() ?? null
+  const searches = intel.verification_searches ?? 0
+  const urls = parseUrls(intel.verification_urls)
+  const sourceBacked =
+    !!quality &&
+    SOURCE_BACKED_QUALITIES.has(quality) &&
+    searches >= 2 &&
+    urls.length > 0
+
+  let reason = "Accepted: source-backed practice_intel row."
+  if (!sourceBacked) {
+    if (!quality) reason = "Rejected: missing verification_quality."
+    else if (!SOURCE_BACKED_QUALITIES.has(quality)) {
+      reason = `Rejected: verification_quality=${quality}.`
+    } else if (searches < 2) {
+      reason = `Rejected: only ${searches} web search${searches === 1 ? "" : "es"} reported.`
+    } else if (urls.length === 0) {
+      reason = "Rejected: no verification URLs stored."
+    }
+  }
+
+  return {
+    status: sourceBacked ? "source_backed" : "rejected",
+    verification_quality: intel.verification_quality,
+    verification_searches: intel.verification_searches,
+    verification_urls: urls,
+    research_date: intel.research_date,
+    reason,
+  }
+}
+
+function sourceUrlsForResponse(
+  intel: PracticeIntel | null,
+  zipIntel: ZipQualitativeIntel | null
+): string[] {
+  return uniqueUrls([
+    ...parseUrls(intel?.verification_urls ?? null),
+    ...parseUrls(intel?.sources ?? null),
+    ...parseUrls(zipIntel?.sources ?? null),
+  ]).slice(0, 12)
 }
 
 function shortDomain(url: string): string {
@@ -1074,18 +1134,18 @@ export async function POST(
     )
   }
 
-  const intelQuality = intel?.verification_quality ?? null
+  const researchAudit = buildResearchAudit(intel)
+  const sourceUrls = sourceUrlsForResponse(intel, zipIntel)
+  const intelQuality = intel?.verification_quality?.toLowerCase() ?? null
   const reliable = !!intel && (intelQuality === "verified" || intelQuality === "high")
-  const noUsable =
-    !intel ||
-    intelQuality === "insufficient" ||
-    intelQuality === "unverified" ||
-    !intelQuality
+  const noUsable = researchAudit.status !== "source_backed"
 
   if (noUsable) {
     return NextResponse.json({
       thesis: null,
       reason: "no_verified_research",
+      research_audit: researchAudit,
+      source_urls: sourceUrls,
       structural_summary: buildStructuralSummary(body),
     })
   }
@@ -1141,6 +1201,8 @@ export async function POST(
     return NextResponse.json({
       thesis: null,
       reason: "no_verified_research",
+      research_audit: researchAudit,
+      source_urls: sourceUrls,
       structural_summary: buildStructuralSummary(body),
     })
   }
@@ -1188,6 +1250,8 @@ export async function POST(
       ledger,
       contradictions,
       questions,
+      research_audit: researchAudit,
+      source_urls: sourceUrls,
       thesis_stale: thesisStaleInfo.thesis_stale,
       stale_reason: thesisStaleInfo.stale_reason ?? undefined,
       intel_age_days: thesisStaleInfo.intel_age_days,
@@ -1235,6 +1299,8 @@ export async function POST(
       ledger,
       contradictions,
       questions,
+      research_audit: researchAudit,
+      source_urls: sourceUrls,
       thesis_stale: thesisStaleInfo.thesis_stale,
       stale_reason: thesisStaleInfo.stale_reason ?? undefined,
       intel_age_days: thesisStaleInfo.intel_age_days,
@@ -1248,6 +1314,8 @@ export async function POST(
   return NextResponse.json({
     thesis: null,
     reason: "validation_failed",
+    research_audit: researchAudit,
+    source_urls: sourceUrls,
     structural_summary: buildStructuralSummary(body),
   })
 }

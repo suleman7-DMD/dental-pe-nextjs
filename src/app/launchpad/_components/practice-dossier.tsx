@@ -342,6 +342,188 @@ function SnapshotTab({
 }
 
 // ---------------------------------------------------------------------------
+// Tab: Intel Evidence
+// ---------------------------------------------------------------------------
+
+function formatBooleanSignal(value: number | boolean | null | undefined): string {
+  if (value == null) return "Unknown"
+  if (typeof value === "boolean") return value ? "Yes" : "No"
+  return value === 1 ? "Yes" : value === 0 ? "No" : "Unknown"
+}
+
+function EvidenceUrlList({ urls }: { urls: string[] }) {
+  if (urls.length === 0) {
+    return <p className="text-sm text-[#9C9C90]">No verification URLs stored.</p>
+  }
+  return (
+    <ul className="space-y-1.5">
+      {urls.slice(0, 10).map((url) => (
+        <li key={url}>
+          <a
+            href={safeExternalUrl(url)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex max-w-full items-center gap-1 text-xs text-[#B8860B] hover:underline"
+          >
+            <ExternalLink className="h-3 w-3 shrink-0" />
+            <span className="truncate">{url.replace(/^https?:\/\//, "")}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function IntelFact({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+      <div className="text-[10px] font-medium uppercase tracking-wider text-[#9C9C90]">
+        {label}
+      </div>
+      <div className="mt-1 text-sm font-medium text-[#1A1A1A]">{value}</div>
+    </div>
+  )
+}
+
+function IntelList({
+  title,
+  items,
+  tone = "neutral",
+}: {
+  title: string
+  items: string[] | null | undefined
+  tone?: "neutral" | "green" | "red"
+}) {
+  if (!items || items.length === 0) return null
+  const color =
+    tone === "green" ? "text-[#2D8B4E]" : tone === "red" ? "text-[#C23B3B]" : "text-[#6B6B60]"
+  return (
+    <div>
+      <SectionHeading>{title}</SectionHeading>
+      <ul className="space-y-1.5">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className={cn("text-sm", color)}>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
+  const { intel, intelAudit } = target
+
+  if (!intel) {
+    return (
+      <div className="space-y-4">
+        <Banner variant="amber">
+          <div className="font-semibold">No source-backed practice dossier attached</div>
+          <div className="mt-1 text-xs opacity-90">
+            {intelAudit?.reason ??
+              "There is no practice_intel row for this location's provider NPIs."}
+          </div>
+        </Banner>
+        {intelAudit && (
+          <div className="grid grid-cols-3 gap-3">
+            <IntelFact label="Quality" value={intelAudit.verification_quality ?? "Missing"} />
+            <IntelFact label="Searches" value={intelAudit.verification_searches ?? 0} />
+            <IntelFact label="URLs" value={intelAudit.verification_urls.length} />
+          </div>
+        )}
+        <div>
+          <SectionHeading>Stored source URLs</SectionHeading>
+          <EvidenceUrlList urls={intelAudit?.verification_urls ?? []} />
+        </div>
+        <div className="rounded-md border border-[#E8E5DE] bg-[#F5F5F0] px-3 py-2 text-xs text-[#6B6B60]">
+          This drawer is using structural NPPES/Data Axle fields only. Rejected raw research is
+          visible as an audit record, but it is not used for scoring, thesis, or evidence claims.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <Banner variant="green">
+        <div className="font-semibold">Source-backed practice dossier</div>
+        <div className="mt-1 text-xs opacity-90">
+          {intel.verification_quality ?? "verified"} · {intel.verification_searches ?? 0} searches ·{" "}
+          {intel.verification_urls?.length ?? 0} URLs
+          {intel.research_date ? ` · ${intel.research_date.slice(0, 10)}` : ""}
+          {intel.npi !== target.npi ? ` · evidence NPI ${intel.npi}` : ""}
+        </div>
+      </Banner>
+
+      <div>
+        <SectionHeading>Verification URLs</SectionHeading>
+        <EvidenceUrlList urls={intel.verification_urls ?? []} />
+      </div>
+
+      {intel.overall_assessment && (
+        <div>
+          <SectionHeading>Assessment</SectionHeading>
+          <p className="text-sm leading-relaxed text-[#6B6B60]">{intel.overall_assessment}</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <IntelFact label="Website" value={intel.website_url ?? "Unknown"} />
+        <IntelFact label="Website era" value={intel.website_era ?? "Unknown"} />
+        <IntelFact label="Owner stage" value={intel.owner_career_stage ?? "Unknown"} />
+        <IntelFact label="Readiness" value={intel.acquisition_readiness ?? "Unknown"} />
+        <IntelFact label="Hiring active" value={formatBooleanSignal(intel.hiring_active)} />
+        <IntelFact label="Technology" value={intel.technology_level ?? "Unknown"} />
+        <IntelFact
+          label="Google"
+          value={
+            intel.google_rating != null || intel.google_review_count != null
+              ? `${intel.google_rating ?? "?"} · ${intel.google_review_count ?? "?"} reviews`
+              : "Unknown"
+          }
+        />
+        <IntelFact
+          label="Healthgrades"
+          value={
+            intel.healthgrades_rating != null || intel.healthgrades_reviews != null
+              ? `${intel.healthgrades_rating ?? "?"} · ${intel.healthgrades_reviews ?? "?"} reviews`
+              : "Unknown"
+          }
+        />
+      </div>
+
+      <IntelList title="Services found" items={intel.services_listed} />
+      <IntelList title="Technology found" items={intel.technology_listed} />
+      <IntelList title="Green flags" items={intel.green_flags} tone="green" />
+      <IntelList title="Red flags" items={intel.red_flags} tone="red" />
+
+      {(intel.website_analysis || intel.provider_notes || intel.insurance_note) && (
+        <div className="space-y-3">
+          {intel.website_analysis && (
+            <div>
+              <SectionHeading>Website notes</SectionHeading>
+              <p className="text-sm text-[#6B6B60]">{intel.website_analysis}</p>
+            </div>
+          )}
+          {intel.provider_notes && (
+            <div>
+              <SectionHeading>Provider notes</SectionHeading>
+              <p className="text-sm text-[#6B6B60]">{intel.provider_notes}</p>
+            </div>
+          )}
+          {intel.insurance_note && (
+            <div>
+              <SectionHeading>Insurance notes</SectionHeading>
+              <p className="text-sm text-[#6B6B60]">{intel.insurance_note}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Tab: Score
 // ---------------------------------------------------------------------------
 
@@ -1170,11 +1352,12 @@ export function PracticeDossier({
             <div className="shrink-0 border-b border-[#E8E5DE] bg-[#FAFAF7] px-4">
               <TabsList
                 variant="line"
-                className="h-10 w-full justify-start gap-0 rounded-none bg-transparent p-0"
+                className="h-10 w-full justify-start gap-0 overflow-x-auto rounded-none bg-transparent p-0"
               >
                 {(
                   [
                     { value: "snapshot", label: "Snapshot" },
+                    { value: "intel", label: "Intel" },
                     { value: "score", label: "Score" },
                     { value: "compensation", label: "Comp" },
                     { value: "mentorship", label: "Mentor" },
@@ -1186,7 +1369,7 @@ export function PracticeDossier({
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className="h-full rounded-none border-0 px-3 text-xs font-medium text-[#6B6B60] data-active:text-[#B8860B] data-active:after:bg-[#B8860B]"
+                    className="h-full shrink-0 rounded-none border-0 px-3 text-xs font-medium text-[#6B6B60] data-active:text-[#B8860B] data-active:after:bg-[#B8860B]"
                   >
                     {tab.label}
                   </TabsTrigger>
@@ -1197,6 +1380,9 @@ export function PracticeDossier({
             <div className="flex-1 overflow-y-auto">
               <TabsContent value="snapshot" className="p-4">
                 <SnapshotTab target={target} />
+              </TabsContent>
+              <TabsContent value="intel" className="p-4">
+                <IntelEvidenceTab target={target} />
               </TabsContent>
               <TabsContent value="score" className="p-4">
                 <ScoreTab target={target} />

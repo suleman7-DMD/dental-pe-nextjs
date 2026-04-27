@@ -278,6 +278,7 @@ export const SIGNALS_REQUIRING_INTEL: LaunchpadSignalId[] = [
 export interface LaunchpadPracticeRecord {
   id: number
   npi: string
+  provider_npis: string[]
   practice_name: string | null
   doing_business_as: string | null
   provider_last_name: string | null
@@ -313,19 +314,52 @@ export interface LaunchpadPracticeRecord {
 export interface LaunchpadPracticeIntelRecord {
   npi: string
   research_date: string | null
+  website_url: string | null
+  website_era: string | null
+  website_analysis: string | null
+  services_listed: string[] | null
+  services_high_rev: string[] | null
+  services_note: string | null
+  technology_listed: string[] | null
   hiring_active: number | boolean | null
+  hiring_positions: string[] | null
+  hiring_source: string | null
+  succession_intent_detected: string | null
   owner_career_stage: string | null
+  provider_count_web: number | null
+  provider_notes: string | null
   accepts_medicaid: number | boolean | null
   ppo_heavy: number | boolean | null
+  insurance_note: string | null
   technology_level: string | null
+  google_review_count: number | null
   google_rating: number | null
   google_velocity: string | null
+  google_sentiment: string | null
+  healthgrades_rating: number | null
+  healthgrades_reviews: number | null
+  acquisition_found: number | boolean | null
+  acquisition_details: string | null
   red_flags: string[] | null
   green_flags: string[] | null
   acquisition_readiness: string | null
   confidence: string | null
   overall_assessment: string | null
+  sources: string[] | null
+  verification_searches: number | null
+  verification_quality: string | null
+  verification_urls: string[] | null
   raw_json: Record<string, unknown> | null
+}
+
+export interface LaunchpadIntelAudit {
+  npi: string
+  status: "source_backed" | "rejected"
+  research_date: string | null
+  verification_quality: string | null
+  verification_searches: number | null
+  verification_urls: string[]
+  reason: string
 }
 
 export interface LaunchpadZipScoreRecord {
@@ -382,6 +416,7 @@ export interface LaunchpadRankedTarget {
   npi: string
   practice: LaunchpadPracticeRecord
   intel: LaunchpadPracticeIntelRecord | null
+  intelAudit: LaunchpadIntelAudit | null
   zipScore: LaunchpadZipScoreRecord | null
   commutable: boolean
   dsoTier: string | null

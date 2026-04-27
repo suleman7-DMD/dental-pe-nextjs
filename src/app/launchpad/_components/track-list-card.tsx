@@ -112,6 +112,7 @@ export function TrackListCard({
   // Confidence capped check
   const trackKey = resolveTrackKey(track, target.bestTrack)
   const confidenceCapped = target.trackScores[trackKey]?.confidenceCapped ?? false
+  const hasSourceBackedIntel = target.intel != null
 
   // Top contributions for hover tooltip
   const topContributions =
@@ -124,9 +125,10 @@ export function TrackListCard({
     track === "all" || !CONCRETE_TRACKS.has(track)
       ? target.bestTrack
       : (track as ConcreteLaunchpadTrack)
+  const evidenceNpi = target.intel?.npi ?? target.npi
 
   const practiceSnapshot = {
-    npi: target.npi,
+    npi: evidenceNpi,
     name: displayName,
     dba: practice.doing_business_as,
     entity_classification: practice.entity_classification,
@@ -289,9 +291,24 @@ export function TrackListCard({
             </p>
           )}
 
+          {hasSourceBackedIntel ? (
+            <p className="mt-1 text-[10px] text-[#2D8B4E]">
+              Source-backed intel · {target.intel?.verification_quality ?? "verified"} ·{" "}
+              {target.intel?.verification_urls?.length ?? 0} URLs
+            </p>
+          ) : target.intelAudit?.status === "rejected" ? (
+            <p className="mt-1 text-[10px] text-[#D4920B]">
+              Raw research rejected — {target.intelAudit.reason.replace(/^Rejected:\s*/i, "")}
+            </p>
+          ) : (
+            <p className="mt-1 text-[10px] text-[#9C9C90]">
+              Structural record only — no source-backed dossier
+            </p>
+          )}
+
           {/* AI compound thesis (lazy-loaded on expand) */}
           <CompoundThesis
-            npi={target.npi}
+            npi={evidenceNpi}
             signals={allSignalIds}
             scores={trackScores}
             track={concreteTrack}

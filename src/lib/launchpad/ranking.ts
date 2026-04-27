@@ -9,6 +9,7 @@ import {
   LAUNCHPAD_SIGNALS,
   LAUNCHPAD_TIER_THRESHOLDS,
   type ConcreteLaunchpadTrack,
+  type LaunchpadIntelAudit,
   type LaunchpadPracticeIntelRecord,
   type LaunchpadPracticeRecord,
   type LaunchpadRankedTarget,
@@ -408,6 +409,7 @@ export function scoreForTrack(
 export interface RankContext {
   practices: LaunchpadPracticeRecord[]
   intelByNpi: Map<string, LaunchpadPracticeIntelRecord>
+  intelAuditByNpi?: Map<string, LaunchpadIntelAudit>
   zipScoreByZip: Map<string, LaunchpadZipScoreRecord>
   recentAcquisitionNpis: Set<string>
   recentDeals: LaunchpadRecentDealRecord[]
@@ -521,6 +523,7 @@ export function rankTargets(ctx: RankContext): LaunchpadRankedTarget[] {
       npi: practice.npi,
       practice,
       intel,
+      intelAudit: ctx.intelAuditByNpi?.get(practice.npi) ?? null,
       zipScore,
       commutable: scopeCommutableZips.has(practice.zip ?? ""),
       dsoTier: dsoEntry?.tier ?? null,

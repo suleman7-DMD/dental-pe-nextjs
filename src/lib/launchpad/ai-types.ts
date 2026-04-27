@@ -103,6 +103,15 @@ export interface ThesisQuestion {
   question: string
 }
 
+export interface ResearchAudit {
+  status: "missing" | "source_backed" | "rejected"
+  verification_quality: string | null
+  verification_searches: number | null
+  verification_urls: string[]
+  research_date: string | null
+  reason: string
+}
+
 export interface CompoundNarrativeResponse {
   thesis: string | null
   reason?: "no_verified_research" | "validation_failed"
@@ -110,6 +119,8 @@ export interface CompoundNarrativeResponse {
   ledger?: LedgerAtom[]
   contradictions?: ThesisContradiction[]
   questions?: ThesisQuestion[]
+  research_audit?: ResearchAudit
+  source_urls?: string[]
   thesis_stale?: boolean
   stale_reason?: string
   intel_age_days?: number | null

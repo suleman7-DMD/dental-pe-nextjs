@@ -12,6 +12,7 @@ import { rankTargets, summarizeRankedTargets } from "@/lib/launchpad/ranking"
 import type {
   LaunchpadBundle,
   LaunchpadDataHealth,
+  LaunchpadIntelAudit,
   LaunchpadPracticeIntelRecord,
   LaunchpadPracticeRecord,
   LaunchpadRecentDealRecord,
@@ -21,6 +22,7 @@ import type {
 } from "@/lib/launchpad/signals"
 
 export const DEFAULT_RANK_LIMIT = 60
+const SOURCE_BACKED_QUALITIES = new Set(["verified", "high", "partial"])
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -37,6 +39,172 @@ function timeoutSignal(ms: number): AbortSignal {
   const controller = new AbortController()
   setTimeout(() => controller.abort(), ms)
   return controller.signal
+}
+
+function parseStringArray(value: unknown): string[] | null {
+  if (value == null) return null
+  if (Array.isArray(value)) {
+    const arr = value.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+    return arr.length > 0 ? arr : null
+  }
+  if (typeof value !== "string") return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (Array.isArray(parsed)) {
+      const arr = parsed.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+      return arr.length > 0 ? arr : null
+    }
+  } catch {
+    // Fall through to delimiter parsing.
+  }
+  const arr = trimmed
+    .split(/[\n;|]/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+  return arr.length > 0 ? arr : null
+}
+
+function parseUrlArray(value: unknown): string[] {
+  const arr = parseStringArray(value) ?? []
+  return arr
+    .map((url) => url.trim())
+    .filter((url) => url.startsWith("http") && url !== "no_results_found")
+}
+
+function parseRawJson(value: unknown): Record<string, unknown> | null {
+  if (!value) return null
+  if (typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>
+  if (typeof value !== "string") return null
+  try {
+    const parsed = JSON.parse(value)
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null
+  } catch {
+    return null
+  }
+}
+
+function toNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null
+}
+
+function toStringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null
+}
+
+function toBooleanNumber(value: unknown): number | boolean | null {
+  if (typeof value === "boolean") return value
+  if (typeof value === "number") return value
+  return null
+}
+
+function normalizeIntelRow(row: Record<string, unknown>): LaunchpadPracticeIntelRecord {
+  return {
+    npi: String(row.npi ?? ""),
+    research_date: toStringOrNull(row.research_date),
+    website_url: toStringOrNull(row.website_url),
+    website_era: toStringOrNull(row.website_era),
+    website_analysis: toStringOrNull(row.website_analysis),
+    services_listed: parseStringArray(row.services_listed),
+    services_high_rev: parseStringArray(row.services_high_rev),
+    services_note: toStringOrNull(row.services_note),
+    technology_listed: parseStringArray(row.technology_listed),
+    hiring_active: toBooleanNumber(row.hiring_active),
+    hiring_positions: parseStringArray(row.hiring_positions),
+    hiring_source: toStringOrNull(row.hiring_source),
+    succession_intent_detected: toStringOrNull(row.succession_intent_detected),
+    owner_career_stage: toStringOrNull(row.owner_career_stage),
+    provider_count_web: toNumber(row.provider_count_web),
+    provider_notes: toStringOrNull(row.provider_notes),
+    accepts_medicaid: toBooleanNumber(row.accepts_medicaid),
+    ppo_heavy: toBooleanNumber(row.ppo_heavy),
+    insurance_note: toStringOrNull(row.insurance_note),
+    technology_level: toStringOrNull(row.technology_level),
+    google_review_count: toNumber(row.google_review_count),
+    google_rating: toNumber(row.google_rating),
+    google_velocity: toStringOrNull(row.google_velocity),
+    google_sentiment: toStringOrNull(row.google_sentiment),
+    healthgrades_rating: toNumber(row.healthgrades_rating),
+    healthgrades_reviews: toNumber(row.healthgrades_reviews),
+    acquisition_found: toBooleanNumber(row.acquisition_found),
+    acquisition_details: toStringOrNull(row.acquisition_details),
+    red_flags: parseStringArray(row.red_flags),
+    green_flags: parseStringArray(row.green_flags),
+    acquisition_readiness: toStringOrNull(row.acquisition_readiness),
+    confidence: toStringOrNull(row.confidence),
+    overall_assessment: toStringOrNull(row.overall_assessment),
+    sources: parseStringArray(row.sources),
+    verification_searches: toNumber(row.verification_searches),
+    verification_quality: toStringOrNull(row.verification_quality),
+    verification_urls: parseUrlArray(row.verification_urls),
+    raw_json: parseRawJson(row.raw_json),
+  }
+}
+
+function hasSourceBackedIntel(intel: LaunchpadPracticeIntelRecord): boolean {
+  const quality = intel.verification_quality?.toLowerCase() ?? ""
+  return (
+    SOURCE_BACKED_QUALITIES.has(quality) &&
+    (intel.verification_searches ?? 0) >= 2 &&
+    (intel.verification_urls?.length ?? 0) > 0
+  )
+}
+
+function auditForIntel(intel: LaunchpadPracticeIntelRecord): LaunchpadIntelAudit {
+  const quality = intel.verification_quality?.toLowerCase() ?? null
+  const searches = intel.verification_searches ?? 0
+  const urlCount = intel.verification_urls?.length ?? 0
+  const sourceBacked = hasSourceBackedIntel(intel)
+  let reason = "Accepted: source-backed practice_intel row."
+  if (!sourceBacked) {
+    if (!quality) reason = "Rejected: missing verification_quality."
+    else if (!SOURCE_BACKED_QUALITIES.has(quality)) {
+      reason = `Rejected: verification_quality=${quality}.`
+    } else if (searches < 2) {
+      reason = `Rejected: only ${searches} web search${searches === 1 ? "" : "es"} reported.`
+    } else if (urlCount === 0) {
+      reason = "Rejected: no verification URLs stored."
+    }
+  }
+  return {
+    npi: intel.npi,
+    status: sourceBacked ? "source_backed" : "rejected",
+    research_date: intel.research_date,
+    verification_quality: intel.verification_quality,
+    verification_searches: intel.verification_searches,
+    verification_urls: intel.verification_urls ?? [],
+    reason,
+  }
+}
+
+function qualityScore(intel: LaunchpadPracticeIntelRecord): number {
+  const quality = intel.verification_quality?.toLowerCase()
+  if (quality === "verified" || quality === "high") return 3
+  if (quality === "partial") return 2
+  if (quality === "insufficient") return 1
+  return 0
+}
+
+function chooseBestIntel(
+  rows: LaunchpadPracticeIntelRecord[]
+): LaunchpadPracticeIntelRecord | null {
+  if (rows.length === 0) return null
+  return [...rows].sort((a, b) => {
+    const sourceBackedDelta = Number(hasSourceBackedIntel(b)) - Number(hasSourceBackedIntel(a))
+    if (sourceBackedDelta !== 0) return sourceBackedDelta
+    const qualityDelta = qualityScore(b) - qualityScore(a)
+    if (qualityDelta !== 0) return qualityDelta
+    return (b.research_date ?? "").localeCompare(a.research_date ?? "")
+  })[0]
+}
+
+function npisForPractice(practice: LaunchpadPracticeRecord): string[] {
+  return Array.from(
+    new Set([practice.npi, ...(practice.provider_npis ?? [])].filter((npi) => npi && npi.length > 0))
+  )
 }
 
 async function withTimeout<T>(
@@ -179,39 +347,68 @@ async function fetchPracticeIntel(
 ): Promise<LaunchpadPracticeIntelRecord[]> {
   if (npis.length === 0) return []
   const BATCH_SIZE = 500
-  const all: LaunchpadPracticeIntelRecord[] = []
+  const uniqueNpis = Array.from(new Set(npis.filter(Boolean)))
 
-  for (let i = 0; i < npis.length; i += BATCH_SIZE) {
-    const batch = npis.slice(i, i + BATCH_SIZE)
-    const { data, error } = await supabase
-      .from("practice_intel")
-      .select(
-        [
-          "npi",
-          "research_date",
-          "hiring_active",
-          "owner_career_stage",
-          "accepts_medicaid",
-          "ppo_heavy",
-          "technology_level",
-          "google_rating",
-          "google_velocity",
-          "red_flags",
-          "green_flags",
-          "acquisition_readiness",
-          "confidence",
-          "overall_assessment",
-          "raw_json",
-        ].join(",")
-      )
-      .in("npi", batch)
-      .abortSignal(timeoutSignal(1500))
-
-    if (error) throw error
-    all.push(...((data as unknown as LaunchpadPracticeIntelRecord[]) ?? []))
+  const batches: string[][] = []
+  for (let i = 0; i < uniqueNpis.length; i += BATCH_SIZE) {
+    batches.push(uniqueNpis.slice(i, i + BATCH_SIZE))
   }
 
-  return all
+  const results = await Promise.all(
+    batches.map(async (batch) => {
+      const { data, error } = await supabase
+        .from("practice_intel")
+        .select(
+          [
+            "npi",
+            "research_date",
+            "website_url",
+            "website_era",
+            "website_analysis",
+            "services_listed",
+            "services_high_rev",
+            "services_note",
+            "technology_listed",
+            "technology_level",
+            "provider_count_web",
+            "provider_notes",
+            "owner_career_stage",
+            "google_review_count",
+            "google_rating",
+            "google_velocity",
+            "google_sentiment",
+            "hiring_active",
+            "hiring_positions",
+            "hiring_source",
+            "succession_intent_detected",
+            "acquisition_found",
+            "acquisition_details",
+            "healthgrades_rating",
+            "healthgrades_reviews",
+            "accepts_medicaid",
+            "ppo_heavy",
+            "insurance_note",
+            "red_flags",
+            "green_flags",
+            "overall_assessment",
+            "acquisition_readiness",
+            "confidence",
+            "sources",
+            "verification_searches",
+            "verification_quality",
+            "verification_urls",
+            "raw_json",
+          ].join(",")
+        )
+        .in("npi", batch)
+        .abortSignal(timeoutSignal(6000))
+
+      if (error) throw error
+      return ((data as unknown as Record<string, unknown>[]) ?? []).map(normalizeIntelRow)
+    })
+  )
+
+  return results.flat()
 }
 
 /** Fetch recent deals where target_zip is in scope ZIPs and deal_date >= 18 months ago. */
@@ -332,11 +529,11 @@ export async function getLaunchpadBundle(options: {
   }
 
   // Collect NPIs for dependent queries
-  const practiceNpis = practices.map((p) => p.npi)
+  const practiceNpis = Array.from(new Set(practices.flatMap(npisForPractice)))
 
   // 3. Dependent fetches — practice_intel + recent acquisition NPIs (parallel)
   const [intelRowsResult, acquisitionResult] = await Promise.all([
-    withTimeout("practice_intel", 2500, () => fetchPracticeIntel(supabase, practiceNpis)),
+    withTimeout("practice_intel", 8000, () => fetchPracticeIntel(supabase, practiceNpis)),
     fetchRecentAcquisitionNpis(supabase, practiceNpis, cutoffIso),
   ])
   const intelRows = intelRowsResult ?? []
@@ -362,9 +559,24 @@ export async function getLaunchpadBundle(options: {
   })
 
   // 5. Build lookup maps
-  const intelByNpi = new Map<string, LaunchpadPracticeIntelRecord>()
+  const rawIntelByNpi = new Map<string, LaunchpadPracticeIntelRecord>()
   for (const intel of intelRows) {
-    intelByNpi.set(intel.npi, intel)
+    rawIntelByNpi.set(intel.npi, intel)
+  }
+
+  const intelByNpi = new Map<string, LaunchpadPracticeIntelRecord>()
+  const intelAuditByNpi = new Map<string, LaunchpadIntelAudit>()
+  for (const practice of practices) {
+    const candidateRows = npisForPractice(practice)
+      .map((npi) => rawIntelByNpi.get(npi) ?? null)
+      .filter((row): row is LaunchpadPracticeIntelRecord => row !== null)
+    const best = chooseBestIntel(candidateRows)
+    if (!best) continue
+    const audit = auditForIntel(best)
+    intelAuditByNpi.set(practice.npi, audit)
+    if (audit.status === "source_backed") {
+      intelByNpi.set(practice.npi, best)
+    }
   }
 
   const zipScoreByZip = new Map<string, LaunchpadZipScoreRecord>()
@@ -379,6 +591,7 @@ export async function getLaunchpadBundle(options: {
     zipScoreByZip,
     recentAcquisitionNpis: acquisitionResult.result,
     recentDeals,
+    intelAuditByNpi,
     scope,
     track,
   })
@@ -395,6 +608,9 @@ export async function getLaunchpadBundle(options: {
   const totalPractices = practices.length
   const withIntel = intelByNpi.size
   const intelPct = totalPractices > 0 ? Math.round((withIntel / totalPractices) * 100) : 0
+  const rejectedIntelCount = Array.from(intelAuditByNpi.values()).filter(
+    (audit) => audit.status === "rejected"
+  ).length
 
   // Location-deduped GP count — sums total_gp_locations across scope ZIPs.
   // Matches the Home + Job Market Phase A denominator (commit `732894f`).
@@ -408,7 +624,13 @@ export async function getLaunchpadBundle(options: {
   const totalGpLocations = gpLocationSum > 0 ? gpLocationSum : null
 
   if (intelPct < 10 && totalPractices > 0) {
-    warnings.push(`Intel coverage is thin (${intelPct}%)`)
+    warnings.push(`Source-backed intel coverage is thin (${intelPct}%)`)
+  }
+
+  if (rejectedIntelCount > 0) {
+    warnings.push(
+      `${rejectedIntelCount} raw practice_intel row${rejectedIntelCount === 1 ? "" : "s"} rejected by verification gate`
+    )
   }
 
   const corporateSharePct = median(zipScores.map((z) => z.corporate_share_pct))
@@ -453,7 +675,7 @@ export async function getLaunchpadBundle(options: {
   const dataHealth: LaunchpadDataHealth = {
     practicesFetched: practices.length,
     zipScoresFetched: zipScores.length,
-    intelFetched: intelRows.length,
+    intelFetched: withIntel,
     recentChangesFetched: acquisitionResult.result.size,
     recentDealsFetched: recentDeals.length,
     intelCoveragePct: intelPct,

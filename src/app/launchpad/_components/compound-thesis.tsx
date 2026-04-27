@@ -12,6 +12,7 @@ import {
   Clock,
   AlertCircle,
   MessageCircleQuestion,
+  ExternalLink,
 } from "lucide-react"
 import type {
   CompoundNarrativeRequest,
@@ -22,6 +23,7 @@ import type {
   ThesisQuestion,
 } from "@/lib/launchpad/ai-types"
 import type { LaunchpadTrack } from "@/lib/launchpad/signals"
+import { safeExternalUrl } from "@/lib/utils/safe-url"
 import { LedgerCards } from "./ledger-cards"
 
 interface CompoundThesisProps {
@@ -157,6 +159,69 @@ function OwnerQuestionsCard({ questions }: { questions: ThesisQuestion[] }) {
   )
 }
 
+function EvidenceSources({ urls }: { urls: string[] | null | undefined }) {
+  const visible = (urls ?? []).slice(0, 8)
+  if (visible.length === 0) return null
+  return (
+    <div className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] p-2">
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#6B6B60]">
+        Source URLs used by research
+      </p>
+      <ul className="space-y-1">
+        {visible.map((url) => (
+          <li key={url}>
+            <a
+              href={safeExternalUrl(url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex max-w-full items-center gap-1 text-[11px] text-[#B8860B] hover:underline"
+            >
+              <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="truncate">{url.replace(/^https?:\/\//, "")}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function ResearchAuditCard({
+  audit,
+}: {
+  audit: CompoundNarrativeResponse["research_audit"]
+}) {
+  if (!audit) return null
+  const accepted = audit.status === "source_backed"
+  return (
+    <div
+      className={
+        accepted
+          ? "rounded-md border border-[#2D8B4E]/25 bg-[#2D8B4E]/5 p-2"
+          : "rounded-md border border-[#D4920B]/25 bg-[#D4920B]/5 p-2"
+      }
+    >
+      <p
+        className={
+          accepted
+            ? "text-[10px] font-semibold uppercase tracking-wider text-[#2D8B4E]"
+            : "text-[10px] font-semibold uppercase tracking-wider text-[#D4920B]"
+        }
+      >
+        Research audit
+      </p>
+      <p className="mt-1 text-[11px] text-[#6B6B60]">{audit.reason}</p>
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[#9C9C90]">
+        <span>quality: {audit.verification_quality ?? "missing"}</span>
+        <span>searches: {audit.verification_searches ?? 0}</span>
+        <span>URLs: {audit.verification_urls.length}</span>
+        {audit.research_date && <span>date: {audit.research_date.slice(0, 10)}</span>}
+      </div>
+    </div>
+  )
+}
+
 export function CompoundThesis({ npi, signals, scores, track, practice }: CompoundThesisProps) {
   const [expanded, setExpanded] = useState(false)
 
@@ -251,15 +316,17 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
           )}
 
           {isRefused && data && !isFetching && (
-            <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+            <div className="space-y-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
               <div className="flex items-center gap-1.5">
                 <FileSearch className="h-3.5 w-3.5 text-[#9C9C90]" aria-hidden="true" />
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6B6B60]">
                   {data.reason === "validation_failed"
                     ? "Thesis withheld — failed numeric audit"
-                    : "No verified research available"}
+                    : "No source-backed research available"}
                 </p>
               </div>
+              <ResearchAuditCard audit={data.research_audit} />
+              <EvidenceSources urls={data.source_urls} />
               {data.structural_summary && (
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
                   <div className="flex flex-col">
@@ -335,7 +402,7 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
               <p className="mt-3 border-t border-[#E8E5DE] pt-2 text-[11px] text-[#9C9C90]">
                 {data.reason === "validation_failed"
                   ? "Generated thesis included numeric claims that don't appear in the verified intel. Refused rather than ship unsourced facts."
-                  : "Thesis cannot be developed from structural signals alone. This practice has not been deep-researched yet."}
+                  : "Thesis cannot be developed from structural signals or rejected raw research. Run or repair the practice deep-dive before using this as evidence."}
               </p>
               {data.reason === "validation_failed" && (
                 <RegenerateButton onClick={() => void refetch()} />
@@ -361,6 +428,8 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
                 </p>
                 <RegenerateButton onClick={() => void refetch()} />
               </div>
+              <ResearchAuditCard audit={data.research_audit} />
+              <EvidenceSources urls={data.source_urls} />
               {data.ledger && data.ledger.length > 0 && <LedgerCards atoms={data.ledger} />}
               {data.contradictions && data.contradictions.length > 0 && (
                 <ContradictionsCard contradictions={data.contradictions} />
@@ -386,6 +455,8 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
                 </p>
                 <RegenerateButton onClick={() => void refetch()} />
               </div>
+              <ResearchAuditCard audit={data.research_audit} />
+              <EvidenceSources urls={data.source_urls} />
               {data.ledger && data.ledger.length > 0 && <LedgerCards atoms={data.ledger} />}
               {data.contradictions && data.contradictions.length > 0 && (
                 <ContradictionsCard contradictions={data.contradictions} />
