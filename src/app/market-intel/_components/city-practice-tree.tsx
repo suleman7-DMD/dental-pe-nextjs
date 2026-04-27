@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { StatusBadge } from '@/components/data-display/status-badge'
 import { createBrowserClient } from '@/lib/supabase/client'
+import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
 import { isIndependentClassification, isCorporateClassification } from '@/lib/constants/entity-classifications'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
@@ -60,30 +61,20 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
     setLoading(true)
 
     const supabase = createBrowserClient()
-    const chunkSize = 100
-    const pageSize = 1000
-    const all: Practice[] = []
-
-    for (let i = 0; i < zipList.length; i += chunkSize) {
-      const chunk = zipList.slice(i, i + chunkSize)
-      let offset = 0
-      let hasMore = true
-      while (hasMore) {
-        const { data } = await supabase
-          .from('practices')
-          .select('npi, practice_name, entity_type, ownership_status, entity_classification, affiliated_dso, affiliated_pe_sponsor, zip')
-          .in('zip', chunk)
-          .range(offset, offset + pageSize - 1)
-
-        if (data && data.length > 0) {
-          all.push(...(data as Practice[]))
-          offset += data.length
-          hasMore = data.length === pageSize
-        } else {
-          hasMore = false
-        }
-      }
-    }
+    const all: Practice[] = (await fetchPracticeLocations(supabase, {
+      zips: zipList,
+      orderBy: 'practice_name',
+      ascending: true,
+    })).map((row) => ({
+      npi: row.primary_npi ?? row.location_id,
+      practice_name: row.practice_name,
+      ownership_status: row.ownership_status,
+      affiliated_dso: row.affiliated_dso,
+      affiliated_pe_sponsor: row.affiliated_pe_sponsor,
+      entity_type: null,
+      entity_classification: row.entity_classification,
+      zip: row.zip,
+    }))
 
     setPractices(all)
     setLoaded(true)

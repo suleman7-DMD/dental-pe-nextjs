@@ -1,6 +1,6 @@
 "use client"
 
-import { Suspense, useMemo } from "react"
+import { Suspense, useCallback, useMemo, useState } from "react"
 import { AlertTriangle, List, Map as MapIcon, RotateCcw, SplitSquareHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -55,6 +55,21 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
     track: state.track,
     initialBundle,
   })
+
+  // Tracks which dossier tab to show when the dossier opens. Default "snapshot",
+  // but the "full breakdown →" link on each card switches it to "score".
+  const [dossierTab, setDossierTab] = useState<string>("snapshot")
+  const openWithScoreTab = useCallback(
+    (npi: string) => {
+      setDossierTab("score")
+      setSelectedNpi(npi)
+    },
+    [setSelectedNpi]
+  )
+  const closeDossier = useCallback(() => {
+    setDossierTab("snapshot")
+    clearSelection()
+  }, [clearSelection])
 
   const effectiveBundle = bundle ?? initialBundle ?? null
 
@@ -225,6 +240,7 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
               onSelect={setSelectedNpi}
               pinnedNpis={state.pinnedNpis}
               onTogglePin={togglePin}
+              onOpenScore={openWithScoreTab}
             />
           )}
         </div>
@@ -234,13 +250,15 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
       <PracticeDossier
         target={selectedTarget}
         open={selectedTarget !== null}
-        onClose={clearSelection}
+        onClose={closeDossier}
         track={state.track}
         bundle={effectiveBundle}
         isPinned={
           selectedTarget ? pinnedSet.has(selectedTarget.npi) : false
         }
         onTogglePin={togglePin}
+        tab={dossierTab}
+        onTabChange={setDossierTab}
       />
 
       {/* ZIP dossier drawer */}

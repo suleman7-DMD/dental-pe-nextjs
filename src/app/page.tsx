@@ -7,7 +7,7 @@ import { HomeShell } from './_components/home-shell'
 import type { HomeSummary } from '@/lib/types'
 import type { DealStats } from '@/lib/supabase/types'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 1800
 export const metadata = {
   title: 'Dental PE Intelligence Platform',
   description:

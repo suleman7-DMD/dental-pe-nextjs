@@ -2,9 +2,14 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getZipScores } from '@/lib/supabase/queries/zip-scores'
 import { getWatchedZips, getDistinctMetroAreas } from '@/lib/supabase/queries/watched-zips'
 import { getADABenchmarks } from '@/lib/supabase/queries/ada-benchmarks'
+import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
+import {
+  GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+  GLOBAL_PRACTICE_NPI_COUNT,
+} from '@/lib/constants/data-snapshot'
 import { MarketIntelShell } from './_components/market-intel-shell'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 1800
 export const metadata = {
   title: 'Market Intelligence | Dental PE Intelligence',
   description:
@@ -21,48 +26,38 @@ export default async function MarketIntelPage() {
     getADABenchmarks(supabase),
   ])
 
-  // Run ALL secondary queries in parallel: freshness + classification counts
-  const allWatchedZipCodes = watchedZips.map(z => z.zip_code)
   const taxonomyLeaks = ['General Dentistry', 'Oral Surgery', 'Orthodontics', 'Periodontics', 'Endodontics', 'Pediatric Dentistry', 'Prosthodontics', 'Dental Hygiene']
+  const locations = await fetchPracticeLocations(supabase)
 
-  const [
-    { count: totalPractices },
-    { count: daEnriched },
-    { data: latestUpdate },
-    { count: watchedTotal },
-    { count: corporateByEC },
-    { count: corporateByStatus },
-    { count: independentByEC },
-    { count: independentByStatus },
-    { count: dsoNationalReal },
-    { count: dsoRegionalStrong },
-    { count: dsoSpecialists },
-  ] = await Promise.all([
-    supabase.from('practices').select('npi', { count: 'exact', head: true }),
-    supabase.from('practices').select('npi', { count: 'exact', head: true }).not('data_axle_import_date', 'is', null),
-    supabase.from('practices').select('updated_at').order('updated_at', { ascending: false }).limit(1).single(),
-    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false),
-    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).in('entity_classification', ['dso_regional', 'dso_national']),
-    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).in('ownership_status', ['dso_affiliated', 'pe_backed']).is('entity_classification', null),
-    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).in('entity_classification', ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group']),
-    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).in('ownership_status', ['independent', 'likely_independent']).is('entity_classification', null),
-    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).eq('entity_classification', 'dso_national').not('affiliated_dso', 'in', `(${taxonomyLeaks.join(',')})`),
-    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).eq('entity_classification', 'dso_regional').or('classification_reasoning.ilike.%EIN=%,classification_reasoning.ilike.%generic brand%,classification_reasoning.ilike.%parent_company%,classification_reasoning.ilike.%franchise%,classification_reasoning.ilike.%branch%'),
-    supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).eq('entity_classification', 'specialist').in('ownership_status', ['dso_affiliated', 'pe_backed']),
-  ])
+  const watchedTotal = locations.length
+  const corporateByEC = locations.filter((p) => p.entity_classification === 'dso_regional' || p.entity_classification === 'dso_national').length
+  const corporateByStatus = locations.filter((p) => p.entity_classification == null && (p.ownership_status === 'dso_affiliated' || p.ownership_status === 'pe_backed')).length
+  const independentByEC = locations.filter((p) => ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group'].includes(p.entity_classification ?? '')).length
+  const independentByStatus = locations.filter((p) => p.entity_classification == null && (p.ownership_status === 'independent' || p.ownership_status === 'likely_independent')).length
+  const dsoNationalReal = locations.filter((p) => p.entity_classification === 'dso_national' && !taxonomyLeaks.includes(p.affiliated_dso ?? '')).length
+  const dsoRegionalStrong = locations.filter((p) => p.entity_classification === 'dso_regional' && (
+    p.classification_reasoning?.includes('EIN=') ||
+    p.classification_reasoning?.toLowerCase().includes('generic brand') ||
+    p.classification_reasoning?.includes('parent_company') ||
+    p.classification_reasoning?.toLowerCase().includes('franchise') ||
+    p.classification_reasoning?.toLowerCase().includes('branch')
+  )).length
+  const dsoSpecialists = locations.filter((p) => p.entity_classification === 'specialist' && (p.ownership_status === 'dso_affiliated' || p.ownership_status === 'pe_backed')).length
+  const latestUpdate = locations
+    .map((p) => p.updated_at)
+    .filter((v): v is string => Boolean(v))
+    .sort()
+    .pop() ?? null
 
   // FIX 4: Per-entity-classification counts for Ownership tab
   const ecValues = ['solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group','dso_regional','dso_national','specialist','non_clinical'] as const
-  const ecCountResults = await Promise.all(
-    ecValues.map(ec => supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', allWatchedZipCodes).eq('is_likely_residential', false).eq('entity_classification', ec))
-  )
   const entityCounts: Record<string, number> = {}
-  ecValues.forEach((ec, i) => { entityCounts[ec] = ecCountResults[i].count ?? 0 })
+  ecValues.forEach((ec) => { entityCounts[ec] = locations.filter((p) => p.entity_classification === ec).length })
 
   const freshness = {
-    totalPractices: totalPractices ?? 0,
-    daEnriched: daEnriched ?? 0,
-    lastUpdated: latestUpdate?.updated_at ?? null,
+    totalPractices: GLOBAL_PRACTICE_NPI_COUNT,
+    daEnriched: GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+    lastUpdated: latestUpdate,
   }
 
   const highConfCorporate = (dsoNationalReal ?? 0) + (dsoRegionalStrong ?? 0) + (dsoSpecialists ?? 0)

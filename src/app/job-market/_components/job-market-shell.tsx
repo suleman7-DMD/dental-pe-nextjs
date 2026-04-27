@@ -37,6 +37,10 @@ import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { isIndependentClassification, isCorporateClassification, classifyPractice, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
+import {
+  fetchPracticeLocations,
+  practiceLocationToLaunchpadRecord,
+} from '@/lib/supabase/queries/practice-locations'
 import { Hospital, CircleCheck, BarChart3, Target, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
 
 import type { Practice, ZipScore, WatchedZip } from '@/lib/types'
@@ -157,15 +161,21 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
   })
 }
 
-// Shared field list for practice queries
-const PRACTICE_FIELDS = [
-  'id', 'npi', 'practice_name', 'doing_business_as', 'address', 'city', 'state', 'zip',
-  'phone', 'website', 'entity_classification', 'ownership_status',
-  'affiliated_dso', 'affiliated_pe_sponsor', 'buyability_score', 'classification_confidence',
-  'classification_reasoning', 'year_established', 'employee_count',
-  'estimated_revenue', 'latitude', 'longitude', 'data_axle_import_date',
-  'num_providers', 'location_type', 'taxonomy_code',
-].join(',')
+function locationPracticeToPractice(row: ReturnType<typeof practiceLocationToLaunchpadRecord>): Practice {
+  return {
+    ...row,
+    buyability_confidence: null,
+    import_batch_id: null,
+    notes: null,
+    created_at: null,
+    data_axle_raw_name: null,
+    enumeration_date: null,
+    last_updated: null,
+    parent_iusa: null,
+    raw_record_count: null,
+    taxonomy_description: null,
+  } as unknown as Practice
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Component
@@ -222,60 +232,14 @@ function JobMarketShellInner({
 
       setLoading(true)
       try {
-        const allPractices: Practice[] = []
-        const pageSize = 1000
-        const zipChunkSize = 50
-
-        // Split ZIP list into chunks for parallel fetching
-        const zipChunks: string[][] = []
-        for (let i = 0; i < zipList.length; i += zipChunkSize) {
-          zipChunks.push(zipList.slice(i, i + zipChunkSize))
-        }
-
-        // Fetch first page of each chunk in parallel
-        const firstPages = await Promise.all(
-          zipChunks.map(chunk =>
-            supabase
-              .from('practices')
-              .select(PRACTICE_FIELDS)
-              .in('zip', chunk)
-              .order('practice_name', { ascending: true })
-              .range(0, pageSize - 1)
-          )
-        )
-
-        // Collect results and identify chunks needing more pages
-        const chunksNeedingMore: { chunk: string[]; offset: number }[] = []
-        for (let i = 0; i < firstPages.length; i++) {
-          const { data } = firstPages[i]
-          if (data && data.length > 0) {
-            allPractices.push(...(data as unknown as Practice[]))
-            if (data.length === pageSize) {
-              chunksNeedingMore.push({ chunk: zipChunks[i], offset: pageSize })
-            }
-          }
-        }
-
-        // Fetch remaining pages for chunks with 1000+ results
-        for (const { chunk, offset: startOffset } of chunksNeedingMore) {
-          let offset = startOffset
-          let hasMore = true
-          while (hasMore) {
-            const { data } = await supabase
-              .from('practices')
-              .select(PRACTICE_FIELDS)
-              .in('zip', chunk)
-              .order('practice_name', { ascending: true })
-              .range(offset, offset + pageSize - 1)
-            if (data && data.length > 0) {
-              allPractices.push(...(data as unknown as Practice[]))
-              offset += data.length
-              hasMore = data.length === pageSize
-            } else {
-              hasMore = false
-            }
-          }
-        }
+        const locations = await fetchPracticeLocations(supabase, {
+          zips: zipList,
+          orderBy: 'practice_name',
+          ascending: true,
+        })
+        const allPractices = locations
+          .map(practiceLocationToLaunchpadRecord)
+          .map(locationPracticeToPractice)
 
         setPractices(allPractices)
         setLoadedLocation(locationKey)
@@ -362,35 +326,19 @@ function JobMarketShellInner({
     if (zipList.length === 0) return
 
     try {
-      const [
-        { count: totalCount },
-        { count: indepCount },
-        { count: dsoRegCount },
-        { count: dsoNatCount },
-        { count: hvCount },
-        { count: largeStaffCount },
-        { count: retireCount },
-      ] = await Promise.all([
-        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false),
-        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
-          .in('entity_classification', ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group']),
-        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
-          .eq('entity_classification', 'dso_regional'),
-        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
-          .eq('entity_classification', 'dso_national'),
-        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
-          .eq('entity_classification', 'solo_high_volume'),
-        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
-          .gte('employee_count', 10),
-        supabase.from('practice_locations').select('location_id', { count: 'exact', head: true }).in('zip', zipList).eq('is_likely_residential', false)
-          .in('entity_classification', ['solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume', 'family_practice', 'small_group', 'large_group'])
-          .not('year_established', 'is', null)
-          .lt('year_established', 1995),
-      ])
-
-      const corporate = (dsoRegCount ?? 0) + (dsoNatCount ?? 0)
-      const total_p = totalCount ?? 0
-      const indep_cnt = indepCount ?? 0
+      const practicesForKpis = (await fetchPracticeLocations(supabase, { zips: zipList }))
+        .map(practiceLocationToLaunchpadRecord)
+        .map(locationPracticeToPractice)
+      const corporate = practicesForKpis.filter((p) => isCorporateClassification(p.entity_classification)).length
+      const total_p = practicesForKpis.length
+      const indep_cnt = practicesForKpis.filter((p) => isIndependentClassification(p.entity_classification)).length
+      const largeStaffCount = practicesForKpis.filter((p) => (p.employee_count ?? 0) >= 10).length
+      const retireCount = practicesForKpis.filter((p) =>
+        isIndependentClassification(p.entity_classification) &&
+        p.year_established != null &&
+        p.year_established < 1995
+      ).length
+      const hvCount = practicesForKpis.filter((p) => p.entity_classification === 'solo_high_volume').length
 
       setClientKpis({
         total_p,
@@ -400,9 +348,9 @@ function JobMarketShellInner({
         unk_cnt: Math.max(0, total_p - corporate - indep_cnt),
         highConfCorporate: 0, // Approximate without row data
         allSignalsCorporate: corporate,
-        large_count: largeStaffCount ?? 0,
-        retirement_risk: retireCount ?? 0,
-        highVolCount: hvCount ?? 0,
+        large_count: largeStaffCount,
+        retirement_risk: retireCount,
+        highVolCount: hvCount,
       })
     } catch {
       // Silently handle — KPIs will show server defaults

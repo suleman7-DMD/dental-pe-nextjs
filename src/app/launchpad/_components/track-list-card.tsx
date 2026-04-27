@@ -21,6 +21,8 @@ interface TrackListCardProps {
   track: LaunchpadTrack
   isPinned?: boolean
   onTogglePin?: (npi: string) => void
+  /** Opens the dossier with the Score tab pre-selected — used by the "Why?" link */
+  onOpenScore?: (npi: string) => void
 }
 
 const TIER_STYLES: Record<
@@ -82,6 +84,7 @@ export function TrackListCard({
   track,
   isPinned = false,
   onTogglePin,
+  onOpenScore,
 }: TrackListCardProps) {
   const practice = target.practice
   const displayName = getPracticeDisplayName(practice)
@@ -243,6 +246,39 @@ export function TrackListCard({
                   </span>
                 )
               })}
+            </div>
+          )}
+
+          {/* Inline score breakdown — top 2 contributors so users see WHY without hover */}
+          {topContributions.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] leading-tight">
+              <span className="font-semibold uppercase tracking-wider text-[#9C9C90]">Why:</span>
+              {topContributions.slice(0, 2).map((c) => (
+                <span key={c.signalId} className="inline-flex items-center gap-1 text-[#1A1A1A]">
+                  <span
+                    className={cn(
+                      "font-mono font-semibold",
+                      c.contribution > 0 ? "text-[#2D8B4E]" : "text-[#C23B3B]"
+                    )}
+                  >
+                    {c.contribution > 0 ? "+" : ""}
+                    {c.contribution.toFixed(0)}
+                  </span>
+                  <span className="text-[#6B6B60]">{c.label}</span>
+                </span>
+              ))}
+              {onOpenScore && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenScore(target.npi)
+                  }}
+                  className="ml-1 rounded text-[10px] font-medium text-[#B8860B] underline-offset-2 hover:underline"
+                >
+                  full breakdown →
+                </button>
+              )}
             </div>
           )}
 

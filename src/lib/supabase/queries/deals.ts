@@ -56,19 +56,17 @@ export async function getDealStats(
   const allDeals: Deal[] = [];
   const pageSize = 1000;
   let page = 0;
-  let totalDeals = 0;
 
   while (true) {
     const from = page * pageSize;
     const to = from + pageSize - 1;
-    const { data, count, error } = await supabase
+    const { data, error } = await supabase
       .from("deals")
-      .select("id, deal_date, platform_company, pe_sponsor, target_name, target_city, target_state, target_zip, deal_type, deal_size_mm, ebitda_multiple, specialty, num_locations, source, source_url, notes, created_at, updated_at", { count: "exact" })
+      .select("id, deal_date, platform_company, pe_sponsor, target_name, target_city, target_state, target_zip, deal_type, deal_size_mm, ebitda_multiple, specialty, num_locations, source, source_url, notes, created_at, updated_at")
       .order("deal_date", { ascending: false })
       .range(from, to);
 
     if (error) throw error;
-    if (page === 0) totalDeals = count ?? 0;
 
     const batch = (data as Deal[]) ?? [];
     allDeals.push(...batch);
@@ -78,7 +76,7 @@ export async function getDealStats(
   }
 
   const deals = allDeals;
-  const total = totalDeals || deals.length;
+  const total = deals.length;
 
   // Deals by type
   const byType: Record<string, number> = {};

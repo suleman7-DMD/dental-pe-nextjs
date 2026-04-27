@@ -3,7 +3,7 @@ import { getBuyabilityPractices } from '@/lib/supabase/queries/practices'
 import { getWatchedZips } from '@/lib/supabase/queries/watched-zips'
 import { BuyabilityShell } from './_components/buyability-shell'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 1800
 export const metadata = {
   title: 'Buyability Scanner | Dental PE Intelligence',
   description:

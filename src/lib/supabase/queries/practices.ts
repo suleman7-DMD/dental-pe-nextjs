@@ -3,8 +3,15 @@ import type { Practice, PracticeStats } from "../types";
 import {
   INDEPENDENT_CLASSIFICATIONS,
   DSO_NATIONAL_TAXONOMY_LEAKS,
-  DSO_REGIONAL_STRONG_SIGNAL_FILTER,
 } from "../../constants/entity-classifications";
+import {
+  GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+  GLOBAL_PRACTICE_NPI_COUNT,
+} from "../../constants/data-snapshot";
+import {
+  fetchPracticeLocations,
+  practiceLocationToLaunchpadRecord,
+} from "./practice-locations";
 
 export async function getPracticesByZips(
   supabase: SupabaseClient,
@@ -165,23 +172,6 @@ export async function getPracticesWithCoords(
 }
 
 /**
- * Safe count query helper: awaits a Supabase count query and returns the count,
- * logging any errors. Returns null on failure instead of silently swallowing errors.
- */
-async function safeCount(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  query: PromiseLike<{ count: number | null; error: any }>,
-  label: string
-): Promise<number | null> {
-  const result = await query;
-  if (result.error) {
-    console.error(`[getPracticeStats] ${label} error:`, result.error.message ?? result.error, `(code: ${result.error.code ?? 'unknown'})`);
-    return null;
-  }
-  return result.count;
-}
-
-/**
  * Aggregate practice statistics for watched ZIPs with tiered consolidation.
  * Returns full PracticeStats including high-confidence corporate count,
  * all-signals corporate count, independent count, unknown count, and enriched count.
@@ -193,140 +183,40 @@ async function safeCount(
 export async function getPracticeStats(
   supabase: SupabaseClient
 ): Promise<PracticeStats> {
-  // ── Phase 1: Get watched ZIPs first (lightweight query) ────────────────
-  const { data: watchedZipRows, error: zipError } = await supabase
-    .from("watched_zips")
-    .select("zip_code");
-
-  if (zipError) {
-    console.error("[getPracticeStats] watched_zips error:", zipError.message);
-  }
-
-  const watchedZips = (watchedZipRows ?? []).map(
-    (z: { zip_code: string }) => z.zip_code
-  );
-
-  if (watchedZips.length === 0) {
-    // Still try to get global total for display
-    const { count: globalTotal } = await supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true });
-    return {
-      totalPractices: globalTotal ?? 0,
-      total: 0,
-      corporate: 0,
-      corporateHighConf: 0,
-      independent: 0,
-      unknown: 0,
-      enriched: 0,
-      consolidatedPct: "--",
-      independentPct: "--",
-    };
-  }
-
-  // ── Source watched-ZIP counts from practice_locations (address-deduped) ─
-  // practice_locations collapses NPI-1 + NPI-2 + suite-variant rows at the
-  // same physical address into ONE canonical row. Filter is_likely_residential
-  // = false so home offices and academic ZIP trainees don't inflate counts.
-
-  // ── Phase 2: Batch A — fast queries with narrow filters (3 concurrent) ─
-  const [allDsoRegional, allDsoNational, dsoSpecialists] = await Promise.all([
-    safeCount(
-      supabase
-        .from("practice_locations")
-        .select("location_id", { count: "exact", head: true })
-        .in("zip", watchedZips)
-        .eq("is_likely_residential", false)
-        .eq("entity_classification", "dso_regional"),
-      "allDsoRegional"
-    ),
-    safeCount(
-      supabase
-        .from("practice_locations")
-        .select("location_id", { count: "exact", head: true })
-        .in("zip", watchedZips)
-        .eq("is_likely_residential", false)
-        .eq("entity_classification", "dso_national"),
-      "allDsoNational"
-    ),
-    safeCount(
-      supabase
-        .from("practice_locations")
-        .select("location_id", { count: "exact", head: true })
-        .in("zip", watchedZips)
-        .eq("is_likely_residential", false)
-        .eq("entity_classification", "specialist")
-        .in("ownership_status", ["dso_affiliated", "pe_backed"]),
-      "dsoSpecialists"
-    ),
-  ]);
-
-  // ── Phase 3: Batch B — more narrow filters (2 concurrent) ──────────────
-  const [dsoNationalReal, dsoRegionalStrong] = await Promise.all([
-    safeCount(
-      supabase
-        .from("practice_locations")
-        .select("location_id", { count: "exact", head: true })
-        .in("zip", watchedZips)
-        .eq("is_likely_residential", false)
-        .eq("entity_classification", "dso_national")
-        .not(
-          "affiliated_dso",
-          "in",
-          `(${DSO_NATIONAL_TAXONOMY_LEAKS.join(",")})`
-        ),
-      "dsoNationalReal"
-    ),
-    safeCount(
-      supabase
-        .from("practice_locations")
-        .select("location_id", { count: "exact", head: true })
-        .in("zip", watchedZips)
-        .eq("is_likely_residential", false)
-        .eq("entity_classification", "dso_regional")
-        .or(DSO_REGIONAL_STRONG_SIGNAL_FILTER),
-      "dsoRegionalStrong"
-    ),
-  ]);
-
-  // ── Phase 4: Expensive broad scans — run sequentially to avoid ─────────
-  // Supabase Postgres statement_timeout (error 57014). practice_locations
-  // is much smaller than practices (5,732 vs 14,053 watched-ZIP rows) so
-  // these scans complete in well under the timeout window.
-  const watchedTotal = await safeCount(
-    supabase
-      .from("practice_locations")
-      .select("location_id", { count: "exact", head: true })
-      .in("zip", watchedZips)
-      .eq("is_likely_residential", false),
-    "watchedTotal"
-  );
-
-  const independentByEC = await safeCount(
-    supabase
-      .from("practice_locations")
-      .select("location_id", { count: "exact", head: true })
-      .in("zip", watchedZips)
-      .eq("is_likely_residential", false)
-      .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS]),
-    "independentByEC"
-  );
-
-  const globalTotal = await safeCount(
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true }),
-    "globalTotal"
-  );
-
-  // Enriched count (scans 400k rows on data_axle_import_date) — run last
-  const enrichedCount = await safeCount(
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .not("data_axle_import_date", "is", null),
-    "enrichedCount"
-  );
+  const locations = await fetchPracticeLocations(supabase)
+  const watchedTotal = locations.length
+  const allDsoRegional = locations.filter(
+    (row) => row.entity_classification === "dso_regional"
+  ).length
+  const allDsoNational = locations.filter(
+    (row) => row.entity_classification === "dso_national"
+  ).length
+  const dsoSpecialists = locations.filter(
+    (row) =>
+      row.entity_classification === "specialist" &&
+      (row.ownership_status === "dso_affiliated" ||
+        row.ownership_status === "pe_backed")
+  ).length
+  const dsoNationalReal = locations.filter(
+    (row) =>
+      row.entity_classification === "dso_national" &&
+      !(DSO_NATIONAL_TAXONOMY_LEAKS as readonly string[]).includes(row.affiliated_dso ?? "")
+  ).length
+  const dsoRegionalStrong = locations.filter(
+    (row) =>
+      row.entity_classification === "dso_regional" &&
+      (row.classification_reasoning?.includes("EIN=") ||
+        row.classification_reasoning?.toLowerCase().includes("generic brand") ||
+        row.classification_reasoning?.includes("parent_company") ||
+        row.classification_reasoning?.toLowerCase().includes("franchise") ||
+        row.classification_reasoning?.toLowerCase().includes("branch"))
+  ).length
+  const independentByEC = locations.filter((row) =>
+    INDEPENDENT_CLASSIFICATIONS.includes(
+      row.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
+    )
+  ).length
+  const enrichedCount = GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT
 
   // Location-deduped GP clinic count: sum zip_scores.total_gp_locations
   // across watched ZIPs. This is the honest "how many clinics" denominator —
@@ -337,8 +227,7 @@ export async function getPracticeStats(
   try {
     const { data: zipRows, error: zsErr } = await supabase
       .from("zip_scores")
-      .select("total_gp_locations")
-      .in("zip_code", watchedZips);
+      .select("total_gp_locations");
     if (zsErr) {
       console.warn("[getPracticeStats] zip_scores fetch failed:", zsErr.message);
     } else if (zipRows) {
@@ -363,15 +252,7 @@ export async function getPracticeStats(
   const unknownCount = Math.max(0, t - corporate - independent);
 
   // If globalTotal timed out, fall back to watchedTotal so KPI isn't 0
-  const effectiveGlobalTotal = globalTotal ?? t;
-
-  // Log if any critical counts failed
-  if (watchedTotal === null || independentByEC === null || globalTotal === null) {
-    console.warn(
-      `[getPracticeStats] Some counts returned null (possible statement_timeout). ` +
-      `globalTotal=${globalTotal}, watchedTotal=${watchedTotal}, independent=${independentByEC}`
-    );
-  }
+  const effectiveGlobalTotal = GLOBAL_PRACTICE_NPI_COUNT;
 
   return {
     totalPractices: effectiveGlobalTotal,
@@ -381,7 +262,7 @@ export async function getPracticeStats(
     corporateHighConf: highConfCorporate,
     independent,
     unknown: unknownCount,
-    enriched: enrichedCount ?? 0,
+    enriched: enrichedCount,
     consolidatedPct:
       t > 0 ? ((highConfCorporate / t) * 100).toFixed(1) + "%" : "0.0%",
     independentPct:
@@ -398,27 +279,15 @@ export async function getPracticeStats(
 export async function getRetirementRiskCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  // First get watched ZIP codes
-  const { data: watchedZipRows } = await supabase
-    .from("watched_zips")
-    .select("zip_code");
-  const watchedZips = (watchedZipRows ?? []).map(
-    (z: { zip_code: string }) => z.zip_code
-  );
-
-  if (watchedZips.length === 0) return 0;
-
-  const { count, error } = await supabase
-    .from("practice_locations")
-    .select("location_id", { count: "exact", head: true })
-    .in("zip", watchedZips)
-    .eq("is_likely_residential", false)
-    .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS])
-    .not("year_established", "is", null)
-    .lt("year_established", 1995);
-
-  if (error) throw error;
-  return count ?? 0;
+  const locations = await fetchPracticeLocations(supabase)
+  return locations.filter(
+    (row) =>
+      INDEPENDENT_CLASSIFICATIONS.includes(
+        row.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
+      ) &&
+      row.year_established != null &&
+      row.year_established < 1995
+  ).length
 }
 
 /**
@@ -430,26 +299,8 @@ export async function getRetirementRiskCount(
 export async function getAcquisitionTargetCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  // First get watched ZIP codes
-  const { data: watchedZipRows } = await supabase
-    .from("watched_zips")
-    .select("zip_code");
-  const watchedZips = (watchedZipRows ?? []).map(
-    (z: { zip_code: string }) => z.zip_code
-  );
-
-  if (watchedZips.length === 0) return 0;
-
-  const { count, error } = await supabase
-    .from("practice_locations")
-    .select("location_id", { count: "exact", head: true })
-    .in("zip", watchedZips)
-    .eq("is_likely_residential", false)
-    .not("buyability_score", "is", null)
-    .gte("buyability_score", 50);
-
-  if (error) throw error;
-  return count ?? 0;
+  const locations = await fetchPracticeLocations(supabase)
+  return locations.filter((row) => (row.buyability_score ?? 0) >= 50).length
 }
 
 /**
@@ -465,28 +316,31 @@ export async function getBuyabilityPractices(
   options: { zips?: string[]; limit?: number } = {}
 ): Promise<Practice[]> {
   const { zips, limit = 1000 } = options;
+  const locations = await fetchPracticeLocations(supabase, {
+    zips,
+    orderBy: "buyability_score",
+    ascending: false,
+    maxRows: limit,
+  })
 
-  const buyabilityFields = [
-    'npi', 'practice_name', 'doing_business_as', 'city', 'state', 'zip',
-    'phone', 'website', 'entity_classification', 'ownership_status',
-    'affiliated_dso', 'buyability_score', 'classification_confidence',
-    'classification_reasoning', 'year_established', 'employee_count',
-    'estimated_revenue', 'num_providers', 'taxonomy_code',
-  ].join(',')
-
-  let query = supabase
-    .from("practices")
-    .select(buyabilityFields)
-    .not("buyability_score", "is", null)
-    .order("buyability_score", { ascending: false })
-    .limit(limit);
-
-  if (zips && zips.length > 0) {
-    query = query.in("zip", zips);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return (data as unknown as Practice[]) ?? [];
+  return locations
+    .filter((row) => row.buyability_score != null)
+    .map((row) => {
+      const practice = practiceLocationToLaunchpadRecord(row)
+      return {
+        ...practice,
+        address: practice.address,
+        buyability_confidence: null,
+        entity_type: null,
+        import_batch_id: null,
+        notes: null,
+        created_at: null,
+        data_axle_raw_name: null,
+        enumeration_date: null,
+        last_updated: null,
+        parent_iusa: null,
+        raw_record_count: null,
+        taxonomy_description: null,
+      } as unknown as Practice
+    });
 }

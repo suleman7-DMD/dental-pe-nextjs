@@ -102,6 +102,7 @@ export interface SitrepLoadOptions {
   excludeCorporate?: boolean;
   confidence?: "all" | "high" | "medium" | "low";
   intentFilter?: WarroomIntentFilter | null;
+  loadSignals?: boolean;
 }
 
 export async function getSitrepBundle(
@@ -113,6 +114,7 @@ export async function getSitrepBundle(
   const lens: WarroomLens = options.lens ?? DEFAULT_WARROOM_LENS;
   const rankLimit = options.rankLimit ?? DEFAULT_RANK_LIMIT;
   const topSignalLimit = options.topSignalLimit ?? DEFAULT_TOP_SIGNAL_LIMIT;
+  const loadSignalLayer = options.loadSignals ?? false;
 
   const dataScope = normalizeWarroomDataScope(scope);
   const zipCodes = resolveScopeZipCodes(scope);
@@ -145,7 +147,13 @@ export async function getSitrepBundle(
     getScopedZipScores(scope, {}, supabase),
     getScopedDeals(scope, {}, supabase),
     getScopedChanges(scope, { maxRows: 500 }, supabase),
-    loadSignalsSafely(scope, supabase),
+    loadSignalLayer
+      ? loadSignalsSafely(scope, supabase)
+      : Promise.resolve({
+          practiceSignals: [],
+          zipSignals: [],
+          error: "Signal layer skipped on first paint.",
+        }),
   ]);
 
   function settled<T>(result: PromiseSettledResult<T>, fallback: T, label: string): T {

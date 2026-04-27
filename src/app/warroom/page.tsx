@@ -4,8 +4,7 @@ import { DEFAULT_WARROOM_SCOPE } from "@/lib/warroom/scope"
 import type { WarroomSitrepBundle } from "@/lib/warroom/signals"
 import { WarroomShell } from "./_components/warroom-shell"
 
-export const dynamic = "force-dynamic"
-export const revalidate = 0
+export const revalidate = 900
 
 export const metadata = {
   title: "Warroom | Dental PE Intelligence",

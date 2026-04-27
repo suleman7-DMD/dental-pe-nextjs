@@ -3,6 +3,7 @@ import { getZipIntel, getPracticeIntel, getIntelStats } from '@/lib/supabase/que
 import { IntelligenceShell } from './_components/intelligence-shell'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 export const metadata = {
   title: 'Intelligence | Dental PE Intelligence',
   description:

@@ -3,7 +3,7 @@ import { getDealStats } from '@/lib/supabase/queries/deals'
 import { getDealSourceFreshness } from '@/lib/supabase/queries/system'
 import { DealFlowShell } from './_components/deal-flow-shell'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 1800
 export const metadata = {
   title: 'Deal Flow | Dental PE Intelligence',
   description:

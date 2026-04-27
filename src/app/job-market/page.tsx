@@ -2,35 +2,23 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getZipScores } from '@/lib/supabase/queries/zip-scores'
 import { getWatchedZips } from '@/lib/supabase/queries/watched-zips'
 import { getADABenchmarks } from '@/lib/supabase/queries/ada-benchmarks'
+import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import {
   INDEPENDENT_CLASSIFICATIONS,
   DSO_NATIONAL_TAXONOMY_LEAKS,
-  DSO_REGIONAL_STRONG_SIGNAL_FILTER,
 } from '@/lib/constants/entity-classifications'
+import {
+  GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+  GLOBAL_PRACTICE_NPI_COUNT,
+} from '@/lib/constants/data-snapshot'
 import { JobMarketShell } from './_components/job-market-shell'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 1800
 export const metadata = {
   title: 'Job Market Intelligence | Dental PE Intelligence',
   description:
     'Evaluate dental practice landscapes near your planned living locations — independent vs consolidated markets.',
-}
-
-/** Safely await a Supabase count query — returns 0 on error instead of crashing the page. */
-const safeCount = async (
-  query: PromiseLike<{ count: number | null; error: unknown }>
-): Promise<number> => {
-  try {
-    const { count, error } = await query
-    if (error) {
-      console.error('Supabase count query failed:', error)
-    }
-    return count ?? 0
-  } catch (e) {
-    console.error('Supabase count query threw:', e)
-    return 0
-  }
 }
 
 export default async function JobMarketPage() {
@@ -63,147 +51,36 @@ export default async function JobMarketPage() {
       }),
     ])
 
-    // ── Batch 2: Global counts + freshness (parallel) ─────────────────────
-    const [globalTotalCount, daCount, latestUpdate] = await Promise.all([
-      safeCount(
-        supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
-      ),
-      safeCount(
-        supabase
-          .from('practices')
-          .select('npi', { count: 'exact', head: true })
-          .not('data_axle_import_date', 'is', null)
-      ),
-      Promise.resolve(
-        supabase
-          .from('practices')
-          .select('updated_at')
-          .order('updated_at', { ascending: false })
-          .limit(1)
-          .single()
+    const locations = await fetchPracticeLocations(supabase, { zips: defaultZips })
+    const latestUpdate = locations
+      .map((p) => p.updated_at)
+      .filter((v): v is string => Boolean(v))
+      .sort()
+      .pop() ?? null
+    const locTotalCount = locations.length
+    const locIndepCount = locations.filter((p) =>
+      INDEPENDENT_CLASSIFICATIONS.includes(
+        p.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
       )
-        .then(({ data }) => data?.updated_at ?? null)
-        .catch(() => null),
-    ])
-
-    // ── Batch 3: Location-scoped count queries (parallel) ─────────────────
-    const [
-      locTotalCount,
-      locIndepCount,
-      locDsoRegionalCount,
-      locDsoNationalCount,
-      locDsoNationalRealCount,
-      locDsoRegionalStrongCount,
-      locDsoSpecialistsCount,
-      locHighVolCount,
-      locLargeStaffCount,
-      locRetirementCount,
-    ] = await Promise.all([
-      // Total in default location
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-      ),
-      // Independent count (7 types)
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .in('entity_classification', [...INDEPENDENT_CLASSIFICATIONS])
-      ),
-      // All dso_regional
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .eq('entity_classification', 'dso_regional')
-      ),
-      // All dso_national
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .eq('entity_classification', 'dso_national')
-      ),
-      // High-conf dso_national (exclude taxonomy leaks)
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .eq('entity_classification', 'dso_national')
-          .not(
-            'affiliated_dso',
-            'in',
-            `(${DSO_NATIONAL_TAXONOMY_LEAKS.join(',')})`
-          )
-      ),
-      // High-conf dso_regional (strong signals only)
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .eq('entity_classification', 'dso_regional')
-          .or(DSO_REGIONAL_STRONG_SIGNAL_FILTER)
-      ),
-      // DSO-owned specialists
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .eq('entity_classification', 'specialist')
-          .in('ownership_status', ['dso_affiliated', 'pe_backed'])
-      ),
-      // High-volume solos
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .eq('entity_classification', 'solo_high_volume')
-      ),
-      // Large staff (10+ employees)
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .gte('employee_count', 10)
-      ),
-      // Retirement risk (independent + established before 1995)
-      safeCount(
-        supabase
-          .from('practice_locations')
-          .select('location_id', { count: 'exact', head: true })
-          .in('zip', defaultZips)
-          .eq('is_likely_residential', false)
-          .in('entity_classification', [...INDEPENDENT_CLASSIFICATIONS])
-          .not('year_established', 'is', null)
-          .lt('year_established', 1995)
-      ),
-    ])
+    ).length
+    const locDsoRegionalCount = locations.filter((p) => p.entity_classification === 'dso_regional').length
+    const locDsoNationalCount = locations.filter((p) => p.entity_classification === 'dso_national').length
+    const locDsoNationalRealCount = locations.filter((p) => p.entity_classification === 'dso_national' && !(DSO_NATIONAL_TAXONOMY_LEAKS as readonly string[]).includes(p.affiliated_dso ?? '')).length
+    const locDsoRegionalStrongCount = locations.filter((p) => p.entity_classification === 'dso_regional' && (p.ein || p.parent_company || p.classification_reasoning?.toLowerCase().includes('generic brand') || p.classification_reasoning?.toLowerCase().includes('branch'))).length
+    const locDsoSpecialistsCount = locations.filter((p) => p.entity_classification === 'specialist' && (p.ownership_status === 'dso_affiliated' || p.ownership_status === 'pe_backed')).length
+    const locHighVolCount = locations.filter((p) => p.entity_classification === 'solo_high_volume').length
+    const locLargeStaffCount = locations.filter((p) => (p.employee_count ?? 0) >= 10).length
+    const locRetirementCount = locations.filter((p) =>
+      INDEPENDENT_CLASSIFICATIONS.includes(
+        p.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
+      ) &&
+      p.year_established != null &&
+      p.year_established < 1995
+    ).length
 
     const freshness = {
-      totalPractices: globalTotalCount,
-      daEnriched: daCount,
+      totalPractices: GLOBAL_PRACTICE_NPI_COUNT,
+      daEnriched: GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
       lastUpdated: latestUpdate,
     }
 

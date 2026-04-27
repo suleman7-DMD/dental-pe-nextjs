@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "../client";
+import {
+  fetchPracticeLocations,
+  practiceLocationToWarroomRecord,
+} from "./practice-locations";
 import { INDEPENDENT_CLASSIFICATIONS, classifyPractice } from "../../constants/entity-classifications";
 import {
   DEFAULT_WARROOM_SCOPE,
@@ -140,6 +144,15 @@ function chunkArray<T>(values: readonly T[], chunkSize: number): T[][] {
     chunks.push(values.slice(i, i + chunkSize));
   }
   return chunks;
+}
+
+function timeoutSignal(ms: number): AbortSignal {
+  if ("timeout" in AbortSignal && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
 }
 
 export async function fetchAllWarroomPages<T>(
@@ -318,11 +331,11 @@ function dedupPracticesByLocation(rows: PracticeRow[]): PracticeRow[] {
   return Array.from(byKey.values());
 }
 
-function sortPracticeRows(
-  rows: PracticeRow[],
+function sortPracticeRows<T extends PracticeRow>(
+  rows: T[],
   orderBy: ScopedPracticesOptions["orderBy"] = "practice_name",
   ascending = true
-): PracticeRow[] {
+): T[] {
   const sorted = [...rows].sort((a, b) => {
     const direction = ascending ? 1 : -1;
     if (orderBy === "buyability_score") {
@@ -343,48 +356,24 @@ export async function getScopedPractices(
 ): Promise<WarroomPracticeRecord[]> {
   const supabase = getClient(supabaseClient);
   const { zipCodes, polygon, boundingBox } = resolveScope(scope);
-  const useMaxRowsDuringFetch =
-    !polygon && (!zipCodes || zipCodes.length <= ZIP_FILTER_CHUNK_SIZE);
+  void boundingBox;
 
-  let rows: PracticeRow[];
+  let rows = (await fetchPracticeLocations(supabase, {
+    zips: polygon ? null : zipCodes,
+    orderBy: options.orderBy,
+    ascending: options.ascending,
+  })).map(practiceLocationToWarroomRecord);
 
-  if (polygon && zipCodes?.length === 0 && boundingBox) {
-    rows = await fetchAllWarroomPages(
-      () => applyPracticeBoundingBoxQuery(supabase, boundingBox, options),
-      { pageSize: options.pageSize, maxRows: undefined }
-    );
-  } else {
-    rows = await fetchRowsByZipScope(
-      zipCodes,
-      (zipChunk) => {
-        let query = supabase.from("practices").select(PRACTICE_SELECT);
-        if (zipChunk) query = query.in("zip", zipChunk);
-        if (options.requireCoordinates || polygon) {
-          query = query.not("latitude", "is", null).not("longitude", "is", null);
-        }
-        query = query.order(options.orderBy ?? "practice_name", {
-          ascending: options.ascending ?? true,
-        });
-        return query as unknown as RangeableQuery<PracticeRow>;
-      },
-      {
-        pageSize: options.pageSize,
-        maxRows: useMaxRowsDuringFetch ? options.maxRows : undefined,
-      }
-    );
+  if (options.requireCoordinates || polygon) {
+    rows = rows.filter((row) => row.latitude != null && row.longitude != null);
   }
 
   rows = filterPracticeRowsByPolygon(rows, polygon);
-  // Collapse NPI-1 + NPI-2 + suite-variant rows at the same physical address
-  // BEFORE sorting and slicing — otherwise Hunt mode shows 14k NPI rows for
-  // Chicagoland while the Sitrep KPIs (sourced from practice_locations) show
-  // ~5.5k locations, and the same prospect appears 2-3× in the target list.
-  rows = dedupPracticesByLocation(rows);
   rows = sortPracticeRows(rows, options.orderBy, options.ascending ?? true);
 
   if (options.maxRows != null) rows = rows.slice(0, options.maxRows);
 
-  return rows.map(toPracticeRecord);
+  return rows;
 }
 
 export async function getScopedDeals(
@@ -455,17 +444,38 @@ async function fetchPracticeIdentitiesForNpis(
 ): Promise<PracticeIdentityRow[]> {
   if (npis.length === 0) return [];
 
+  const wanted = new Set(npis);
+  const locations = await fetchPracticeLocations(supabase, { includeResidential: true });
   const rows: PracticeIdentityRow[] = [];
-  for (const chunk of chunkArray(npis, NPI_FILTER_CHUNK_SIZE)) {
-    const batch = await fetchAllWarroomPages(
-      () =>
-        supabase
-          .from("practices")
-          .select("npi, practice_name, city, state, zip, latitude, longitude")
-          .in("npi", chunk) as unknown as RangeableQuery<PracticeIdentityRow>
-    );
-    rows.push(...batch);
+
+  for (const location of locations) {
+    const candidateNpis = new Set<string>();
+    if (location.primary_npi) candidateNpis.add(location.primary_npi);
+    try {
+      const parsed = JSON.parse(location.provider_npis ?? "[]");
+      if (Array.isArray(parsed)) {
+        parsed.forEach((npi) => {
+          if (typeof npi === "string") candidateNpis.add(npi);
+        });
+      }
+    } catch {
+      // Ignore malformed provider_npis; primary_npi is still usable.
+    }
+
+    for (const npi of candidateNpis) {
+      if (!wanted.has(npi)) continue;
+      rows.push({
+        npi,
+        practice_name: location.practice_name,
+        city: location.city,
+        state: location.state,
+        zip: location.zip,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
+    }
   }
+
   return rows;
 }
 
@@ -771,6 +781,7 @@ export async function getScopedPracticeSignals(
         query = query.order("zip_code", { ascending: true });
       }
 
+      query = query.abortSignal(timeoutSignal(1500));
       return query as unknown as RangeableQuery<PracticeSignalRow>;
     },
     { pageSize: options.pageSize, maxRows: options.maxRows }
@@ -793,6 +804,7 @@ export async function getScopedZipSignals(
       let query = supabase.from("zip_signals").select(ZIP_SIGNAL_SELECT);
       if (zipChunk) query = query.in("zip_code", zipChunk);
       query = query.order("zip_code", { ascending: true });
+      query = query.abortSignal(timeoutSignal(1500));
       return query as unknown as RangeableQuery<ZipSignalRow>;
     },
     { pageSize: options.pageSize, maxRows: options.maxRows }
@@ -922,18 +934,11 @@ async function averageScopedScores(
   supabase: SupabaseClient,
   zipCodes: string[] | null
 ): Promise<{ avgBuyability: number | null; avgOpportunity: number | null }> {
-  const buyabilityRows = await fetchRowsByZipScope<{ buyability_score: number | null }>(
-    zipCodes,
-    (zipChunk) => {
-      let query = supabase
-        .from("practices")
-        .select("buyability_score")
-        .not("buyability_score", "is", null);
-      if (zipChunk) query = query.in("zip", zipChunk);
-      return query as unknown as RangeableQuery<{ buyability_score: number | null }>;
-    },
-    { pageSize: 1000 }
-  );
+  const buyabilityRows = await fetchPracticeLocations(supabase, {
+    zips: zipCodes,
+    orderBy: "buyability_score",
+    ascending: false,
+  });
 
   const opportunityRows = await fetchRowsByZipScope<{ opportunity_score: number | null }>(
     zipCodes,
@@ -1004,19 +1009,30 @@ export async function getWarroomSummary(
       return false;
     }).length;
   } else {
-    [
-      ownership,
-      enrichedPractices,
-      acquisitionTargets,
-      retirementRisk,
-      corporateHighConfidence,
-    ] = await Promise.all([
-      getOwnershipCountsByQuery(supabase, resolution.zipCodes),
-      countEnrichedPractices(supabase, resolution.zipCodes),
-      countAcquisitionTargets(supabase, resolution.zipCodes),
-      countRetirementRisk(supabase, resolution.zipCodes),
-      countCorporateHighConfidence(supabase, resolution.zipCodes),
-    ]);
+    const practices = await getScopedPractices(scope, {}, supabase);
+    ownership = computeOwnershipCountsFromPractices(practices);
+    enrichedPractices = practices.filter((practice) => practice.data_axle_import_date != null).length;
+    acquisitionTargets = practices.filter((practice) => (practice.buyability_score ?? 0) >= 50).length;
+    retirementRisk = practices.filter((practice) => {
+      const group = classifyPractice(practice.entity_classification, practice.ownership_status);
+      return group === "independent" && (practice.year_established ?? 9999) < 1995;
+    }).length;
+    corporateHighConfidence = practices.filter((practice) => {
+      if (practice.entity_classification === "dso_national") return true;
+      if (
+        practice.entity_classification === "dso_regional" &&
+        (practice.ein || practice.parent_company || practice.franchise_name)
+      ) {
+        return true;
+      }
+      if (
+        practice.entity_classification === "specialist" &&
+        (practice.ownership_status === "dso_affiliated" || practice.ownership_status === "pe_backed")
+      ) {
+        return true;
+      }
+      return false;
+    }).length;
   }
 
   const [dealCount, deals, zipScores, changes, changes90d, scoreAverages] = await Promise.all([
@@ -1028,19 +1044,10 @@ export async function getWarroomSummary(
     averageScopedScores(supabase, resolution.zipCodes),
   ]);
 
-  let signalCounts: WarroomSignalCounts | null = null;
-  try {
-    const [practiceSignals, zipSignals] = await Promise.all([
-      getScopedPracticeSignals(scope, { onlyFlagged: true }, supabase),
-      getScopedZipSignals(scope, {}, supabase),
-    ]);
-    signalCounts = computeSignalCounts(practiceSignals, zipSignals);
-  } catch (error) {
-    // Signals tables may not yet exist in Supabase (background sync in flight).
-    // Fall through with null signalCounts — UI will render "signals pending" state.
-    signalCounts = null;
-    void error;
-  }
+  // Signal tables are optional overlays and are currently the slowest Supabase
+  // REST path. First paint must not wait on them; detailed signal lookups are
+  // guarded separately with short abort timeouts.
+  const signalCounts: WarroomSignalCounts | null = null;
 
   return {
     scopeKind: resolution.scope.kind,
@@ -1095,8 +1102,12 @@ export async function getPracticeSignalsByNpi(
     .from("practice_signals")
     .select(PEER_PERCENTILE_SELECT)
     .eq("npi", npi)
+    .abortSignal(timeoutSignal(1500))
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    console.warn(`[warroom] practice_signals npi=${npi} unavailable:`, error.message);
+    return null;
+  }
   return (data as PracticePeerPercentiles | null) ?? null;
 }
 

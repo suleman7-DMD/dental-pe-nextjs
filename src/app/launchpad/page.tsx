@@ -5,7 +5,7 @@ import { DEFAULT_LAUNCHPAD_TRACK } from "@/lib/launchpad/signals"
 import { LaunchpadShell } from "./_components/launchpad-shell"
 import { AiDisabledBanner } from "./_components/ai-disabled-banner"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 900
 
 export const metadata = {
   title: "Launchpad | Dental PE Intelligence",
@@ -38,8 +38,8 @@ function serializeError(error: unknown): string {
 
 export default async function LaunchpadPage() {
   // Server-side check: if ANTHROPIC_API_KEY is missing, show a banner.
-  // This is evaluated at request time (force-dynamic), so it reflects the live
-  // Vercel env var state. Audit §14.8 / §15 #1.
+  // This is evaluated during the cached server render, so env changes may take
+  // up to the page revalidation window to appear.
   const aiDisabled = !process.env.ANTHROPIC_API_KEY
 
   const supabase = getSupabaseServerClient()

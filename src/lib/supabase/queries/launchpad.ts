@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import {
+  fetchPracticeLocations,
+  practiceLocationToLaunchpadRecord,
+} from "@/lib/supabase/queries/practice-locations"
+import {
   getLaunchpadScopeOption,
   resolveLaunchpadZipCodes,
   type LaunchpadScope,
@@ -22,70 +26,57 @@ export const DEFAULT_RANK_LIMIT = 60
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/** Paginate through all practices in the given ZIP codes, 1000 rows per page. */
+function isAbortLike(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError"
+}
+
+function timeoutSignal(ms: number): AbortSignal {
+  if ("timeout" in AbortSignal && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms)
+  }
+  const controller = new AbortController()
+  setTimeout(() => controller.abort(), ms)
+  return controller.signal
+}
+
+async function withTimeout<T>(
+  label: string,
+  ms: number,
+  fn: (signal: AbortSignal) => Promise<T>
+): Promise<T | null> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | null = null
+  try {
+    return await Promise.race([
+      fn(controller.signal),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => {
+          controller.abort()
+          resolve(null)
+        }, ms)
+      }),
+    ])
+  } catch (error) {
+    if (!isAbortLike(error)) {
+      console.warn(`[launchpad] ${label} unavailable:`, error)
+    }
+    return null
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+/** Paginate through address-deduped practice locations in the given ZIP codes. */
 async function fetchAllPracticesByZips(
   supabase: SupabaseClient,
   zipCodes: string[]
 ): Promise<LaunchpadPracticeRecord[]> {
-  const all: LaunchpadPracticeRecord[] = []
-  const PAGE_SIZE = 1000
-  const CHUNK_SIZE = 100
-
-  for (let i = 0; i < zipCodes.length; i += CHUNK_SIZE) {
-    const chunk = zipCodes.slice(i, i + CHUNK_SIZE)
-    let offset = 0
-
-    while (true) {
-      const { data, error } = await supabase
-        .from("practices")
-        .select(
-          [
-            "id",
-            "npi",
-            "practice_name",
-            "doing_business_as",
-            "provider_last_name",
-            "address",
-            "city",
-            "state",
-            "zip",
-            "phone",
-            "website",
-            "entity_type",
-            "entity_classification",
-            "ownership_status",
-            "affiliated_dso",
-            "affiliated_pe_sponsor",
-            "buyability_score",
-            "classification_confidence",
-            "classification_reasoning",
-            "latitude",
-            "longitude",
-            "year_established",
-            "employee_count",
-            "estimated_revenue",
-            "num_providers",
-            "taxonomy_code",
-            "parent_company",
-            "ein",
-            "franchise_name",
-            "data_source",
-            "data_axle_import_date",
-            "updated_at",
-          ].join(",")
-        )
-        .in("zip", chunk)
-        .range(offset, offset + PAGE_SIZE - 1)
-
-      if (error) throw error
-      const batch = (data as unknown as LaunchpadPracticeRecord[]) ?? []
-      all.push(...batch)
-      if (batch.length < PAGE_SIZE) break
-      offset += PAGE_SIZE
-    }
-  }
-
-  return all
+  const rows = await fetchPracticeLocations(supabase, {
+    zips: zipCodes,
+    orderBy: "buyability_score",
+    ascending: false,
+  })
+  return rows.map(practiceLocationToLaunchpadRecord)
 }
 
 type WatchedZipRow = {
@@ -214,6 +205,7 @@ async function fetchPracticeIntel(
         ].join(",")
       )
       .in("npi", batch)
+      .abortSignal(timeoutSignal(1500))
 
     if (error) throw error
     all.push(...((data as unknown as LaunchpadPracticeIntelRecord[]) ?? []))
@@ -271,6 +263,7 @@ async function fetchRecentAcquisitionNpis(
         .ilike("change_type", "%acquisition%")
         .gte("change_date", cutoffDate)
         .in("npi", batch)
+        .abortSignal(timeoutSignal(1500))
 
       if (error) throw error
       for (const row of (data as unknown as Array<{ npi: string | null }>) ?? []) {
@@ -342,10 +335,12 @@ export async function getLaunchpadBundle(options: {
   const practiceNpis = practices.map((p) => p.npi)
 
   // 3. Dependent fetches — practice_intel + recent acquisition NPIs (parallel)
-  const [intelRows, acquisitionResult] = await Promise.all([
-    fetchPracticeIntel(supabase, practiceNpis),
+  const [intelRowsResult, acquisitionResult] = await Promise.all([
+    withTimeout("practice_intel", 2500, () => fetchPracticeIntel(supabase, practiceNpis)),
     fetchRecentAcquisitionNpis(supabase, practiceNpis, cutoffIso),
   ])
+  const intelRows = intelRowsResult ?? []
+  if (intelRowsResult == null) warnings.push("Practice intel timed out; ranking used structural signals only.")
 
   if (acquisitionResult.warning) {
     warnings.push(acquisitionResult.warning)

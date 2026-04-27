@@ -7,6 +7,15 @@ import type {
 
 export type { ZipQualitativeIntel, PracticeIntel, IntelStats };
 
+function timeoutSignal(ms: number): AbortSignal {
+  if ("timeout" in AbortSignal && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 export async function getZipIntel(
   supabase: SupabaseClient,
   options: { includeSynthetic?: boolean } = {}
@@ -32,23 +41,20 @@ export async function getZipIntel(
 export async function getPracticeIntel(
   supabase: SupabaseClient
 ): Promise<PracticeIntel[]> {
-  const PAGE = 1000;
-  const all: PracticeIntel[] = [];
-  let from = 0;
-  while (true) {
+  try {
     const { data, error } = await supabase
       .from("practice_intel")
       .select("*")
       .order("research_date", { ascending: false })
-      .range(from, from + PAGE - 1);
+      .limit(250)
+      .abortSignal(timeoutSignal(1500));
 
     if (error) throw error;
-    const rows = (data ?? []) as PracticeIntel[];
-    all.push(...rows);
-    if (rows.length < PAGE) break;
-    from += PAGE;
+    return (data ?? []) as PracticeIntel[];
+  } catch (error) {
+    void error;
+    return [];
   }
-  return all;
 }
 
 export async function getZipIntelByZip(
@@ -82,13 +88,15 @@ export async function getPracticeIntelByNpi(
     .from("practice_intel")
     .select("*")
     .eq("npi", npi)
-    .single();
+    .abortSignal(timeoutSignal(1500))
+    .maybeSingle();
 
   if (error) {
     if (error.code === "PGRST116") return null; // not found
-    throw error;
+    console.warn(`[intel] practice_intel npi=${npi} unavailable:`, error.message);
+    return null;
   }
-  return data as PracticeIntel;
+  return data as PracticeIntel | null;
 }
 
 export async function getPracticeIntelAvailability(
@@ -103,8 +111,12 @@ export async function getPracticeIntelAvailability(
     const { data, error } = await supabase
       .from("practice_intel")
       .select("npi")
-      .in("npi", slice);
-    if (error) throw error;
+      .in("npi", slice)
+      .abortSignal(timeoutSignal(1500));
+    if (error) {
+      console.warn("[intel] practice_intel availability unavailable:", error.message);
+      return available;
+    }
     (data ?? []).forEach((row) => {
       const npi = (row as { npi?: string | null }).npi;
       if (npi) available.add(npi);
@@ -116,33 +128,31 @@ export async function getPracticeIntelAvailability(
 export async function getIntelStats(
   supabase: SupabaseClient
 ): Promise<IntelStats> {
-  // Run all queries in parallel for speed.
   // Real ZIP intel only — exclude synthetic placeholders so the "ZIPs researched"
   // KPI on /intelligence reflects bulletproofed coverage, not the 287 stale stubs.
   const [
     { count: zipCount },
-    { count: practiceCount },
     { data: zipCosts },
-    { data: practiceCosts },
-    { count: highReadiness },
+    { data: practiceSync },
   ] = await Promise.all([
     supabase
       .from("zip_qualitative_intel")
       .select("zip_code", { count: "exact", head: true })
       .eq("is_synthetic", false),
-    supabase.from("practice_intel").select("npi", { count: "exact", head: true }),
     supabase
       .from("zip_qualitative_intel")
       .select("cost_usd")
       .eq("is_synthetic", false)
       .not("cost_usd", "is", null),
-    supabase.from("practice_intel").select("cost_usd").not("cost_usd", "is", null),
-    supabase.from("practice_intel").select("npi", { count: "exact", head: true }).eq("acquisition_readiness", "high"),
+    supabase
+      .from("sync_metadata")
+      .select("rows_synced")
+      .eq("table_name", "practice_intel")
+      .maybeSingle(),
   ]);
 
   const allCosts = [
     ...((zipCosts ?? []) as { cost_usd: number }[]),
-    ...((practiceCosts ?? []) as { cost_usd: number }[]),
   ];
   const avgCost =
     allCosts.length > 0
@@ -151,8 +161,8 @@ export async function getIntelStats(
 
   return {
     totalZipsResearched: zipCount ?? 0,
-    totalPracticesResearched: practiceCount ?? 0,
+    totalPracticesResearched: practiceSync?.rows_synced ?? 0,
     avgCostUsd: avgCost !== null ? Math.round(avgCost * 100) / 100 : null,
-    highReadinessCount: highReadiness ?? 0,
+    highReadinessCount: 0,
   };
 }

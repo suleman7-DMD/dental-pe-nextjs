@@ -1,5 +1,10 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { DataFreshness } from "../types";
+import {
+  GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+  GLOBAL_PRACTICE_NPI_COUNT,
+} from "../../constants/data-snapshot";
+import { fetchPracticeLocations } from "./practice-locations";
 
 /* ─── Types expected by system page components ───────────────────────── */
 
@@ -36,24 +41,14 @@ export interface CompletenessMetric {
 export async function getDataFreshness(
   supabase: SupabaseClient
 ): Promise<DataFreshness> {
+  const locationsPromise = fetchPracticeLocations(supabase);
   const [
-    { count: totalPractices },
-    { count: enrichedCount },
+    locations,
     { count: totalDeals },
     { count: totalWatchedZips },
     { data: recentDeal },
-    { data: recentPractice },
   ] = await Promise.all([
-    // Total practices
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true }),
-
-    // Enriched (Data Axle) count
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .not("data_axle_import_date", "is", null),
+    locationsPromise,
 
     // Total deals
     supabase
@@ -72,23 +67,21 @@ export async function getDataFreshness(
       .order("deal_date", { ascending: false })
       .limit(1)
       .single(),
-
-    // Most recent practice update
-    supabase
-      .from("practices")
-      .select("updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .single(),
   ]);
 
+  const recentPractice = locations
+    .map((row) => row.updated_at)
+    .filter((value): value is string => Boolean(value))
+    .sort()
+    .pop() ?? null;
+
   return {
-    total_practices: totalPractices ?? 0,
-    enriched_count: enrichedCount ?? 0,
+    total_practices: GLOBAL_PRACTICE_NPI_COUNT,
+    enriched_count: GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
     total_deals: totalDeals ?? 0,
     total_watched_zips: totalWatchedZips ?? 0,
     last_deal_date: recentDeal?.deal_date ?? null,
-    last_practice_update: recentPractice?.updated_at ?? null,
+    last_practice_update: recentPractice,
   };
 }
 
@@ -100,69 +93,34 @@ export interface SourceCoverageDetail {
 export async function getSourceCoverage(
   supabase: SupabaseClient
 ): Promise<Record<string, SourceCoverageDetail>> {
-  // Count practices per data_source + get freshness timestamps.
-  // Also query dso_locations (ADSO) and ada_hpi_benchmarks for their own freshness.
+  // Avoid first-paint scans of the `practices` table. It is the largest table
+  // and can be locked/slow during sync. `practice_locations` is the frontend's
+  // canonical, address-deduped surface and is fast enough to aggregate in JS.
+  const locations = await fetchPracticeLocations(supabase);
+  const sourceCounts = new Map<string, number>();
+  const sourceLatest = new Map<string, string>();
+  for (const row of locations) {
+    const sources = (row.data_sources ?? "unknown").split(",").map((s) => s.trim()).filter(Boolean);
+    for (const source of sources.length ? sources : ["unknown"]) {
+      sourceCounts.set(source, (sourceCounts.get(source) ?? 0) + 1);
+      if (row.updated_at && row.updated_at > (sourceLatest.get(source) ?? "")) {
+        sourceLatest.set(source, row.updated_at);
+      }
+    }
+  }
+
   const [
-    { count: total },
-    { count: nppesCount },
-    { count: dataAxleCount },
-    { count: manualCount },
-    { count: nullCount },
     { count: adsoCount },
     { count: adaCount },
-    { data: nppesLatest },
-    { data: dataAxleLatest },
-    { data: manualLatest },
     { data: adsoLatest },
     { data: adaLatest },
   ] = await Promise.all([
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true }),
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .eq("data_source", "nppes"),
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .eq("data_source", "data_axle"),
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .eq("data_source", "manual"),
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .is("data_source", null),
     supabase
       .from("dso_locations")
       .select("*", { count: "exact", head: true }),
     supabase
       .from("ada_hpi_benchmarks")
       .select("*", { count: "exact", head: true }),
-    // Get most recent updated_at per source for freshness
-    supabase
-      .from("practices")
-      .select("updated_at")
-      .eq("data_source", "nppes")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .single(),
-    supabase
-      .from("practices")
-      .select("updated_at")
-      .eq("data_source", "data_axle")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .single(),
-    supabase
-      .from("practices")
-      .select("updated_at")
-      .eq("data_source", "manual")
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .single(),
     // DSO Locations freshness: most recent scraped_at from dso_locations table
     supabase
       .from("dso_locations")
@@ -181,21 +139,21 @@ export async function getSourceCoverage(
   ]);
 
   const result: Record<string, SourceCoverageDetail> = {};
-  if ((nppesCount ?? 0) > 0)
-    result["nppes"] = { count: nppesCount ?? 0, lastUpdated: nppesLatest?.updated_at ?? "" };
-  if ((dataAxleCount ?? 0) > 0)
-    result["data_axle"] = { count: dataAxleCount ?? 0, lastUpdated: dataAxleLatest?.updated_at ?? "" };
-  if ((manualCount ?? 0) > 0)
-    result["manual"] = { count: manualCount ?? 0, lastUpdated: manualLatest?.updated_at ?? "" };
+  for (const [source, count] of sourceCounts.entries()) {
+    result[source] = { count, lastUpdated: sourceLatest.get(source) ?? "" };
+  }
+  result["Global NPI pool"] = {
+    count: GLOBAL_PRACTICE_NPI_COUNT,
+    lastUpdated: sourceLatest.values().next().value ?? "",
+  };
+  result["Data Axle enriched NPIs"] = {
+    count: GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+    lastUpdated: sourceLatest.get("data_axle") ?? "",
+  };
 
   // Expose ADSO Scraper and ADA HPI freshness under the keys the FreshnessIndicators component looks for
   result["ADSO Scraper"] = { count: adsoCount ?? 0, lastUpdated: adsoLatest?.scraped_at ?? "" };
   result["ADA HPI"] = { count: adaCount ?? 0, lastUpdated: adaLatest?.created_at ?? "" };
-
-  const knownTotal = (nppesCount ?? 0) + (dataAxleCount ?? 0) + (manualCount ?? 0) + (nullCount ?? 0);
-  const remaining = (total ?? 0) - knownTotal;
-  if (remaining > 0) result["other"] = { count: remaining, lastUpdated: "" };
-  if ((nullCount ?? 0) > 0) result["unknown"] = { count: nullCount ?? 0, lastUpdated: "" };
 
   return result;
 }
@@ -292,64 +250,19 @@ export async function getDealSourceFreshness(
 export async function getCompletenessMetrics(
   supabase: SupabaseClient
 ): Promise<CompletenessMetric[]> {
-  // Run all count queries in parallel
-  const [
-    { count: total },
-    { count: classifiedByEC },
-    { count: classifiedByOS },
-    { count: withCoords },
-    { count: withPhone },
-    { count: withEntity },
-    { count: enriched },
-  ] = await Promise.all([
-    // Total practices count
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true }),
-
-    // Ownership classified by entity_classification (primary)
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .not("entity_classification", "is", null),
-
-    // Ownership classified by ownership_status fallback (entity_classification is null)
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .is("entity_classification", null)
-      .neq("ownership_status", "unknown"),
-
-    // Have coordinates
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .not("latitude", "is", null)
-      .not("longitude", "is", null),
-
-    // Have phone
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .not("phone", "is", null),
-
-    // Entity classification set
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .not("entity_classification", "is", null),
-
-    // Data Axle enriched
-    supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .not("data_axle_import_date", "is", null),
-  ]);
-
-  const t = total ?? 0;
+  const locations = await fetchPracticeLocations(supabase);
+  const t = locations.length;
   if (t === 0) return [];
 
-  const classified = (classifiedByEC ?? 0) + (classifiedByOS ?? 0);
+  const classified = locations.filter(
+    (row) =>
+      row.entity_classification != null ||
+      (row.ownership_status != null && row.ownership_status !== "unknown")
+  ).length;
+  const withCoords = locations.filter((row) => row.latitude != null && row.longitude != null).length;
+  const withPhone = locations.filter((row) => row.phone != null).length;
+  const withEntity = locations.filter((row) => row.entity_classification != null).length;
+  const enriched = locations.filter((row) => row.data_axle_enriched).length;
 
   const make = (label: string, count: number): CompletenessMetric => ({
     label,
@@ -360,9 +273,9 @@ export async function getCompletenessMetrics(
 
   return [
     make("Ownership Classified", classified),
-    make("Geocoded (lat/lon)", withCoords ?? 0),
-    make("Phone Number", withPhone ?? 0),
-    make("Entity Classification", withEntity ?? 0),
-    make("Data Axle Enriched", enriched ?? 0),
+    make("Geocoded (lat/lon)", withCoords),
+    make("Phone Number", withPhone),
+    make("Entity Classification", withEntity),
+    make("Data Axle Enriched", enriched),
   ];
 }

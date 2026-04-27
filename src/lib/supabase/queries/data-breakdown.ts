@@ -25,6 +25,20 @@ import {
   ENTITY_CLASSIFICATIONS,
   getEntityClassificationLabel,
 } from "@/lib/constants/entity-classifications";
+import {
+  GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+  GLOBAL_PRACTICE_NPI_COUNT,
+} from "@/lib/constants/data-snapshot";
+import { fetchPracticeLocations } from "./practice-locations";
+
+function timeoutSignal(ms: number): AbortSignal {
+  if ("timeout" in AbortSignal && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(ms);
+  }
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
 
 export interface BreakdownSegment {
   label: string;
@@ -76,8 +90,11 @@ async function countWhere(
     else if (f.type === "gte") q = q.gte(f.column, f.value as number);
     else if (f.type === "lt") q = q.lt(f.column, f.value as number);
   }
-  const { count, error } = await q;
-  if (error) throw error;
+  const { count, error } = await q.abortSignal(timeoutSignal(table === "practices" ? 1200 : 2500));
+  if (error) {
+    console.warn(`[data-breakdown] count timed out/unavailable for ${table}.${filters.map((f) => f.column).join(",")}:`, error.message);
+    return 0;
+  }
   return count ?? 0;
 }
 
@@ -94,6 +111,32 @@ function reconcile(total: number, segments: BreakdownSegment[]): BreakdownBlock[
         : drift > 0
         ? `Segments sum is ${drift} higher than the headline — overlap or double-counting.`
         : `Segments sum is ${Math.abs(drift)} lower than the headline — uncategorized rows missing.`,
+  };
+}
+
+/** Fast snapshot block for the global NPI pool. */
+export function getGlobalPracticesSnapshot(): BreakdownBlock {
+  const primary = {
+    label: "Global federal dental NPI rows",
+    count: GLOBAL_PRACTICE_NPI_COUNT,
+    color: CHART_COLORWAY[0],
+    description: "Post-F32 hygienist-leak cleanup snapshot verified 2026-04-26",
+  };
+  const enriched = {
+    label: "Data Axle enriched NPI rows",
+    count: GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+    color: CHART_COLORWAY[1],
+    description: "Subset with Data Axle enrichment",
+  };
+  return {
+    title: "All Practices (Global Snapshot)",
+    total: GLOBAL_PRACTICE_NPI_COUNT,
+    unit: "NPI rows",
+    source: "Verified F32 snapshot constants; live practices scans are intentionally avoided in the frontend hot path",
+    surfacedOn: ["Home", "System", "Data freshness bars"],
+    groupBy: "snapshot",
+    segments: [primary, enriched],
+    reconciliation: reconcile(GLOBAL_PRACTICE_NPI_COUNT, [primary]),
   };
 }
 
@@ -174,23 +217,14 @@ export async function getWatchedPracticesByEntityClass(
 export async function getWatchedLocationsByEntityClass(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
-  const [counts, nullCount] = await Promise.all([
-    Promise.all(
-      ENTITY_CLASSIFICATIONS.map(async (ec) => ({
-        label: ec.label,
-        count: await countWhere(supabase, "practice_locations", [
-          { type: "eq", column: "is_likely_residential", value: false },
-          { type: "eq", column: "entity_classification", value: ec.value },
-        ]),
-        color: ENTITY_CLASSIFICATION_COLORS[ec.value] ?? "#9C9C90",
-        description: ec.description,
-      }))
-    ),
-    countWhere(supabase, "practice_locations", [
-      { type: "eq", column: "is_likely_residential", value: false },
-      { type: "is", column: "entity_classification", value: null },
-    ]),
-  ]);
+  const locations = await fetchPracticeLocations(supabase);
+  const counts = ENTITY_CLASSIFICATIONS.map((ec) => ({
+    label: ec.label,
+    count: locations.filter((row) => row.entity_classification === ec.value).length,
+    color: ENTITY_CLASSIFICATION_COLORS[ec.value] ?? "#9C9C90",
+    description: ec.description,
+  }));
+  const nullCount = locations.filter((row) => row.entity_classification == null).length;
   const segments = [
     ...counts,
     {
@@ -339,22 +373,28 @@ export async function getDealsBySource(
 export async function getDealsByType(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
+  const rows: Array<{ deal_type: string | null }> = [];
+  const pageSize = 1000;
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("deals")
+      .select("deal_type")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as Array<{ deal_type: string | null }>;
+    rows.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
   const types = Object.keys(DEAL_TYPE_COLORS);
-  const [counts, nullCount] = await Promise.all([
-    Promise.all(
-      types.map(async (t) => ({
-        label: t,
-        count: await countWhere(supabase, "deals", [
-          { type: "eq", column: "deal_type", value: t },
-        ]),
-        color: DEAL_TYPE_COLORS[t] ?? "#9C9C90",
-        description: `deal_type = '${t}'`,
-      }))
-    ),
-    countWhere(supabase, "deals", [
-      { type: "is", column: "deal_type", value: null },
-    ]),
-  ]);
+  const counts = types.map((t) => ({
+    label: t,
+    count: rows.filter((row) => row.deal_type === t).length,
+    color: DEAL_TYPE_COLORS[t] ?? "#9C9C90",
+    description: `deal_type = '${t}'`,
+  }));
+  const nullCount = rows.filter((row) => row.deal_type == null).length;
   const segments = [
     ...counts,
     {
@@ -497,29 +537,20 @@ export async function getRetirementRiskByEntityClass(
 export async function getPracticeIntelByVerification(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
-  const qualities = ["verified", "partial", "insufficient", "high"];
-  const [counts, nullCount] = await Promise.all([
-    Promise.all(
-      qualities.map(async (q, i) => ({
-        label: q,
-        count: await countWhere(supabase, "practice_intel", [
-          { type: "eq", column: "verification_quality", value: q },
-        ]),
-        color: CHART_COLORWAY[i % CHART_COLORWAY.length],
-        description: `verification_quality = '${q}'`,
-      }))
-    ),
-    countWhere(supabase, "practice_intel", [
-      { type: "is", column: "verification_quality", value: null },
-    ]),
-  ]);
+  const { data } = await supabase
+    .from("sync_metadata")
+    .select("rows_synced,last_sync_at")
+    .eq("table_name", "practice_intel")
+    .maybeSingle();
+  const synced = data?.rows_synced ?? 0;
   const segments = [
-    ...counts,
     {
-      label: "(null)",
-      count: nullCount,
-      color: "#B0B0A4",
-      description: "verification_quality IS NULL (pre-bulletproofing rows)",
+      label: "Synced dossiers",
+      count: synced,
+      color: CHART_COLORWAY[0],
+      description: data?.last_sync_at
+        ? `Last practice_intel sync: ${String(data.last_sync_at).slice(0, 19)}`
+        : "practice_intel sync metadata unavailable",
     },
   ]
     .filter((s) => s.count > 0)
@@ -529,9 +560,9 @@ export async function getPracticeIntelByVerification(
     title: "Practice Intel Dossiers by Verification Quality",
     total,
     unit: "dossiers",
-    source: "practice_intel.verification_quality — anti-hallucination evidence quality (post 2026-04-25)",
+    source: "sync_metadata rows_synced for practice_intel — avoids live scans of the optional dossier table",
     surfacedOn: ["Intelligence", "Launchpad", "Warroom dossier drawer"],
-    groupBy: "verification_quality",
+    groupBy: "sync_metadata",
     segments,
     reconciliation: reconcile(total, segments),
   };
@@ -620,14 +651,9 @@ export async function getDataBreakdownBundle(
   const watchedZips = (zipRows as { zip_code: string }[] | null)?.map((r) => r.zip_code) ?? [];
 
   const blockSpecs: Array<{ title: string; fetch: () => Promise<BreakdownBlock> }> = [
-    { title: "All Practices (Global, NPI rows)", fetch: () => getGlobalPracticesByEntityClass(supabase) },
-    { title: "Watched-ZIP Practices (NPI rows)", fetch: () => getWatchedPracticesByEntityClass(supabase, watchedZips) },
+    { title: "All Practices (Global Snapshot)", fetch: () => Promise.resolve(getGlobalPracticesSnapshot()) },
     { title: "Watched-ZIP GP Clinic Locations (deduped)", fetch: () => getWatchedLocationsByEntityClass(supabase) },
-    { title: "Watched-ZIP Practices by Data Source", fetch: () => getWatchedPracticesByDataSource(supabase, watchedZips) },
-    { title: "Watched-ZIP Practices by ownership_status (LEGACY)", fetch: () => getWatchedPracticesByOwnership(supabase, watchedZips) },
     { title: "Watched ZIPs by State", fetch: () => getWatchedZipsByState(supabase) },
-    { title: "Watched-ZIP Practices by ZIP Prefix", fetch: () => getWatchedPracticesByZipPrefix(supabase, watchedZips) },
-    { title: "Retirement Risk Practices", fetch: () => getRetirementRiskByEntityClass(supabase, watchedZips) },
     { title: "Deals by Source", fetch: () => getDealsBySource(supabase) },
     { title: "Deals by Deal Type", fetch: () => getDealsByType(supabase) },
     { title: "Deals by Year", fetch: () => getDealsByYear(supabase) },

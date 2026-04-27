@@ -60,6 +60,9 @@ interface PracticeDossierProps {
   bundle: LaunchpadBundle | null
   isPinned?: boolean
   onTogglePin?: (npi: string) => void
+  /** Optional controlled active tab. Defaults uncontrolled to "snapshot". */
+  tab?: string
+  onTabChange?: (tab: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -1018,6 +1021,8 @@ export function PracticeDossier({
   bundle,
   isPinned = false,
   onTogglePin,
+  tab,
+  onTabChange,
 }: PracticeDossierProps) {
   const [askIntelOpen, setAskIntelOpen] = useState(false)
 
@@ -1158,7 +1163,8 @@ export function PracticeDossier({
 
           {/* Tabs */}
           <Tabs
-            defaultValue="snapshot"
+            value={tab ?? "snapshot"}
+            onValueChange={onTabChange}
             className="flex min-h-0 flex-1 flex-col"
           >
             <div className="shrink-0 border-b border-[#E8E5DE] bg-[#FAFAF7] px-4">

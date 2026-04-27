@@ -22,6 +22,8 @@ interface TrackListProps {
   onSelect: (npi: string) => void
   pinnedNpis?: string[]
   onTogglePin?: (npi: string) => void
+  /** Opens the dossier with the Score tab pre-selected. */
+  onOpenScore?: (npi: string) => void
   className?: string
 }
 
@@ -79,6 +81,7 @@ export function TrackList({
   onSelect,
   pinnedNpis,
   onTogglePin,
+  onOpenScore,
   className,
 }: TrackListProps) {
   const [expandedTiers, setExpandedTiers] = useState<Set<LaunchpadTier>>(
@@ -197,6 +200,7 @@ export function TrackList({
                         track={track}
                         isPinned={pinnedSet.has(target.npi)}
                         onTogglePin={onTogglePin}
+                        onOpenScore={onOpenScore}
                       />
                     ))}
                   </ol>
