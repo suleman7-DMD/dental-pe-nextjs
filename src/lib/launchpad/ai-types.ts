@@ -104,7 +104,7 @@ export interface ThesisQuestion {
 }
 
 export interface ResearchAudit {
-  status: "missing" | "source_backed" | "rejected"
+  status: "missing" | "source_backed" | "legacy" | "rejected"
   verification_quality: string | null
   verification_searches: number | null
   verification_urls: string[]

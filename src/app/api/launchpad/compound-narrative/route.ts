@@ -115,8 +115,21 @@ function buildResearchAudit(intel: PracticeIntel | null): ResearchAudit {
     searches >= 2 &&
     urls.length > 0
 
-  let reason = "Accepted: source-backed practice_intel row."
-  if (!sourceBacked) {
+  const substantive =
+    intel.overall_assessment != null ||
+    intel.website_url != null ||
+    intel.google_rating != null
+
+  let status: "source_backed" | "legacy" | "rejected"
+  let reason: string
+  if (sourceBacked) {
+    status = "source_backed"
+    reason = "Accepted: source-backed practice_intel row."
+  } else if (substantive) {
+    status = "legacy"
+    reason = "Accepted: pre-verification intel with substantive content."
+  } else {
+    status = "rejected"
     if (!quality) reason = "Rejected: missing verification_quality."
     else if (!SOURCE_BACKED_QUALITIES.has(quality)) {
       reason = `Rejected: verification_quality=${quality}.`
@@ -124,11 +137,13 @@ function buildResearchAudit(intel: PracticeIntel | null): ResearchAudit {
       reason = `Rejected: only ${searches} web search${searches === 1 ? "" : "es"} reported.`
     } else if (urls.length === 0) {
       reason = "Rejected: no verification URLs stored."
+    } else {
+      reason = "Rejected: no substantive content."
     }
   }
 
   return {
-    status: sourceBacked ? "source_backed" : "rejected",
+    status,
     verification_quality: intel.verification_quality,
     verification_searches: intel.verification_searches,
     verification_urls: urls,
@@ -1138,7 +1153,7 @@ export async function POST(
   const sourceUrls = sourceUrlsForResponse(intel, zipIntel)
   const intelQuality = intel?.verification_quality?.toLowerCase() ?? null
   const reliable = !!intel && (intelQuality === "verified" || intelQuality === "high")
-  const noUsable = researchAudit.status !== "source_backed"
+  const noUsable = researchAudit.status !== "source_backed" && researchAudit.status !== "legacy"
 
   if (noUsable) {
     return NextResponse.json({

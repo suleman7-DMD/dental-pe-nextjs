@@ -193,7 +193,7 @@ function ResearchAuditCard({
   audit: CompoundNarrativeResponse["research_audit"]
 }) {
   if (!audit) return null
-  const accepted = audit.status === "source_backed"
+  const accepted = audit.status === "source_backed" || audit.status === "legacy"
   return (
     <div
       className={
