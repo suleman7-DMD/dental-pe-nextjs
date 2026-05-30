@@ -287,7 +287,8 @@ export async function getDealCompsForPractice(
     .select("deal_date, platform_company, pe_sponsor, specialty, deal_size_mm, ebitda_multiple")
     .eq("target_state", state)
     .gte("deal_date", sinceIso)
-    .order("deal_date", { ascending: false });
+    .order("deal_date", { ascending: false })
+    .limit(1000);
 
   if (error) throw error;
   const rows = (data ?? []) as Array<{
