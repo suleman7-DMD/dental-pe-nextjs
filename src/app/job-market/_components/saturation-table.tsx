@@ -12,26 +12,29 @@ interface SaturationTableProps {
 }
 
 // Color coding thresholds for DLD, Buyable %, and Corporate %
+// DLD: national avg ~6.1 — green <6.1 (under-saturated), amber 6.1–10, red >10
 function dldColor(val: number | null): { bg: string; text: string } | null {
   if (val == null) return null
-  if (val < 5.0) return { bg: '#1B5E20', text: '#ffffff' }
-  if (val <= 7.0) return { bg: '#F57F17', text: '#ffffff' }
+  if (val < 6.1) return { bg: '#1B5E20', text: '#ffffff' }
+  if (val <= 10.0) return { bg: '#F57F17', text: '#ffffff' }
   return { bg: '#B71C1C', text: '#ffffff' }
 }
 
+// Buyable %: green >40% (plenty of acquisition targets), amber 20–40%, red <20%
 function buyableColor(val: number | null): { bg: string; text: string } | null {
   if (val == null) return null
   const pct = val * 100
-  if (pct > 50) return { bg: '#1B5E20', text: '#ffffff' }
+  if (pct > 40) return { bg: '#1B5E20', text: '#ffffff' }
   if (pct >= 20) return { bg: '#F57F17', text: '#ffffff' }
   return { bg: '#B71C1C', text: '#ffffff' }
 }
 
+// Corporate %: green <5% (low PE/DSO presence), amber 5–15%, red >15%
 function corporateColor(val: number | null): { bg: string; text: string } | null {
   if (val == null) return null
   const pct = val * 100
-  if (pct < 15) return { bg: '#1B5E20', text: '#ffffff' }
-  if (pct <= 35) return { bg: '#F57F17', text: '#ffffff' }
+  if (pct < 5) return { bg: '#1B5E20', text: '#ffffff' }
+  if (pct <= 15) return { bg: '#F57F17', text: '#ffffff' }
   return { bg: '#B71C1C', text: '#ffffff' }
 }
 

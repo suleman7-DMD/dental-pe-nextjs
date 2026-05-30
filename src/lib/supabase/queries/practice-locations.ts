@@ -116,6 +116,50 @@ function stableNumericId(value: string | null | undefined): number {
   return hash
 }
 
+/**
+ * Attempts to extract a provider last name from a practice name when no
+ * primary_npi is available (location-deduped rows from practice_locations
+ * that lack a single canonical NPI). Returns null when the pattern is
+ * ambiguous so downstream display falls back to the practice name itself.
+ *
+ * Recognized patterns (NPPES data is stored in all-caps):
+ *   "SMITH DENTAL"      → "Smith"
+ *   "SMITH DDS"         → "Smith"
+ *   "DR SMITH"          → "Smith"
+ *   "DR. SMITH"         → "Smith"
+ *   "JOHN SMITH DDS"    → null  (given + last — too ambiguous)
+ *   "SMITH AND JONES"   → null  (multi-name group)
+ */
+function extractLastNameFromPracticeName(name: string | null): string | null {
+  if (!name) return null
+
+  const upper = name.trim().toUpperCase()
+
+  // Reject group / brand tokens — no single provider to surface.
+  const groupTokens = [" AND ", " & ", " ASSOCIATES", " GROUP", " PARTNERS",
+    " FAMILY", " CENTER", " CARE", " CLINIC", " HEALTH", " TEAM",
+    " KIDS", " CHILDREN"]
+  if (groupTokens.some((t) => upper.includes(t))) return null
+
+  // Pattern 1: "DR LASTNAME" or "DR. LASTNAME" at the start.
+  const drPrefix = upper.match(/^DR\.?\s+([A-Z]{2,25})(?:\s|$)/)
+  if (drPrefix) return toTitleCase(drPrefix[1])
+
+  // Pattern 2: single-word last name followed by a dental suffix.
+  // The leading token must be one word (no space before the suffix) so we
+  // don't accidentally grab the last name out of a "JOHN SMITH DDS" string.
+  const suffixMatch = upper.match(
+    /^([A-Z]{2,25})\s+(?:DDS|DMD|DENTAL|DENTISTRY|ORTHODONTICS|ENDODONTICS|PERIODONTICS|PEDIATRIC|PEDODONTICS)(?:\s|$)/
+  )
+  if (suffixMatch) return toTitleCase(suffixMatch[1])
+
+  return null
+}
+
+function toTitleCase(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+}
+
 export async function fetchPracticeLocations(
   supabase: SupabaseClient,
   options: PracticeLocationFetchOptions = {}
@@ -135,7 +179,7 @@ export async function fetchPracticeLocations(
       .select(PRACTICE_LOCATION_SELECT)
 
     if (zips && zips.length > 0) query = query.in("zip", zips)
-    if (!options.includeResidential) query = query.eq("is_likely_residential", false)
+    if (!options.includeResidential) query = query.or("is_likely_residential.eq.false,is_likely_residential.is.null")
 
     query = query.order(options.orderBy ?? "practice_name", {
       ascending: options.ascending ?? true,
@@ -163,7 +207,7 @@ export function practiceLocationToLaunchpadRecord(
     provider_npis: parseStringArray(row.provider_npis),
     practice_name: row.practice_name,
     doing_business_as: row.doing_business_as,
-    provider_last_name: null,
+    provider_last_name: row.primary_npi ? null : extractLastNameFromPracticeName(row.practice_name),
     address: row.normalized_address,
     city: row.city,
     state: row.state,

@@ -115,10 +115,12 @@ function buildResearchAudit(intel: PracticeIntel | null): ResearchAudit {
     searches >= 2 &&
     urls.length > 0
 
+  const isInsufficient = quality === "insufficient"
   const substantive =
-    intel.overall_assessment != null ||
+    !isInsufficient &&
+    (intel.overall_assessment != null ||
     intel.website_url != null ||
-    intel.google_rating != null
+    intel.google_rating != null)
 
   let status: "source_backed" | "legacy" | "rejected"
   let reason: string

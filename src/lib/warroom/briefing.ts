@@ -1,3 +1,4 @@
+import { getCorporateBand } from "@/lib/constants/consolidation-honesty";
 import type {
   WarroomBriefingItem,
   WarroomChangeRecord,
@@ -30,11 +31,6 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function formatPercent(value: number | null): string {
-  if (value == null) return "--";
-  return `${round1(value)}%`;
-}
-
 function isWithinWindow(dateString: string | null, days: number): boolean {
   if (!dateString) return false;
   const ts = Date.parse(dateString);
@@ -44,21 +40,30 @@ function isWithinWindow(dateString: string | null, days: number): boolean {
 }
 
 function addCorporateConsolidationItem(items: WarroomBriefingItem[], summary: WarroomSummary) {
-  const pct = round1(summary.corporateHighConfidencePct ?? 0);
-  const total = summary.ownership.total;
-  if (total === 0) return;
+  const { ownership } = summary;
+  if (ownership.total === 0) return;
+  // GP-only denominator (drop specialists + non-clinical) so the share matches
+  // the canonical confirmed-floor used across the app.
+  const gpDenom = Math.max(
+    0,
+    ownership.total - ownership.specialist - ownership.nonClinical
+  ) || ownership.total;
+  const pct = round1((ownership.corporate / gpDenom) * 100);
+  const band = getCorporateBand(pct, "mixed");
   const severity: WarroomBriefingItem["severity"] =
     pct >= 5 ? "critical" : pct >= 2.5 ? "high" : "medium";
 
   items.push({
     id: "corporate-consolidation",
     severity,
-    title: `${pct}% high-confidence corporate in ${summary.scopeLabel}`,
+    title: `${pct}% confirmed corporate (floor) in ${summary.scopeLabel}`,
     detail:
-      `${summary.corporateHighConfidence.toLocaleString()} verified DSO/PE-owned locations out of ${total.toLocaleString()} practices. ` +
-      `Broader corporate signals (including phone-only): ${formatPercent(summary.ownership.corporatePct)}.`,
+      `${ownership.corporate.toLocaleString()} corporate-owned GP locations of ${gpDenom.toLocaleString()} ` +
+      `(${summary.corporateHighConfidence.toLocaleString()} high-confidence). ` +
+      `This is a documented FLOOR — DSOs keep acquired practices' local names, so true share is higher. ` +
+      `${band.anchorLabel}: ${band.anchorPct}% of dentists DSO-affiliated (per-dentist benchmark).`,
     lens: "consolidation",
-    metric: { label: "Corporate share", value: `${pct}`, unit: "%" },
+    metric: { label: "Confirmed corporate (floor)", value: `${pct}`, unit: "%" },
   });
 }
 

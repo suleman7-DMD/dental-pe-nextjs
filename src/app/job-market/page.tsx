@@ -8,10 +8,6 @@ import {
   INDEPENDENT_CLASSIFICATIONS,
   DSO_NATIONAL_TAXONOMY_LEAKS,
 } from '@/lib/constants/entity-classifications'
-import {
-  GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
-  GLOBAL_PRACTICE_NPI_COUNT,
-} from '@/lib/constants/data-snapshot'
 import { JobMarketShell } from './_components/job-market-shell'
 
 export const dynamic = "force-dynamic"
@@ -58,42 +54,58 @@ export default async function JobMarketPage() {
       .filter((v): v is string => Boolean(v))
       .sort()
       .pop() ?? null
-    const locTotalCount = locations.length
-    const locIndepCount = locations.filter((p) =>
+
+    // GP-filtered subset for KPI computation: exclude specialist, non_clinical, and
+    // org_only_npi rows. These inflate the denominator by ~26% and make Independent %
+    // read 68.6% when the GP-scoped reality is ~92.7%. The full `locations` array is
+    // still available for the freshness bar (which should reflect all tracked data).
+    const gpLocations = locations.filter((p) => {
+      const ec = (p.entity_classification ?? '').toLowerCase()
+      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi'
+    })
+
+    const locTotalCount = gpLocations.length
+    const locIndepCount = gpLocations.filter((p) =>
       INDEPENDENT_CLASSIFICATIONS.includes(
         p.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
       )
     ).length
-    const locDsoRegionalCount = locations.filter((p) => p.entity_classification === 'dso_regional').length
-    const locDsoNationalCount = locations.filter((p) => p.entity_classification === 'dso_national').length
-    const locDsoNationalRealCount = locations.filter((p) => p.entity_classification === 'dso_national' && !(DSO_NATIONAL_TAXONOMY_LEAKS as readonly string[]).includes(p.affiliated_dso ?? '')).length
-    const locDsoRegionalStrongCount = locations.filter((p) => p.entity_classification === 'dso_regional' && (p.ein || p.parent_company || p.classification_reasoning?.toLowerCase().includes('generic brand') || p.classification_reasoning?.toLowerCase().includes('branch'))).length
+    const locDsoRegionalCount = gpLocations.filter((p) => p.entity_classification === 'dso_regional').length
+    const locDsoNationalCount = gpLocations.filter((p) => p.entity_classification === 'dso_national').length
+    const locDsoNationalRealCount = gpLocations.filter((p) => p.entity_classification === 'dso_national' && !(DSO_NATIONAL_TAXONOMY_LEAKS as readonly string[]).includes(p.affiliated_dso ?? '')).length
+    const locDsoRegionalStrongCount = gpLocations.filter((p) => p.entity_classification === 'dso_regional' && (p.ein || p.parent_company || p.classification_reasoning?.toLowerCase().includes('generic brand') || p.classification_reasoning?.toLowerCase().includes('franchise') || p.classification_reasoning?.toLowerCase().includes('branch'))).length
     const locDsoSpecialistsCount = locations.filter((p) => p.entity_classification === 'specialist' && (p.ownership_status === 'dso_affiliated' || p.ownership_status === 'pe_backed')).length
-    const locHighVolCount = locations.filter((p) => p.entity_classification === 'solo_high_volume').length
-    const locLargeStaffCount = locations.filter((p) => (p.employee_count ?? 0) >= 10).length
-    const locRetirementCount = locations.filter((p) =>
+    const locHighVolCount = gpLocations.filter((p) => p.entity_classification === 'solo_high_volume').length
+    const locLargeStaffCount = gpLocations.filter((p) => (p.employee_count ?? 0) >= 10).length
+    const locRetirementCount = gpLocations.filter((p) =>
       INDEPENDENT_CLASSIFICATIONS.includes(
         p.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
       ) &&
       p.year_established != null &&
-      p.year_established < 1995
+      p.year_established < new Date().getFullYear() - 30
     ).length
+    // Enriched count: scoped to the GP location set (data_axle_enriched=true).
+    // This makes the freshness bar scope-aware: "21.7% in Chicagoland" instead of
+    // "0.8% globally" (which used a frozen 381k denominator from data-snapshot.ts).
+    const locDaEnrichedCount = gpLocations.filter((p) => p.data_axle_enriched === true).length
 
     const freshness = {
-      totalPractices: GLOBAL_PRACTICE_NPI_COUNT,
-      daEnriched: GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+      // Use all-location count (not GP-only) so the bar reflects all tracked data
+      // in the selected area, including specialists and non-clinical.
+      totalPractices: locations.length,
+      daEnriched: locDaEnrichedCount,
       lastUpdated: latestUpdate,
     }
 
-    // Compute server-side KPI counts (no practice rows needed)
+    // Compute server-side KPI counts using GP-scoped denominators
     const corporate = locDsoRegionalCount + locDsoNationalCount
     const highConfCorporate =
       locDsoNationalRealCount +
       locDsoRegionalStrongCount +
       locDsoSpecialistsCount
-    const total_p = locTotalCount
+    const total_p = locTotalCount  // GP locations only — excludes specialist/non_clinical
     const indep_cnt = locIndepCount
-    // specialist + non_clinical + unclassified = total - corporate - independent
+    // unclassified = GP total - corporate - independent (specialist/non_clinical already excluded)
     const unk_cnt = Math.max(0, total_p - corporate - indep_cnt)
 
     const serverKpis = {

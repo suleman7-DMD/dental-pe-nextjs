@@ -39,7 +39,7 @@ export function computeJobOpportunityScore(
   if (ec) {
     if (isIndependentClassification(ec)) {
       score += 30;
-    } else if (!isCorporateClassification(ec) && ec !== "specialist" && ec !== "non_clinical") {
+    } else if (!isCorporateClassification(ec) && ec !== "specialist" && ec !== "non_clinical" && ec !== "org_only_npi") {
       score += 10; // unknown/unrecognized
     }
   } else {

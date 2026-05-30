@@ -250,7 +250,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
     })
   }
 
-  if (cls === "dso_national" && (dsoTier === "tier1" || dsoTier === "tier2")) {
+  if (CORPORATE_CLASSIFICATIONS.has(cls ?? "") && (dsoTier === "tier1" || dsoTier === "tier2")) {
     active.push({
       id: "community_dso_signal",
       reasoning: `${practice.affiliated_dso ?? "DSO"} is rated ${dsoTier === "tier1" ? "Tier 1" : "Tier 2"} — structured benefits + mentorship.`,
@@ -330,7 +330,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
     medicaid &&
     zipIncome != null &&
     zipIncome < 45_000 &&
-    intel?.google_velocity?.toLowerCase() === "high"
+    (intel?.google_velocity?.toLowerCase() === "high" || intel?.google_velocity?.toLowerCase() === "active")
   ) {
     active.push({
       id: "medicaid_mill_warning",

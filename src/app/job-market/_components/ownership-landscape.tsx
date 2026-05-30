@@ -26,10 +26,16 @@ interface OwnershipLandscapeProps {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips }: OwnershipLandscapeProps) {
+  // ── Filter org_only_npi (NPI-2 admin records, not physical clinics) ───
+  const filteredPractices = useMemo(
+    () => practices.filter(p => p.entity_classification !== 'org_only_npi'),
+    [practices]
+  )
+
   // ── Ownership Status Bar Chart ────────────────────────────────────────
   const ownershipData = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       const ec = (p.entity_classification ?? '').trim().toLowerCase() || 'unknown'
       counts[ec] = (counts[ec] ?? 0) + 1
     }
@@ -41,13 +47,13 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
         color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#9C9C90',
       }))
       .sort((a, b) => b.value - a.value)
-  }, [practices])
+  }, [filteredPractices])
 
   // ── Practice Size Distribution ────────────────────────────────────────
   const sizeData = useMemo(() => {
     const sizes = { 'Solo (1-4)': 0, 'Small Group (5-9)': 0, 'Large Group (10+)': 0 }
 
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       const emp = p.employee_count != null ? Number(p.employee_count) : NaN
       if (isNaN(emp) || emp <= 0) continue
 
@@ -61,12 +67,12 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
     if (total === 0) return null
 
     return Object.entries(sizes).map(([label, value]) => ({ label, value }))
-  }, [practices])
+  }, [filteredPractices])
 
   // ── Top DSOs table ────────────────────────────────────────────────────
   const topDsos = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       const dso = p.affiliated_dso
       if (!dso || dso.trim() === '') continue
       if (DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))) continue
@@ -78,7 +84,7 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([name, practices]) => ({ name, practices }))
-  }, [practices])
+  }, [filteredPractices])
 
   // ── DSO Penetration by ZIP ────────────────────────────────────────────
   const wzCityMap = useMemo(() => {
@@ -102,7 +108,7 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
       }))
   }, [zipScores, wzCityMap])
 
-  if (practices.length === 0) return null
+  if (filteredPractices.length === 0) return null
 
   return (
     <div>

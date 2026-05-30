@@ -252,11 +252,19 @@ export function PracticeDensityMap({
   const [showIndividual, setShowIndividual] = useState(false)
   const [hideUnknown, setHideUnknown] = useState(false)
 
+  // Filter out org_only_npi rows — these are NPI-2 organization registrations with zero
+  // individual providers (administrative records, not physical clinics). They appear as
+  // gray dots at fake ZIP-centroid positions and pollute the map.
+  const filteredPractices = useMemo(
+    () => practices.filter(p => p.entity_classification !== 'org_only_npi'),
+    [practices]
+  )
+
   // Geocode all practices: real coords if available, ZIP centroid + NPI jitter otherwise
   const geocoded = useMemo<MapPractice[]>(() => {
     const results: MapPractice[] = []
 
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       // Canonical classification: entity_classification primary, ownership_status fallback.
       // classifyPractice() returns "independent" | "corporate" | "specialist" | "non_clinical" | "unknown".
       const ec = (p.entity_classification ?? '').trim().toLowerCase()
@@ -322,7 +330,7 @@ export function PracticeDensityMap({
     }
 
     return results
-  }, [practices, hideUnknown])
+  }, [filteredPractices, hideUnknown])
 
   // Split into independent and consolidated for hex layers using canonical buckets.
   const independentData = useMemo(
@@ -343,6 +351,16 @@ export function PracticeDensityMap({
 
   const unknownCount = useMemo(
     () => geocoded.filter((d) => d.status_clean === 'unknown').length,
+    [geocoded]
+  )
+
+  const specialistCount = useMemo(
+    () => geocoded.filter((d) => d.status_clean === 'specialist').length,
+    [geocoded]
+  )
+
+  const nonClinicalCount = useMemo(
+    () => geocoded.filter((d) => d.status_clean === 'non_clinical').length,
     [geocoded]
   )
 
@@ -497,6 +515,8 @@ export function PracticeDensityMap({
             Showing {geocoded.length.toLocaleString()} practices (
             {independentData.length.toLocaleString()} independent,{' '}
             {consolidatedData.length.toLocaleString()} consolidated,{' '}
+            {specialistCount.toLocaleString()} specialist,{' '}
+            {nonClinicalCount.toLocaleString()} non-clinical,{' '}
             {unknownCount.toLocaleString()} unknown)
             {' '}&middot;{' '}
             {geocoded.filter(d => !d.is_approximate).length.toLocaleString()} precise locations,{' '}

@@ -15,6 +15,11 @@ import {
 } from "lucide-react"
 import { KpiCard } from "@/components/data-display/kpi-card"
 import { formatNumber, formatPercent } from "@/lib/utils/formatting"
+import {
+  corporateBandSubtitle,
+  corporateBandTooltip,
+  getCorporateBand,
+} from "@/lib/constants/consolidation-honesty"
 import type { WarroomSummary } from "@/lib/warroom/signals"
 
 interface SitrepKpiStripProps {
@@ -39,10 +44,19 @@ export function SitrepKpiStrip({ summary, className }: SitrepKpiStripProps) {
     changeCount90d,
     signalCounts,
     corporateHighConfidence,
-    corporateHighConfidencePct,
     avgBuyabilityScore,
     avgOpportunityScore,
   } = summary
+
+  // GP-only denominator (drop specialists + non-clinical so the corporate share
+  // matches the canonical ~4.0% used on Home / Market Intel / Job Market).
+  const gpLocations = Math.max(
+    0,
+    ownership.total - ownership.specialist - ownership.nonClinical
+  )
+  const gpDenom = gpLocations > 0 ? gpLocations : ownership.total
+  const corporateFloorPct = gpDenom > 0 ? (ownership.corporate / gpDenom) * 100 : 0
+  const corpBand = getCorporateBand(corporateFloorPct, "mixed")
 
   return (
     <div
@@ -65,15 +79,15 @@ export function SitrepKpiStrip({ summary, className }: SitrepKpiStripProps) {
 
       <KpiCard
         icon={<Building2 className="h-4 w-4" />}
-        label="Corporate (High-Conf)"
-        value={formatNumber(corporateHighConfidence)}
-        suffix={formatPercent(corporateHighConfidencePct)}
+        label="Confirmed Corporate"
+        value={formatNumber(ownership.corporate)}
+        suffix={formatPercent(corporateFloorPct)}
         subtitle={
-          <span className="text-[11px] text-[#D4920B]">
-            All signals: {countsToPct(ownership.corporate, ownership.total)}
+          <span className="text-[11px] text-[#6B6B60]">
+            {corporateBandSubtitle(corpBand)} · {formatNumber(corporateHighConfidence)} high-confidence
           </span>
         }
-        tooltip="High-confidence = dso_national + dso_regional with parent company/EIN/franchise + DSO-owned specialists. Secondary row shows all corporate signals including phone-only matches."
+        tooltip={corporateBandTooltip(corpBand)}
         accentColor="#C23B3B"
       />
 

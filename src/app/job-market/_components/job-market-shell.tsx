@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { KpiCard } from '@/components/data-display/kpi-card'
@@ -35,6 +35,7 @@ const MarketAnalytics = dynamic(() => import('./market-analytics').then(m => ({ 
 })
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { isIndependentClassification, isCorporateClassification, classifyPractice, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
+import { getCorporateBand, corporateBandTooltip, corporateBandSubtitle } from '@/lib/constants/consolidation-honesty'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
 import {
@@ -108,10 +109,6 @@ const FULL_DATA_TABS: TabId[] = ['map', 'directory', 'analytics']
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-function cleanStatus(status: string | null | undefined): string {
-  return (status ?? 'unknown').trim().toLowerCase()
-}
-
 function computeZipStats(practices: Practice[]): ZipStats[] {
   const byZip: Record<string, Practice[]> = {}
   for (const p of practices) {
@@ -127,14 +124,19 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
     let dso_affiliated_count = 0
     const pe_backed_count = 0
     let unknown_count = 0
+    let non_gp_count = 0 // specialist + non_clinical + org_only — outside the GP denominator
     let city = ''
 
     for (const p of pList) {
       if (!city && p.city) city = p.city
+      const ec = (p.entity_classification ?? '').trim().toLowerCase()
+      if (ec === 'specialist' || ec === 'non_clinical' || ec === 'org_only_npi') {
+        non_gp_count++
+      }
       const category = classifyPractice(p.entity_classification, p.ownership_status)
       if (category === 'corporate') {
         dso_affiliated_count++
-      } else if (category === 'independent' || category === 'specialist' || category === 'non_clinical') {
+      } else if (category === 'independent') {
         independent_count++
       } else {
         unknown_count++
@@ -142,9 +144,14 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
     }
 
     const consolidated_count = dso_affiliated_count + pe_backed_count
+    // Consolidation share uses the GP-clinic denominator (excludes specialists /
+    // non-clinical), matching the canonical corporate_location_count /
+    // total_gp_locations definition used by every headline KPI. Using all
+    // practices here would understate each ZIP's share vs the page headline.
+    const gp_count = Math.max(0, total_practices - non_gp_count)
     const consolidation_pct_of_total =
-      total_practices > 0
-        ? Math.round((consolidated_count / total_practices) * 1000) / 10
+      gp_count > 0
+        ? Math.round((consolidated_count / gp_count) * 1000) / 10
         : 0
 
     return {
@@ -197,7 +204,7 @@ function JobMarketShellInner({
   // Current living location from URL or default
   const locationKeys = Object.keys(LIVING_LOCATIONS)
   const urlLocation = searchParams.get('location')
-  const currentLocation = locationKeys.includes(urlLocation ?? '') ? urlLocation! : locationKeys[0]
+  const currentLocation = locationKeys.includes(urlLocation ?? '') ? urlLocation! : defaultLocationKey
   const loc = LIVING_LOCATIONS[currentLocation]
 
   // Tab state from URL
@@ -213,7 +220,10 @@ function JobMarketShellInner({
   // ── State ──────────────────────────────────────────────────────────────
   // Full practice data — loaded lazily only when a data-heavy tab is active
   const [practices, setPractices] = useState<Practice[] | null>(null)
-  const [zipScores, setZipScores] = useState<ZipScore[]>(initialZipScores)
+  const defaultLoc = LIVING_LOCATIONS[defaultLocationKey]
+  const [zipScores, setZipScores] = useState<ZipScore[]>(
+    initialZipScores.filter(zs => defaultLoc.commutable_zips.includes(zs.zip_code))
+  )
   const [loading, setLoading] = useState(false)
   // Track which location has had full data loaded
   const [loadedLocation, setLoadedLocation] = useState<string | null>(null)
@@ -223,6 +233,9 @@ function JobMarketShellInner({
   // Whether we're using server KPIs or need client-computed ones
   const isDefaultLocation = currentLocation === defaultLocationKey
   const activeKpis = (isDefaultLocation && !clientKpis) ? serverKpis : (clientKpis ?? serverKpis)
+
+  // Track previous location to detect changes inside the merged effect
+  const prevLocationRef = useRef<string>(currentLocation)
 
   // ── Fetch full practices for a location (parallel batched) ─────────
   const fetchFullPractices = useCallback(
@@ -259,9 +272,13 @@ function JobMarketShellInner({
     [supabase, initialZipScores]
   )
 
-  // Compute KPIs client-side from full practice data
+  // Compute KPIs client-side from full practice data (GP-scoped to match server)
   const computeClientKpis = useCallback((allPractices: Practice[]) => {
-    const total_p = allPractices.length
+    const gpPractices = allPractices.filter((p) => {
+      const ec = (p.entity_classification ?? '').toLowerCase()
+      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi'
+    })
+    const total_p = gpPractices.length
     let indep_cnt = 0
     let dso_cnt = 0
     const pe_cnt = 0
@@ -274,10 +291,10 @@ function JobMarketShellInner({
     let retirement_risk = 0
     const currentYear = new Date().getFullYear()
 
-    for (const p of allPractices) {
+    for (const p of gpPractices) {
       const category = classifyPractice(p.entity_classification, p.ownership_status)
       if (category === 'corporate') dso_cnt++
-      else if (category === 'independent' || category === 'specialist' || category === 'non_clinical') indep_cnt++
+      else if (category === 'independent') indep_cnt++
       else unk_cnt++
 
       const ec = (p.entity_classification ?? '').trim().toLowerCase()
@@ -292,18 +309,23 @@ function JobMarketShellInner({
             reasoning.includes('branch')) {
           dsoRegionalStrong++
         }
-      } else if (ec === 'specialist') {
-        const os = (p.ownership_status ?? '').trim().toLowerCase()
-        if (os === 'dso_affiliated' || os === 'pe_backed') dsoSpecialists++
       }
 
       if (ec === 'solo_high_volume') highVolCount++
       if (p.employee_count != null && Number(p.employee_count) >= 10) large_count++
 
       const yr = p.year_established != null ? Number(p.year_established) : NaN
-      const isIndep = isIndependentClassification(p.entity_classification) ||
-        (!p.entity_classification && ['independent', 'likely_independent'].includes(cleanStatus(p.ownership_status)))
-      if (!isNaN(yr) && yr <= currentYear - 30 && isIndep) retirement_risk++
+      const isIndep = isIndependentClassification(p.entity_classification)
+      if (!isNaN(yr) && yr < currentYear - 30 && isIndep) retirement_risk++
+    }
+
+    // DSO-owned specialists counted from full set (not GP-filtered)
+    for (const p of allPractices) {
+      const ec = (p.entity_classification ?? '').trim().toLowerCase()
+      if (ec === 'specialist') {
+        const os = (p.ownership_status ?? '').trim().toLowerCase()
+        if (os === 'dso_affiliated' || os === 'pe_backed') dsoSpecialists++
+      }
     }
 
     setClientKpis({
@@ -326,19 +348,51 @@ function JobMarketShellInner({
     if (zipList.length === 0) return
 
     try {
-      const practicesForKpis = (await fetchPracticeLocations(supabase, { zips: zipList }))
+      const allPracticesForKpis = (await fetchPracticeLocations(supabase, { zips: zipList }))
         .map(practiceLocationToLaunchpadRecord)
         .map(locationPracticeToPractice)
+      const practicesForKpis = allPracticesForKpis.filter((p) => {
+        const ec = (p.entity_classification ?? '').toLowerCase()
+        return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi'
+      })
       const corporate = practicesForKpis.filter((p) => isCorporateClassification(p.entity_classification)).length
       const total_p = practicesForKpis.length
       const indep_cnt = practicesForKpis.filter((p) => isIndependentClassification(p.entity_classification)).length
       const largeStaffCount = practicesForKpis.filter((p) => (p.employee_count ?? 0) >= 10).length
+      const currentYear = new Date().getFullYear()
       const retireCount = practicesForKpis.filter((p) =>
         isIndependentClassification(p.entity_classification) &&
         p.year_established != null &&
-        p.year_established < 1995
+        p.year_established < currentYear - 30
       ).length
       const hvCount = practicesForKpis.filter((p) => p.entity_classification === 'solo_high_volume').length
+
+      // Compute highConfCorporate from GP-filtered set + DSO-owned specialists from full set
+      let dsoNationalReal = 0
+      let dsoRegionalStrong = 0
+      let dsoSpecialists = 0
+      for (const p of practicesForKpis) {
+        const ec = (p.entity_classification ?? '').trim().toLowerCase()
+        if (ec === 'dso_national') {
+          const dso = (p.affiliated_dso ?? '').trim()
+          const isTaxonomyLeak = dso && DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))
+          if (!isTaxonomyLeak) dsoNationalReal++
+        } else if (ec === 'dso_regional') {
+          const reasoning = (p.classification_reasoning ?? '').toLowerCase()
+          if (reasoning.includes('ein=') || reasoning.includes('generic brand') ||
+              reasoning.includes('parent_company') || reasoning.includes('franchise') ||
+              reasoning.includes('branch')) {
+            dsoRegionalStrong++
+          }
+        }
+      }
+      for (const p of allPracticesForKpis) {
+        const ec = (p.entity_classification ?? '').trim().toLowerCase()
+        if (ec === 'specialist') {
+          const os = (p.ownership_status ?? '').trim().toLowerCase()
+          if (os === 'dso_affiliated' || os === 'pe_backed') dsoSpecialists++
+        }
+      }
 
       setClientKpis({
         total_p,
@@ -346,7 +400,7 @@ function JobMarketShellInner({
         dso_cnt: corporate,
         pe_cnt: 0,
         unk_cnt: Math.max(0, total_p - corporate - indep_cnt),
-        highConfCorporate: 0, // Approximate without row data
+        highConfCorporate: dsoNationalReal + dsoRegionalStrong + dsoSpecialists,
         allSignalsCorporate: corporate,
         large_count: largeStaffCount,
         retirement_risk: retireCount,
@@ -357,44 +411,52 @@ function JobMarketShellInner({
     }
   }, [supabase])
 
-  // ── Trigger full data load when tab needs it ────────────────────────
+  // ── Unified effect: handle location changes AND tab-triggered data loads ──
+  // Merging two separate effects prevents a race condition where both fire in
+  // the same render cycle (e.g. user clicks a new location while on the Map
+  // tab), triggering two concurrent fetchFullPractices calls that can race to
+  // setPractices. A single effect with a prevLocationRef gate ensures only one
+  // fetch fires per transition.
   useEffect(() => {
+    const locationChanged = currentLocation !== prevLocationRef.current
+    prevLocationRef.current = currentLocation
+
     const needsFullData = FULL_DATA_TABS.includes(activeTab)
-    if (needsFullData && loadedLocation !== currentLocation) {
+
+    if (locationChanged) {
+      // ── Location changed — reset all derived state ──────────────────
+      if (!urlLocation || urlLocation === defaultLocationKey) {
+        // Reverted to (or started at) default — no fetch needed, just
+        // filter zipScores from the server-provided initialZipScores.
+        setPractices(null)
+        setLoadedLocation(null)
+        setClientKpis(null)
+        setZipScores(initialZipScores.filter(zs => defaultLoc.commutable_zips.includes(zs.zip_code)))
+      } else {
+        // Non-default location — reset and fetch
+        setPractices(null)
+        setLoadedLocation(null)
+        setClientKpis(null)
+
+        const zipList = LIVING_LOCATIONS[urlLocation]?.commutable_zips ?? []
+        const filteredZs = initialZipScores.filter((zs) =>
+          zipList.includes(zs.zip_code)
+        )
+        setZipScores(filteredZs)
+
+        if (needsFullData) {
+          fetchFullPractices(urlLocation)
+        } else {
+          fetchKpiCounts(urlLocation)
+        }
+      }
+    } else if (needsFullData && loadedLocation !== currentLocation) {
+      // ── Tab changed to a data-heavy tab, no location change ─────────
+      // Only fetch if the current location hasn't been fully loaded yet.
       fetchFullPractices(currentLocation)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, currentLocation])
-
-  // Load data when URL location changes
-  useEffect(() => {
-    if (urlLocation && urlLocation !== defaultLocationKey) {
-      // Reset for new location
-      setPractices(null)
-      setLoadedLocation(null)
-      setClientKpis(null)
-
-      const zipList = LIVING_LOCATIONS[urlLocation]?.commutable_zips ?? []
-      const filteredZs = initialZipScores.filter((zs) =>
-        zipList.includes(zs.zip_code)
-      )
-      setZipScores(filteredZs)
-
-      if (FULL_DATA_TABS.includes(activeTab)) {
-        fetchFullPractices(urlLocation)
-      } else {
-        // Only fetch lightweight KPI counts
-        fetchKpiCounts(urlLocation)
-      }
-    } else if (urlLocation === defaultLocationKey || !urlLocation) {
-      // Reset to default location
-      setPractices(null)
-      setLoadedLocation(null)
-      setClientKpis(null)
-      setZipScores(initialZipScores)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlLocation])
 
   const handleLocationChange = useCallback((newLocation: string) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -540,20 +602,18 @@ function JobMarketShellInner({
             />
             <KpiCard
               icon={<BarChart3 className="h-5 w-5" />}
-              label="High-Confidence Corporate"
-              value={kpiDisplay.highConf_pct}
-              accentColor="#2D8B4E"
-              tooltip={`High-confidence includes practices with DSO brand matches, shared EIN, or corporate parent signals. All-signals adds ${(kpiDisplay.allSignalsCorporate - kpiDisplay.highConfCorporate).toLocaleString()} practices detected only by shared phone numbers (a weaker signal). Industry estimates from ADA HPI suggest actual consolidation is 25-35%, as stealth acquisitions keep the original practice name.`}
+              label="Confirmed Corporate"
+              value={kpiDisplay.allSignals_pct}
+              accentColor="#C23B3B"
+              tooltip={corporateBandTooltip(
+                getCorporateBand(parseFloat(kpiDisplay.allSignals_pct) || 0, 'mixed')
+              )}
               subtitle={
                 <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#D4920B]" />
-                    <span className="text-[10px] text-[#D4920B] font-mono font-medium">
-                      All detected signals: {kpiDisplay.allSignals_pct}
-                    </span>
-                  </div>
                   <p className="text-[9px] text-[#707064] leading-tight">
-                    Industry estimate: 25-35%
+                    {corporateBandSubtitle(
+                      getCorporateBand(parseFloat(kpiDisplay.allSignals_pct) || 0, 'mixed')
+                    )}
                   </p>
                 </div>
               }

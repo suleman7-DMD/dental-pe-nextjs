@@ -9,7 +9,7 @@ function clean(value: string | null | undefined): string | null {
   if (value == null) return null
   const trimmed = value.trim()
   if (trimmed.length === 0) return null
-  if (/^null$/i.test(trimmed) || /^none$/i.test(trimmed)) return null
+  if (/^null$/i.test(trimmed) || /^none$/i.test(trimmed) || /^<?\s*unavail\s*>?$/i.test(trimmed)) return null
   return trimmed
 }
 

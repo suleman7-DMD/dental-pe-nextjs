@@ -25,12 +25,15 @@ export function DataFreshnessBar({
 
   return (
     <div className="flex flex-wrap items-center gap-4 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-xs">
-      <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+      <div
+        className="flex items-center gap-1.5 text-[var(--text-secondary)]"
+        title="Raw NPI-row count from federal NPPES (all 50 states): one row per individual dentist AND one per organization at the same address. NOT a practice count — the US has ~137k dental practices (BCG); this is ~2.6x inflated."
+      >
         <Database className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
         <span className="font-medium text-[var(--text-primary)]">
           {formatNumber(totalPractices)}
         </span>
-        <span>practices tracked</span>
+        <span>federal NPI records</span>
       </div>
 
       <div className="h-3 w-px bg-[var(--border)]" />

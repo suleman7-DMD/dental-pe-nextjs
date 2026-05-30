@@ -75,8 +75,11 @@ Key tables (mirrored from Python pipeline's SQLite via `sync_to_supabase.py`):
 - **platforms**: 69 known DSO platform profiles.
 
 ### Current Data Stats
-- 402,004 practices (14,053 NPI rows in watched ZIPs, all with entity_classification — live 2026-04-25)
-- **4,889 GP clinic locations in watched ZIPs** (CHI 4,575 + BOS 314 — `SUM(zip_scores.total_gp_locations)`, post-`dc18d24` ULTRA-FIX dedup classifier rewrite, verified live Supabase 2026-04-26) — the location-deduped denominator after collapsing NPI-1 + NPI-2 + suite-variant rows at the same physical building. ~2.7× smaller than the raw NPI count. Surfaced as a subtitle on Home + Job Market "Total Practices" KPI cards (Phase A, 2026-04-25, commit `732894f`). **Pre-`dc18d24` baseline was 5,265** — the dedup pipeline collapsed an additional ~376 stale residential/duplicate rows out of zip_scores; quote 4,889 in all current docs.
+
+> **2026-05-30 reclassification — numbers below updated to post-audit SQLite.** The classifier was rewritten location-level + confidence-tiered (`scrapers/reclassify_locations.py`); confirmed corporate share is now **200 / 4,970 GP locations = 4.02%** (floor), down from the old inflated 4.60%. **Supabase still holds the OLD classification until `sync_to_supabase.py` runs** (gated on user confirmation), so the LIVE site shows the old counts until then. See project-root `CLAUDE.md` F29 cheat-sheet for the full reconciliation.
+
+- 381,598 federal dental **NPI records** (NOT "practices" — ~2.4× the true clinic count; real US practice universe ≈137k per BCG 2026). 13,818 NPI rows in watched ZIPs, all with entity_classification.
+- **4,970 GP clinic locations in watched ZIPs** (CHI 4,608 + BOS 362 — `SUM(zip_scores.total_gp_locations)`, post-2026-05-30 reclassification; was 4,889 / CHI 4,575 / BOS 314) — the location-deduped denominator after collapsing NPI-1 + NPI-2 + suite-variant rows at the same physical building. ~2.4× smaller than the raw NPI count. Surfaced as a subtitle on Home + Job Market "Total Practices" KPI cards (Phase A, commit `732894f`).
 - 2,895 deals (coverage Oct 2020 – 2026-03-02; per Supabase live 2026-04-25). GDN's April roundup was 404 as of 2026-04-25, so 03-02 is current per source. SQLite has 2,861 (+34 ghost rows in Supabase, audit §15 #11).
 - 2,992 Data Axle enriched practices (with lat/lon, revenue, employees, year established)
 - 290 scored ZIPs (279 with saturation metrics)
@@ -462,6 +465,8 @@ Three commits chained on `main` to land the audit:
 - `9e3375c` — Warroom signal layer chunked at 50 ZIPs to dodge Supabase 8s `statement_timeout`
 
 Vercel deploy `dpl_nSdvkjofARjt9ukxYbktq5dKTe4N` is live on https://dental-pe-nextjs.vercel.app — production alias updated. All 6 affected pages return 200. Live numeric verification:
+
+> **Historical snapshot (2026-04-26).** The counts in the table below predate the 2026-05-30 reclassification. Current SQLite values: 4,970 GP (CHI 4,608 + BOS 362), 13,818 watched NPI rows, 5,657 all-class locations. The denominator *principles* (NPI-row vs location, GP-only headline) still hold; only the integers changed.
 
 | Page | Headline | NPI count | Verified value |
 |------|----------|----------:|---------------:|

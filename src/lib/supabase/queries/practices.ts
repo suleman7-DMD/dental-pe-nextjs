@@ -280,12 +280,20 @@ export async function getPracticeStats(
     independent,
     unknown: unknownCount,
     enriched: enrichedCount,
+    // Both corporate (dso_*) and independent (solo_*/family/small/large group)
+    // are GP-class entity_classifications — specialists and non_clinical carry
+    // their own labels. So BOTH percentages MUST use the same GP-location
+    // denominator (total_gp_locations) to reconcile. Using `t` (all locations,
+    // incl. specialists) for one and GP for the other was the cross-page
+    // denominator mismatch flagged in the 2026-05-30 data-integrity audit.
     consolidatedPct:
       (totalGpLocations ?? t) > 0
         ? ((corporate / (totalGpLocations ?? t)) * 100).toFixed(1) + "%"
         : "0.0%",
     independentPct:
-      t > 0 ? ((independent / t) * 100).toFixed(1) + "%" : "0.0%",
+      (totalGpLocations ?? t) > 0
+        ? ((independent / (totalGpLocations ?? t)) * 100).toFixed(1) + "%"
+        : "0.0%",
   };
 }
 

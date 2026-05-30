@@ -15,6 +15,11 @@ import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 import { WarroomCrossLink } from '@/components/layout/warroom-cross-link'
 import { DSOPenetrationTable } from './dso-penetration-table'
+import {
+  getCorporateBand,
+  corporateBandTooltip,
+  corporateBandSubtitle,
+} from '@/lib/constants/consolidation-honesty'
 
 // Lazy-load heavy components (maps, large tables with sub-queries)
 const ConsolidationMap = dynamic(() => import('./consolidation-map').then(m => ({ default: m.ConsolidationMap })), {
@@ -107,25 +112,35 @@ function MarketIntelShellInner({
       .reduce((a, b) => a + b, 0)
 
     if (selectedMetro === 'All Watched ZIPs') {
-      const { total, corporate, corporateHighConf, independent, unknown } = classificationCounts
+      const { total, corporate, corporateHighConf, independent } = classificationCounts
       if (total === 0) return null
-      const highConfPct = (corporateHighConf / total) * 100
-      const allSignalsPct = (corporate / total) * 100
+      // GP-relative denominator — matches the canonical corporate_share headline
+      // (zip_scores.corporate_location_count / total_gp_locations). corporate (dso_*)
+      // and independent (solo_*/family/group) are GP-class ECs that share this
+      // denominator. Specialist + non_clinical locations sit OUTSIDE the GP
+      // denominator and are reported as a separate count, never folded into the %.
+      const gpDenom = totalGpLocations > 0 ? totalGpLocations : total
+      const nonGpCount = Math.max(0, total - gpDenom) // specialist + non_clinical + residential
+      const highConfPct = (corporateHighConf / gpDenom) * 100
+      const allSignalsPct = (corporate / gpDenom) * 100
       return {
         totalP: total,
         totalGpLocations,
+        gpDenom,
+        nonGpCount,
         corporateHighConf,
         corporateAll: corporate,
         indepCount: independent,
-        unkCount: unknown,
         highConfPct,
         allSignalsPct,
-        indepPct: (independent / total) * 100,
-        unkPct: (unknown / total) * 100,
+        indepPct: (independent / gpDenom) * 100,
       }
     }
 
-    // For filtered metro, use zip_scores
+    // For filtered metro, use zip_scores. All corporate/independent shares use
+    // the GP-location denominator so they reconcile with the headline (and with
+    // the All-Watched-ZIPs branch above). Specialist/non-clinical are reported
+    // as a separate count, never inside the corporate/independent %.
     if (zipScores.length === 0) return null
     const totalP = zipScores.reduce((sum, z) => {
       const t = z.total_practices ?? ((z.total_gp_locations ?? 0) + (z.total_specialist_locations ?? 0))
@@ -140,22 +155,23 @@ function MarketIntelShellInner({
       }
     }
     const indepCount = zipScores.reduce((sum, z) => sum + (z.independent_count ?? 0), 0)
-    const unkCount = Math.max(0, totalP - corporateCount - indepCount)
-    const allSignalsPct = totalP > 0 ? (corporateCount / totalP) * 100 : 0
     const corporateHighConf = zipScores.reduce((sum, z) => sum + (z.corporate_highconf_count ?? 0), 0)
-    const highConfPct = totalP > 0 ? (corporateHighConf / totalP) * 100 : 0
+    const gpDenom = totalGpLocations > 0 ? totalGpLocations : totalP
+    const nonGpCount = Math.max(0, totalP - gpDenom)
+    const allSignalsPct = gpDenom > 0 ? (corporateCount / gpDenom) * 100 : 0
+    const highConfPct = gpDenom > 0 ? (corporateHighConf / gpDenom) * 100 : 0
 
     return {
       totalP,
       totalGpLocations,
+      gpDenom,
+      nonGpCount,
       corporateHighConf,
       corporateAll: corporateCount,
       indepCount,
-      unkCount,
       highConfPct,
       allSignalsPct,
-      indepPct: totalP > 0 ? (indepCount / totalP) * 100 : 0,
-      unkPct: totalP > 0 ? (unkCount / totalP) * 100 : 0,
+      indepPct: gpDenom > 0 ? (indepCount / gpDenom) * 100 : 0,
     }
   }, [zipScores, selectedMetro, classificationCounts])
 
@@ -190,8 +206,13 @@ function MarketIntelShellInner({
         {/* Data freshness bar */}
         <div className="rounded-lg border border-[#D4D0C8] bg-gradient-to-r from-[#F7F7F4] to-[#F5F5F0] px-5 py-3 flex items-center justify-between flex-wrap gap-2">
           <span className="text-[#6B6B60] text-[0.82rem] font-medium">
-            <strong className="text-[#1A1A1A]">{freshness.totalPractices.toLocaleString()}</strong>{' '}
-            practices tracked &nbsp;&middot;&nbsp;{' '}
+            <strong
+              className="text-[#1A1A1A]"
+              title="Raw NPI-row count from federal NPPES (all 50 states) — one row per individual dentist AND one per organization. NOT a practice count (the US has ~137k dental practices per BCG; this is ~2.6x inflated). Watched-ZIP clinic counts appear in the KPI cards below."
+            >
+              {freshness.totalPractices.toLocaleString()}
+            </strong>{' '}
+            federal NPI records &nbsp;&middot;&nbsp;{' '}
             <strong className="text-[#1A1A1A]">{freshness.daEnriched.toLocaleString()}</strong>{' '}
             Data Axle enriched
             {freshness.lastUpdated && (
@@ -243,16 +264,26 @@ function MarketIntelShellInner({
                   tooltip="Physical clinic count after deduping by address — the honest 'how many clinics' denominator. Subtitle shows raw NPI rows from federal NPPES (counts individual dentists + organization rows registered separately at the same address)."
                 />
                 <KpiCard
-                  label="Known Corporate"
-                  value={formatPct(kpis.highConfPct)}
-                  tooltip={`High-confidence: ${kpis.corporateHighConf.toLocaleString()} practices (DSO brands + EIN clusters). Including shared-phone signals: ${formatPct(kpis.allSignalsPct)} (${kpis.corporateAll.toLocaleString()}).`}
+                  label="Confirmed Corporate"
+                  value={formatPct(kpis.allSignalsPct)}
+                  subtitle={
+                    <span className="text-xs text-[#6B6B60]">
+                      {corporateBandSubtitle(getCorporateBand(kpis.allSignalsPct, 'mixed'))}
+                    </span>
+                  }
+                  tooltip={corporateBandTooltip(getCorporateBand(kpis.allSignalsPct, 'mixed'))}
                   accentColor="#C23B3B"
                 />
                 <KpiCard
-                  label="Independent (of total)"
+                  label="Independent"
                   value={formatPct(kpis.indepPct)}
+                  tooltip={`Share of the ${kpis.gpDenom.toLocaleString()} GP clinic locations classified independent (solo, family, small/large group). Uses the same GP denominator as the corporate share.`}
                 />
-                <KpiCard label="Specialist + Other" value={formatPct(kpis.unkPct)} />
+                <KpiCard
+                  label="Specialist / Non-clinical"
+                  value={formatNumber(kpis.nonGpCount)}
+                  tooltip="Specialist (ortho/endo/perio/OMS/pedo) + non-clinical (lab/supply/billing) locations. Tracked separately — NOT part of the GP-clinic denominator used for corporate/independent share."
+                />
               </div>
 
               {/* Tiered consolidation detail */}
@@ -261,38 +292,39 @@ function MarketIntelShellInner({
                   <div className="flex items-center gap-2">
                     <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#C23B3B]" />
                     <span className="text-xs text-[#1A1A1A] font-medium">
-                      Known Corporate (high confidence):
+                      Confirmed corporate (location floor):
                     </span>
                     <span className="text-xs font-mono font-bold text-[#C23B3B]">
-                      {formatPct(kpis.highConfPct)} ({kpis.corporateHighConf.toLocaleString()})
+                      {formatPct(kpis.allSignalsPct)} ({kpis.corporateAll.toLocaleString()} of {kpis.gpDenom.toLocaleString()} GP clinics)
                     </span>
                   </div>
                   <span className="text-[#D4D0C8]">|</span>
                   <span className="text-[10px] text-[#6B6B60]">
-                    Real DSO brands + EIN-verified corporate entities + DSO-owned specialists
+                    Real DSO brands + EIN-verified corporate entities + DSO-owned specialists. A floor — DSOs that operate under local names are undercounted.
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#D4920B]" />
+                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#0D9488]" />
                     <span className="text-xs text-[#1A1A1A] font-medium">
-                      Incl. shared-phone signals:
+                      Estimated true share (ADA HPI anchor):
                     </span>
-                    <span className="text-xs font-mono font-bold text-[#D4920B]">
-                      {formatPct(kpis.allSignalsPct)} ({kpis.corporateAll.toLocaleString()})
+                    <span className="text-xs font-mono font-bold text-[#0D9488]">
+                      {getCorporateBand(kpis.highConfPct, 'mixed').anchorPct.toFixed(1)}% of dentists
                     </span>
                   </div>
                   <span className="text-[#D4D0C8]">|</span>
                   <span className="text-[10px] text-[#6B6B60]">
-                    Adds practices sharing a phone # with others (weaker signal, may be group practices)
+                    {getCorporateBand(kpis.highConfPct, 'mixed').anchorLabel} — per-dentist DSO affiliation runs above the per-location floor because corporate offices employ more dentists each.
                   </span>
                 </div>
               </div>
 
               <p className="text-[#707064] text-xs mt-2">
-                {kpis.totalP.toLocaleString()} practices: Independent {kpis.indepPct.toFixed(1)}% ({kpis.indepCount.toLocaleString()}) |
-                Specialist/Other {kpis.unkPct.toFixed(1)}% ({kpis.unkCount.toLocaleString()}).
-                All percentages use total practices as denominator.
+                {kpis.gpDenom.toLocaleString()} GP clinic locations: Confirmed corporate {kpis.allSignalsPct.toFixed(1)}% ({kpis.corporateAll.toLocaleString()}) ·
+                Independent {kpis.indepPct.toFixed(1)}% ({kpis.indepCount.toLocaleString()}).
+                Plus {kpis.nonGpCount.toLocaleString()} specialist / non-clinical locations tracked separately.
+                Corporate and independent share use GP clinic locations as the denominator (matches the headline).
               </p>
             </>
           ) : (

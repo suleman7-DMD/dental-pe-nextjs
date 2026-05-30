@@ -21,6 +21,11 @@ import {
 } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import type { HomeSummary, PracticeChange } from '@/lib/types'
+import {
+  getCorporateBand,
+  corporateBandTooltip,
+  corporateBandSubtitle,
+} from '@/lib/constants/consolidation-honesty'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -298,7 +303,18 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             Dental PE Intelligence
           </h1>
           <p className="text-[#6B6B60] text-[14px] mt-2 max-w-2xl">
-            Tracking consolidation across {summary.totalPractices.toLocaleString()} practices in {summary.watchedZips.toLocaleString()} markets
+            Tracking consolidation across{' '}
+            {(summary.totalGpLocations && summary.totalGpLocations > 0
+              ? summary.totalGpLocations
+              : summary.watchedZips
+            ).toLocaleString()}{' '}
+            {summary.totalGpLocations && summary.totalGpLocations > 0
+              ? 'GP clinics'
+              : 'markets'}{' '}
+            across {summary.watchedZips.toLocaleString()} watched ZIP markets
+            <span className="text-[#9C9C90]">
+              {' '}— filtered from {summary.totalPractices.toLocaleString()} federal NPI records nationally
+            </span>
           </p>
         </div>
 
@@ -354,9 +370,18 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
           />
           <KpiCard
             icon={<TrendingUp className="h-4 w-4" />}
-            label="Known Corporate"
+            label="Confirmed Corporate"
             value={summary.consolidatedPct.includes('%') ? summary.consolidatedPct : `${summary.consolidatedPct}%`}
-            tooltip="High-confidence corporate rate in watched ZIPs (DSO brands + EIN-verified entities). See Market Intel for full tiered breakdown."
+            subtitle={
+              <span className="text-[10px] text-[#6B6B60] leading-tight block">
+                {corporateBandSubtitle(
+                  getCorporateBand(parseFloat(summary.consolidatedPct) || 0, 'mixed')
+                )}
+              </span>
+            }
+            tooltip={corporateBandTooltip(
+              getCorporateBand(parseFloat(summary.consolidatedPct) || 0, 'mixed')
+            )}
             accentColor="#C23B3B"
           />
           <KpiCard

@@ -163,6 +163,8 @@ function hasSourceBackedIntel(intel: LaunchpadPracticeIntelRecord): boolean {
 }
 
 function hasSubstantiveIntel(intel: LaunchpadPracticeIntelRecord): boolean {
+  const quality = intel.verification_quality?.toLowerCase() ?? ""
+  if (quality === "insufficient") return false
   return (
     intel.overall_assessment != null ||
     intel.website_url != null ||

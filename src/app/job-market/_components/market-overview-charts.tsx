@@ -55,6 +55,12 @@ export function MarketOverviewCharts({
   zipStats,
   kpis,
 }: MarketOverviewChartsProps) {
+  // ── Filter org_only_npi (NPI-2 admin records, not physical clinics) ───
+  const filteredPractices = useMemo(
+    () => practices.filter(p => p.entity_classification !== 'org_only_npi'),
+    [practices]
+  )
+
   // ── Chart 1: Consolidation by ZIP ─────────────────────────────────────
   const consolidationByZip = useMemo(() => {
     const rows = zipStats
@@ -71,7 +77,7 @@ export function MarketOverviewCharts({
   // ── Chart 2: Ownership Donut ──────────────────────────────────────────
   const donutData = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       const ec = (p.entity_classification ?? '').trim().toLowerCase() || 'unknown'
       counts[ec] = (counts[ec] ?? 0) + 1
     }
@@ -87,12 +93,12 @@ export function MarketOverviewCharts({
 
     const grandTotal = segments.reduce((s, seg) => s + seg.value, 0)
     return { segments, centerLabel: grandTotal.toLocaleString(), grandTotal }
-  }, [practices])
+  }, [filteredPractices])
 
   // ── Chart 3: Practice Age Distribution ────────────────────────────────
   const ageHistogramData = useMemo(() => {
     const rows: Array<{ year: number; ownership: string }> = []
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       const yr = p.year_established != null ? Number(p.year_established) : NaN
       if (isNaN(yr) || yr < 1900 || yr > 2030) continue
       const ec = (p.entity_classification ?? '').trim().toLowerCase()
@@ -100,12 +106,12 @@ export function MarketOverviewCharts({
       rows.push({ year: yr, ownership })
     }
     return rows
-  }, [practices])
+  }, [filteredPractices])
 
   // ── Chart 4: Top DSOs in Zone ─────────────────────────────────────────
   const topDsos = useMemo(() => {
     const counts: Record<string, number> = {}
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       const dso = p.affiliated_dso
       if (!dso || dso.trim() === '') continue
       // Filter out taxonomy description artifacts
@@ -118,9 +124,9 @@ export function MarketOverviewCharts({
       .sort((a, b) => a[1] - b[1])
       .slice(-15)
       .map(([label, value]) => ({ label, value }))
-  }, [practices])
+  }, [filteredPractices])
 
-  if (zipStats.length === 0 && practices.length === 0) return null
+  if (zipStats.length === 0 && filteredPractices.length === 0) return null
 
   return (
     <div>
