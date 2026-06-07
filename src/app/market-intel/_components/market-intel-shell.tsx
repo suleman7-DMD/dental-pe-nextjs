@@ -15,6 +15,7 @@ import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 import { WarroomCrossLink } from '@/components/layout/warroom-cross-link'
 import { DSOPenetrationTable } from './dso-penetration-table'
+import { CorporateBandBar } from '@/components/data-display/corporate-band-bar'
 import {
   getCorporateBand,
   corporateBandTooltip,
@@ -286,39 +287,13 @@ function MarketIntelShellInner({
                 />
               </div>
 
-              {/* Tiered consolidation detail */}
-              <div className="mt-3 rounded-lg border border-[#E8E5DE] bg-[#FFFFFF]/60 px-4 py-3 space-y-1.5">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#C23B3B]" />
-                    <span className="text-xs text-[#1A1A1A] font-medium">
-                      Confirmed corporate (location floor):
-                    </span>
-                    <span className="text-xs font-mono font-bold text-[#C23B3B]">
-                      {formatPct(kpis.allSignalsPct)} ({kpis.corporateAll.toLocaleString()} of {kpis.gpDenom.toLocaleString()} GP clinics)
-                    </span>
-                  </div>
-                  <span className="text-[#D4D0C8]">|</span>
-                  <span className="text-[10px] text-[#6B6B60]">
-                    Real DSO brands + EIN-verified corporate entities + DSO-owned specialists. A floor — DSOs that operate under local names are undercounted.
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#0D9488]" />
-                    <span className="text-xs text-[#1A1A1A] font-medium">
-                      Estimated true share (ADA HPI anchor):
-                    </span>
-                    <span className="text-xs font-mono font-bold text-[#0D9488]">
-                      {getCorporateBand(kpis.highConfPct, 'mixed').anchorPct.toFixed(1)}% of dentists
-                    </span>
-                  </div>
-                  <span className="text-[#D4D0C8]">|</span>
-                  <span className="text-[10px] text-[#6B6B60]">
-                    {getCorporateBand(kpis.highConfPct, 'mixed').anchorLabel} — per-dentist DSO affiliation runs above the per-location floor because corporate offices employ more dentists each.
-                  </span>
-                </div>
-              </div>
+              {/* Tiered consolidation band — location floor → per-dentist floor → ADA anchor */}
+              <CorporateBandBar
+                className="mt-3"
+                band={getCorporateBand(kpis.allSignalsPct, 'mixed')}
+                title="Corporate consolidation — confirmed floor to ADA anchor"
+                caption={`${kpis.corporateAll.toLocaleString()} of ${kpis.gpDenom.toLocaleString()} GP clinic locations carry documented corporate evidence. The two red markers are OURS (confirmed corporate, by location then by dentist); the goldenrod marker is the external ADA per-dentist anchor.`}
+              />
 
               <p className="text-[#707064] text-xs mt-2">
                 {kpis.gpDenom.toLocaleString()} GP clinic locations: Confirmed corporate {kpis.allSignalsPct.toFixed(1)}% ({kpis.corporateAll.toLocaleString()}) ·
@@ -461,7 +436,7 @@ function MarketIntelShellInner({
                     <div className="flex gap-3">
                       <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#D4920B] mt-1 flex-shrink-0" />
                       <div>
-                        <strong className="text-[#1A1A1A]">All-signals corporate</strong> -- Includes shared-phone-only dso_regional classifications. ~92% of dso_regional were triggered by shared phone numbers alone, which often indicates group practices at the same address rather than true DSO affiliation. Treat as directional.
+                        <strong className="text-[#1A1A1A]">All-signals corporate</strong> -- Adds dso_regional locations carrying a single corporate signal: an affiliated DSO operating under a local name (~73% of regional locations), a shared EIN across 3+ ZIPs (~60%), or a corporate parent (~43%). After the 2026-05-30 reclassification these are documented signals (web-verified IL friendly-PC clusters + NPPES brand-mining) -- the legacy shared-phone heuristic is now ~0% of regional rows. Directional but evidence-backed.
                       </div>
                     </div>
                     <div className="flex gap-3">

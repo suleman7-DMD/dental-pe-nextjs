@@ -15,7 +15,7 @@
  *      • an EIN shared across 3+ watched ZIPs (a billing-entity chain).
  *    This is computed at the location level in `reclassify_locations.py` and
  *    surfaced as `zip_scores.corporate_location_count / total_gp_locations`.
- *    As of 2026-05-30 it is ~4.0% of watched GP locations (200 / 4,970).
+ *    As of 2026-05-30 it is 5.27% of watched GP locations (262 / 4,970).
  *
  *    >>> THIS IS A FLOOR, NOT THE TRUTH. <<<
  *    DSOs routinely keep the acquired practice's original local name. A
@@ -23,22 +23,37 @@
  *    UNDER-counts true corporate ownership, by design. We never present it
  *    as "the consolidation rate" — only as "confirmed corporate".
  *
+ * 1b. CONFIRMED per-DENTIST corporate share (the unit bridge): the SAME
+ *    CATEGORY of confirmed corporate evidence as (1) — DSO brand, corporate
+ *    parent, or shared-EIN chain — but evaluated by individual dentist
+ *    (NPPES entity_type='individual', the NPI-level `practices` classifier)
+ *    instead of by location (the `practice_locations` classifier). The two
+ *    classifiers run independently and agree on ~80% of corporate dentists
+ *    (690 of 861 NPIs shared); nearly all of the per-dentist set (690 / 754)
+ *    are dentists working at our confirmed corporate locations. Because a
+ *    corporate office employs ~2x the dentists of an independent one (≈3.3 vs
+ *    ≈1.4 dentists/location in IL), the share rises from 5.27% (locations) to
+ *    9.68% (IL dentists, 754 / 7,792) — the lift is primarily this density
+ *    effect, not new claims. It is ALSO a documented floor (every counted NPI
+ *    carries corporate evidence) and is in the same UNIT as the ADA anchor (2).
+ *
  * 2. ADA HPI DSO-affiliation rate (the external benchmark): the share of
  *    DENTISTS — not locations — affiliated with a DSO, published by the
- *    American Dental Association's Health Policy Institute. This is a
- *    DIFFERENT UNIT: it counts people, and corporate offices employ more
- *    dentists per location, so the per-dentist rate runs HIGHER than a
- *    per-location rate. We use it only as the upper anchor of the estimated
- *    range — never as our own measured value.
+ *    American Dental Association's Health Policy Institute. Same UNIT as (1b).
+ *    We use it only as the upper anchor of the estimated range — never as our
+ *    own measured value.
  *
- * The honest statement on every corporate KPI is therefore:
- *    "X.X% confirmed corporate-owned locations (documented floor).
- *     True share is higher — DSOs hide behind local names. ADA HPI reports
- *     YY% of <state> dentists are DSO-affiliated (per-dentist, <year>)."
+ * The band therefore has THREE honest anchors, and the gap decomposes:
+ *    5.27% (our floor, locations)
+ *      └─ density effect (our confirmed corporate, by dentist) ─┐
+ *    9.68% (our floor, IL dentists)                             │ density-driven
+ *      └─ genuinely UNMEASURED hidden-DSO share ────────────────┘
+ *   14.6% (ADA HPI 2024, IL dentists)        ← the remaining, truly-unknown gap
  *
- * We NEVER fabricate a precise "real" number in either direction. The
- * confirmed floor has SQL provenance; the upper anchor is a cited external
- * benchmark; the gap between them is labeled honestly as unmeasured.
+ * The first segment is OUR confirmed corporate counted per-dentist (the lift is
+ * primarily office density, not new claims); the second is the honest "we can't
+ * see local-name DSOs" gap. We NEVER fabricate a precise "real" number inside
+ * that second segment.
  */
 
 /**
@@ -78,6 +93,39 @@ export const ADA_HPI_DSO_AFFILIATION = {
 export type ConsolidationState = keyof typeof ADA_HPI_DSO_AFFILIATION
 
 /**
+ * CONFIRMED per-DENTIST corporate share — OUR measured floor, counted by
+ * individual dentist (NPPES `entity_type='individual'`) instead of by location.
+ * Same UNIT as `ADA_HPI_DSO_AFFILIATION`, so it bridges the per-location floor
+ * and the ADA anchor on the band.
+ *
+ * Provenance (SQLite `practices` ⋈ `watched_zips`, 2026-05-30 post-IL-DSO-seed):
+ *   individual-dentist NPIs classified dso_regional/dso_national ÷ ALL
+ *   individual-dentist NPIs in scope.
+ *     IL   754 / 7,792 = 9.68%
+ *     MA    73 / 1,752 = 4.17%
+ *     all  827 / 9,544 = 8.67%
+ *
+ * This is ALSO a FLOOR — every counted NPI is classified corporate on
+ * documented evidence (DSO brand, corporate parent, or shared-EIN chain). It is
+ * the same CATEGORY of evidence as the per-location floor, evaluated by the
+ * NPI-level `practices` classifier rather than the location-level one; the two
+ * agree on ~80% of corporate dentists (690 of 861 shared). The lift from 5.27%
+ * (locations) to 9.68% (IL dentists) is primarily the density effect — corporate
+ * offices employ ~2x the dentists of an independent location (≈3.3 vs ≈1.4 in IL).
+ *
+ * NOTE: a documented pipeline constant (parallels ADA), NOT live-recomputed.
+ * Computed from canonical SQLite state; at authoring time Supabase `practices`
+ * had not yet re-synced the 214 NPI flips (live per-dentist ~6.x%) — it converges
+ * on the next weekly full sync. The per-LOCATION floor (`confirmedPct`) remains a
+ * live runtime parameter; this per-dentist anchor and the ADA anchor are both
+ * cited measures with provenance, by design.
+ */
+export const CONFIRMED_PER_DENTIST_CORPORATE = {
+  IL: { pct: 9.68, corp: 754, total: 7792 },
+  MA: { pct: 4.17, corp: 73, total: 1752 },
+} as const
+
+/**
  * Real US dental-practice (establishment / clinic) count, for national context.
  *
  * Source: BCG dental-consolidation reporting (2026) + US Census County
@@ -99,55 +147,111 @@ export const US_DENTAL_PRACTICE_ESTIMATE = 137_000
 export const US_NPPES_DENTAL_NPI_ROWS = 381_598
 
 export interface CorporateBand {
-  /** Evidence-based location-share floor (what we actually measured). */
+  /** Evidence-based per-LOCATION corporate floor (what we measured; live value). */
   confirmedPct: number
+  /** Our confirmed corporate counted per-DENTIST (NPI-level classifier) — the unit bridge (also a floor). */
+  perDentistPct: number
+  /** e.g. "our confirmed · IL dentists". */
+  perDentistLabel: string
   /** ADA HPI per-dentist DSO-affiliation rate used as the upper anchor. */
   anchorPct: number
   anchorYear: number
   /** e.g. "ADA HPI 2024 · IL dentists". */
   anchorLabel: string
+  /** 'IL' | 'MA' resolved state used for both per-dentist + anchor. */
+  stateLabel: string
 }
 
 /**
- * Build the confirmed-floor + ADA-anchored band for a given measured
- * confirmed location share.
+ * Build the three-anchor honest band (per-location floor → per-dentist floor →
+ * ADA per-dentist anchor) for a given measured confirmed LOCATION share.
  *
- * @param confirmedPct  Our measured corporate-owned location share (e.g. 4.0).
- * @param state         'IL' | 'MA' | 'mixed'. The watched set is IL-dominant
- *                      (269 IL ZIPs + 21 MA ZIPs), so 'mixed' anchors to IL.
+ * @param confirmedPct      Our measured corporate-owned LOCATION share (live, e.g. 5.27).
+ * @param state             'IL' | 'MA' | 'mixed'. The watched set is IL-dominant
+ *                          (269 IL ZIPs + 21 MA ZIPs), so 'mixed' anchors to IL.
+ * @param perDentistOverride Optional live per-dentist share. Pass this once the NPI
+ *                          flips re-sync to Supabase to make the bridge live too;
+ *                          omit to use the documented `CONFIRMED_PER_DENTIST_CORPORATE`.
  */
 export function getCorporateBand(
   confirmedPct: number,
-  state: ConsolidationState | "mixed" = "mixed"
+  state: ConsolidationState | "mixed" = "mixed",
+  perDentistOverride?: number
 ): CorporateBand {
-  const a =
-    state === "mixed" ? ADA_HPI_DSO_AFFILIATION.IL : ADA_HPI_DSO_AFFILIATION[state]
-  const stateLabel = state === "mixed" ? "IL" : state
+  const key: ConsolidationState = state === "mixed" ? "IL" : state
+  const a = ADA_HPI_DSO_AFFILIATION[key]
+  const pd = CONFIRMED_PER_DENTIST_CORPORATE[key]
   return {
     confirmedPct,
+    perDentistPct: perDentistOverride ?? pd.pct,
+    perDentistLabel: `our confirmed · ${key} dentists`,
     anchorPct: a.pctDentists,
     anchorYear: a.year,
-    anchorLabel: `ADA HPI ${a.year} · ${stateLabel} dentists`,
+    anchorLabel: `ADA HPI ${a.year} · ${key} dentists`,
+    stateLabel: key,
   }
 }
 
+/** One marker on the visual band. */
+export interface CorporateBandPoint {
+  key: "floor" | "perDentist" | "anchor"
+  /** Short label under the marker. */
+  label: string
+  pct: number
+  /** 'confirmed' = our measured floor (red); 'anchor' = external ADA (goldenrod). */
+  kind: "confirmed" | "anchor"
+  /** Long-form explanation for tooltip/legend. */
+  note: string
+}
+
 /**
- * Full honest tooltip for a corporate KPI. Explains the floor, why it's a
- * floor, and the external anchor — in the unit-aware language above.
+ * Ordered markers for the visual band bar (always low→high). The first two are
+ * OUR confirmed floors (locations, then dentists); the third is the ADA anchor.
+ */
+export function getCorporateBandPoints(band: CorporateBand): CorporateBandPoint[] {
+  return [
+    {
+      key: "floor",
+      label: "Confirmed (locations)",
+      pct: band.confirmedPct,
+      kind: "confirmed",
+      note: "Corporate-owned GP locations with documented evidence (DSO brand, corporate parent, or EIN shared across 3+ ZIPs). The live, synced floor.",
+    },
+    {
+      key: "perDentist",
+      label: "Confirmed (dentists)",
+      pct: band.perDentistPct,
+      kind: "confirmed",
+      note: `Our confirmed corporate, counted per dentist instead of per location (the NPI-level classifier; ~80% set overlap with the location floor, ≈690 shared). The lift from the location floor is primarily office density — corporate offices employ ~2x the dentists of an independent one. Same UNIT as the ADA anchor.`,
+    },
+    {
+      key: "anchor",
+      label: band.anchorLabel,
+      pct: band.anchorPct,
+      kind: "anchor",
+      note: `${band.anchorLabel} = ${band.anchorPct}% of dentists DSO-affiliated (American Dental Association Health Policy Institute, ${band.anchorYear}). Upper anchor — the per-dentist gap above our confirmed per-dentist floor is the genuinely unmeasured hidden-DSO share (DSOs operating under local names that name/EIN matching can't see).`,
+    },
+  ]
+}
+
+/**
+ * Full honest tooltip for a corporate KPI. Explains the floor, the per-dentist
+ * unit bridge, and the external anchor — in the unit-aware language above.
  */
 export function corporateBandTooltip(band: CorporateBand): string {
   return [
     `${band.confirmedPct.toFixed(1)}% CONFIRMED corporate-owned GP locations.`,
     `Every one carries documented evidence: a known DSO brand, a corporate parent company, or an EIN shared across 3+ ZIPs.`,
     `This is a FLOOR — DSOs routinely keep the acquired practice's local name, so name-matching can't see them.`,
-    `External benchmark: ${band.anchorLabel} = ${band.anchorPct}% of dentists DSO-affiliated (a per-dentist measure; corporate offices employ more dentists, so true per-location share sits between our confirmed floor and this figure).`,
+    `Counting our confirmed corporate by dentist instead of by location (corporate offices employ ~2x the dentists each) lifts it to ${band.perDentistPct.toFixed(1)}% of ${band.stateLabel} dentists — primarily a density effect, still a floor.`,
+    `External anchor: ${band.anchorLabel} = ${band.anchorPct}% of dentists DSO-affiliated. The gap from ${band.perDentistPct.toFixed(1)}% to ${band.anchorPct}% (same per-dentist unit) is the genuinely unmeasured local-name DSO share.`,
   ].join(" ")
 }
 
 /**
- * Compact "confirmed → estimate" string for subtitles, e.g.
- * "Confirmed floor · true share likely higher (ADA HPI: 14.6% of IL dentists)".
+ * Compact three-anchor string for subtitles, e.g.
+ * "Floor (locations) · 9.7% per dentist · ADA HPI 14.6% of IL dentists".
  */
 export function corporateBandSubtitle(band: CorporateBand): string {
-  return `Confirmed floor — true share is higher (${band.anchorLabel}: ${band.anchorPct}% of dentists DSO-affiliated)`
+  return `Floor · ${band.perDentistPct.toFixed(1)}% per ${band.stateLabel} dentist · anchor ${band.anchorPct}% (${band.anchorLabel})`
 }
