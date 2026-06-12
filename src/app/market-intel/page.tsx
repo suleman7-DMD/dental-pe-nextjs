@@ -51,7 +51,10 @@ export default async function MarketIntelPage() {
     .pop() ?? null
 
   // FIX 4: Per-entity-classification counts for Ownership tab
-  const ecValues = ['solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group','dso_regional','dso_national','specialist','non_clinical'] as const
+  // da_unverified = Data-Axle-only records (synthetic DA_ NPIs) that could not be
+  // verified as operating practices (2026-06-12 junk purge) — shown so the
+  // breakdown reconciles to the total, but never counted corporate/independent.
+  const ecValues = ['solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group','dso_regional','dso_national','specialist','non_clinical','da_unverified'] as const
   const entityCounts: Record<string, number> = {}
   ecValues.forEach((ec) => { entityCounts[ec] = locations.filter((p) => p.entity_classification === ec).length })
 

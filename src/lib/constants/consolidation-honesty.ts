@@ -15,9 +15,17 @@
  *      • an EIN shared across 3+ watched ZIPs (a billing-entity chain).
  *    This is computed at the location level in `reclassify_locations.py` and
  *    surfaced as `zip_scores.corporate_location_count / total_gp_locations`.
- *    As of 2026-06-07 it is 5.73% of watched GP locations (285 / 4,970) — the
- *    262 (5.27%) 2026-05-30 floor plus 23 Phase-4 Data-Axle structural-verified
- *    promotions. (Live value is read at runtime from `zip_scores`, not this number.)
+ *    As of 2026-06-12 it is 5.43% of watched GP locations (261 / 4,811) — the
+ *    285 (5.73%) 2026-06-07 floor minus 18 web-verified FALSE-corporate
+ *    demotions (Evenly parent_iusa placeholder linkage, landlord-name
+ *    confusion, bad seed addresses; audit in
+ *    data/dso_research/il_false_corporate_demotions_20260612.json) and minus
+ *    the Data-Axle junk purge (cleanup_data_axle_junk.py: 6 DA_-synthetic
+ *    corporate rows out of the numerator, 179 unverifiable DA_-only rows —
+ *    'nan' addresses + NPI-less phantom solo_inactive — out of the
+ *    denominator as the new `da_unverified` class; audit in
+ *    data/dso_research/da_junk_cleanup_20260612.json).
+ *    (Live value is read at runtime from `zip_scores`, not this number.)
  *
  *    >>> THIS IS A FLOOR, NOT THE TRUTH. <<<
  *    DSOs routinely keep the acquired practice's original local name. A
@@ -30,12 +38,11 @@
  *    parent, or shared-EIN chain — but evaluated by individual dentist
  *    (NPPES entity_type='individual', the NPI-level `practices` classifier)
  *    instead of by location (the `practice_locations` classifier). The two
- *    classifiers run independently and agree on ~82% of corporate dentists
- *    (760 of 931 NPIs shared); 92% of the per-dentist set (760 / 824)
+ *    classifiers run independently; 92% of the per-dentist set (720 / 784)
  *    are dentists working at our confirmed corporate locations. Because a
  *    corporate office employs ~2x the dentists of an independent one (≈3.3 vs
- *    ≈1.4 dentists/location in IL), the share rises from 5.73% (locations) to
- *    10.57% (IL dentists, 824 / 7,792) — the lift is primarily this density
+ *    ≈1.4 dentists/location in IL), the share rises from 5.43% (locations) to
+ *    10.06% (IL dentists, 784 / 7,792) — the lift is primarily this density
  *    effect, not new claims. It is ALSO a documented floor (every counted NPI
  *    carries corporate evidence) and is in the same UNIT as the ADA anchor (2).
  *
@@ -46,9 +53,9 @@
  *    own measured value.
  *
  * The band therefore has THREE honest anchors, and the gap decomposes:
- *    5.73% (our floor, locations)
+ *    5.43% (our floor, locations)
  *      └─ density effect (our confirmed corporate, by dentist) ─┐
- *   10.57% (our floor, IL dentists)                             │ density-driven
+ *   10.06% (our floor, IL dentists)                             │ density-driven
  *      └─ genuinely UNMEASURED hidden-DSO share ────────────────┘
  *   14.6% (ADA HPI 2024, IL dentists)        ← the remaining, truly-unknown gap
  *
@@ -100,24 +107,26 @@ export type ConsolidationState = keyof typeof ADA_HPI_DSO_AFFILIATION
  * Same UNIT as `ADA_HPI_DSO_AFFILIATION`, so it bridges the per-location floor
  * and the ADA anchor on the band.
  *
- * Provenance (SQLite `practices` ⋈ `watched_zips`, 2026-06-07 post-Phase-4
- * Data-Axle structural-verification):
+ * Provenance (SQLite `practices` ⋈ `watched_zips`, 2026-06-12 post
+ * false-corporate demotions — demote_false_corporate_il.py removed 18
+ * web-verified-independent locations (Evenly placeholder linkage, landlord
+ * confusion, bad seed addresses) and their 52 NPIs; audit:
+ * data/dso_research/il_false_corporate_demotions_20260612.json):
  *   individual-dentist NPIs classified dso_regional/dso_national ÷ ALL
  *   individual-dentist NPIs in scope.
- *     IL   824 / 7,792 = 10.57%   (was 754 / 9.68% at 2026-05-30; +70 dentists
- *                                  from the 23 Phase-4 verified-corporate flips)
- *     MA    73 / 1,752 = 4.17%    (unchanged — all Phase-4 promotions were IL)
- *     all  897 / 9,544 = 9.40%
+ *     IL   784 / 7,792 = 10.06%   (was 824 / 10.57% at 2026-06-07; -40 dentists
+ *                                  from the 18 false-corporate demotions)
+ *     MA    73 / 1,752 = 4.17%    (unchanged — all demotions were IL)
+ *     all  857 / 9,544 = 8.98%
  *
  * This is ALSO a FLOOR — every counted NPI is classified corporate on
  * documented evidence (DSO brand, corporate parent, or shared-EIN chain). It is
  * the same CATEGORY of evidence as the per-location floor, evaluated by the
- * NPI-level `practices` classifier rather than the location-level one; the two
- * agree on ~82% of corporate dentists (760 of 931 shared), and 92% of the
- * per-dentist set (760 / 824) are dentists at our confirmed corporate locations.
- * The lift from 5.73% (locations) to 10.57% (IL dentists) is primarily the
- * density effect — corporate offices employ ~2x the dentists of an independent
- * location (≈3.3 vs ≈1.4 in IL).
+ * NPI-level `practices` classifier rather than the location-level one; 92% of
+ * the per-dentist set (720 / 784) are dentists at our confirmed corporate
+ * locations. The lift from 5.43% (locations) to 10.06% (IL dentists) is
+ * primarily the density effect — corporate offices employ ~2x the dentists of
+ * an independent location (≈3.3 vs ≈1.4 in IL).
  *
  * NOTE: a documented pipeline constant (parallels ADA), NOT live-recomputed.
  * Computed from canonical SQLite state; at authoring time Supabase `practices`
@@ -127,7 +136,7 @@ export type ConsolidationState = keyof typeof ADA_HPI_DSO_AFFILIATION
  * are both cited measures with provenance, by design.
  */
 export const CONFIRMED_PER_DENTIST_CORPORATE = {
-  IL: { pct: 10.57, corp: 824, total: 7792 },
+  IL: { pct: 10.06, corp: 784, total: 7792 },
   MA: { pct: 4.17, corp: 73, total: 1752 },
 } as const
 

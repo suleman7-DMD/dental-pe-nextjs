@@ -615,11 +615,15 @@ function basePracticeLocationCountQuery(
   // Exclude org_only_npi rows — these are NPI-2 organization-record artifacts
   // from the location dedup pass that have no standalone clinical meaning.
   // 584 such rows exist in practice_locations; leaking them inflates KPIs.
+  // Also exclude da_unverified — Data-Axle-only records (synthetic DA_ NPIs,
+  // no federal NPI at the address) that could not be verified as operating
+  // practices (2026-06-12 junk purge); they stay out of every denominator.
   let query = supabase
     .from("practice_locations")
     .select("location_id", { count: "exact", head: true })
     .eq("is_likely_residential", false)
-    .neq("entity_classification", "org_only_npi") as unknown as CountFilterQuery;
+    .neq("entity_classification", "org_only_npi")
+    .neq("entity_classification", "da_unverified") as unknown as CountFilterQuery;
   if (zipChunk) query = query.in("zip", zipChunk);
   return query;
 }

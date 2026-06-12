@@ -27,6 +27,10 @@ export const GLOBAL_PRACTICE_NPI_COUNT = 381_598
  * Job Market page now computes enriched count from scoped `practice_locations`
  * rows (data_axle_enriched=true) rather than using this global constant.
  * Remaining users: market-intel, system, data-breakdown.
- * SQLite truth as of 2026-04-26: 2,983.
+ * SQLite truth as of 2026-06-12: 2,983 rows with data_axle_import_date set —
+ * of those, 481 are DA_-prefixed synthetic rows (no federal NPI; classed
+ * `da_unverified` since the 2026-06-12 junk purge), so real-NPI enriched =
+ * 2,502. This constant counts ALL enriched rows to match the
+ * `data_axle_import_date IS NOT NULL` queries that consume it.
  */
-export const GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT = 2_992
+export const GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT = 2_983

@@ -270,6 +270,8 @@ async function withTimeout<T>(
  * with no individual provider at the address. classifyPractice("org_only_npi")
  * returns "unknown" and ~584 such rows (10.2% of practice_locations) would
  * inflate totalPracticesInScope without contributing real job targets.
+ * Also excludes da_unverified — Data-Axle-only records (synthetic DA_ NPIs, no
+ * federal NPI at the address) that could not be verified as operating practices.
  */
 async function fetchAllPracticesByZips(
   supabase: SupabaseClient,
@@ -281,7 +283,11 @@ async function fetchAllPracticesByZips(
     ascending: false,
   })
   return rows
-    .filter((row) => row.entity_classification !== "org_only_npi")
+    .filter(
+      (row) =>
+        row.entity_classification !== "org_only_npi" &&
+        row.entity_classification !== "da_unverified"
+    )
     .map(practiceLocationToLaunchpadRecord)
 }
 

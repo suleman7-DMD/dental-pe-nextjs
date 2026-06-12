@@ -27,13 +27,13 @@ export function DataFreshnessBar({
     <div className="flex flex-wrap items-center gap-4 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-xs">
       <div
         className="flex items-center gap-1.5 text-[var(--text-secondary)]"
-        title="Raw NPI-row count from federal NPPES (all 50 states): one row per individual dentist AND one per organization at the same address. NOT a practice count — the US has ~137k dental practices (BCG); this is ~2.6x inflated."
+        title="Address-deduped location records tracked in the selected scope — all classes (GP, specialist, non-clinical, unverified). NOT raw federal NPI rows (NPPES emits ~2.4x more rows than physical locations) and NOT the GP-only clinic denominator used by the KPI cards."
       >
         <Database className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
         <span className="font-medium text-[var(--text-primary)]">
           {formatNumber(totalPractices)}
         </span>
-        <span>federal NPI records</span>
+        <span>tracked locations</span>
       </div>
 
       <div className="h-3 w-px bg-[var(--border)]" />

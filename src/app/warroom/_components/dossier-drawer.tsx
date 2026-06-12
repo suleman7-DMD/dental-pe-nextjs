@@ -1155,7 +1155,7 @@ function MarketTab({
               label="Corporate Share"
               value={
                 zipScore.corporate_share_pct != null
-                  ? formatPercent(zipScore.corporate_share_pct)
+                  ? formatPercent(zipScore.corporate_share_pct * 100)
                   : "—"
               }
               subtitle={
@@ -1169,7 +1169,7 @@ function MarketTab({
               label="Buyable Ratio"
               value={
                 zipScore.buyable_practice_ratio != null
-                  ? formatPercent(zipScore.buyable_practice_ratio)
+                  ? formatPercent(zipScore.buyable_practice_ratio * 100)
                   : "—"
               }
               accent="#2D8B4E"

@@ -611,13 +611,17 @@ export function ZipDossierDrawer({
               <div className="grid grid-cols-2 gap-2">
                 <StatBlock
                   label="Corporate share"
-                  value={corporateSharePct != null ? formatPercent(corporateSharePct) : "—"}
+                  value={
+                    corporateSharePct != null
+                      ? formatPercent(corporateSharePct * 100)
+                      : "—"
+                  }
                   subtitle="dso_regional + dso_national"
                   accent="#C23B3B"
                 />
                 <StatBlock
                   label="Buyable ratio"
-                  value={buyableRatio != null ? formatPercent(buyableRatio) : "—"}
+                  value={buyableRatio != null ? formatPercent(buyableRatio * 100) : "—"}
                   subtitle="Solo + inactive targets"
                   accent="#2D8B4E"
                 />

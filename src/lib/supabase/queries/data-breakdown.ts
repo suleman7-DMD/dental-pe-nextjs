@@ -335,11 +335,11 @@ export async function getWatchedZipsByState(
   };
 }
 
-/** Block 6: Deals by source (PESP, GDN, PitchBook). */
+/** Block 6: Deals by source (GDN, PESP, Becker's, PitchBook, cross-source merges). */
 export async function getDealsBySource(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
-  const sources = ["GDN", "PESP", "PITCHBOOK"];
+  const sources = ["GDN", "PESP", "BECKERS", "PITCHBOOK", "BECKERS+GDN"];
   const counts = await Promise.all(
     sources.map(async (s, i) => {
       const { count, error } = await supabase

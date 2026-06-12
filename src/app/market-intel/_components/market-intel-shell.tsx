@@ -258,11 +258,11 @@ function MarketIntelShellInner({
                   subtitle={
                     kpis.totalGpLocations > 0 ? (
                       <span className="text-xs text-[#6B6B60]">
-                        {formatNumber(kpis.totalP)} NPI rows
+                        {formatNumber(kpis.totalP)} locations incl. specialists
                       </span>
                     ) : undefined
                   }
-                  tooltip="Physical clinic count after deduping by address — the honest 'how many clinics' denominator. Subtitle shows raw NPI rows from federal NPPES (counts individual dentists + organization rows registered separately at the same address)."
+                  tooltip="Headline = GP clinic locations after deduping by address (the honest 'how many clinics' denominator, from zip_scores.total_gp_locations). Subtitle = all address-deduped location records in scope, including specialist, non-clinical, and unverified-record classes that sit outside the GP denominator."
                 />
                 <KpiCard
                   label="Confirmed Corporate"

@@ -47,6 +47,13 @@ export const ENTITY_CLASSIFICATIONS: EntityClassificationInfo[] = [
     category: "other",
   },
   {
+    value: "da_unverified",
+    label: "Unverified (Data Axle only)",
+    description:
+      "Data Axle business listing with no federal NPI at the address and no phone/website (or a junk address) -- cannot be verified as an operating practice. Excluded from every denominator; rolls into 'unknown' like org_only_npi.",
+    category: "other",
+  },
+  {
     value: "family_practice",
     label: "Family Practice",
     description:
@@ -186,6 +193,7 @@ export function classifyPractice(
   if (ec === "specialist") return "specialist";
   if (ec === "non_clinical") return "non_clinical";
   if (ec === "org_only_npi") return "unknown";
+  if (ec === "da_unverified") return "unknown";
 
   // Fallback to ownership_status when entity_classification is empty
   if (ec) return "unknown"; // ec is set but unrecognized

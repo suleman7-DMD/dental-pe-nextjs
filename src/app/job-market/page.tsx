@@ -55,13 +55,15 @@ export default async function JobMarketPage() {
       .sort()
       .pop() ?? null
 
-    // GP-filtered subset for KPI computation: exclude specialist, non_clinical, and
-    // org_only_npi rows. These inflate the denominator by ~26% and make Independent %
-    // read 68.6% when the GP-scoped reality is ~92.7%. The full `locations` array is
-    // still available for the freshness bar (which should reflect all tracked data).
+    // GP-filtered subset for KPI computation: exclude specialist, non_clinical,
+    // org_only_npi, and da_unverified rows. These inflate the denominator by ~26%
+    // and make Independent % read 68.6% when the GP-scoped reality is ~92.7%.
+    // da_unverified = Data-Axle-only records (synthetic DA_ NPIs) that could not
+    // be verified as operating practices (2026-06-12 junk purge). The full
+    // `locations` array is still available for the freshness bar.
     const gpLocations = locations.filter((p) => {
       const ec = (p.entity_classification ?? '').toLowerCase()
-      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi'
+      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified'
     })
 
     const locTotalCount = gpLocations.length

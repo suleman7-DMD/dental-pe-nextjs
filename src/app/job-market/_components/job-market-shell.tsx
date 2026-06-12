@@ -124,13 +124,13 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
     let dso_affiliated_count = 0
     const pe_backed_count = 0
     let unknown_count = 0
-    let non_gp_count = 0 // specialist + non_clinical + org_only — outside the GP denominator
+    let non_gp_count = 0 // specialist + non_clinical + org_only + da_unverified — outside the GP denominator
     let city = ''
 
     for (const p of pList) {
       if (!city && p.city) city = p.city
       const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      if (ec === 'specialist' || ec === 'non_clinical' || ec === 'org_only_npi') {
+      if (ec === 'specialist' || ec === 'non_clinical' || ec === 'org_only_npi' || ec === 'da_unverified') {
         non_gp_count++
       }
       const category = classifyPractice(p.entity_classification, p.ownership_status)
@@ -276,7 +276,7 @@ function JobMarketShellInner({
   const computeClientKpis = useCallback((allPractices: Practice[]) => {
     const gpPractices = allPractices.filter((p) => {
       const ec = (p.entity_classification ?? '').toLowerCase()
-      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi'
+      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified'
     })
     const total_p = gpPractices.length
     let indep_cnt = 0
@@ -353,7 +353,7 @@ function JobMarketShellInner({
         .map(locationPracticeToPractice)
       const practicesForKpis = allPracticesForKpis.filter((p) => {
         const ec = (p.entity_classification ?? '').toLowerCase()
-        return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi'
+        return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified'
       })
       const corporate = practicesForKpis.filter((p) => isCorporateClassification(p.entity_classification)).length
       const total_p = practicesForKpis.length
@@ -588,11 +588,11 @@ function JobMarketShellInner({
               subtitle={
                 kpiDisplay.gpLocations > 0 ? (
                   <span className="text-xs text-[#6B6B60]">
-                    {kpiDisplay.total_p.toLocaleString()} NPI rows
+                    {kpiDisplay.total_p.toLocaleString()} GP location records
                   </span>
                 ) : undefined
               }
-              tooltip="Physical clinic count in this living location after deduping by address — the honest 'how many clinics' denominator. Subtitle shows raw NPI rows from federal NPPES (counts individual dentists + organization rows registered separately at the same address)."
+              tooltip="Headline = GP clinic locations in this living location (zip_scores.total_gp_locations — address-deduped, residential- and unverified-record-filtered). Subtitle = raw GP-class rows in practice_locations for the same scope; the small delta is residential-flagged addresses that the scored denominator drops."
             />
             <KpiCard
               icon={<CircleCheck className="h-5 w-5" />}
