@@ -8,7 +8,7 @@ export const revalidate = 0
 export const metadata = {
   title: 'Deal Flow | Dental PE Intelligence',
   description:
-    'Real-time tracking of private equity deal activity in U.S. dentistry -- buyouts, add-ons, recapitalizations, and more.',
+    'Illinois dental private equity deal activity -- buyouts, add-ons, recapitalizations, and more.',
 }
 
 export default async function DealFlowPage() {

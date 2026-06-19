@@ -54,8 +54,9 @@ export function ResearchShell({ sponsors, platforms, states }: ResearchShellProp
             Research Tools
           </h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
-            Deep-dive into specific PE sponsors, platforms, states, or write custom SQL queries.
-            Use these tools to research specific companies or markets.
+            Deep-dive into Illinois-relevant PE sponsors, platforms, states, or write custom SQL
+            queries. Use these tools to research companies and markets tied to the
+            Chicagoland practice universe.
           </p>
         </div>
 

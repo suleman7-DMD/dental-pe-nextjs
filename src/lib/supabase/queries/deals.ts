@@ -4,6 +4,8 @@ import type { DealFilters, DealStats } from "../types";
 export type { Deal } from "../types";
 import type { Deal } from "../types";
 
+const PRIMARY_DEAL_STATE = "IL";
+
 export async function getDealsByFilters(
   supabase: SupabaseClient,
   filters: DealFilters,
@@ -12,7 +14,8 @@ export async function getDealsByFilters(
 ): Promise<{ data: Deal[]; count: number }> {
   let query = supabase
     .from("deals")
-    .select("*", { count: "exact" });
+    .select("*", { count: "exact" })
+    .eq("target_state", PRIMARY_DEAL_STATE);
 
   if (filters.deal_type) {
     query = query.eq("deal_type", filters.deal_type);
@@ -20,7 +23,7 @@ export async function getDealsByFilters(
   if (filters.pe_sponsor) {
     query = query.ilike("pe_sponsor", `%${filters.pe_sponsor}%`);
   }
-  if (filters.target_state) {
+  if (filters.target_state && filters.target_state === PRIMARY_DEAL_STATE) {
     query = query.eq("target_state", filters.target_state);
   }
   if (filters.source) {
@@ -63,6 +66,7 @@ export async function getDealStats(
     const { data, error } = await supabase
       .from("deals")
       .select("id, deal_date, platform_company, pe_sponsor, target_name, target_city, target_state, target_zip, deal_type, deal_size_mm, ebitda_multiple, specialty, num_locations, source, source_url, notes, created_at, updated_at")
+      .eq("target_state", PRIMARY_DEAL_STATE)
       .order("deal_date", { ascending: false })
       .range(from, to);
 
@@ -178,6 +182,7 @@ export async function getTopSponsors(
     const { data, error } = await supabase
       .from("deals")
       .select("pe_sponsor")
+      .eq("target_state", PRIMARY_DEAL_STATE)
       .not("pe_sponsor", "is", null)
       .range(from, to);
 
@@ -214,6 +219,7 @@ export async function getTopPlatforms(
     const { data, error } = await supabase
       .from("deals")
       .select("platform_company")
+      .eq("target_state", PRIMARY_DEAL_STATE)
       .range(from, to);
 
     if (error) throw error;
@@ -242,6 +248,7 @@ export async function getRecentDeals(
   const { data, error } = await supabase
     .from("deals")
     .select("id, deal_date, platform_company, pe_sponsor, target_name, target_city, target_state, target_zip, deal_type, deal_size_mm, ebitda_multiple, specialty, num_locations, source, source_url, notes, created_at, updated_at")
+    .eq("target_state", PRIMARY_DEAL_STATE)
     .order("deal_date", { ascending: false })
     .limit(limit);
 
@@ -366,6 +373,7 @@ async function fetchAllDealColumn<T extends Record<string, unknown>>(
     const from = page * pageSize;
     const to = from + pageSize - 1;
     let q = supabase.from("deals").select(column);
+    q = q.eq("target_state", PRIMARY_DEAL_STATE);
     if (notNull) q = q.not(column, "is", null);
     q = q.range(from, to);
     const { data, error } = await q;

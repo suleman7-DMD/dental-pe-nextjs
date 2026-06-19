@@ -346,13 +346,14 @@ export async function getDealsBySource(
       const { count, error } = await supabase
         .from("deals")
         .select("*", { count: "exact", head: true })
+        .eq("target_state", "IL")
         .ilike("source", s);
       if (error) throw error;
       return {
         label: s,
         count: count ?? 0,
         color: CHART_COLORWAY[i % CHART_COLORWAY.length],
-        description: `source ILIKE '${s}'`,
+        description: `target_state = 'IL' AND source ILIKE '${s}'`,
       };
     })
   );
@@ -362,7 +363,7 @@ export async function getDealsBySource(
     title: "Deals by Source",
     total,
     unit: "deals",
-    source: "deals table — PE deal announcements grouped by scraper origin",
+    source: "deals table WHERE target_state = 'IL' — PE deal announcements grouped by scraper origin",
     surfacedOn: ["Home", "Deal Flow"],
     groupBy: "source",
     segments,
@@ -381,6 +382,7 @@ export async function getDealsByType(
     const { data, error } = await supabase
       .from("deals")
       .select("deal_type")
+      .eq("target_state", "IL")
       .range(from, from + pageSize - 1);
     if (error) throw error;
     const batch = (data ?? []) as Array<{ deal_type: string | null }>;
@@ -412,7 +414,7 @@ export async function getDealsByType(
     title: "Deals by Deal Type",
     total,
     unit: "deals",
-    source: "deals.deal_type",
+    source: "deals.deal_type WHERE target_state = 'IL'",
     surfacedOn: ["Deal Flow charts"],
     groupBy: "deal_type",
     segments,
@@ -433,6 +435,7 @@ export async function getDealsByYear(
     const { data, error } = await supabase
       .from("deals")
       .select("deal_date")
+      .eq("target_state", "IL")
       .not("deal_date", "is", null)
       .range(from, to);
     if (error) throw error;
@@ -451,7 +454,7 @@ export async function getDealsByYear(
       label: year,
       count,
       color: CHART_COLORWAY[i % CHART_COLORWAY.length],
-      description: `deal_date YEAR(${year})`,
+      description: `target_state = 'IL' AND deal_date YEAR(${year})`,
     }))
     .sort((a, b) => parseInt(b.label) - parseInt(a.label));
   const total = segments.reduce((s, x) => s + x.count, 0);
@@ -459,7 +462,7 @@ export async function getDealsByYear(
     title: "Deals by Year",
     total,
     unit: "deals",
-    source: "deals.deal_date — temporal coverage of the deal corpus",
+    source: "deals.deal_date WHERE target_state = 'IL' — temporal coverage of the Illinois deal corpus",
     surfacedOn: ["Deal Flow timeline"],
     groupBy: "year",
     segments,

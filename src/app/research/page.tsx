@@ -11,7 +11,7 @@ export const revalidate = 0
 export const metadata = {
   title: 'Research Tools | Dental PE Intelligence',
   description:
-    'Deep-dive into specific PE sponsors, platforms, states, or write custom SQL queries.',
+    'Deep-dive into Illinois-relevant PE sponsors, platforms, states, or write custom SQL queries.',
 }
 
 export default async function ResearchPage() {

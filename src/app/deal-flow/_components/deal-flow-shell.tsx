@@ -164,7 +164,7 @@ export function DealFlowShell({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Dental PE Consolidation Intelligence</h1>
           <p className="text-[#6B6B60] mt-1 text-sm">
-            Real-time tracking of private equity activity in U.S. dentistry
+            Illinois deal flow relevant to the Chicagoland practice market
           </p>
           <p className="text-[#707064] text-xs mt-0.5">
             {totalCount.toLocaleString()} deals | {sourceCount} sources | Filtered view
