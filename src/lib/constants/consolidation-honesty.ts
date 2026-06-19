@@ -15,16 +15,16 @@
  *      • an EIN shared across 3+ watched ZIPs (a billing-entity chain).
  *    This is computed at the location level in `reclassify_locations.py` and
  *    surfaced as `zip_scores.corporate_location_count / total_gp_locations`.
- *    As of 2026-06-12 it is 5.43% of watched GP locations (261 / 4,811) — the
- *    285 (5.73%) 2026-06-07 floor minus 18 web-verified FALSE-corporate
- *    demotions (Evenly parent_iusa placeholder linkage, landlord-name
- *    confusion, bad seed addresses; audit in
- *    data/dso_research/il_false_corporate_demotions_20260612.json) and minus
- *    the Data-Axle junk purge (cleanup_data_axle_junk.py: 6 DA_-synthetic
- *    corporate rows out of the numerator, 179 unverifiable DA_-only rows —
- *    'nan' addresses + NPI-less phantom solo_inactive — out of the
- *    denominator as the new `da_unverified` class; audit in
- *    data/dso_research/da_junk_cleanup_20260612.json).
+ *    As of 2026-06-19 it is 5.58% of watched GP locations (268 / 4,802) and
+ *    5.61% in Chicagoland (249 / 4,440). That is the corrected 2026-06-12
+ *    floor after false-corporate demotions + Data-Axle junk purge, plus the
+ *    2026-06-19 exact-address DSO locator/friendly-PC promotions, net of 5
+ *    duplicate-location rows excluded from the denominator. Audits:
+ *    data/dso_research/il_false_corporate_demotions_20260612.json,
+ *    data/dso_research/il_false_corporate_demotions_round2_20260612.json,
+ *    data/dso_research/da_junk_cleanup_20260612.json,
+ *    data/dso_research/duplicate_location_cleanup_20260619.json, and
+ *    data/dso_research/il_verified_locator_promotions_20260619.json.
  *    (Live value is read at runtime from `zip_scores`, not this number.)
  *
  *    >>> THIS IS A FLOOR, NOT THE TRUTH. <<<
@@ -38,11 +38,11 @@
  *    parent, or shared-EIN chain — but evaluated by individual dentist
  *    (NPPES entity_type='individual', the NPI-level `practices` classifier)
  *    instead of by location (the `practice_locations` classifier). The two
- *    classifiers run independently; 92% of the per-dentist set (720 / 784)
+ *    classifiers run independently; most of the per-dentist set
  *    are dentists working at our confirmed corporate locations. Because a
  *    corporate office employs ~2x the dentists of an independent one (≈3.3 vs
- *    ≈1.4 dentists/location in IL), the share rises from 5.43% (locations) to
- *    10.06% (IL dentists, 784 / 7,792) — the lift is primarily this density
+ *    ≈1.4 dentists/location in IL), the share rises from 5.61% (CHI locations)
+ *    to 10.47% (IL dentists, 816 / 7,792) — the lift is primarily this density
  *    effect, not new claims. It is ALSO a documented floor (every counted NPI
  *    carries corporate evidence) and is in the same UNIT as the ADA anchor (2).
  *
@@ -53,9 +53,9 @@
  *    own measured value.
  *
  * The band therefore has THREE honest anchors, and the gap decomposes:
- *    5.43% (our floor, locations)
+ *    5.58% (our floor, watched locations; 5.61% CHI)
  *      └─ density effect (our confirmed corporate, by dentist) ─┐
- *   10.06% (our floor, IL dentists)                             │ density-driven
+ *   10.47% (our floor, IL dentists)                             │ density-driven
  *      └─ genuinely UNMEASURED hidden-DSO share ────────────────┘
  *   14.6% (ADA HPI 2024, IL dentists)        ← the remaining, truly-unknown gap
  *
@@ -107,36 +107,31 @@ export type ConsolidationState = keyof typeof ADA_HPI_DSO_AFFILIATION
  * Same UNIT as `ADA_HPI_DSO_AFFILIATION`, so it bridges the per-location floor
  * and the ADA anchor on the band.
  *
- * Provenance (SQLite `practices` ⋈ `watched_zips`, 2026-06-12 post
- * false-corporate demotions — demote_false_corporate_il.py removed 18
- * web-verified-independent locations (Evenly placeholder linkage, landlord
- * confusion, bad seed addresses) and their 52 NPIs; audit:
- * data/dso_research/il_false_corporate_demotions_20260612.json):
+ * Provenance (SQLite `practices` ⋈ `watched_zips`, 2026-06-19 post
+ * false-corporate demotions, duplicate-location cleanup, and exact-match
+ * DSO locator/friendly-PC promotions):
  *   individual-dentist NPIs classified dso_regional/dso_national ÷ ALL
  *   individual-dentist NPIs in scope.
- *     IL   784 / 7,792 = 10.06%   (was 824 / 10.57% at 2026-06-07; -40 dentists
- *                                  from the 18 false-corporate demotions)
- *     MA    73 / 1,752 = 4.17%    (unchanged — all demotions were IL)
- *     all  857 / 9,544 = 8.98%
+ *     IL   816 / 7,792 = 10.47%
+ *     MA    73 / 1,752 = 4.17%    (legacy comparison only; UI is Chicago-first)
+ *     all  889 / 9,544 = 9.31%    (legacy combined watched set)
  *
  * This is ALSO a FLOOR — every counted NPI is classified corporate on
  * documented evidence (DSO brand, corporate parent, or shared-EIN chain). It is
  * the same CATEGORY of evidence as the per-location floor, evaluated by the
- * NPI-level `practices` classifier rather than the location-level one; 92% of
- * the per-dentist set (720 / 784) are dentists at our confirmed corporate
- * locations. The lift from 5.43% (locations) to 10.06% (IL dentists) is
+ * NPI-level `practices` classifier rather than the location-level one. The
+ * lift from 5.58% (locations) to 10.47% (IL dentists) is
  * primarily the density effect — corporate offices employ ~2x the dentists of
  * an independent location (≈3.3 vs ≈1.4 in IL).
  *
  * NOTE: a documented pipeline constant (parallels ADA), NOT live-recomputed.
- * Computed from canonical SQLite state; at authoring time Supabase `practices`
- * had not yet re-synced the latest NPI flips (live per-dentist lags) — it
- * converges on the next weekly full sync. The per-LOCATION floor (`confirmedPct`)
- * remains a live runtime parameter; this per-dentist anchor and the ADA anchor
- * are both cited measures with provenance, by design.
+ * Computed from canonical SQLite state and synced to Supabase on 2026-06-19.
+ * The per-LOCATION floor (`confirmedPct`) remains a live runtime parameter;
+ * this per-dentist anchor and the ADA anchor are both cited measures with
+ * provenance, by design.
  */
 export const CONFIRMED_PER_DENTIST_CORPORATE = {
-  IL: { pct: 10.06, corp: 784, total: 7792 },
+  IL: { pct: 10.47, corp: 816, total: 7792 },
   MA: { pct: 4.17, corp: 73, total: 1752 },
 } as const
 
@@ -182,8 +177,8 @@ export interface CorporateBand {
  * ADA per-dentist anchor) for a given measured confirmed LOCATION share.
  *
  * @param confirmedPct      Our measured corporate-owned LOCATION share (live, e.g. 5.27).
- * @param state             'IL' | 'MA' | 'mixed'. The watched set is IL-dominant
- *                          (269 IL ZIPs + 21 MA ZIPs), so 'mixed' anchors to IL.
+ * @param state             'IL' | 'MA' | 'mixed'. The primary app scope is now
+ *                          Chicagoland-only, so 'mixed' anchors to IL.
  * @param perDentistOverride Optional live per-dentist share. Pass this once the NPI
  *                          flips re-sync to Supabase to make the bridge live too;
  *                          omit to use the documented `CONFIRMED_PER_DENTIST_CORPORATE`.

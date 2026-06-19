@@ -58,10 +58,12 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
         const coords = ZIP_CENTROIDS[zs.zip_code]
         if (!coords) return null
 
-        // Total practices — prefer total_practices, fall back to GP + specialist locations
-        const total = zs.total_practices
-          ?? ((zs.total_gp_locations ?? 0) + (zs.total_specialist_locations ?? 0))
-        const gpLoc = zs.total_gp_locations ?? total
+        // Map the GP clinic denominator used by corporate_share_pct. Specialist
+        // locations are tracked separately and should not size/color the
+        // consolidation map.
+        const gpLoc = zs.total_gp_locations
+          ?? Math.max(0, (zs.total_practices ?? 0) - (zs.total_specialist_locations ?? 0))
+        const total = gpLoc
 
         // Corporate count from saturation metrics (entity_classification-based, most accurate)
         const corporateFromSaturation = zs.corporate_share_pct != null && zs.total_gp_locations != null
@@ -74,7 +76,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
         const consolPct = zs.corporate_share_pct != null
           ? zs.corporate_share_pct * 100
           : total > 0
-            ? (consolCount / total) * 100
+            ? (consolCount / Math.max(total, 1)) * 100
             : 0
 
         // Independent count estimate
@@ -95,6 +97,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
           lat: coords[0],
           lon: coords[1],
           total,
+          specialistCount: zs.total_specialist_locations ?? 0,
           independent: indepCount,
           consolCount,
           consolPct,
@@ -110,6 +113,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
       lat: number
       lon: number
       total: number
+      specialistCount: number
       independent: number
       consolCount: number
       consolPct: number
@@ -122,7 +126,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
 
   // Compute map center
   const center = useMemo(() => {
-    const metroKey = selectedMetro !== 'All Watched ZIPs' ? selectedMetro : null
+    const metroKey = selectedMetro
     if (metroKey && METRO_CENTERS[metroKey]) {
       return METRO_CENTERS[metroKey]
     }
@@ -248,11 +252,11 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
               `<div style="font-family:system-ui;font-size:12px;line-height:1.5">
                 <strong style="font-size:14px">${escapeHtml(props.city)}</strong>
                 <span style="color:#90a4ae"> &middot; ${escapeHtml(props.zip)}</span><br/>
-                <span style="color:#333"><strong>${escapeHtml(props.total)}</strong> practices (deduplicated)</span><br/>
+                <span style="color:#333"><strong>${escapeHtml(props.total)}</strong> GP clinics</span><br/>
                 <span style="color:#2E7D32">&blacktriangleright; ${escapeHtml(props.independent)} independent</span> |
                 <span style="color:#E65100">${escapeHtml(props.consolCount)} consolidated (DSO+PE)</span><br/>
                 <span style="color:${consolPctVal >= 30 ? '#C23B3B' : consolPctVal >= 15 ? '#D4920B' : '#2D8B4E'}">
-                  Consolidation: ${consolPctVal.toFixed(1)}% of total
+                  Consolidation: ${consolPctVal.toFixed(1)}% of GP clinics
                 </span><br/>
                 <span style="color:#78909c;font-size:10px">Data confidence: ${escapeHtml(props.confidence)}</span>
               </div>`
@@ -290,7 +294,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
     <div>
       <SectionHeader
         title="Consolidation Map"
-        helpText="Each dot = one watched ZIP code. Size = practice count. Color = consolidation level (green = mostly independent, red = mostly consolidated). Faded areas = low data confidence."
+        helpText="Each dot = one Chicagoland ZIP code. Size = GP clinic count. Color = documented corporate share of GP clinic locations. Faded areas = low data confidence."
       />
 
       {mapData.length > 0 ? (
@@ -327,7 +331,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
               }}
             />
             <span className="text-[10px] text-[#6B6B60]">30%+</span>
-            <span className="text-[10px] text-[#707064] ml-1">Consolidation % (of total)</span>
+            <span className="text-[10px] text-[#707064] ml-1">Documented corporate % of GP clinics</span>
           </div>
         </>
       ) : (

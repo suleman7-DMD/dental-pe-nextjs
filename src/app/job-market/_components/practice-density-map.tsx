@@ -254,12 +254,12 @@ export function PracticeDensityMap({
 
   // Filter out org_only_npi rows — these are NPI-2 organization registrations with zero
   // individual providers (administrative records, not physical clinics). They appear as
-  // gray dots at fake ZIP-centroid positions and pollute the map. Same for da_unverified —
-  // Data-Axle-only records that could not be verified as operating practices.
+  // gray dots at fake ZIP-centroid positions and pollute the map. Same for
+  // da_unverified and duplicate_location artifacts.
   const filteredPractices = useMemo(
     () =>
       practices.filter(
-        p => p.entity_classification !== 'org_only_npi' && p.entity_classification !== 'da_unverified'
+        p => p.entity_classification !== 'org_only_npi' && p.entity_classification !== 'da_unverified' && p.entity_classification !== 'duplicate_location'
       ),
     [practices]
   )

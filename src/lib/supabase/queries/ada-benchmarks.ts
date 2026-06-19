@@ -18,6 +18,7 @@ export async function getADABenchmarks(supabase: SupabaseClient): Promise<ADABen
     const { data, error } = await supabase
       .from('ada_hpi_benchmarks')
       .select('*')
+      .eq('state', 'IL')
       .order('state', { ascending: true })
       .range(offset, offset + pageSize - 1)
 

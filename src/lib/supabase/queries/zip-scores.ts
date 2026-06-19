@@ -3,11 +3,16 @@ import type { ZipScore } from "../types";
 
 export type { ZipScore };
 
+const PRIMARY_MARKET_STATE = "IL";
+
 export async function getZipScores(
   supabase: SupabaseClient,
   metroArea?: string
 ): Promise<ZipScore[]> {
-  let query = supabase.from("zip_scores").select("*");
+  let query = supabase
+    .from("zip_scores")
+    .select("*")
+    .eq("state", PRIMARY_MARKET_STATE);
 
   if (metroArea) {
     query = query.eq("metro_area", metroArea);
@@ -36,6 +41,7 @@ export async function getSaturationMetrics(
     .select(
       "zip_code, city, total_gp_locations, total_specialist_locations, dld_gp_per_10k, people_per_gp_door, buyable_practice_ratio, corporate_share_pct, market_type, market_type_confidence, metrics_confidence"
     )
+    .eq("state", PRIMARY_MARKET_STATE)
     .in("zip_code", zipCodes);
 
   if (error) throw error;

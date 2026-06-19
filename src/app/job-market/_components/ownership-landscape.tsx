@@ -26,12 +26,11 @@ interface OwnershipLandscapeProps {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips }: OwnershipLandscapeProps) {
-  // ── Filter org_only_npi (NPI-2 admin records) + da_unverified (Data-Axle-only
-  // records that could not be verified as operating practices) ───
+  // ── Filter non-operating / duplicate location artifacts ───
   const filteredPractices = useMemo(
     () =>
       practices.filter(
-        p => p.entity_classification !== 'org_only_npi' && p.entity_classification !== 'da_unverified'
+        p => p.entity_classification !== 'org_only_npi' && p.entity_classification !== 'da_unverified' && p.entity_classification !== 'duplicate_location'
       ),
     [practices]
   )

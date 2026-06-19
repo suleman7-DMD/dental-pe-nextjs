@@ -54,6 +54,13 @@ export const ENTITY_CLASSIFICATIONS: EntityClassificationInfo[] = [
     category: "other",
   },
   {
+    value: "duplicate_location",
+    label: "Duplicate Location",
+    description:
+      "Suite/unit/direction variant of an already counted office, proven by same ZIP, phone, house number, and street core. Excluded from every denominator and map surface.",
+    category: "other",
+  },
+  {
     value: "family_practice",
     label: "Family Practice",
     description:
@@ -194,6 +201,7 @@ export function classifyPractice(
   if (ec === "non_clinical") return "non_clinical";
   if (ec === "org_only_npi") return "unknown";
   if (ec === "da_unverified") return "unknown";
+  if (ec === "duplicate_location") return "unknown";
 
   // Fallback to ownership_status when entity_classification is empty
   if (ec) return "unknown"; // ec is set but unrecognized

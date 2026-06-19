@@ -311,7 +311,7 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             {summary.totalGpLocations && summary.totalGpLocations > 0
               ? 'GP clinics'
               : 'markets'}{' '}
-            across {summary.watchedZips.toLocaleString()} watched ZIP markets
+            across {summary.watchedZips.toLocaleString()} Chicagoland ZIP markets
             <span className="text-[#9C9C90]">
               {' '}— filtered from {summary.totalPractices.toLocaleString()} federal NPI records nationally
             </span>
@@ -439,7 +439,7 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
                 <span className="text-[#1A1A1A] font-medium">
                   {summary.totalGpLocations.toLocaleString()}
                 </span>{' '}
-                GP clinics tracked
+                Chicagoland GP clinics tracked
               </span>
             </>
           )}
@@ -462,7 +462,7 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
             <span className="text-[#1A1A1A] font-medium">
               {summary.watchedZips.toLocaleString()}
             </span>{' '}
-            ZIPs monitored
+            Chicagoland ZIPs monitored
           </span>
           {summary.lastPipelineRun && (
             <>

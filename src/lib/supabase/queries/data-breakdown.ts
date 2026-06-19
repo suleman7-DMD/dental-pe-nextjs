@@ -300,13 +300,14 @@ export async function getWatchedPracticesByDataSource(
   };
 }
 
-/** Block 5: Watched ZIPs by state (IL Chicagoland vs MA Boston). */
+/** Block 5: Primary watched ZIPs by state (Chicagoland only). */
 export async function getWatchedZipsByState(
   supabase: SupabaseClient
 ): Promise<BreakdownBlock> {
   const { data, error } = await supabase
     .from("watched_zips")
-    .select("state, zip_code");
+    .select("state, zip_code")
+    .eq("state", "IL");
   if (error) throw error;
   const byState = new Map<string, number>();
   for (const row of (data as { state: string | null; zip_code: string }[]) ?? []) {
@@ -316,18 +317,18 @@ export async function getWatchedZipsByState(
   const entries = Array.from(byState.entries());
   const segments = entries
     .map(([label, count], i) => ({
-      label: label === "IL" ? "Illinois (Chicagoland)" : label === "MA" ? "Massachusetts (Boston)" : label,
+      label: label === "IL" ? "Illinois (Chicagoland)" : label,
       count,
       color: CHART_COLORWAY[i % CHART_COLORWAY.length],
-      description: label === "IL" ? "269 Chicagoland ZIPs" : label === "MA" ? "21 Boston Metro ZIPs" : `state = ${label}`,
+      description: label === "IL" ? "269 Chicagoland ZIPs" : `state = ${label}`,
     }))
     .sort((a, b) => b.count - a.count);
   const total = segments.reduce((s, x) => s + x.count, 0);
   return {
-    title: "Watched ZIPs by State",
+    title: "Primary Watched ZIPs by State",
     total,
     unit: "ZIPs",
-    source: "watched_zips table grouped by state",
+    source: "watched_zips table WHERE state = 'IL', grouped by state",
     surfacedOn: ["Home", "Job Market location selector", "Warroom scope selector"],
     groupBy: "state",
     segments,
@@ -580,7 +581,7 @@ export async function getPracticeIntelByVerification(
   };
 }
 
-/** Block 12: Watched-ZIP practices by metro (subzone heuristic via zip prefix). */
+/** Block 12: Chicagoland watched-ZIP practices by ZIP prefix. */
 export async function getWatchedPracticesByZipPrefix(
   supabase: SupabaseClient,
   watchedZips: string[]
@@ -611,7 +612,7 @@ export async function getWatchedPracticesByZipPrefix(
     title: "Watched-ZIP Practices by ZIP Prefix",
     total,
     unit: "NPI rows",
-    source: "practices grouped by 3-digit ZIP prefix (Chicagoland 60x/61x, Boston 02x)",
+    source: "practices grouped by 3-digit ZIP prefix (Chicagoland 60x/61x)",
     surfacedOn: ["Subzone selectors across Job Market / Warroom / Launchpad"],
     groupBy: "zip_prefix",
     segments,
@@ -658,14 +659,15 @@ export async function getDataBreakdownBundle(
 ): Promise<DataBreakdownBundle> {
   const { data: zipRows, error: zipErr } = await supabase
     .from("watched_zips")
-    .select("zip_code");
+    .select("zip_code")
+    .eq("state", "IL");
   if (zipErr) throw zipErr;
   const watchedZips = (zipRows as { zip_code: string }[] | null)?.map((r) => r.zip_code) ?? [];
 
   const blockSpecs: Array<{ title: string; fetch: () => Promise<BreakdownBlock> }> = [
     { title: "All Practices (Global Snapshot)", fetch: () => Promise.resolve(getGlobalPracticesSnapshot()) },
     { title: "Watched-ZIP GP Clinic Locations (deduped)", fetch: () => getWatchedLocationsByEntityClass(supabase) },
-    { title: "Watched ZIPs by State", fetch: () => getWatchedZipsByState(supabase) },
+    { title: "Primary Watched ZIPs by State", fetch: () => getWatchedZipsByState(supabase) },
     { title: "Deals by Source", fetch: () => getDealsBySource(supabase) },
     { title: "Deals by Deal Type", fetch: () => getDealsByType(supabase) },
     { title: "Deals by Year", fetch: () => getDealsByYear(supabase) },

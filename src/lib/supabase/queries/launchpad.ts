@@ -286,7 +286,8 @@ async function fetchAllPracticesByZips(
     .filter(
       (row) =>
         row.entity_classification !== "org_only_npi" &&
-        row.entity_classification !== "da_unverified"
+        row.entity_classification !== "da_unverified" &&
+        row.entity_classification !== "duplicate_location"
     )
     .map(practiceLocationToLaunchpadRecord)
 }

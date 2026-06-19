@@ -126,7 +126,7 @@ export function DataBreakdownShell({ bundle, error }: DataBreakdownShellProps) {
           </div>
           <div>
             <div className="text-[10px] font-medium uppercase tracking-wider text-[#9C9C90]">
-              Watched ZIPs
+              Chicagoland ZIPs
             </div>
             <div
               className="text-[20px] font-bold text-[#1A1A1A]"

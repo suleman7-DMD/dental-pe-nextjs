@@ -14,19 +14,29 @@ export async function getRecentChanges(
   const sinceDate = new Date();
   sinceDate.setDate(sinceDate.getDate() - days);
   const sinceDateStr = sinceDate.toISOString().split("T")[0];
+  let effectiveZipCodes = zipCodes?.filter(Boolean) ?? null;
+
+  if (!effectiveZipCodes) {
+    const { data, error } = await supabase
+      .from("watched_zips")
+      .select("zip_code")
+      .eq("state", "IL");
+    if (error) throw error;
+    effectiveZipCodes = (data ?? []).map((row: { zip_code: string }) => row.zip_code);
+  }
 
   // If we have ZIP codes, we need to join through practices
   // Supabase doesn't support cross-table filtering directly in the REST API,
   // so we fetch practice NPIs in the given ZIPs first, then filter changes.
-  if (zipCodes && zipCodes.length > 0) {
+  if (effectiveZipCodes.length > 0) {
     // Paginate NPI query to avoid Supabase 1000-row default limit
     // (watched ZIPs contain 14k+ practices)
     const chunkSize = 100;
     const pageSize = 1000;
     const allNpis: string[] = [];
 
-    for (let i = 0; i < zipCodes.length; i += chunkSize) {
-      const zipChunk = zipCodes.slice(i, i + chunkSize);
+    for (let i = 0; i < effectiveZipCodes.length; i += chunkSize) {
+      const zipChunk = effectiveZipCodes.slice(i, i + chunkSize);
       let offset = 0;
       let hasMore = true;
       while (hasMore) {
@@ -73,16 +83,5 @@ export async function getRecentChanges(
     });
   }
 
-  // No ZIP filter: get all recent changes.
-  // Explicit column list (not *) keeps the query fast and avoids pulling
-  // large text blobs that can cause statement_timeout (57014) in Supabase.
-  const { data, error } = await supabase
-    .from("practice_changes")
-    .select(CHANGE_COLS)
-    .gte("change_date", sinceDateStr)
-    .order("change_date", { ascending: false })
-    .limit(500);
-
-  if (error) throw error;
-  return (data as PracticeChange[]) ?? [];
+  return [];
 }

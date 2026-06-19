@@ -17,7 +17,10 @@ export default async function IntelligencePage() {
     getZipIntel(supabase),
     getPracticeIntel(supabase),
     getIntelStats(supabase),
-    supabase.from('watched_zips').select('zip_code', { count: 'exact', head: true }),
+    supabase
+      .from('watched_zips')
+      .select('zip_code', { count: 'exact', head: true })
+      .eq('state', 'IL'),
   ])
 
   return (

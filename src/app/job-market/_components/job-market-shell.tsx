@@ -124,13 +124,13 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
     let dso_affiliated_count = 0
     const pe_backed_count = 0
     let unknown_count = 0
-    let non_gp_count = 0 // specialist + non_clinical + org_only + da_unverified — outside the GP denominator
+    let non_gp_count = 0 // specialist + non_clinical + org_only + da_unverified + duplicate_location — outside the GP denominator
     let city = ''
 
     for (const p of pList) {
       if (!city && p.city) city = p.city
       const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      if (ec === 'specialist' || ec === 'non_clinical' || ec === 'org_only_npi' || ec === 'da_unverified') {
+      if (ec === 'specialist' || ec === 'non_clinical' || ec === 'org_only_npi' || ec === 'da_unverified' || ec === 'duplicate_location') {
         non_gp_count++
       }
       const category = classifyPractice(p.entity_classification, p.ownership_status)
@@ -276,7 +276,7 @@ function JobMarketShellInner({
   const computeClientKpis = useCallback((allPractices: Practice[]) => {
     const gpPractices = allPractices.filter((p) => {
       const ec = (p.entity_classification ?? '').toLowerCase()
-      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified'
+      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified' && ec !== 'duplicate_location'
     })
     const total_p = gpPractices.length
     let indep_cnt = 0
@@ -353,7 +353,7 @@ function JobMarketShellInner({
         .map(locationPracticeToPractice)
       const practicesForKpis = allPracticesForKpis.filter((p) => {
         const ec = (p.entity_classification ?? '').toLowerCase()
-        return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified'
+        return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified' && ec !== 'duplicate_location'
       })
       const corporate = practicesForKpis.filter((p) => isCorporateClassification(p.entity_classification)).length
       const total_p = practicesForKpis.length

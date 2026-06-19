@@ -134,6 +134,5 @@ export const METRO_CENTERS: Record<string, { lat: number; lon: number; zoom: num
   "Chicago West": { lat: 41.9, lon: -87.9, zoom: 10 },
   "Chicago Far West": { lat: 41.92, lon: -88.3, zoom: 10 },
   "Chicago Far South": { lat: 41.5, lon: -88.1, zoom: 10 },
-  "Boston Metro": { lat: 42.36, lon: -71.1, zoom: 11 },
   "Chicagoland": { lat: 41.8, lon: -87.85, zoom: 9 },
 };

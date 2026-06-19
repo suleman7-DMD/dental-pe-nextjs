@@ -4,6 +4,7 @@ import type { WarroomPracticeRecord } from "@/lib/warroom/signals"
 import { classifyPractice } from "@/lib/constants/entity-classifications"
 
 const PAGE_SIZE = 1000
+const PRIMARY_MARKET_STATE = "IL"
 
 export const PRACTICE_LOCATION_SELECT = [
   "location_id",
@@ -75,6 +76,7 @@ export interface PracticeLocationRecord {
 
 export interface PracticeLocationFetchOptions {
   zips?: string[] | null
+  includeLegacyMarkets?: boolean
   includeResidential?: boolean
   orderBy?: "practice_name" | "city" | "zip" | "buyability_score" | "updated_at"
   ascending?: boolean
@@ -178,7 +180,11 @@ export async function fetchPracticeLocations(
       .from("practice_locations")
       .select(PRACTICE_LOCATION_SELECT)
 
-    if (zips && zips.length > 0) query = query.in("zip", zips)
+    if (zips && zips.length > 0) {
+      query = query.in("zip", zips)
+    } else if (!options.includeLegacyMarkets) {
+      query = query.eq("state", PRIMARY_MARKET_STATE)
+    }
     if (!options.includeResidential) query = query.or("is_likely_residential.eq.false,is_likely_residential.is.null")
 
     query = query.order(options.orderBy ?? "practice_name", {

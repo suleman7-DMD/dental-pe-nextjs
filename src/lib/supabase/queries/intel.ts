@@ -7,6 +7,15 @@ import type {
 
 export type { ZipQualitativeIntel, PracticeIntel, IntelStats };
 
+async function getPrimaryMarketZipCodes(supabase: SupabaseClient): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("watched_zips")
+    .select("zip_code")
+    .eq("state", "IL");
+  if (error) throw error;
+  return (data ?? []).map((row: { zip_code: string }) => row.zip_code);
+}
+
 function timeoutSignal(ms: number): AbortSignal {
   if ("timeout" in AbortSignal && typeof AbortSignal.timeout === "function") {
     return AbortSignal.timeout(ms);
@@ -20,9 +29,13 @@ export async function getZipIntel(
   supabase: SupabaseClient,
   options: { includeSynthetic?: boolean } = {}
 ): Promise<ZipQualitativeIntel[]> {
+  const zipCodes = await getPrimaryMarketZipCodes(supabase);
+  if (zipCodes.length === 0) return [];
+
   const query = supabase
     .from("zip_qualitative_intel")
     .select("*")
+    .in("zip_code", zipCodes)
     .order("zip_code", { ascending: true });
 
   // Default: hide the 287 placeholder rows that were inserted before the
@@ -128,6 +141,16 @@ export async function getPracticeIntelAvailability(
 export async function getIntelStats(
   supabase: SupabaseClient
 ): Promise<IntelStats> {
+  const zipCodes = await getPrimaryMarketZipCodes(supabase);
+  if (zipCodes.length === 0) {
+    return {
+      totalZipsResearched: 0,
+      totalPracticesResearched: 0,
+      avgCostUsd: null,
+      highReadinessCount: 0,
+    };
+  }
+
   // Real ZIP intel only — exclude synthetic placeholders so the "ZIPs researched"
   // KPI on /intelligence reflects bulletproofed coverage, not the 287 stale stubs.
   const [
@@ -138,10 +161,12 @@ export async function getIntelStats(
     supabase
       .from("zip_qualitative_intel")
       .select("zip_code", { count: "exact", head: true })
+      .in("zip_code", zipCodes)
       .eq("is_synthetic", false),
     supabase
       .from("zip_qualitative_intel")
       .select("cost_usd")
+      .in("zip_code", zipCodes)
       .eq("is_synthetic", false)
       .not("cost_usd", "is", null),
     supabase

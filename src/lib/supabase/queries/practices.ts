@@ -13,6 +13,8 @@ import {
   practiceLocationToLaunchpadRecord,
 } from "./practice-locations";
 
+const PRIMARY_MARKET_STATE = "IL";
+
 export async function getPracticesByZips(
   supabase: SupabaseClient,
   zips: string[],
@@ -110,6 +112,14 @@ export async function getPracticeCountsByStatus(
     specQ = specQ.in("zip", zips);
     ncQ = ncQ.in("zip", zips);
     totalQ = totalQ.in("zip", zips);
+  } else {
+    indepQ = indepQ.eq("state", PRIMARY_MARKET_STATE);
+    indepFallbackQ = indepFallbackQ.eq("state", PRIMARY_MARKET_STATE);
+    corpQ = corpQ.eq("state", PRIMARY_MARKET_STATE);
+    corpFallbackQ = corpFallbackQ.eq("state", PRIMARY_MARKET_STATE);
+    specQ = specQ.eq("state", PRIMARY_MARKET_STATE);
+    ncQ = ncQ.eq("state", PRIMARY_MARKET_STATE);
+    totalQ = totalQ.eq("state", PRIMARY_MARKET_STATE);
   }
 
   // Run ALL count queries in parallel
@@ -225,6 +235,7 @@ export async function getPracticeStats(
     const { count: dataAxleCount, error: enrichErr } = await supabase
       .from("practices")
       .select("npi", { count: "exact", head: true })
+      .eq("state", PRIMARY_MARKET_STATE)
       .not("data_axle_import_date", "is", null)
     if (!enrichErr && dataAxleCount !== null) {
       enrichedCount = dataAxleCount
@@ -244,7 +255,8 @@ export async function getPracticeStats(
   try {
     const { data: zipRows, error: zsErr } = await supabase
       .from("zip_scores")
-      .select("total_gp_locations");
+      .select("total_gp_locations")
+      .eq("state", PRIMARY_MARKET_STATE);
     if (zsErr) {
       console.warn("[getPracticeStats] zip_scores fetch failed:", zsErr.message);
     } else if (zipRows) {

@@ -6,6 +6,8 @@ import {
 } from "../../constants/data-snapshot";
 import { fetchPracticeLocations } from "./practice-locations";
 
+const PRIMARY_MARKET_STATE = "IL";
+
 /* ─── Types expected by system page components ───────────────────────── */
 
 export interface SourceCoverage {
@@ -58,7 +60,8 @@ export async function getDataFreshness(
     // Total watched ZIPs
     supabase
       .from("watched_zips")
-      .select("zip_code", { count: "exact", head: true }),
+      .select("zip_code", { count: "exact", head: true })
+      .eq("state", PRIMARY_MARKET_STATE),
 
     // Most recent deal date
     supabase

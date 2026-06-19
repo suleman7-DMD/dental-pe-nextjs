@@ -61,6 +61,7 @@ const TABS = [
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
+const ALL_CHICAGO_SCOPE = 'Chicagoland'
 
 function MarketIntelShellInner({
   initialZipScores,
@@ -87,17 +88,20 @@ function MarketIntelShellInner({
     router.push(url, { scroll: false })
   }
 
-  const [selectedMetro, setSelectedMetro] = useState<string>('All Watched ZIPs')
-  const allMetros = useMemo(() => ['All Watched ZIPs', ...metroAreas], [metroAreas])
+  const [selectedMetro, setSelectedMetro] = useState<string>(ALL_CHICAGO_SCOPE)
+  const allMetros = useMemo(
+    () => [ALL_CHICAGO_SCOPE, ...metroAreas.filter((m) => m !== ALL_CHICAGO_SCOPE)],
+    [metroAreas]
+  )
 
   // Filter zip scores and watched zips by selected metro
   const zipScores = useMemo(() => {
-    if (selectedMetro === 'All Watched ZIPs') return initialZipScores
+    if (selectedMetro === ALL_CHICAGO_SCOPE) return initialZipScores
     return initialZipScores.filter(z => z.metro_area === selectedMetro)
   }, [initialZipScores, selectedMetro])
 
   const watchedZips = useMemo(() => {
-    if (selectedMetro === 'All Watched ZIPs') return initialWatchedZips
+    if (selectedMetro === ALL_CHICAGO_SCOPE) return initialWatchedZips
     return initialWatchedZips.filter(z => z.metro_area === selectedMetro)
   }, [initialWatchedZips, selectedMetro])
 
@@ -112,7 +116,7 @@ function MarketIntelShellInner({
       .filter((v): v is number => v != null && !isNaN(v))
       .reduce((a, b) => a + b, 0)
 
-    if (selectedMetro === 'All Watched ZIPs') {
+    if (selectedMetro === ALL_CHICAGO_SCOPE) {
       const { total, corporate, corporateHighConf, independent } = classificationCounts
       if (total === 0) return null
       // GP-relative denominator — matches the canonical corporate_share headline
@@ -194,8 +198,8 @@ function MarketIntelShellInner({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Market Intelligence</h1>
           <p className="text-[#6B6B60] mt-1 text-sm">
-            Drill into your watched neighborhoods to see who owns what, which practices are
-            independent, and where consolidation is happening.
+            Drill into Chicagoland ZIPs to see who owns what, which GP offices are
+            independent, and where documented consolidation is happening.
           </p>
         </div>
 
@@ -225,10 +229,10 @@ function MarketIntelShellInner({
           </span>
         </div>
 
-        {/* Metro area selector */}
+        {/* Market selector */}
         <div className="flex items-center gap-3">
           <label className="text-[0.78rem] text-[#6B6B60] uppercase tracking-wider font-medium">
-            Metro Area
+            Market
           </label>
           <select
             value={selectedMetro}
