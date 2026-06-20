@@ -543,7 +543,7 @@ export function ZipDossierDrawer({
               <span>
                 ZIP {zipCode} dossier —{" "}
                 {gpLocations != null
-                  ? `${formatNumber(gpLocations)} GP locations`
+                  ? `${formatNumber(gpLocations)} GP offices`
                   : "GP count unavailable"}
                 {population != null
                   ? ` · ${formatNumber(population)} residents`
@@ -901,24 +901,9 @@ export function ZipDossierDrawer({
                   Supply &amp; demand
                 </p>
                 <DetailRow
-                  label="Total practices"
-                  value={
-                    zipScore?.total_practices != null
-                      ? formatNumber(zipScore.total_practices)
-                      : null
-                  }
-                />
-                <DetailRow
-                  label="GP locations"
+                  label="GP offices"
                   value={gpLocations != null ? formatNumber(gpLocations) : null}
-                />
-                <DetailRow
-                  label="Specialist locations"
-                  value={
-                    zipScore?.total_specialist_locations != null
-                      ? formatNumber(zipScore.total_specialist_locations)
-                      : null
-                  }
+                  hint="Directory denominator; specialists/non-clinical rows excluded"
                 />
                 <DetailRow
                   label="People / GP door"

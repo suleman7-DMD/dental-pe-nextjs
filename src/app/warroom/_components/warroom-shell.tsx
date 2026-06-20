@@ -239,7 +239,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
     return false
   }, [activeIntent])
 
-  const rankLimit = useMemo(() => activeIntent?.filter.limit ?? 40, [activeIntent])
+  const rankLimit = useMemo(() => activeIntent?.filter.limit ?? 5000, [activeIntent])
 
   const {
     stages: lifecycleStages,
@@ -632,7 +632,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                   </span>
                   {rankedTargets.length > 0 && (
                     <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
-                      {rankedTargets.length} ranked
+                      {rankedTargets.length.toLocaleString()} GP offices ranked
                     </span>
                   )}
                 </div>

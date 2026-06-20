@@ -48,23 +48,17 @@ export default async function JobMarketPage() {
       }),
     ])
 
-    const locations = await fetchPracticeLocations(supabase, { zips: defaultZips })
+    const locations = await fetchPracticeLocations(supabase, { zips: defaultZips, gpOnly: true })
     const latestUpdate = locations
       .map((p) => p.updated_at)
       .filter((v): v is string => Boolean(v))
       .sort()
       .pop() ?? null
 
-    // GP-filtered subset for KPI computation: exclude specialist, non_clinical,
-    // org_only_npi, da_unverified, and duplicate_location rows. These inflate the denominator by ~26%
-    // and make Independent % read 68.6% when the GP-scoped reality is ~92.7%.
-    // da_unverified = Data-Axle-only records (synthetic DA_ NPIs) that could not
-    // be verified as operating practices (2026-06-12 junk purge). The full
-    // `locations` array is still available for the freshness bar.
-    const gpLocations = locations.filter((p) => {
-      const ec = (p.entity_classification ?? '').toLowerCase()
-      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified' && ec !== 'duplicate_location'
-    })
+    // Canonical GP-only Chicagoland directory feed. The query layer excludes
+    // specialists, non-clinical rows, org-only NPIs, da_unverified records, and
+    // duplicate shells before the page computes KPIs or renders maps/lists.
+    const gpLocations = locations
 
     const locTotalCount = gpLocations.length
     const locIndepCount = gpLocations.filter((p) =>
@@ -76,7 +70,7 @@ export default async function JobMarketPage() {
     const locDsoNationalCount = gpLocations.filter((p) => p.entity_classification === 'dso_national').length
     const locDsoNationalRealCount = gpLocations.filter((p) => p.entity_classification === 'dso_national' && !(DSO_NATIONAL_TAXONOMY_LEAKS as readonly string[]).includes(p.affiliated_dso ?? '')).length
     const locDsoRegionalStrongCount = gpLocations.filter((p) => p.entity_classification === 'dso_regional' && (p.ein || p.parent_company || p.classification_reasoning?.toLowerCase().includes('generic brand') || p.classification_reasoning?.toLowerCase().includes('franchise') || p.classification_reasoning?.toLowerCase().includes('branch'))).length
-    const locDsoSpecialistsCount = locations.filter((p) => p.entity_classification === 'specialist' && (p.ownership_status === 'dso_affiliated' || p.ownership_status === 'pe_backed')).length
+    const locDsoSpecialistsCount = 0
     const locHighVolCount = gpLocations.filter((p) => p.entity_classification === 'solo_high_volume').length
     const locLargeStaffCount = gpLocations.filter((p) => (p.employee_count ?? 0) >= 10).length
     const locRetirementCount = gpLocations.filter((p) =>
@@ -92,8 +86,6 @@ export default async function JobMarketPage() {
     const locDaEnrichedCount = gpLocations.filter((p) => p.data_axle_enriched === true).length
 
     const freshness = {
-      // Use all-location count (not GP-only) so the bar reflects all tracked data
-      // in the selected area, including specialists and non-clinical.
       totalPractices: locations.length,
       daEnriched: locDaEnrichedCount,
       lastUpdated: latestUpdate,

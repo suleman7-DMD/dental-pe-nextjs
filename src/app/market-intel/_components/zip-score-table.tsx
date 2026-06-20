@@ -31,9 +31,8 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
   // saturation metrics are unavailable.
   const rows = useMemo((): ZipScoreRow[] => {
     return zipScores.map(z => {
-      // Total practices — prefer total_practices, fall back to sum of GP + specialist locations
-      const total = z.total_practices ?? ((z.total_gp_locations ?? 0) + (z.total_specialist_locations ?? 0))
-      const gpLoc = z.total_gp_locations ?? total
+      const gpLoc = z.total_gp_locations ?? 0
+      const total = gpLoc
 
       // Corporate count from saturation metrics (entity_classification-based)
       const corporateFromSaturation = z.corporate_share_pct != null && z.total_gp_locations != null
@@ -55,12 +54,8 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
           ? (corporateCount / total) * 100
           : 0
 
-      // Independent % — compute from total minus corporate and specialists
-      const specialistCount = z.total_specialist_locations ?? 0
-      const nonClinicalEtc = total - corporateCount - indepCount - specialistCount
       const indepPct = total > 0 ? (indepCount / total) * 100 : 0
-      // Unknown/other % (specialist + non-clinical + unclassified)
-      const unkPct = total > 0 ? (Math.max(0, nonClinicalEtc + specialistCount) / total) * 100 : 0
+      const unkPct = total > 0 ? (Math.max(0, total - corporateCount - indepCount) / total) * 100 : 0
 
       // Opportunity score — use DB value directly
       const oppScore = z.opportunity_score ?? 0
@@ -95,7 +90,7 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
     { key: 'city', header: 'City' },
     {
       key: 'total_practices',
-      header: 'Total',
+      header: 'GP Offices',
       align: 'right' as const,
     },
     {
@@ -133,7 +128,7 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
     },
     {
       key: 'unknown_pct',
-      header: '% Other',
+      header: '% Unclassified',
       align: 'right' as const,
       render: (v: unknown) => {
         if (typeof v === 'number') return `${v.toFixed(1)}%`

@@ -4,7 +4,11 @@ import {
   fetchPracticeLocations,
   practiceLocationToWarroomRecord,
 } from "./practice-locations";
-import { INDEPENDENT_CLASSIFICATIONS, classifyPractice } from "../../constants/entity-classifications";
+import {
+  GP_LOCATION_CLASSIFICATIONS,
+  INDEPENDENT_CLASSIFICATIONS,
+  classifyPractice,
+} from "../../constants/entity-classifications";
 import {
   DEFAULT_WARROOM_SCOPE,
   getGeoJsonBoundingBox,
@@ -361,6 +365,7 @@ export async function getScopedPractices(
 
   let rows = (await fetchPracticeLocations(supabase, {
     zips: polygon ? null : zipCodes,
+    gpOnly: true,
     orderBy: options.orderBy,
     ascending: options.ascending,
   })).map(practiceLocationToWarroomRecord);
@@ -612,18 +617,15 @@ function basePracticeLocationCountQuery(
   supabase: SupabaseClient,
   zipChunk: string[] | null
 ): CountFilterQuery {
-  // Exclude org_only_npi rows — these are NPI-2 organization-record artifacts
-  // from the location dedup pass that have no standalone clinical meaning.
-  // 584 such rows exist in practice_locations; leaking them inflates KPIs.
-  // Also exclude da_unverified and duplicate_location rows; both stay out of
-  // every denominator and map surface.
+  // Canonical GP-only Sitrep/query universe. This intentionally excludes
+  // specialists, non-clinical rows, org-only NPIs, da_unverified records, and
+  // duplicate shells from every Warroom denominator.
   let query = supabase
     .from("practice_locations")
     .select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false)
-    .neq("entity_classification", "org_only_npi")
-    .neq("entity_classification", "da_unverified")
-    .neq("entity_classification", "duplicate_location") as unknown as CountFilterQuery;
+    .or("is_likely_residential.eq.false,is_likely_residential.is.null")
+    .eq("state", "IL")
+    .in("entity_classification", [...GP_LOCATION_CLASSIFICATIONS]) as unknown as CountFilterQuery;
   if (zipChunk) query = query.in("zip", zipChunk);
   return query;
 }
@@ -736,11 +738,19 @@ async function countScopedDeals(
 }
 
 function averageCorporateShare(zipScores: WarroomZipScoreRecord[]): number | null {
-  const values = zipScores
-    .map((row) => row.corporate_share_pct)
-    .filter((value): value is number => value != null);
-  if (values.length === 0) return null;
-  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+  const totals = zipScores.reduce(
+    (acc, row) => {
+      const gpLocations = row.total_gp_locations ?? 0;
+      if (gpLocations <= 0) return acc;
+      acc.gpLocations += gpLocations;
+      acc.corporateLocations += row.corporate_location_count ?? 0;
+      return acc;
+    },
+    { gpLocations: 0, corporateLocations: 0 }
+  );
+
+  if (totals.gpLocations === 0) return null;
+  return Math.round((totals.corporateLocations / totals.gpLocations) * 1000) / 10;
 }
 
 function dateDaysAgo(days: number): string {
@@ -935,12 +945,7 @@ async function countCorporateHighConfidence(
       .eq("entity_classification", "dso_regional")
       .or("ein.not.is.null,parent_company.not.is.null")
   );
-  const dsoSpecialists = await countPracticeLocationRows(supabase, zipCodes, (query) =>
-    query
-      .eq("entity_classification", "specialist")
-      .in("ownership_status", ["dso_affiliated", "pe_backed"])
-  );
-  return dsoNational + strongRegional + dsoSpecialists;
+  return dsoNational + strongRegional;
 }
 
 async function averageScopedScores(
@@ -949,6 +954,7 @@ async function averageScopedScores(
 ): Promise<{ avgBuyability: number | null; avgOpportunity: number | null }> {
   const buyabilityRows = await fetchPracticeLocations(supabase, {
     zips: zipCodes,
+    gpOnly: true,
     orderBy: "buyability_score",
     ascending: false,
   });

@@ -21,7 +21,7 @@ import type {
   LaunchpadZipScoreRecord,
 } from "@/lib/launchpad/signals"
 
-export const DEFAULT_RANK_LIMIT = 60
+export const DEFAULT_RANK_LIMIT = 5000
 
 /**
  * How many structurally-ranked practices to fetch intel for.
@@ -266,12 +266,9 @@ async function withTimeout<T>(
 
 /**
  * Paginate through address-deduped practice locations in the given ZIP codes.
- * Excludes org_only_npi rows — these are billing-only NPI-2 organization records
- * with no individual provider at the address. classifyPractice("org_only_npi")
- * returns "unknown" and ~584 such rows (10.2% of practice_locations) would
- * inflate totalPracticesInScope without contributing real job targets.
- * Also excludes da_unverified — Data-Axle-only records (synthetic DA_ NPIs, no
- * federal NPI at the address) that could not be verified as operating practices.
+ * Fetches the canonical GP-only directory universe for Launchpad ranking.
+ * Specialists, non-clinical rows, org-only NPIs, da_unverified records, and
+ * duplicate shells are excluded in the shared practice_locations query layer.
  */
 async function fetchAllPracticesByZips(
   supabase: SupabaseClient,
@@ -279,17 +276,11 @@ async function fetchAllPracticesByZips(
 ): Promise<LaunchpadPracticeRecord[]> {
   const rows = await fetchPracticeLocations(supabase, {
     zips: zipCodes,
+    gpOnly: true,
     orderBy: "buyability_score",
     ascending: false,
   })
-  return rows
-    .filter(
-      (row) =>
-        row.entity_classification !== "org_only_npi" &&
-        row.entity_classification !== "da_unverified" &&
-        row.entity_classification !== "duplicate_location"
-    )
-    .map(practiceLocationToLaunchpadRecord)
+  return rows.map(practiceLocationToLaunchpadRecord)
 }
 
 type WatchedZipRow = {

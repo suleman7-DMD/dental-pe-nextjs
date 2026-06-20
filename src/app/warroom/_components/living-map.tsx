@@ -117,6 +117,14 @@ function interpolateColor(from: string, to: string, t: number): string {
   return `rgb(${r}, ${g}, ${b})`
 }
 
+function hashKey(value: string): number {
+  let h = 0
+  for (let i = 0; i < value.length; i += 1) {
+    h = ((h << 5) - h + value.charCodeAt(i)) | 0
+  }
+  return Math.abs(h)
+}
+
 export function LivingMap({
   lens,
   onLensChange,
@@ -173,21 +181,35 @@ export function LivingMap({
 
   const targetsGeoJson: FeatureCollection<Point> = useMemo(() => {
     const features: Feature<Point>[] = rankedTargets
-      .filter((target) => target.latitude != null && target.longitude != null)
-      .slice(0, 150)
-      .map((target) => ({
-        type: "Feature",
-        geometry: {
-          type: "Point",
-          coordinates: [target.longitude ?? 0, target.latitude ?? 0],
-        },
-        properties: {
-          npi: target.npi,
-          name: target.practiceName,
-          score: target.score,
-          tier: target.tier,
-        },
-      }))
+      .map((target): Feature<Point> | null => {
+        let lat = target.latitude
+        let lng = target.longitude
+        let approximate = false
+        if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+          const centroid = target.zip ? ZIP_CENTROIDS[target.zip] : null
+          if (!centroid) return null
+          const h = hashKey(target.npi)
+          lat = centroid[0] + ((h % 10000) / 10000 - 0.5) * 0.025
+          lng = centroid[1] + ((Math.floor(h / 10000) % 10000) / 10000 - 0.5) * 0.025
+          approximate = true
+        }
+        if (lat == null || lng == null) return null
+        return {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [lng, lat],
+          },
+          properties: {
+            npi: target.npi,
+            name: target.practiceName,
+            score: target.score,
+            tier: target.tier,
+            approximate: approximate ? 1 : 0,
+          },
+        }
+      })
+      .filter((feature): feature is Feature<Point> => feature !== null)
     return { type: "FeatureCollection", features }
   }, [rankedTargets])
 
@@ -314,7 +336,12 @@ export function LivingMap({
                     "cool", "#2563EB",
                     "#6B6B60",
                   ],
-                  "circle-opacity": 0.35,
+                  "circle-opacity": [
+                    "case",
+                    ["==", ["get", "approximate"], 1],
+                    0.22,
+                    0.35,
+                  ],
                   "circle-stroke-width": 1,
                   "circle-stroke-color": "#1A1A1A",
                   "circle-stroke-opacity": 0.25,
@@ -343,7 +370,7 @@ export function LivingMap({
             <span className="font-mono text-[#6B6B60]">{computation.format(maxValue)}</span>
           </div>
           <p className="text-[10px] text-[#707064]">
-            {markers.length} ZIPs · {targetsGeoJson.features.length} target pins
+            {formatNumber(markers.length)} ZIPs · {formatNumber(targetsGeoJson.features.length)} target pins
           </p>
         </div>
 

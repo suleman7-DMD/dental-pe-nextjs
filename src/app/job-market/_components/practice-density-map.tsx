@@ -5,7 +5,11 @@ import type mapboxgl from 'mapbox-gl'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { MapContainer } from '@/components/maps/map-container'
 import { ZIP_CENTROIDS } from '@/lib/constants/zip-centroids'
-import { classifyPractice, getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
+import {
+  classifyPractice,
+  getEntityClassificationLabel,
+  isGpLocationClassification,
+} from '@/lib/constants/entity-classifications'
 
 import type { Practice } from '@/lib/types'
 
@@ -252,15 +256,12 @@ export function PracticeDensityMap({
   const [showIndividual, setShowIndividual] = useState(false)
   const [hideUnknown, setHideUnknown] = useState(false)
 
-  // Filter out org_only_npi rows — these are NPI-2 organization registrations with zero
-  // individual providers (administrative records, not physical clinics). They appear as
-  // gray dots at fake ZIP-centroid positions and pollute the map. Same for
-  // da_unverified and duplicate_location artifacts.
+  // Canonical GP-only map layer. This excludes specialists, non-clinical rows,
+  // org-only NPIs, da_unverified records, and duplicate shells even if a caller
+  // accidentally passes the full mixed location table.
   const filteredPractices = useMemo(
     () =>
-      practices.filter(
-        p => p.entity_classification !== 'org_only_npi' && p.entity_classification !== 'da_unverified' && p.entity_classification !== 'duplicate_location'
-      ),
+      practices.filter((p) => isGpLocationClassification(p.entity_classification)),
     [practices]
   )
 
@@ -358,16 +359,6 @@ export function PracticeDensityMap({
     [geocoded]
   )
 
-  const specialistCount = useMemo(
-    () => geocoded.filter((d) => d.status_clean === 'specialist').length,
-    [geocoded]
-  )
-
-  const nonClinicalCount = useMemo(
-    () => geocoded.filter((d) => d.status_clean === 'non_clinical').length,
-    [geocoded]
-  )
-
   // Build deck.gl layer configs
   const layers = useMemo(() => {
     const result: Array<Record<string, unknown>> = []
@@ -452,7 +443,7 @@ export function PracticeDensityMap({
     <div>
       <SectionHeader
         title="Practice Density Map"
-        helpText="Hexagonal density shows practice concentration. Green = independent clusters. Red = consolidated (DSO/PE) clusters. Overlap = competitive markets. Toggle individual dots for detail."
+        helpText="Hexagonal density shows address-deduped general dental practice concentration. Green = independent GP clusters. Red = DSO/PE GP clusters. Toggle individual dots for detail."
       />
 
       {geocoded.length === 0 ? (
@@ -470,7 +461,7 @@ export function PracticeDensityMap({
                 onChange={(e) => setShowIndividual(e.target.checked)}
                 className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
               />
-              Show individual practices
+              Show individual GP offices
             </label>
             <label className="flex items-center gap-2 text-sm text-[#1A1A1A] cursor-pointer">
               <input
@@ -479,7 +470,7 @@ export function PracticeDensityMap({
                 onChange={(e) => setHideUnknown(e.target.checked)}
                 className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
               />
-              Hide unknown practices
+              Hide unclassified rows
             </label>
           </div>
 
@@ -516,11 +507,9 @@ export function PracticeDensityMap({
 
           {/* Summary counts */}
           <p className="text-xs text-[#6B6B60] mt-1">
-            Showing {geocoded.length.toLocaleString()} practices (
+            Showing {geocoded.length.toLocaleString()} GP offices (
             {independentData.length.toLocaleString()} independent,{' '}
             {consolidatedData.length.toLocaleString()} consolidated,{' '}
-            {specialistCount.toLocaleString()} specialist,{' '}
-            {nonClinicalCount.toLocaleString()} non-clinical,{' '}
             {unknownCount.toLocaleString()} unknown)
             {' '}&middot;{' '}
             {geocoded.filter(d => !d.is_approximate).length.toLocaleString()} precise locations,{' '}

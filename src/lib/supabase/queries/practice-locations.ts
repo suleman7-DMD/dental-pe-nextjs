@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type { LaunchpadPracticeRecord } from "@/lib/launchpad/signals"
 import type { WarroomPracticeRecord } from "@/lib/warroom/signals"
-import { classifyPractice } from "@/lib/constants/entity-classifications"
+import {
+  GP_LOCATION_CLASSIFICATIONS,
+  classifyPractice,
+  isGpLocationClassification,
+} from "@/lib/constants/entity-classifications"
 
 const PAGE_SIZE = 1000
 const PRIMARY_MARKET_STATE = "IL"
@@ -78,6 +82,7 @@ export interface PracticeLocationFetchOptions {
   zips?: string[] | null
   includeLegacyMarkets?: boolean
   includeResidential?: boolean
+  gpOnly?: boolean
   orderBy?: "practice_name" | "city" | "zip" | "buyability_score" | "updated_at"
   ascending?: boolean
   maxRows?: number
@@ -182,10 +187,16 @@ export async function fetchPracticeLocations(
 
     if (zips && zips.length > 0) {
       query = query.in("zip", zips)
+      if (!options.includeLegacyMarkets) {
+        query = query.eq("state", PRIMARY_MARKET_STATE)
+      }
     } else if (!options.includeLegacyMarkets) {
       query = query.eq("state", PRIMARY_MARKET_STATE)
     }
     if (!options.includeResidential) query = query.or("is_likely_residential.eq.false,is_likely_residential.is.null")
+    if (options.gpOnly) {
+      query = query.in("entity_classification", [...GP_LOCATION_CLASSIFICATIONS])
+    }
 
     query = query.order(options.orderBy ?? "practice_name", {
       ascending: options.ascending ?? true,
@@ -202,6 +213,17 @@ export async function fetchPracticeLocations(
   }
 
   return options.maxRows == null ? rows : rows.slice(0, options.maxRows)
+}
+
+export async function fetchGpPracticeLocations(
+  supabase: SupabaseClient,
+  options: Omit<PracticeLocationFetchOptions, "gpOnly"> = {}
+): Promise<PracticeLocationRecord[]> {
+  return fetchPracticeLocations(supabase, { ...options, gpOnly: true })
+}
+
+export function isGpPracticeLocation(row: Pick<PracticeLocationRecord, "entity_classification">): boolean {
+  return isGpLocationClassification(row.entity_classification)
 }
 
 export function practiceLocationToLaunchpadRecord(

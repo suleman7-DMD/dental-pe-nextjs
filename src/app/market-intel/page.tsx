@@ -3,10 +3,6 @@ import { getZipScores } from '@/lib/supabase/queries/zip-scores'
 import { getWatchedZips, getDistinctMetroAreas } from '@/lib/supabase/queries/watched-zips'
 import { getADABenchmarks } from '@/lib/supabase/queries/ada-benchmarks'
 import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
-import {
-  GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
-  GLOBAL_PRACTICE_NPI_COUNT,
-} from '@/lib/constants/data-snapshot'
 import { MarketIntelShell } from './_components/market-intel-shell'
 
 export const dynamic = "force-dynamic"
@@ -28,7 +24,7 @@ export default async function MarketIntelPage() {
   ])
 
   const taxonomyLeaks = ['General Dentistry', 'Oral Surgery', 'Orthodontics', 'Periodontics', 'Endodontics', 'Pediatric Dentistry', 'Prosthodontics', 'Dental Hygiene']
-  const locations = await fetchPracticeLocations(supabase)
+  const locations = await fetchPracticeLocations(supabase, { gpOnly: true })
 
   const watchedTotal = locations.length
   const corporateByEC = locations.filter((p) => p.entity_classification === 'dso_regional' || p.entity_classification === 'dso_national').length
@@ -43,23 +39,22 @@ export default async function MarketIntelPage() {
     p.classification_reasoning?.toLowerCase().includes('franchise') ||
     p.classification_reasoning?.toLowerCase().includes('branch')
   )).length
-  const dsoSpecialists = locations.filter((p) => p.entity_classification === 'specialist' && (p.ownership_status === 'dso_affiliated' || p.ownership_status === 'pe_backed')).length
+  const dsoSpecialists = 0
   const latestUpdate = locations
     .map((p) => p.updated_at)
     .filter((v): v is string => Boolean(v))
     .sort()
     .pop() ?? null
 
-  // FIX 4: Per-entity-classification counts for Ownership tab
-  // da_unverified + duplicate_location are shown so the breakdown reconciles
-  // to the total, but never counted corporate/independent.
-  const ecValues = ['solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group','dso_regional','dso_national','specialist','non_clinical','da_unverified','duplicate_location'] as const
+  // GP-only per-entity counts for the Ownership tab. Specialists, non-clinical
+  // rows, da_unverified records, and duplicate shells are deliberately absent.
+  const ecValues = ['solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group','dso_regional','dso_national'] as const
   const entityCounts: Record<string, number> = {}
   ecValues.forEach((ec) => { entityCounts[ec] = locations.filter((p) => p.entity_classification === ec).length })
 
   const freshness = {
-    totalPractices: GLOBAL_PRACTICE_NPI_COUNT,
-    daEnriched: GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
+    totalPractices: watchedTotal,
+    daEnriched: locations.filter((p) => p.data_axle_enriched === true).length,
     lastUpdated: latestUpdate,
   }
 

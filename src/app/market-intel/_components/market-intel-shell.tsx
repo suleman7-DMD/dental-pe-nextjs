@@ -119,20 +119,15 @@ function MarketIntelShellInner({
     if (selectedMetro === ALL_CHICAGO_SCOPE) {
       const { total, corporate, corporateHighConf, independent } = classificationCounts
       if (total === 0) return null
-      // GP-relative denominator — matches the canonical corporate_share headline
-      // (zip_scores.corporate_location_count / total_gp_locations). corporate (dso_*)
-      // and independent (solo_*/family/group) are GP-class ECs that share this
-      // denominator. Specialist + non_clinical locations sit OUTSIDE the GP
-      // denominator and are reported as a separate count, never folded into the %.
       const gpDenom = totalGpLocations > 0 ? totalGpLocations : total
-      const nonGpCount = Math.max(0, total - gpDenom) // specialist + non_clinical + residential
+      const unknownCount = Math.max(0, gpDenom - corporate - independent)
       const highConfPct = (corporateHighConf / gpDenom) * 100
       const allSignalsPct = (corporate / gpDenom) * 100
       return {
         totalP: total,
         totalGpLocations,
         gpDenom,
-        nonGpCount,
+        unknownCount,
         corporateHighConf,
         corporateAll: corporate,
         indepCount: independent,
@@ -142,15 +137,8 @@ function MarketIntelShellInner({
       }
     }
 
-    // For filtered metro, use zip_scores. All corporate/independent shares use
-    // the GP-location denominator so they reconcile with the headline (and with
-    // the All-Watched-ZIPs branch above). Specialist/non-clinical are reported
-    // as a separate count, never inside the corporate/independent %.
     if (zipScores.length === 0) return null
-    const totalP = zipScores.reduce((sum, z) => {
-      const t = z.total_practices ?? ((z.total_gp_locations ?? 0) + (z.total_specialist_locations ?? 0))
-      return sum + t
-    }, 0)
+    const totalP = totalGpLocations
     let corporateCount = 0
     for (const z of zipScores) {
       if (z.corporate_share_pct != null && z.total_gp_locations != null) {
@@ -162,7 +150,7 @@ function MarketIntelShellInner({
     const indepCount = zipScores.reduce((sum, z) => sum + (z.independent_count ?? 0), 0)
     const corporateHighConf = zipScores.reduce((sum, z) => sum + (z.corporate_highconf_count ?? 0), 0)
     const gpDenom = totalGpLocations > 0 ? totalGpLocations : totalP
-    const nonGpCount = Math.max(0, totalP - gpDenom)
+    const unknownCount = Math.max(0, gpDenom - corporateCount - indepCount)
     const allSignalsPct = gpDenom > 0 ? (corporateCount / gpDenom) * 100 : 0
     const highConfPct = gpDenom > 0 ? (corporateHighConf / gpDenom) * 100 : 0
 
@@ -170,7 +158,7 @@ function MarketIntelShellInner({
       totalP,
       totalGpLocations,
       gpDenom,
-      nonGpCount,
+      unknownCount,
       corporateHighConf,
       corporateAll: corporateCount,
       indepCount,
@@ -213,13 +201,13 @@ function MarketIntelShellInner({
           <span className="text-[#6B6B60] text-[0.82rem] font-medium">
             <strong
               className="text-[#1A1A1A]"
-              title="Raw NPI-row count from federal NPPES (all 50 states) — one row per individual dentist AND one per organization. NOT a practice count (the US has ~137k dental practices per BCG; this is ~2.6x inflated). Watched-ZIP clinic counts appear in the KPI cards below."
+              title="Address-deduped Chicagoland GP clinic locations in the 269 watched Illinois ZIPs. Specialists, non-clinical rows, org-only NPIs, and da_unverified artifacts are excluded."
             >
               {freshness.totalPractices.toLocaleString()}
             </strong>{' '}
-            federal NPI records &nbsp;&middot;&nbsp;{' '}
+            GP clinic locations &nbsp;&middot;&nbsp;{' '}
             <strong className="text-[#1A1A1A]">{freshness.daEnriched.toLocaleString()}</strong>{' '}
-            Data Axle enriched
+            Data Axle enriched GP locations
             {freshness.lastUpdated && (
               <>
                 {' '}&nbsp;&middot;&nbsp;{' '}
@@ -260,13 +248,11 @@ function MarketIntelShellInner({
                       : formatNumber(kpis.totalP)
                   }
                   subtitle={
-                    kpis.totalGpLocations > 0 ? (
-                      <span className="text-xs text-[#6B6B60]">
-                        {formatNumber(kpis.totalP)} locations incl. specialists
-                      </span>
-                    ) : undefined
+                    <span className="text-xs text-[#6B6B60]">
+                      Chicagoland GP directory scope
+                    </span>
                   }
-                  tooltip="Headline = GP clinic locations after deduping by address (the honest 'how many clinics' denominator, from zip_scores.total_gp_locations). Subtitle = all address-deduped location records in scope, including specialist, non-clinical, and unverified-record classes that sit outside the GP denominator."
+                  tooltip="Address-deduped general dental clinic locations from zip_scores.total_gp_locations. Specialists, non-clinical records, unverified Data Axle rows, and duplicate shells are excluded from this directory scope."
                 />
                 <KpiCard
                   label="Confirmed Corporate"
@@ -285,9 +271,9 @@ function MarketIntelShellInner({
                   tooltip={`Share of the ${kpis.gpDenom.toLocaleString()} GP clinic locations classified independent (solo, family, small/large group). Uses the same GP denominator as the corporate share.`}
                 />
                 <KpiCard
-                  label="Specialist / Non-clinical"
-                  value={formatNumber(kpis.nonGpCount)}
-                  tooltip="Specialist (ortho/endo/perio/OMS/pedo) + non-clinical (lab/supply/billing) locations. Tracked separately — NOT part of the GP-clinic denominator used for corporate/independent share."
+                  label="Unclassified GP"
+                  value={formatNumber(kpis.unknownCount)}
+                  tooltip="GP directory rows not classified as independent or corporate. This should be zero when the classifier and practice_locations feed are in sync."
                 />
               </div>
 
@@ -302,7 +288,6 @@ function MarketIntelShellInner({
               <p className="text-[#707064] text-xs mt-2">
                 {kpis.gpDenom.toLocaleString()} GP clinic locations: Confirmed corporate {kpis.allSignalsPct.toFixed(1)}% ({kpis.corporateAll.toLocaleString()}) ·
                 Independent {kpis.indepPct.toFixed(1)}% ({kpis.indepCount.toLocaleString()}).
-                Plus {kpis.nonGpCount.toLocaleString()} specialist / non-clinical locations tracked separately.
                 Corporate and independent share use GP clinic locations as the denominator (matches the headline).
               </p>
             </>
@@ -434,7 +419,7 @@ function MarketIntelShellInner({
                     <div className="flex gap-3">
                       <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#C23B3B] mt-1 flex-shrink-0" />
                       <div>
-                        <strong className="text-[#1A1A1A]">High-confidence corporate</strong> -- Real DSO brand matches (dso_national, excluding taxonomy leaks) + dso_regional with EIN/brand/parent company/franchise signals + DSO-owned specialists. Most reliable indicator of actual corporate ownership.
+                        <strong className="text-[#1A1A1A]">High-confidence corporate</strong> -- Real DSO brand matches (dso_national, excluding taxonomy leaks) + dso_regional with EIN/brand/parent company/franchise signals. Most reliable indicator of actual GP corporate ownership.
                       </div>
                     </div>
                     <div className="flex gap-3">
@@ -462,7 +447,7 @@ function MarketIntelShellInner({
                       Entity classification is assigned by the DSO classifier pipeline (Pass 3: <code className="bg-[#F7F7F4] px-1 rounded">classify_entity_types()</code>). Classification uses provider count at address, last name matching, taxonomy codes, corporate signals from Data Axle enrichment, and known DSO brand matching.
                     </p>
                     <p>
-                      <strong>Priority order (first match wins):</strong> non_clinical &rarr; specialist &rarr; dso_national &rarr; corporate signals (dso_regional) &rarr; family_practice &rarr; large_group &rarr; small_group &rarr; solo variants.
+                      <strong>GP directory classes:</strong> dso_national, dso_regional, family_practice, large_group, small_group, and solo variants. Specialist, non-clinical, da_unverified, org-only, and duplicate rows are excluded from the visible GP directory and maps.
                     </p>
                     <p>
                       <strong>Confidence scores</strong> range from 0-100. Higher scores indicate stronger evidence for the classification (e.g., exact DSO brand match = high confidence vs. shared phone number alone = lower confidence).

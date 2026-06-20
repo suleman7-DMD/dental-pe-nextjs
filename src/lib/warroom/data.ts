@@ -35,7 +35,7 @@ import type {
   WarroomZipSignalRecord,
 } from "./signals";
 
-const DEFAULT_RANK_LIMIT = 40;
+const DEFAULT_RANK_LIMIT = 5000;
 const DEFAULT_TOP_SIGNAL_LIMIT = 8;
 
 function stableScopeId(kind: WarroomScopeKind, zipCodes: string[] | null): string {

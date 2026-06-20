@@ -117,7 +117,15 @@ function avoidColor(count: number, maxCount: number): string {
   return AVOID_COLORS[idx]
 }
 
-const PRACTICE_DOT_LIMIT = 250
+const PRACTICE_DOT_LIMIT = 5000
+
+function hashKey(value: string): number {
+  let h = 0
+  for (let i = 0; i < value.length; i += 1) {
+    h = ((h << 5) - h + value.charCodeAt(i)) | 0
+  }
+  return Math.abs(h)
+}
 
 // ---------------------------------------------------------------------------
 // Aggregation types
@@ -141,6 +149,13 @@ interface ZipAggregate {
   topTargets: LaunchpadRankedTarget[]
   /** From zipScore.metrics_confidence */
   metricsConfidence: string | null
+}
+
+interface PracticeMarker {
+  target: LaunchpadRankedTarget
+  lat: number
+  lng: number
+  isApproximate: boolean
 }
 
 function dominantTierOf(counts: Record<LaunchpadTier, number>): LaunchpadTier {
@@ -275,15 +290,39 @@ export function LaunchpadLivingMap({
   // ---------------------------------------------------------------------------
   const practiceMarkers = useMemo(() => {
     return rankedTargets
-      .filter(
-        (t) =>
-          t.practice.latitude != null &&
-          t.practice.longitude != null &&
-          Number.isFinite(t.practice.latitude) &&
-          Number.isFinite(t.practice.longitude)
-      )
+      .map((target): PracticeMarker | null => {
+        const exactLat = target.practice.latitude
+        const exactLng = target.practice.longitude
+        if (
+          exactLat != null &&
+          exactLng != null &&
+          Number.isFinite(exactLat) &&
+          Number.isFinite(exactLng)
+        ) {
+          return { target, lat: exactLat, lng: exactLng, isApproximate: false }
+        }
+
+        const zip = target.practice.zip
+        const centroid = zip ? ZIP_CENTROIDS[zip] : null
+        if (!centroid) return null
+        const h = hashKey(target.npi)
+        const jitterLat = ((h % 10000) / 10000 - 0.5) * 0.025
+        const jitterLng = ((Math.floor(h / 10000) % 10000) / 10000 - 0.5) * 0.025
+        return {
+          target,
+          lat: centroid[0] + jitterLat,
+          lng: centroid[1] + jitterLng,
+          isApproximate: true,
+        }
+      })
+      .filter((marker): marker is PracticeMarker => marker !== null)
       .slice(0, PRACTICE_DOT_LIMIT)
   }, [rankedTargets])
+
+  const precisePracticeMarkers = useMemo(
+    () => practiceMarkers.filter((marker) => !marker.isApproximate).length,
+    [practiceMarkers]
+  )
 
   const maxZipTotal = useMemo(
     () => zipAggregates.reduce((m, z) => Math.max(m, z.total), 0) || 1,
@@ -363,7 +402,7 @@ export function LaunchpadLivingMap({
           <h2 className="text-sm font-semibold text-[#1A1A1A]">Living Map</h2>
           <p className="text-xs text-[#707064]">
             {view === "practices"
-              ? `Top ${practiceMarkers.length.toLocaleString()} practices colored by fit tier`
+              ? `${practiceMarkers.length.toLocaleString()} mapped GP practices colored by fit tier`
               : activeLens === "tier"
                 ? `${zipAggregates.length.toLocaleString()} ZIPs colored by dominant tier · sized by practice count`
                 : activeLens === "mentor_density"
@@ -561,10 +600,8 @@ export function LaunchpadLivingMap({
           })()}
 
           {view === "practices" &&
-            practiceMarkers.map((target) => {
-              const lat = target.practice.latitude
-              const lng = target.practice.longitude
-              if (lat == null || lng == null) return null
+            practiceMarkers.map((marker) => {
+              const target = marker.target
               const selected = selectedNpi === target.npi
               const hovered = hoveredNpi === target.npi
               const color = TIER_COLORS[target.displayTier]
@@ -578,8 +615,8 @@ export function LaunchpadLivingMap({
               return (
                 <Marker
                   key={target.npi}
-                  longitude={lng}
-                  latitude={lat}
+                  longitude={marker.lng}
+                  latitude={marker.lat}
                   anchor="center"
                 >
                   <button
@@ -600,26 +637,24 @@ export function LaunchpadLivingMap({
                       backgroundColor: color,
                       borderColor: "#FFFFFF",
                       borderWidth: 1.5,
-                      opacity: 0.9,
+                      opacity: marker.isApproximate ? 0.55 : 0.9,
                     }}
-                    aria-label={`${getPracticeDisplayName(target.practice)} — score ${Math.round(target.displayScore)}`}
-                    title={`${getPracticeDisplayName(target.practice)} · ${Math.round(target.displayScore)} · ${LAUNCHPAD_TIER_LABELS[target.displayTier]}`}
+                    aria-label={`${getPracticeDisplayName(target.practice)} — score ${Math.round(target.displayScore)}${marker.isApproximate ? " approximate ZIP location" : ""}`}
+                    title={`${getPracticeDisplayName(target.practice)} · ${Math.round(target.displayScore)} · ${LAUNCHPAD_TIER_LABELS[target.displayTier]}${marker.isApproximate ? " · approximate ZIP location" : ""}`}
                   />
                 </Marker>
               )
             })}
 
           {view === "practices" && hoveredNpi && (() => {
-            const hovered = practiceMarkers.find((t) => t.npi === hoveredNpi)
+            const hovered = practiceMarkers.find((marker) => marker.target.npi === hoveredNpi)
             if (!hovered) return null
-            const lat = hovered.practice.latitude
-            const lng = hovered.practice.longitude
-            if (lat == null || lng == null) return null
-            const displayName = getPracticeDisplayName(hovered.practice)
+            const target = hovered.target
+            const displayName = getPracticeDisplayName(target.practice)
             return (
               <Popup
-                longitude={lng}
-                latitude={lat}
+                longitude={hovered.lng}
+                latitude={hovered.lat}
                 anchor="top"
                 closeButton={false}
                 closeOnClick={false}
@@ -630,19 +665,24 @@ export function LaunchpadLivingMap({
                   <p className="text-[#6B6B60]">
                     Score{" "}
                     <span className="font-mono font-semibold text-[#1A1A1A]">
-                      {Math.round(hovered.displayScore)}
+                      {Math.round(target.displayScore)}
                     </span>{" "}
-                    · {LAUNCHPAD_TIER_LABELS[hovered.displayTier]}
+                    · {LAUNCHPAD_TIER_LABELS[target.displayTier]}
                   </p>
-                  {hovered.practice.zip && (
+                  {target.practice.zip && (
                     <p className="text-[#707064]">
-                      ZIP {hovered.practice.zip}
-                      {hovered.practice.city ? ` · ${hovered.practice.city}` : ""}
+                      ZIP {target.practice.zip}
+                      {target.practice.city ? ` · ${target.practice.city}` : ""}
                     </p>
                   )}
-                  {hovered.dsoTier && (
+                  {hovered.isApproximate && (
                     <p className="text-[10px] uppercase tracking-wider text-[#707064]">
-                      {hovered.dsoTier.toUpperCase()} DSO
+                      Approximate ZIP-centroid dot
+                    </p>
+                  )}
+                  {target.dsoTier && (
+                    <p className="text-[10px] uppercase tracking-wider text-[#707064]">
+                      {target.dsoTier.toUpperCase()} DSO
                     </p>
                   )}
                 </div>
@@ -667,7 +707,7 @@ export function LaunchpadLivingMap({
                   {bundle === null
                     ? "Map data unavailable"
                     : view === "practices"
-                      ? "No geocoded practices in scope"
+                      ? "No mappable GP practices in scope"
                       : "No ZIP-level data in scope"}
                 </p>
                 <p className="text-[11px] text-[#6B6B60]">
@@ -755,7 +795,7 @@ export function LaunchpadLivingMap({
           )}
           <p className="text-[10px] text-[#707064]">
             {view === "practices"
-              ? `Showing up to ${PRACTICE_DOT_LIMIT} geocoded practices`
+              ? `Showing ${practiceMarkers.length.toLocaleString()} mapped GP practices (${precisePracticeMarkers.toLocaleString()} precise, ${(practiceMarkers.length - precisePracticeMarkers).toLocaleString()} ZIP-estimated)`
               : `${zipAggregates.length} ZIPs with ranked targets`}
           </p>
         </div>

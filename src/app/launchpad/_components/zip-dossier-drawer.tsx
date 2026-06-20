@@ -240,10 +240,10 @@ export function LaunchpadZipDossierDrawer({
             <SheetDescription className="mt-1 flex items-center gap-1.5 text-[12px] text-[#6B6B60]">
               <MapPin className="h-3.5 w-3.5 text-[#707064]" aria-hidden="true" />
               <span>
-                ZIP {zipCode} · {totalInZip} ranked{" "}
+                ZIP {zipCode} · {totalInZip} ranked GP{" "}
                 {totalInZip === 1 ? "practice" : "practices"}
                 {gpLocations != null
-                  ? ` · ${formatNumber(gpLocations)} GP locations`
+                  ? ` · ${formatNumber(gpLocations)} GP offices`
                   : ""}
               </span>
             </SheetDescription>
@@ -329,7 +329,7 @@ export function LaunchpadZipDossierDrawer({
                 <StatBlock
                   label="People / GP door"
                   value={peoplePerDoor != null ? formatNumber(peoplePerDoor) : "—"}
-                  subtitle="Population / GP locations"
+                  subtitle="Population / GP offices"
                   accent="#0D9488"
                 />
                 <StatBlock
@@ -384,24 +384,9 @@ export function LaunchpadZipDossierDrawer({
                   value={medianIncome != null ? formatCurrency(medianIncome) : null}
                 />
                 <DetailRow
-                  label="Total practices"
-                  value={
-                    zipScore?.total_practices != null
-                      ? formatNumber(zipScore.total_practices)
-                      : null
-                  }
-                />
-                <DetailRow
-                  label="GP locations"
+                  label="GP offices"
                   value={gpLocations != null ? formatNumber(gpLocations) : null}
-                />
-                <DetailRow
-                  label="Specialist locations"
-                  value={
-                    zipScore?.total_specialist_locations != null
-                      ? formatNumber(zipScore.total_specialist_locations)
-                      : null
-                  }
+                  hint="Directory denominator; specialists/non-clinical rows excluded"
                 />
               </div>
 

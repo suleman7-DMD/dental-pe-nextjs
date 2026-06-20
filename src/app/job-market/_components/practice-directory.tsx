@@ -237,6 +237,10 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     setSelectedSources(['All'])
   }, [practices.length])
 
+  useEffect(() => {
+    setPage(1)
+  }, [activeView, searchTerm, selectedStatuses, selectedSources, sortBy])
+
   const withDisplayName = useMemo(
     () =>
       practices.map((p) => ({
@@ -387,8 +391,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   return (
     <div>
       <SectionHeader
-        title="Practice Directory"
-        helpText="Browse and search all practices in the commutable zone. Use the dual-lens tabs to focus on employment opportunities or ownership pipeline targets."
+        title="GP Practice Directory"
+        helpText="Browse and search address-deduped general dental practices in the selected Chicagoland scope. Specialists, non-clinical records, duplicate shells, and unverified Data Axle rows are excluded."
       />
 
       {/* Search & Filters */}
@@ -439,7 +443,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         {/* Results count */}
         <div className="text-sm text-[#B8860B]">
           Showing <strong>{filtered.length.toLocaleString()}</strong> of{' '}
-          <strong>{totalPractices.toLocaleString()}</strong> practices |{' '}
+          <strong>{totalPractices.toLocaleString()}</strong> GP offices |{' '}
           <strong>{filteredEnriched.toLocaleString()}</strong> enriched by Data Axle
         </div>
       </div>
@@ -450,12 +454,12 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
           <TabsTrigger value="employment">Employment Opportunities</TabsTrigger>
           <TabsTrigger value="ownership">Ownership Pipeline</TabsTrigger>
           <TabsTrigger value="enriched">Enriched Practices (Data Axle)</TabsTrigger>
-          <TabsTrigger value="all">All Practices</TabsTrigger>
+          <TabsTrigger value="all">All GP Offices</TabsTrigger>
         </TabsList>
 
         <TabsContent value="employment">
           <p className="text-sm text-[#6B6B60] mb-2">
-            Practices with high patient volume that are likely hiring associates.
+            GP offices with high patient volume that are likely hiring associates.
           </p>
           {lowEnrichmentNote && (
             <p className="text-xs text-[#D4920B] mb-2">Warning: {lowEnrichmentNote}</p>
@@ -473,7 +477,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
                 rowKey="npi"
               />
               <p className="text-xs text-[#6B6B60] mt-2">
-                {employmentPractices.length} practices match employment criteria
+              {employmentPractices.length} GP offices match employment criteria
               </p>
               <Pagination
                 total={employmentPractices.length}
@@ -487,7 +491,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
         <TabsContent value="ownership">
           <p className="text-sm text-[#6B6B60] mb-2">
-            Independent practices with indicators suggesting the owner may be approaching transition.
+            Independent GP offices with indicators suggesting the owner may be approaching transition.
           </p>
           {lowEnrichmentNote && (
             <p className="text-xs text-[#D4920B] mb-2">Warning: {lowEnrichmentNote}</p>
@@ -505,7 +509,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
                 rowKey="npi"
               />
               <p className="text-xs text-[#6B6B60] mt-2">
-                {ownershipPractices.length} practices match ownership pipeline criteria
+              {ownershipPractices.length} GP offices match ownership pipeline criteria
               </p>
               <Pagination
                 total={ownershipPractices.length}
@@ -520,14 +524,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <TabsContent value="enriched">
           {enrichedPractices.length === 0 ? (
             <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-              No Data Axle-enriched practices match the current filters.
+              No Data Axle-enriched GP offices match the current filters.
             </div>
           ) : (
             <>
               {enrichedPractices.length > 500 && (
                 <p className="text-xs text-[#B8860B] mb-2">
-                  Showing first 500 of {enrichedPractices.length.toLocaleString()} enriched
-                  practices. Download CSV for full list.
+                  Showing page {page} of {Math.ceil(enrichedPractices.length / PAGE_SIZE)} for{' '}
+                  {enrichedPractices.length.toLocaleString()} enriched GP offices. Download CSV for full list.
                 </p>
               )}
               <DataTable
@@ -549,14 +553,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <TabsContent value="all">
           {filtered.length === 0 ? (
             <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-              No practices match the current filters.
+              No GP offices match the current filters.
             </div>
           ) : (
             <>
               {filtered.length > 500 && (
                 <p className="text-xs text-[#B8860B] mb-2">
-                  Showing first 500 of {filtered.length.toLocaleString()} practices. Download CSV
-                  for full list.
+                  Showing page {page} of {Math.ceil(filtered.length / PAGE_SIZE)} for{' '}
+                  {filtered.length.toLocaleString()} GP offices. Download CSV for full list.
                 </p>
               )}
               <DataTable
@@ -583,7 +587,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
           className="inline-flex items-center gap-2 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-4 py-2 text-sm text-[#1A1A1A] hover:border-[#D4D0C8] hover:bg-[#F7F7F4] transition-colors"
         >
           <Download className="h-4 w-4" />
-          Download filtered practices (CSV)
+          Download filtered GP offices (CSV)
         </button>
       </div>
 

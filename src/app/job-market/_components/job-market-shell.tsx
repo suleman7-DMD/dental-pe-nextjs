@@ -247,6 +247,7 @@ function JobMarketShellInner({
       try {
         const locations = await fetchPracticeLocations(supabase, {
           zips: zipList,
+          gpOnly: true,
           orderBy: 'practice_name',
           ascending: true,
         })
@@ -285,7 +286,6 @@ function JobMarketShellInner({
     let unk_cnt = 0
     let dsoNationalReal = 0
     let dsoRegionalStrong = 0
-    let dsoSpecialists = 0
     let highVolCount = 0
     let large_count = 0
     let retirement_risk = 0
@@ -319,22 +319,13 @@ function JobMarketShellInner({
       if (!isNaN(yr) && yr < currentYear - 30 && isIndep) retirement_risk++
     }
 
-    // DSO-owned specialists counted from full set (not GP-filtered)
-    for (const p of allPractices) {
-      const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      if (ec === 'specialist') {
-        const os = (p.ownership_status ?? '').trim().toLowerCase()
-        if (os === 'dso_affiliated' || os === 'pe_backed') dsoSpecialists++
-      }
-    }
-
     setClientKpis({
       total_p,
       indep_cnt,
       dso_cnt,
       pe_cnt,
       unk_cnt,
-      highConfCorporate: dsoNationalReal + dsoRegionalStrong + dsoSpecialists,
+      highConfCorporate: dsoNationalReal + dsoRegionalStrong,
       allSignalsCorporate: dso_cnt + pe_cnt,
       large_count,
       retirement_risk,
@@ -348,7 +339,7 @@ function JobMarketShellInner({
     if (zipList.length === 0) return
 
     try {
-      const allPracticesForKpis = (await fetchPracticeLocations(supabase, { zips: zipList }))
+      const allPracticesForKpis = (await fetchPracticeLocations(supabase, { zips: zipList, gpOnly: true }))
         .map(practiceLocationToLaunchpadRecord)
         .map(locationPracticeToPractice)
       const practicesForKpis = allPracticesForKpis.filter((p) => {
@@ -367,10 +358,9 @@ function JobMarketShellInner({
       ).length
       const hvCount = practicesForKpis.filter((p) => p.entity_classification === 'solo_high_volume').length
 
-      // Compute highConfCorporate from GP-filtered set + DSO-owned specialists from full set
+      // Compute highConfCorporate from the canonical GP-only directory set.
       let dsoNationalReal = 0
       let dsoRegionalStrong = 0
-      let dsoSpecialists = 0
       for (const p of practicesForKpis) {
         const ec = (p.entity_classification ?? '').trim().toLowerCase()
         if (ec === 'dso_national') {
@@ -386,13 +376,6 @@ function JobMarketShellInner({
           }
         }
       }
-      for (const p of allPracticesForKpis) {
-        const ec = (p.entity_classification ?? '').trim().toLowerCase()
-        if (ec === 'specialist') {
-          const os = (p.ownership_status ?? '').trim().toLowerCase()
-          if (os === 'dso_affiliated' || os === 'pe_backed') dsoSpecialists++
-        }
-      }
 
       setClientKpis({
         total_p,
@@ -400,7 +383,7 @@ function JobMarketShellInner({
         dso_cnt: corporate,
         pe_cnt: 0,
         unk_cnt: Math.max(0, total_p - corporate - indep_cnt),
-        highConfCorporate: dsoNationalReal + dsoRegionalStrong + dsoSpecialists,
+        highConfCorporate: dsoNationalReal + dsoRegionalStrong,
         allSignalsCorporate: corporate,
         large_count: largeStaffCount,
         retirement_risk: retireCount,

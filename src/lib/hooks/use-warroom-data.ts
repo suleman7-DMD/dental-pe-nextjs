@@ -12,6 +12,7 @@ import { DEFAULT_WARROOM_LENS, type WarroomLens } from "../warroom/mode";
 import type { WarroomIntentFilter, WarroomSitrepBundle } from "../warroom/signals";
 
 const SITREP_BUNDLE_KEY = "warroom-sitrep";
+const DEFAULT_DIRECTORY_RANK_LIMIT = 5000;
 
 export interface UseWarroomDataOptions {
   scope?: WarroomScopeInput;
@@ -73,7 +74,7 @@ function buildQueryKey(options: UseWarroomDataOptions): readonly unknown[] {
     SITREP_BUNDLE_KEY,
     serializeScope(options.scope),
     options.lens ?? DEFAULT_WARROOM_LENS,
-    options.rankLimit ?? 40,
+    options.rankLimit ?? DEFAULT_DIRECTORY_RANK_LIMIT,
     options.topSignalLimit ?? 8,
     options.requireFlags?.slice().sort().join("|") ?? "",
     options.excludeFlags?.slice().sort().join("|") ?? "",
@@ -115,7 +116,7 @@ export function useWarroomData(options: UseWarroomDataOptions = {}): UseWarroomD
     const initialKey = buildQueryKey({
       scope: options.initialDataScope ?? DEFAULT_WARROOM_SCOPE,
       lens: options.initialDataLens ?? DEFAULT_WARROOM_LENS,
-      rankLimit: 40,
+      rankLimit: DEFAULT_DIRECTORY_RANK_LIMIT,
       topSignalLimit: 8,
       excludeCorporate: false,
       confidence: "all",

@@ -63,6 +63,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
     const supabase = createBrowserClient()
     const all: Practice[] = (await fetchPracticeLocations(supabase, {
       zips: zipList,
+      gpOnly: true,
       orderBy: 'practice_name',
       ascending: true,
     })).map((row) => ({
@@ -106,8 +107,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
         for (const zip of zips) {
           const zs = zipScoreMap.get(zip)
           if (zs) {
-            const zipTotal = zs.total_practices
-              ?? ((zs.total_gp_locations ?? 0) + (zs.total_specialist_locations ?? 0))
+            const zipTotal = zs.total_gp_locations ?? 0
             total += zipTotal
             // Corporate count: prefer saturation metric (corporate_share_pct * GP locations)
             const corpFromSat = zs.corporate_share_pct != null && zs.total_gp_locations != null
@@ -115,11 +115,10 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
               : null
             const corpCount = corpFromSat ?? ((zs.dso_affiliated_count ?? 0) + (zs.pe_backed_count ?? 0))
             dso += corpCount
-            // Independent count: prefer DB value, else estimate from total minus corporate minus specialist
-            const specCount = zs.total_specialist_locations ?? 0
+            // Independent count: prefer DB value, else estimate from total minus corporate.
             const indepFromDb = zs.independent_count != null && zs.independent_count > 0
               ? zs.independent_count
-              : Math.max(0, zipTotal - corpCount - specCount)
+              : Math.max(0, zipTotal - corpCount)
             independent += indepFromDb
             pe += 0  // PE is folded into corporate count from saturation metrics
           }
@@ -193,7 +192,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
     <div>
       <SectionHeader
         title="Practice Detail by City"
-        helpText="Practices grouped by city, then by ZIP code. Expand a city to see its ZIP codes, then expand a ZIP to see every practice. Green = independent, Yellow = DSO-affiliated, Red = PE-backed."
+        helpText="Address-deduped general dental practices grouped by city and ZIP. Specialists, non-clinical records, unverified Data Axle rows, and duplicate shells are excluded."
       />
 
       <div className="mt-4 space-y-1">
@@ -217,7 +216,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                 </svg>
                 <span className="text-sm font-medium text-[#1A1A1A]">{cg.cityName}</span>
                 <span className="text-xs text-[#6B6B60]">
-                  {cg.total} practices across {cg.zips.length} ZIP{cg.zips.length > 1 ? 's' : ''}
+                  {cg.total} GP offices across {cg.zips.length} ZIP{cg.zips.length > 1 ? 's' : ''}
                 </span>
                 <div className="ml-auto flex items-center gap-3 text-xs">
                   <span className="text-[#2D8B4E]">{cg.independent} indep.</span>
@@ -240,7 +239,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                         <div className="grid grid-cols-4 gap-3 px-4 py-3 bg-[#FAFAF7]/50">
                           <div className="text-center">
                             <div className="text-lg font-mono font-semibold text-[#1A1A1A]">{cg.total}</div>
-                            <div className="text-[0.7rem] text-[#6B6B60]">Total</div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">GP Offices</div>
                           </div>
                           <div className="text-center">
                             <div className="text-lg font-mono font-semibold text-[#2D8B4E]">{cg.independent}</div>
@@ -270,8 +269,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                         // Use zip_scores count before practices are loaded
                         const zipPracticeCount = loaded
                           ? zipPractices.length
-                          : (zipScore?.total_practices
-                              ?? ((zipScore?.total_gp_locations ?? 0) + (zipScore?.total_specialist_locations ?? 0)))
+                          : (zipScore?.total_gp_locations ?? 0)
 
                         return (
                           <div key={zip} className="border-t border-[#E8E5DE]/50">
@@ -289,14 +287,14 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                               </svg>
                               <span className="text-[0.82rem] text-[#1A1A1A]">{zip}</span>
                               <span className="text-xs text-[#6B6B60]">
-                                {zipPracticeCount} practices{scoreTag}
+                                {zipPracticeCount} GP offices{scoreTag}
                               </span>
                             </button>
 
                             {zipIsExpanded && (
                               <div className="px-6 pb-3">
                                 {zipPractices.length === 0 ? (
-                                  <div className="text-sm text-[#6B6B60] py-2">No practices in this ZIP.</div>
+                                  <div className="text-sm text-[#6B6B60] py-2">No GP offices in this ZIP.</div>
                                 ) : (
                                   <table className="w-full text-[0.78rem]">
                                     <thead>

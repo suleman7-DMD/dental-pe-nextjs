@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ChevronDown, ChevronRight, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { exportToCsv } from "@/lib/utils/csv-export"
@@ -39,6 +39,7 @@ const DEFAULT_EXPANDED_TIERS: ReadonlySet<LaunchpadTier> = new Set<LaunchpadTier
   "best_fit",
   "strong",
 ])
+const PAGE_SIZE = 100
 
 function exportRankedCsv(targets: LaunchpadRankedTarget[], track: LaunchpadTrack) {
   const rows = targets.map((t) => ({
@@ -87,6 +88,7 @@ export function TrackList({
   const [expandedTiers, setExpandedTiers] = useState<Set<LaunchpadTier>>(
     () => new Set(DEFAULT_EXPANDED_TIERS)
   )
+  const [page, setPage] = useState(1)
   const pinnedSet = useMemo(() => new Set(pinnedNpis ?? []), [pinnedNpis])
 
   const rankedTargets = useMemo(
@@ -94,7 +96,18 @@ export function TrackList({
     [bundle]
   )
 
-  const grouped = useMemo(() => {
+  useEffect(() => {
+    setPage(1)
+  }, [rankedTargets.length, track])
+
+  const totalPages = Math.max(1, Math.ceil(rankedTargets.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paginatedTargets = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE
+    return rankedTargets.slice(start, start + PAGE_SIZE)
+  }, [rankedTargets, safePage])
+
+  const totalGrouped = useMemo(() => {
     const map = new Map<LaunchpadTier, LaunchpadRankedTarget[]>()
     for (const tier of LAUNCHPAD_TIERS) {
       map.set(tier, [])
@@ -105,6 +118,18 @@ export function TrackList({
     }
     return map
   }, [rankedTargets])
+
+  const grouped = useMemo(() => {
+    const map = new Map<LaunchpadTier, LaunchpadRankedTarget[]>()
+    for (const tier of LAUNCHPAD_TIERS) {
+      map.set(tier, [])
+    }
+    for (const target of paginatedTargets) {
+      const group = map.get(target.displayTier)
+      if (group) group.push(target)
+    }
+    return map
+  }, [paginatedTargets])
 
   const toggleTier = (tier: LaunchpadTier) => {
     setExpandedTiers((current) => {
@@ -123,16 +148,16 @@ export function TrackList({
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E8E5DE] px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-[#1A1A1A]">
-            Ranked practices
+            Ranked GP practices
             <span className="ml-2 rounded-md bg-[#F7F7F4] px-1.5 py-0.5 text-[11px] font-medium text-[#6B6B60]">
-              {rankedTargets.length} total
+              {rankedTargets.length.toLocaleString()} total
             </span>
           </h2>
           {rankedTargets.length > 0 && (
             <p className="text-xs text-[#707064]">
               Top score {Math.round(rankedTargets[0]?.displayScore ?? 0)} ·{" "}
-              {(grouped.get("best_fit") ?? []).length} best-fit ·{" "}
-              {(grouped.get("strong") ?? []).length} strong
+              {(totalGrouped.get("best_fit") ?? []).length.toLocaleString()} best-fit ·{" "}
+              {(totalGrouped.get("strong") ?? []).length.toLocaleString()} strong
             </p>
           )}
         </div>
@@ -149,7 +174,7 @@ export function TrackList({
 
       {rankedTargets.length === 0 ? (
         <div className="px-4 py-12 text-center text-sm text-[#6B6B60]">
-          No practices loaded yet — select a living location above.
+          No GP practices loaded yet — select a living location above.
         </div>
       ) : (
         <div className="max-h-[800px] overflow-y-auto">
@@ -183,7 +208,7 @@ export function TrackList({
                       {LAUNCHPAD_TIER_LABELS[tier]}
                     </span>
                     <span className="rounded-full bg-[#F7F7F4] px-2 py-0.5 text-[11px] font-medium text-[#6B6B60]">
-                      {items.length}
+                      {(totalGrouped.get(tier) ?? []).length.toLocaleString()}
                     </span>
                   </div>
                 </button>
@@ -208,6 +233,36 @@ export function TrackList({
               </div>
             )
           })}
+          {rankedTargets.length > PAGE_SIZE && (
+            <div className="flex items-center justify-between border-t border-[#E8E5DE] px-4 py-3 text-xs text-[#6B6B60]">
+              <span>
+                Showing {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}-
+                {Math.min(safePage * PAGE_SIZE, rankedTargets.length).toLocaleString()} of{' '}
+                {rankedTargets.length.toLocaleString()} GP practices
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={safePage <= 1}
+                  className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 py-1 text-[#1A1A1A] disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {safePage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={safePage >= totalPages}
+                  className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 py-1 text-[#1A1A1A] disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>

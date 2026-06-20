@@ -1,13 +1,11 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { Practice, PracticeStats } from "../types";
 import {
+  GP_LOCATION_CLASSIFICATIONS,
   INDEPENDENT_CLASSIFICATIONS,
   DSO_NATIONAL_TAXONOMY_LEAKS,
 } from "../../constants/entity-classifications";
-import {
-  GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT,
-  GLOBAL_PRACTICE_NPI_COUNT,
-} from "../../constants/data-snapshot";
+import { GLOBAL_PRACTICE_NPI_COUNT } from "../../constants/data-snapshot";
 import {
   fetchPracticeLocations,
   practiceLocationToLaunchpadRecord,
@@ -77,70 +75,41 @@ export async function getPracticeCountsByStatus(
   supabase: SupabaseClient,
   zips?: string[]
 ): Promise<Record<string, number>> {
-  // Use entity_classification as PRIMARY field for ownership counts,
-  // with ownership_status as fallback only when entity_classification is null.
-  // Sourced from practice_locations (address-deduped, non-residential).
+  // GP-only counts from practice_locations (address-deduped, non-residential).
 
   // Build all queries first, then run in parallel
   let indepQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false)
+    .or("is_likely_residential.eq.false,is_likely_residential.is.null")
+    .eq("state", PRIMARY_MARKET_STATE)
     .in("entity_classification", [...INDEPENDENT_CLASSIFICATIONS]);
-  let indepFallbackQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false)
-    .is("entity_classification", null).in("ownership_status", ["independent", "likely_independent"]);
   let corpQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false)
+    .or("is_likely_residential.eq.false,is_likely_residential.is.null")
+    .eq("state", PRIMARY_MARKET_STATE)
     .in("entity_classification", ["dso_regional", "dso_national"]);
-  let corpFallbackQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false)
-    .is("entity_classification", null).in("ownership_status", ["dso_affiliated", "pe_backed"]);
-  let specQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false)
-    .eq("entity_classification", "specialist");
-  let ncQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false)
-    .eq("entity_classification", "non_clinical");
   let totalQ = supabase.from("practice_locations").select("location_id", { count: "exact", head: true })
-    .eq("is_likely_residential", false);
+    .or("is_likely_residential.eq.false,is_likely_residential.is.null")
+    .eq("state", PRIMARY_MARKET_STATE)
+    .in("entity_classification", [...GP_LOCATION_CLASSIFICATIONS]);
 
   // Apply ZIP filter if provided
   if (zips && zips.length > 0) {
     indepQ = indepQ.in("zip", zips);
-    indepFallbackQ = indepFallbackQ.in("zip", zips);
     corpQ = corpQ.in("zip", zips);
-    corpFallbackQ = corpFallbackQ.in("zip", zips);
-    specQ = specQ.in("zip", zips);
-    ncQ = ncQ.in("zip", zips);
     totalQ = totalQ.in("zip", zips);
-  } else {
-    indepQ = indepQ.eq("state", PRIMARY_MARKET_STATE);
-    indepFallbackQ = indepFallbackQ.eq("state", PRIMARY_MARKET_STATE);
-    corpQ = corpQ.eq("state", PRIMARY_MARKET_STATE);
-    corpFallbackQ = corpFallbackQ.eq("state", PRIMARY_MARKET_STATE);
-    specQ = specQ.eq("state", PRIMARY_MARKET_STATE);
-    ncQ = ncQ.eq("state", PRIMARY_MARKET_STATE);
-    totalQ = totalQ.eq("state", PRIMARY_MARKET_STATE);
   }
 
   // Run ALL count queries in parallel
   const [
     { count: indepByEC },
-    { count: indepByOS },
     { count: corpByEC },
-    { count: corpByOS },
-    { count: specCount },
-    { count: ncCount },
     { count: total },
-  ] = await Promise.all([indepQ, indepFallbackQ, corpQ, corpFallbackQ, specQ, ncQ, totalQ]);
+  ] = await Promise.all([indepQ, corpQ, totalQ]);
 
   const counts: Record<string, number> = {};
-  counts["independent"] = (indepByEC ?? 0) + (indepByOS ?? 0);
-  counts["dso_affiliated"] = (corpByEC ?? 0) + (corpByOS ?? 0);
-  if (specCount && specCount > 0) counts["specialist"] = specCount;
-  if (ncCount && ncCount > 0) counts["non_clinical"] = ncCount;
+  counts["independent"] = indepByEC ?? 0;
+  counts["dso_affiliated"] = corpByEC ?? 0;
 
-  const known = (counts["independent"] ?? 0) + (counts["dso_affiliated"] ?? 0)
-    + (counts["specialist"] ?? 0) + (counts["non_clinical"] ?? 0);
+  const known = (counts["independent"] ?? 0) + (counts["dso_affiliated"] ?? 0);
   counts["unknown"] = Math.max(0, (total ?? 0) - known);
 
   return counts;
@@ -193,19 +162,13 @@ export async function getPracticesWithCoords(
 export async function getPracticeStats(
   supabase: SupabaseClient
 ): Promise<PracticeStats> {
-  const locations = await fetchPracticeLocations(supabase)
+  const locations = await fetchPracticeLocations(supabase, { gpOnly: true })
   const watchedTotal = locations.length
   const allDsoRegional = locations.filter(
     (row) => row.entity_classification === "dso_regional"
   ).length
   const allDsoNational = locations.filter(
     (row) => row.entity_classification === "dso_national"
-  ).length
-  const dsoSpecialists = locations.filter(
-    (row) =>
-      row.entity_classification === "specialist" &&
-      (row.ownership_status === "dso_affiliated" ||
-        row.ownership_status === "pe_backed")
   ).length
   const dsoNationalReal = locations.filter(
     (row) =>
@@ -226,25 +189,7 @@ export async function getPracticeStats(
       row.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
     )
   ).length
-  // Live enrichedCount: count of practices with a Data Axle import date.
-  // This replaces the stale hardcoded constant (was 2,992; SQLite truth is 2,983).
-  // Use a head-only count query — no rows fetched, just the count header.
-  // Falls back to the snapshot constant if the query fails (e.g. timeout).
-  let enrichedCount: number = GLOBAL_DATA_AXLE_ENRICHED_NPI_COUNT
-  try {
-    const { count: dataAxleCount, error: enrichErr } = await supabase
-      .from("practices")
-      .select("npi", { count: "exact", head: true })
-      .eq("state", PRIMARY_MARKET_STATE)
-      .not("data_axle_import_date", "is", null)
-    if (!enrichErr && dataAxleCount !== null) {
-      enrichedCount = dataAxleCount
-    } else if (enrichErr) {
-      console.warn("[getPracticeStats] enrichedCount query failed:", enrichErr.message)
-    }
-  } catch (e) {
-    console.warn("[getPracticeStats] enrichedCount query threw:", e)
-  }
+  const enrichedCount = locations.filter((row) => row.data_axle_enriched === true).length
 
   // Location-deduped GP clinic count: sum zip_scores.total_gp_locations
   // across watched ZIPs. This is the honest "how many clinics" denominator —
@@ -274,10 +219,9 @@ export async function getPracticeStats(
   const t = watchedTotal ?? 0;
   const corporate = (allDsoRegional ?? 0) + (allDsoNational ?? 0);
   const highConfCorporate =
-    (dsoNationalReal ?? 0) + (dsoRegionalStrong ?? 0) + (dsoSpecialists ?? 0);
+    (dsoNationalReal ?? 0) + (dsoRegionalStrong ?? 0);
   const independent = independentByEC ?? 0;
-  // "Unknown" = total - corporate - independent.
-  // This remainder includes specialist, non_clinical, and any truly unclassified.
+  // "Unknown" = GP-only total - corporate - independent.
   const unknownCount = Math.max(0, t - corporate - independent);
 
   // If globalTotal timed out, fall back to watchedTotal so KPI isn't 0
@@ -318,7 +262,7 @@ export async function getPracticeStats(
 export async function getRetirementRiskCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  const locations = await fetchPracticeLocations(supabase)
+  const locations = await fetchPracticeLocations(supabase, { gpOnly: true })
   return locations.filter(
     (row) =>
       INDEPENDENT_CLASSIFICATIONS.includes(
@@ -338,7 +282,7 @@ export async function getRetirementRiskCount(
 export async function getAcquisitionTargetCount(
   supabase: SupabaseClient
 ): Promise<number> {
-  const locations = await fetchPracticeLocations(supabase)
+  const locations = await fetchPracticeLocations(supabase, { gpOnly: true })
   return locations.filter((row) => (row.buyability_score ?? 0) >= 50).length
 }
 
@@ -357,6 +301,7 @@ export async function getBuyabilityPractices(
   const { zips, limit = 1000 } = options;
   const locations = await fetchPracticeLocations(supabase, {
     zips,
+    gpOnly: true,
     orderBy: "buyability_score",
     ascending: false,
     maxRows: limit,

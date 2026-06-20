@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   CheckCircle2,
   ChevronDown,
@@ -45,6 +45,7 @@ interface TargetListProps {
 }
 
 type TierFilter = "all" | RankedTarget["tier"]
+const PAGE_SIZE = 100
 
 const TIER_STYLES: Record<
   RankedTarget["tier"],
@@ -229,6 +230,7 @@ export function TargetList({
   const [intelOnly, setIntelOnly] = useState(false)
   const [hideReviewed, setHideReviewed] = useState(false)
   const [pipelineOnly, setPipelineOnly] = useState(false)
+  const [page, setPage] = useState(1)
 
   const tierCounts = useMemo(() => {
     const counts: Record<RankedTarget["tier"], number> = {
@@ -280,6 +282,17 @@ export function TargetList({
     lifecycleStages,
   ])
 
+  useEffect(() => {
+    setPage(1)
+  }, [targets.length, tierFilter, intelOnly, hideReviewed, pipelineOnly])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paginated = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE
+    return filtered.slice(start, start + PAGE_SIZE)
+  }, [filtered, safePage])
+
   const toggleExpanded = (npi: string) => {
     setExpanded((current) => {
       const next = new Set(current)
@@ -300,13 +313,13 @@ export function TargetList({
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E8E5DE] px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-[#1A1A1A]">
-            Ranked Targets
+            GP Practice Directory
             <span className="ml-2 rounded-md bg-[#F7F7F4] px-1.5 py-0.5 text-[11px] font-medium text-[#6B6B60]">
               {getWarroomLensLabel(lens)}
             </span>
           </h2>
           <p className="text-xs text-[#707064]">
-            {targets.length} ranked · top score {targets[0]?.score ?? 0}
+            {targets.length.toLocaleString()} GP offices ranked · top score {targets[0]?.score ?? 0}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -401,7 +414,7 @@ export function TargetList({
           </div>
         ) : (
           <ol className="divide-y divide-[#E8E5DE]">
-            {filtered.map((target) => {
+            {paginated.map((target) => {
               const tier = TIER_STYLES[target.tier]
               const isExpanded = expanded.has(target.npi)
               const isSelected = selectedNpi === target.npi
@@ -604,6 +617,36 @@ export function TargetList({
           </ol>
         )}
       </div>
+      {filtered.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between border-t border-[#E8E5DE] px-4 py-3 text-xs text-[#6B6B60]">
+          <span>
+            Showing {((safePage - 1) * PAGE_SIZE + 1).toLocaleString()}-
+            {Math.min(safePage * PAGE_SIZE, filtered.length).toLocaleString()} of{' '}
+            {filtered.length.toLocaleString()} GP offices
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={safePage <= 1}
+              className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 py-1 text-[#1A1A1A] disabled:opacity-40"
+            >
+              Previous
+            </button>
+            <span>
+              Page {safePage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={safePage >= totalPages}
+              className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-2 py-1 text-[#1A1A1A] disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

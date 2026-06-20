@@ -6,7 +6,11 @@ import { BarChart } from '@/components/charts/bar-chart'
 import { StackedBarChart } from '@/components/charts/stacked-bar-chart'
 import { DataTable } from '@/components/data-display/data-table'
 
-import { isCorporateClassification, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
+import {
+  DSO_FILTER_KEYWORDS,
+  isCorporateClassification,
+  isGpLocationClassification,
+} from '@/lib/constants/entity-classifications'
 
 import type { Practice } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
@@ -25,6 +29,11 @@ interface MarketAnalyticsProps {
 // ────────────────────────────────────────────────────────────────────────────
 
 export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
+  const filteredPractices = useMemo(
+    () => practices.filter((p) => isGpLocationClassification(p.entity_classification)),
+    [practices]
+  )
+
   // ── Dentist Density by ZIP (top 25, horizontal bar, blue) ─────────────
   const densityData = useMemo(() => {
     return [...zipStats]
@@ -68,10 +77,10 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
 
   // ── DSO Market Share table ────────────────────────────────────────────
   const dsoMarketShare = useMemo(() => {
-    const totalInZone = practices.length
+    const totalInZone = filteredPractices.length
     const dsoCounts: Record<string, { locations: number; zips: Set<string> }> = {}
 
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       const dso = p.affiliated_dso
       if (!dso || dso.trim() === '') continue
       // Filter out taxonomy description artifacts
@@ -96,7 +105,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
           ? Math.round((data.locations / totalInZone) * 1000) / 10
           : 0,
       }))
-  }, [practices])
+  }, [filteredPractices])
 
   // ── PE Sponsors Active table ──────────────────────────────────────────
   const peSponsors = useMemo(() => {
@@ -105,7 +114,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
       { dsos: Set<string>; totalLocations: number }
     > = {}
 
-    for (const p of practices) {
+    for (const p of filteredPractices) {
       const pe = p.affiliated_pe_sponsor
       if (!pe || pe.trim() === '') continue
 
@@ -123,7 +132,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
         portfolio_dsos: data.dsos.size,
         total_locations: data.totalLocations,
       }))
-  }, [practices])
+  }, [filteredPractices])
 
   if (zipStats.length === 0) return null
 

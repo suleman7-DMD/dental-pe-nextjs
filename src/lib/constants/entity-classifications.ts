@@ -166,6 +166,28 @@ export const INDEPENDENT_CLASSIFICATIONS = [
   'family_practice', 'small_group', 'large_group',
 ] as const;
 
+/** Corporate entity_classification values that are valid GP practice locations. */
+export const CORPORATE_CLASSIFICATIONS = [
+  'dso_regional',
+  'dso_national',
+] as const;
+
+/**
+ * Canonical address-deduped GP practice universe for Chicagoland directory/map surfaces.
+ * Excludes specialists, non-clinical entities, org-only NPI rows, da_unverified rows, and
+ * duplicate_location shells.
+ */
+export const GP_LOCATION_CLASSIFICATIONS = [
+  ...INDEPENDENT_CLASSIFICATIONS,
+  ...CORPORATE_CLASSIFICATIONS,
+] as const;
+
+/** True when an entity_classification should appear in GP practice directories/maps. */
+export function isGpLocationClassification(ec: string | null | undefined): boolean {
+  if (!ec) return false;
+  return (GP_LOCATION_CLASSIFICATIONS as readonly string[]).includes(ec.trim().toLowerCase());
+}
+
 /** Taxonomy description strings that leak into affiliated_dso for dso_national (case-sensitive). */
 export const DSO_NATIONAL_TAXONOMY_LEAKS = [
   'General Dentistry', 'Oral Surgery', 'Orthodontics', 'Periodontics',

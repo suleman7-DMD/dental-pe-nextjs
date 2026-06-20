@@ -7,7 +7,12 @@ import { DonutChart } from '@/components/charts/donut-chart'
 import { HistogramChart } from '@/components/charts/histogram-chart'
 
 import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
-import { getEntityClassificationLabel, isCorporateClassification, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
+import {
+  DSO_FILTER_KEYWORDS,
+  getEntityClassificationLabel,
+  isCorporateClassification,
+  isGpLocationClassification,
+} from '@/lib/constants/entity-classifications'
 
 import type { Practice } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
@@ -55,12 +60,10 @@ export function MarketOverviewCharts({
   zipStats,
   kpis,
 }: MarketOverviewChartsProps) {
-  // ── Filter non-operating / duplicate location artifacts ───
+  // ── Defensive GP-only guard ───
   const filteredPractices = useMemo(
     () =>
-      practices.filter(
-        p => p.entity_classification !== 'org_only_npi' && p.entity_classification !== 'da_unverified' && p.entity_classification !== 'duplicate_location'
-      ),
+      practices.filter((p) => isGpLocationClassification(p.entity_classification)),
     [practices]
   )
 
