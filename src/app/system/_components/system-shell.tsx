@@ -6,6 +6,7 @@ import { FreshnessIndicators } from './freshness-indicators'
 import { CompletenessBars } from './completeness-bars'
 import { PipelineLogViewer } from './pipeline-log-viewer'
 import { ScraperHealthPanel } from './scraper-health-panel'
+import { DealRefreshControl } from './deal-refresh-control'
 import { ManualEntryForms } from './manual-entry-forms'
 import type {
   SourceCoverage,
@@ -72,6 +73,15 @@ export function SystemShell({
             description="How complete your data is across key fields. Green = 80%+ filled. Yellow = 50-80%. Red = under 50%. Deals with PE sponsor = % of deals where we know the PE firm. Practices classified = % where ownership is known."
           />
           <CompletenessBars metrics={initialCompleteness} />
+        </section>
+
+        {/* Scraper Health */}
+        <section>
+          <SectionHeader
+            title="Run Deal Scrapers"
+            description="Start a focused deal-flow refresh without waiting for the weekly full pipeline. The job runs in GitHub Actions, writes to Supabase, and reports status back here."
+          />
+          <DealRefreshControl />
         </section>
 
         {/* Scraper Health */}
