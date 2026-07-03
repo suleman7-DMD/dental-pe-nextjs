@@ -9,9 +9,9 @@ import { ResearchShell } from './_components/research-shell'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: 'Research Tools | Dental PE Intelligence',
+  title: 'Evidence | Chicagoland Census',
   description:
-    'Deep-dive into Illinois-relevant PE sponsors, platforms, states, or write custom SQL queries.',
+    'Sponsor, platform, market, and SQL evidence used to support ownership-tree claims.',
 }
 
 export default async function ResearchPage() {

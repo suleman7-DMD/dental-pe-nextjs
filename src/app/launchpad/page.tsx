@@ -9,9 +9,9 @@ export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 export const metadata = {
-  title: "Launchpad | Dental PE Intelligence",
+  title: "Job Hunt | Chicagoland Census",
   description:
-    "Launchpad — your first-job copilot. Ranked dental practices for new grads by succession, high-volume, and DSO track.",
+    "Career search powered by verified ownership context, practice intel, and the Chicagoland GP directory.",
 }
 
 function serializeError(error: unknown): string {

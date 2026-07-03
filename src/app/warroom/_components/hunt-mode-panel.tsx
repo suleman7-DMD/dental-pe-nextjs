@@ -155,7 +155,7 @@ export function HuntModePanel({
         "rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] shadow-sm",
         className
       )}
-      aria-label="Hunt mode filter builder"
+      aria-label="Review filter builder"
     >
       <HuntPanelHeader
         chipCount={intent.chips.length}
@@ -862,7 +862,7 @@ function ActiveChipsRow({
   if (chips.length === 0) {
     return (
       <footer className="border-t border-[#E8E5DE] px-4 py-3 text-[11px] text-[#707064]">
-        No filters active. Your target list is ranked by the default Warroom
+        No filters active. Your target list is ranked by the default Review Desk
         formula for the current lens.
       </footer>
     )

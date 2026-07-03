@@ -76,7 +76,7 @@ export function KeyboardShortcutsOverlay({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-[#1A1A1A]">
             <Keyboard className="h-4 w-4 text-[#B8860B]" />
-            Warroom keyboard shortcuts
+            Review Desk shortcuts
           </DialogTitle>
           <DialogDescription className="text-[#6B6B60]">
             Single-key shortcuts are disabled while typing in an input or

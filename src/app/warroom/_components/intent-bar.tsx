@@ -82,7 +82,7 @@ export function IntentBar({
         "rounded-lg border border-[#E8E5DE] bg-[#FFFFFF]",
         className
       )}
-      aria-label="Intent command bar"
+      aria-label="Smart filter bar"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-2 px-4 py-3">
         <div className="flex items-start gap-3">
@@ -100,14 +100,14 @@ export function IntentBar({
                   setShowPresets(false)
                 }
               }}
-              placeholder={pendingHint ?? "Ask in plain English — e.g. “top 25 acquisition targets in SW suburbs, no PE exposure, retirement risk”"}
+              placeholder={pendingHint ?? "Describe what you want to review, like acquisition targets in the southwest suburbs with no PE exposure"}
               disabled={disabled}
               className="h-10 w-full rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-3 pr-24 text-sm text-[#1A1A1A] outline-none transition-colors placeholder:text-[#8F8E82] hover:border-[#D4D0C8] focus:border-[#B8860B] focus:ring-2 focus:ring-[#B8860B]/20 disabled:opacity-50"
               aria-label="Describe the targets you want"
             />
             <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center gap-1 text-[11px] text-[#8F8E82]">
               <span className="rounded border border-[#E8E5DE] bg-[#F7F7F4] px-1 font-mono">⏎</span>
-              <span>to hunt</span>
+              <span>to apply</span>
             </div>
           </div>
           {value.length > 0 && (
@@ -129,7 +129,7 @@ export function IntentBar({
             disabled={disabled || !value.trim()}
             className="inline-flex h-10 items-center gap-1.5 rounded-md bg-[#B8860B] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#9C7324] disabled:opacity-40"
           >
-            Hunt
+            Apply
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>

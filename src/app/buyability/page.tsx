@@ -6,9 +6,9 @@ import { BuyabilityShell } from './_components/buyability-shell'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: 'Buyability Scanner | Dental PE Intelligence',
+  title: 'Acquisition Scout | Chicagoland Census',
   description:
-    'Practices scored by acquisition likelihood based on hand research and directory analysis.',
+    'Succession, partnership, and acquisition research queues built from the Chicagoland practice directory.',
 }
 
 export default async function BuyabilityPage() {

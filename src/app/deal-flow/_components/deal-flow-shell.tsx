@@ -162,9 +162,9 @@ export function DealFlowShell({
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page header */}
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dental PE Consolidation Intelligence</h1>
+          <h1 className="text-2xl font-bold tracking-tight">PE Deals</h1>
           <p className="text-[#6B6B60] mt-1 text-sm">
-            Illinois deal flow relevant to the Chicagoland practice market
+            Separated private-equity deal archive and sponsor context for the practice directory.
           </p>
           <p className="text-[#707064] text-xs mt-0.5">
             {totalCount.toLocaleString()} deals | {sourceCount} sources | Filtered view

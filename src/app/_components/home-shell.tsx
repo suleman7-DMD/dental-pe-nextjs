@@ -3,29 +3,27 @@
 import Link from 'next/link'
 import {
   BarChart3,
-  Map,
   Target,
   Briefcase,
   Microscope,
   ArrowRight,
-  Activity,
-  TrendingUp,
-  Hospital,
-  Clock,
   Zap,
   Building2,
   RefreshCw,
   Brain,
   Crosshair,
   AlertTriangle,
+  Database,
+  FileCheck2,
+  GitBranch,
+  Layers3,
+  MapPinned,
+  ShieldCheck,
+  Search,
 } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import type { HomeSummary, PracticeChange } from '@/lib/types'
-import {
-  getCorporateBand,
-  corporateBandTooltip,
-  corporateBandSubtitle,
-} from '@/lib/constants/consolidation-honesty'
+import type { CensusSummary } from '@/lib/supabase/queries/census'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -35,6 +33,7 @@ interface HomeShellProps {
   summary: HomeSummary
   acquisitionTargets: number
   recentChanges: PracticeChange[] | null
+  censusSummary: CensusSummary
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -51,53 +50,60 @@ interface NavCard {
 
 const NAV_CARDS: NavCard[] = [
   {
-    href: '/warroom',
-    icon: Crosshair,
-    title: 'Warroom',
-    description: 'Scope-aware command center',
+    href: '/job-market',
+    icon: Database,
+    title: 'Directory',
+    description: 'Every Chicagoland GP location',
     accentColor: '#B8860B',
   },
   {
-    href: '/job-market',
-    icon: Briefcase,
-    title: 'Job Market',
-    description: 'Career opportunity finder',
-    accentColor: '#7C3AED',
+    href: '/market-intel',
+    icon: GitBranch,
+    title: 'Ownership',
+    description: 'Census coverage and owner trees',
+    accentColor: '#2D8B4E',
   },
   {
-    href: '/market-intel',
-    icon: Map,
-    title: 'Market Intel',
-    description: 'ZIP consolidation analysis',
-    accentColor: '#2D8B4E',
+    href: '/launchpad',
+    icon: Briefcase,
+    title: 'Job Hunt',
+    description: 'Career search from verified ownership',
+    accentColor: '#7C3AED',
   },
   {
     href: '/buyability',
     icon: Target,
-    title: 'Buyability',
-    description: 'Acquisition target scoring',
+    title: 'Acquisition Scout',
+    description: 'Succession and buy-side research',
     accentColor: '#D4920B',
+  },
+  {
+    href: '/warroom',
+    icon: Crosshair,
+    title: 'Review Desk',
+    description: 'Rows that need a closer look',
+    accentColor: '#C23B3B',
   },
   {
     href: '/deal-flow',
     icon: BarChart3,
-    title: 'Deal Flow',
-    description: 'PE deal tracking and analytics',
+    title: 'PE Deals',
+    description: 'Separated deal archive and sponsors',
     accentColor: '#6366F1',
   },
   {
     href: '/research',
     icon: Microscope,
-    title: 'Research',
-    description: 'Deep dive tools',
+    title: 'Evidence',
+    description: 'Sponsor, platform, and proof library',
     accentColor: '#06B6D4',
   },
   {
     href: '/intelligence',
     icon: Brain,
-    title: 'Intelligence',
-    description: 'AI-powered market research',
-    accentColor: '#C23B3B',
+    title: 'Research Notes',
+    description: 'Practice and ZIP context',
+    accentColor: '#8B5CF6',
   },
 ]
 
@@ -290,7 +296,125 @@ function daysBetween(dateStr: string | null): number | null {
   return Math.floor((now - then) / (24 * 60 * 60 * 1000))
 }
 
-export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeShellProps) {
+function formatPct(value: number): string {
+  return `${value.toFixed(value >= 10 ? 1 : 2)}%`
+}
+
+const TIER_ROWS = [
+  { key: 'true_independent', label: 'T1 True independent', color: '#2563EB' },
+  { key: 'single_loc_group', label: 'T2 Single-location group', color: '#0D9488' },
+  { key: 'dentist_multi', label: 'T3 Dentist-owned multi', color: '#6366F1' },
+  { key: 'stealth_dso', label: 'T4 Stealth DSO', color: '#D4920B' },
+  { key: 'branded_dso', label: 'T5 Branded DSO', color: '#C23B3B' },
+  { key: 'institutional', label: 'T6 Institutional', color: '#6B7280' },
+]
+
+function TierBreakdown({ census }: { census: CensusSummary }) {
+  const reviewed = Math.max(census.reviewed, 1)
+
+  return (
+    <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF]">
+      <div className="border-b border-[#E8E5DE] bg-[#F7F7F4] px-4 py-3">
+        <h3 className="text-sm font-semibold text-[#1A1A1A]">Reviewed Ownership Mix</h3>
+        <p className="mt-0.5 text-xs text-[#6B6B60]">
+          Percentages are among reviewed rows only. Unreviewed locations are held out.
+        </p>
+      </div>
+      <div className="space-y-3 p-4">
+        {TIER_ROWS.map((tier) => {
+          const count = census.tierCounts[tier.key] ?? 0
+          const width = `${Math.max((count / reviewed) * 100, count > 0 ? 2 : 0)}%`
+          return (
+            <div key={tier.key} className="space-y-1">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-medium text-[#1A1A1A]">{tier.label}</span>
+                <span className="font-mono text-[#6B6B60]">
+                  {count.toLocaleString()} · {formatPct((count / reviewed) * 100)}
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-[#F0EEE8]">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width, backgroundColor: tier.color }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function CensusStatusModel({ census }: { census: CensusSummary }) {
+  return (
+    <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF]">
+      <div className="border-b border-[#E8E5DE] bg-[#F7F7F4] px-4 py-3">
+        <h3 className="text-sm font-semibold text-[#1A1A1A]">What We Know</h3>
+        <p className="mt-0.5 text-xs text-[#6B6B60]">
+          Reviewed, needs-evidence, and not-reviewed rows stay separate so the app never fills
+          gaps with guesses.
+        </p>
+      </div>
+      <div className="grid gap-3 p-4 sm:grid-cols-2">
+        <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[#6B6B60]">
+            <FileCheck2 className="h-3.5 w-3.5" />
+            Verified
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-mono text-2xl font-bold text-[#1A1A1A]">
+              {census.classifiedReviewed.toLocaleString()}
+            </span>
+            <span className="text-xs text-[#6B6B60]">ownership calls</span>
+          </div>
+          <p className="mt-2 text-xs text-[#6B6B60]">
+            Evidence-backed rows written to the live database.
+          </p>
+        </div>
+        <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+          <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[#6B6B60]">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Needs Evidence
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-mono text-2xl font-bold text-[#1A1A1A]">
+              {census.undeterminedReviewed.toLocaleString()}
+            </span>
+            <span className="text-xs text-[#6B6B60]">researched, not guessed</span>
+          </div>
+          <p className="mt-2 text-xs text-[#6B6B60]">
+            The team looked, but the public evidence was not strong enough.
+          </p>
+        </div>
+        <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-[#6B6B60]">
+            Not Reviewed Yet
+          </div>
+          <div className="mt-2 font-mono text-2xl font-bold text-[#1A1A1A]">
+            {census.unreviewed.toLocaleString()}
+          </div>
+          <p className="mt-2 text-xs text-[#6B6B60]">
+            No synced ownership conclusion yet. These remain unknown.
+          </p>
+        </div>
+        <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+          <div className="text-xs font-medium uppercase tracking-wider text-[#6B6B60]">
+            Batch Progress
+          </div>
+          <div className="mt-2 text-sm font-semibold text-[#1A1A1A]">
+            Appears after sync
+          </div>
+          <p className="mt-2 text-xs text-[#6B6B60]">
+            Research batches will show here once Fable syncs their review status into the app.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function HomeShell({ summary, acquisitionTargets, recentChanges, censusSummary }: HomeShellProps) {
   const daysSinceLastNewDeal = daysBetween(summary.lastNewDealDate)
   const dealFlowStale = daysSinceLastNewDeal !== null && daysSinceLastNewDeal > 30
 
@@ -298,24 +422,36 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
     <div className="min-h-screen bg-[#FAFAF7]">
       <div className="px-6 py-8 space-y-8 max-w-7xl mx-auto">
         {/* Hero */}
-        <div>
-          <h1 className="font-sans font-bold text-[28px] text-[#1A1A1A]">
-            Dental PE Intelligence
-          </h1>
-          <p className="text-[#6B6B60] text-[14px] mt-2 max-w-2xl">
-            Tracking consolidation across{' '}
-            {(summary.totalGpLocations && summary.totalGpLocations > 0
-              ? summary.totalGpLocations
-              : summary.watchedZips
-            ).toLocaleString()}{' '}
-            {summary.totalGpLocations && summary.totalGpLocations > 0
-              ? 'GP clinics'
-              : 'markets'}{' '}
-            across {summary.watchedZips.toLocaleString()} Chicagoland ZIP markets
-            <span className="text-[#9C9C90]">
-              {' '}— filtered from {summary.totalPractices.toLocaleString()} federal NPI records nationally
-            </span>
-          </p>
+        <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-sans text-[28px] font-bold text-[#1A1A1A]">
+                  Chicagoland Dental Directory
+                </h1>
+                <span className="rounded-full border border-[#B8860B]/30 bg-[#B8860B]/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider text-[#8B6508]">
+                  Verified ownership layer
+                </span>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[#6B6B60]">
+                Search every GP practice, see who owns it, and use the same record for job
+                hunting or acquisition research. Reviewed rows are labeled with evidence;
+                unreviewed rows stay honest until the census catches up.
+              </p>
+            </div>
+            <div className="grid min-w-[260px] grid-cols-2 gap-2 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 text-xs">
+              <span className="text-[#6B6B60]">Mode</span>
+              <span className="text-right font-medium text-[#1A1A1A]">Directory</span>
+              <span className="text-[#6B6B60]">Live reviewed</span>
+              <span className="text-right font-mono font-bold text-[#1A1A1A]">
+                {censusSummary.reviewed.toLocaleString()}
+              </span>
+              <span className="text-[#6B6B60]">Not reviewed</span>
+              <span className="text-right font-mono font-bold text-[#1A1A1A]">
+                {censusSummary.unreviewed.toLocaleString()}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Honesty banner: only fires when MAX(deal_date) is >30d old. Distinguishes
@@ -338,132 +474,129 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
           </div>
         )}
 
-        {/* KPI Strip — 6 cards in horizontal flex */}
+        {/* Census KPI Strip */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <KpiCard
-            icon={<Hospital className="h-4 w-4" />}
-            label="Tracked Clinics"
-            value={
-              summary.totalGpLocations && summary.totalGpLocations > 0
-                ? summary.totalGpLocations.toLocaleString()
-                : summary.totalPractices.toLocaleString()
-            }
-            subtitle={
-              summary.totalGpLocations && summary.totalGpLocations > 0 ? (
-                <span className="text-xs text-[#6B6B60]">
-                  {summary.totalPractices.toLocaleString()} federal NPI records (national)
-                </span>
-              ) : undefined
-            }
-            tooltip="Physical clinic count in watched ZIPs after deduping by address — the honest 'how many clinics' denominator. Subtitle shows raw NPI-row count from federal NPPES (includes individual dentists + organization rows registered separately at the same building)."
+            icon={<Database className="h-4 w-4" />}
+            label="GP Universe"
+            value={censusSummary.universe.toLocaleString()}
+            subtitle={<span className="text-xs text-[#6B6B60]">IL watched-ZIP locations</span>}
+            tooltip="The Chicagoland general-practice location universe. This is a location count, not the federal NPI-row count."
           />
           <KpiCard
-            icon={<BarChart3 className="h-4 w-4" />}
-            label="PE Deals"
-            value={summary.totalDeals.toLocaleString()}
-            subtitle={
-              <span className="text-xs text-[#6B6B60]">
-                {summary.ytdDeals.toLocaleString()} YTD
-              </span>
-            }
+            icon={<FileCheck2 className="h-4 w-4" />}
+            label="Reviewed"
+            value={censusSummary.reviewed.toLocaleString()}
+            subtitle={<span className="text-xs text-[#6B6B60]">{formatPct(censusSummary.coveragePct)} coverage</span>}
             accentColor="#B8860B"
           />
           <KpiCard
-            icon={<TrendingUp className="h-4 w-4" />}
-            label="Confirmed Corporate"
-            value={summary.consolidatedPct.includes('%') ? summary.consolidatedPct : `${summary.consolidatedPct}%`}
-            subtitle={
-              <span className="text-[10px] text-[#6B6B60] leading-tight block">
-                {corporateBandSubtitle(
-                  getCorporateBand(parseFloat(summary.consolidatedPct) || 0, 'mixed')
-                )}
-              </span>
-            }
-            tooltip={corporateBandTooltip(
-              getCorporateBand(parseFloat(summary.consolidatedPct) || 0, 'mixed')
-            )}
+            icon={<GitBranch className="h-4 w-4" />}
+            label="DSO/PE"
+            value={censusSummary.dsoPeReviewed.toLocaleString()}
+            subtitle={<span className="text-xs text-[#6B6B60]">{formatPct(censusSummary.dsoPeWholeFloorPct)} whole-universe floor</span>}
+            tooltip="T4 stealth DSO + T5 branded DSO rows that have earned a census tier. Whole-universe floor holds unreviewed rows out as unknown."
             accentColor="#C23B3B"
           />
           <KpiCard
-            icon={<Clock className="h-4 w-4" />}
-            label="Retirement Risk"
-            value={summary.retirementRisk.toLocaleString()}
-            tooltip="Independent practices in watched ZIPs established before 1995 (30+ years old). Internal succession or sale risk."
-            accentColor="#D4920B"
+            icon={<Layers3 className="h-4 w-4" />}
+            label="Multi-Location"
+            value={censusSummary.multiLocationReviewed.toLocaleString()}
+            subtitle={<span className="text-xs text-[#6B6B60]">T3-T5 among reviewed</span>}
+            tooltip="T3 dentist-owned multi-location groups, T4 stealth DSOs, and T5 branded DSOs. T2 single-location groups stay independent."
+            accentColor="#6366F1"
           />
           <KpiCard
             icon={<Zap className="h-4 w-4" />}
-            label="Acquisition Targets"
+            label="Scout Queue"
             value={acquisitionTargets.toLocaleString()}
-            tooltip="Strict definition: independents with buyability_score ≥ 50 in watched ZIPs. Buyability page uses a broader 4-category framework (~177 targets including lower-score independents)."
+            subtitle={<span className="text-xs text-[#6B6B60]">legacy heuristic</span>}
+            tooltip="Existing buyability/acquisition heuristic. It remains useful as a signal, but should be filtered through reviewed census ownership before final action."
             accentColor="#2D8B4E"
           />
           <KpiCard
-            icon={<Activity className="h-4 w-4" />}
-            label="Last New Deal"
-            value={summary.lastNewDealDate ?? '--'}
-            subtitle={
-              <span className="text-xs text-[#6B6B60]">
-                {summary.lastPipelineRun
-                  ? `Sync ${summary.lastPipelineRun}`
-                  : 'Sync —'}
-              </span>
-            }
-            tooltip="Top: most recent deal_date in the database (when a deal was actually announced). Bottom: most recent sync that committed a row. The two diverge when sources go quiet between scrapes."
-            accentColor={dealFlowStale ? '#D4920B' : undefined}
+            icon={<BarChart3 className="h-4 w-4" />}
+            label="Legacy Floor"
+            value={formatPct(censusSummary.legacyCorporatePct)}
+            subtitle={<span className="text-xs text-[#6B6B60]">{censusSummary.legacyCorporateLocations.toLocaleString()} detector corp rows</span>}
+            tooltip="Old entity_classification / zip_scores corporate floor. It is retained for comparison and should not be presented as the true consolidation rate."
+            accentColor="#8F8E82"
           />
         </div>
 
-        {/* Two-column layout: Recent Deals + Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <RecentDealsTable deals={summary.recentDeals} />
-          <RecentActivityFeed changes={recentChanges} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1fr]">
+          <TierBreakdown census={censusSummary} />
+          <CensusStatusModel census={censusSummary} />
         </div>
 
-        {/* Data Freshness Bar */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-[#B8860B]" />
+              <h3 className="text-sm font-semibold text-[#1A1A1A]">Find Any Practice</h3>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[#6B6B60]">
+              Start from the practice itself: address, ownership, evidence, job context, and
+              acquisition signals in one place.
+            </p>
+            <Link href="/job-market" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[#B8860B]">
+              Open Directory <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+            <div className="flex items-center gap-2">
+              <MapPinned className="h-4 w-4 text-[#2D8B4E]" />
+              <h3 className="text-sm font-semibold text-[#1A1A1A]">See Who Owns It</h3>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[#6B6B60]">
+              Ownership analytics start with coverage. A ZIP is not called low-corporate until
+              the reviewed evidence supports that conclusion.
+            </p>
+            <Link href="/market-intel" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[#B8860B]">
+              Open Ownership <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-[#06B6D4]" />
+              <h3 className="text-sm font-semibold text-[#1A1A1A]">Open the Proof</h3>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[#6B6B60]">
+              Each ownership claim should lead to a locator, practice site, filing,
+              acquisition citation, or a clear reason it needs more review.
+            </p>
+            <Link href="/research" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[#B8860B]">
+              Open Evidence <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+        </div>
+
+        <div>
+          <h2 className="mb-4 font-sans text-lg font-semibold text-[#1A1A1A]">
+            Where to Go
+          </h2>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            {NAV_CARDS.map((card) => (
+              <NavCardComponent key={card.href} card={card} />
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <RecentActivityFeed changes={recentChanges} />
+          <RecentDealsTable deals={summary.recentDeals} />
+        </div>
+
         <div className="flex flex-wrap items-center gap-4 rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] px-4 py-2.5 text-xs text-[#6B6B60]">
           <span className="relative flex h-2.5 w-2.5 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#2D8B4E] opacity-75" />
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#2D8B4E]" />
           </span>
-          <span title="Raw NPI-row count from federal NPPES data (national).">
-            <span className="text-[#1A1A1A] font-medium">
-              {summary.totalPractices.toLocaleString()}
-            </span>{' '}
-            NPI records
-          </span>
-          {summary.totalGpLocations && summary.totalGpLocations > 0 && (
-            <>
-              <span className="text-[#E8E5DE]">|</span>
-              <span title="Physical clinic count in watched ZIPs after location-based dedup (collapses NPI-1 + NPI-2 + suite variants at the same building).">
-                <span className="text-[#1A1A1A] font-medium">
-                  {summary.totalGpLocations.toLocaleString()}
-                </span>{' '}
-                Chicagoland GP clinics tracked
-              </span>
-            </>
-          )}
+          <span><span className="font-medium text-[#1A1A1A]">{summary.totalPractices.toLocaleString()}</span> national NPI records</span>
           <span className="text-[#E8E5DE]">|</span>
-          <span>
-            <span className="text-[#1A1A1A] font-medium">
-              {summary.totalDeals.toLocaleString()}
-            </span>{' '}
-            deals tracked
-          </span>
+          <span><span className="font-medium text-[#1A1A1A]">{summary.watchedZips.toLocaleString()}</span> IL ZIPs monitored</span>
           <span className="text-[#E8E5DE]">|</span>
-          <span title="Counts practices with data_axle_import_date set (any Data Axle enrichment). System page shows ~481 with data_source='data_axle' (literal source attribution). Both correct, different definitions.">
-            <span className="text-[#1A1A1A] font-medium">
-              {summary.enrichedCount.toLocaleString()}
-            </span>{' '}
-            enriched ({summary.totalPractices > 0 ? ((summary.enrichedCount / summary.totalPractices) * 100).toFixed(1) : '0.0'}%)
-          </span>
-          <span className="text-[#E8E5DE]">|</span>
-          <span>
-            <span className="text-[#1A1A1A] font-medium">
-              {summary.watchedZips.toLocaleString()}
-            </span>{' '}
-            Chicagoland ZIPs monitored
-          </span>
+          <span><span className="font-medium text-[#1A1A1A]">{summary.totalDeals.toLocaleString()}</span> PE deals archived</span>
           {summary.lastPipelineRun && (
             <>
               <span className="text-[#E8E5DE]">|</span>
@@ -473,26 +606,9 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges }: HomeSh
           {summary.lastNewDealDate && (
             <>
               <span className="text-[#E8E5DE]">|</span>
-              <span title="MAX(deal_date) — most recent deal announcement">
-                Last new deal: {summary.lastNewDealDate}
-                {daysSinceLastNewDeal !== null && daysSinceLastNewDeal > 0 && (
-                  <span className="text-[#9C9C90]"> ({daysSinceLastNewDeal}d ago)</span>
-                )}
-              </span>
+              <span>Last new deal: {summary.lastNewDealDate}</span>
             </>
           )}
-        </div>
-
-        {/* Quick Nav Cards */}
-        <div>
-          <h2 className="font-sans font-semibold text-lg text-[#1A1A1A] mb-4">
-            Quick Navigation
-          </h2>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {NAV_CARDS.map((card) => (
-              <NavCardComponent key={card.href} card={card} />
-            ))}
-          </div>
         </div>
       </div>
     </div>

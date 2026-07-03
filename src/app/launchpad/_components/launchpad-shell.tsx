@@ -101,7 +101,7 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="font-sans text-2xl font-bold tracking-tight text-[#1A1A1A]">
-                    Launchpad
+                    Job Hunt
                   </h1>
                   <span
                     className={
@@ -119,7 +119,8 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
                   )}
                 </div>
                 <p className="mt-1 text-sm text-[#6B6B60]">
-                  Your first-job copilot — ranked dental practices for new grads
+                  Career search powered by the Chicagoland directory, ownership context,
+                  and practice-level intel.
                 </p>
               </div>
 

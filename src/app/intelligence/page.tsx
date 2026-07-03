@@ -5,9 +5,9 @@ import { IntelligenceShell } from './_components/intelligence-shell'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const metadata = {
-  title: 'Intelligence | Dental PE Intelligence',
+  title: 'Research Notes | Chicagoland Directory',
   description:
-    'AI-powered qualitative research — ZIP-level market signals, practice-level due diligence, and acquisition readiness scoring.',
+    'ZIP and practice dossiers for liveness, job-hunt context, and acquisition research.',
 }
 
 export default async function IntelligencePage() {

@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react"
-import { AlertTriangle, Command, Keyboard, RotateCcw, Search } from "lucide-react"
+import { AlertTriangle, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
@@ -602,7 +602,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="font-sans text-2xl font-bold tracking-tight text-[#1A1A1A]">
-                    Chicagoland Warroom
+                    Review Desk
                   </h1>
                   <span
                     className={cn(
@@ -621,6 +621,9 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                   )}
                 </div>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#6B6B60]">
+                  <span className="w-full text-sm leading-5 text-[#6B6B60]">
+                    Focus on holds, edge cases, and practices that need a second look.
+                  </span>
                   <span className="rounded-md border border-[#E8E5DE] bg-[#F7F7F4] px-2 py-1">
                     {scope.shortLabel}
                   </span>
@@ -642,29 +645,6 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
                 <ScopeSelector value={state.scope} onChange={setScope} />
                 <ModeSwitcher value={state.mode} onChange={handleModeChange} />
                 <LensSelector value={state.lens} onChange={setLens} />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="lg"
-                  onClick={handleCommandShortcut}
-                  className="h-9 border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
-                  aria-label="Focus intent bar"
-                >
-                  <Search className="h-4 w-4" />
-                  <span>Cmd K</span>
-                  <Command className="h-3.5 w-3.5 text-[#8F8E82]" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShortcutsOpen(true)}
-                  className="h-9 w-9 border-[#E8E5DE] bg-[#FFFFFF] text-[#6B6B60] hover:bg-[#F7F7F4] hover:text-[#1A1A1A]"
-                  aria-label="Keyboard shortcuts"
-                  title="Keyboard shortcuts (?)"
-                >
-                  <Keyboard className="h-4 w-4" />
-                </Button>
               </div>
             </div>
 
@@ -756,7 +736,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
         {summary && <SitrepKpiStrip summary={summary} />}
 
         {state.mode === "hunt" && (
-          <PanelErrorBoundary panelName="Hunt mode">
+          <PanelErrorBoundary panelName="Review filters">
             <HuntModePanel
               filter={currentHuntFilter}
               onFilterChange={handleHuntFilterChange}

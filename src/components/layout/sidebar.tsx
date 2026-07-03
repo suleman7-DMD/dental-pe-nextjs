@@ -41,28 +41,28 @@ interface NavSection {
 
 const NAV_SECTIONS: NavSection[] = [
   {
-    title: "OVERVIEW",
+    title: "DIRECTORY",
     items: [
-      { label: "Dashboard", href: "/", icon: LayoutDashboard },
-      { label: "Launchpad", href: "/launchpad", icon: Rocket },
-      { label: "Warroom", href: "/warroom", icon: Crosshair },
+      { label: "Home", href: "/", icon: LayoutDashboard },
+      { label: "Directory", href: "/job-market", icon: Briefcase },
+      { label: "Ownership", href: "/market-intel", icon: MapPin },
     ],
   },
   {
-    title: "MARKETS",
+    title: "ACTIONS",
     items: [
-      { label: "Job Market", href: "/job-market", icon: Briefcase },
-      { label: "Market Intel", href: "/market-intel", icon: MapPin },
-      { label: "Buyability", href: "/buyability", icon: Target },
+      { label: "Job Hunt", href: "/launchpad", icon: Rocket },
+      { label: "Acquisition Scout", href: "/buyability", icon: Target },
+      { label: "Review Desk", href: "/warroom", icon: Crosshair },
     ],
   },
   {
-    title: "ANALYSIS",
+    title: "LIBRARY",
     items: [
-      { label: "Deal Flow", href: "/deal-flow", icon: TrendingUp },
-      { label: "Research", href: "/research", icon: Search },
-      { label: "Intelligence", href: "/intelligence", icon: Brain },
-      { label: "Data Breakdown", href: "/data-breakdown", icon: BarChart3 },
+      { label: "PE Deals", href: "/deal-flow", icon: TrendingUp },
+      { label: "Evidence", href: "/research", icon: Search },
+      { label: "Research Notes", href: "/intelligence", icon: Brain },
+      { label: "Methodology", href: "/data-breakdown", icon: BarChart3 },
     ],
   },
   {
@@ -152,13 +152,13 @@ function SidebarContent({
             <span className="text-[13px] font-bold text-[#B8860B]">DP</span>
           </div>
         ) : (
-          /* Expanded: Dental PE / INTELLIGENCE */
+          /* Expanded: Chicagoland / DIRECTORY */
           <div className="flex flex-col">
             <span className="text-[18px] font-bold leading-tight text-[#F5F5F0]" style={{ fontFamily: 'var(--font-sans), Inter, sans-serif' }}>
-              Dental PE
+              Chicagoland
             </span>
             <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#B8860B]">
-              Intelligence
+              Directory
             </span>
           </div>
         )}

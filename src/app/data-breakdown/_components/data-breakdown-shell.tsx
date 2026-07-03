@@ -72,7 +72,7 @@ export function DataBreakdownShell({ bundle, error }: DataBreakdownShellProps) {
           className="text-[24px] font-bold text-[#1A1A1A]"
           style={{ fontFamily: "var(--font-heading), DM Sans, sans-serif" }}
         >
-          Data Breakdown
+          Methodology
         </h1>
         <div className="mt-6 rounded-md border border-[#C23B3B]/30 bg-[#C23B3B]/5 px-4 py-3 text-[13px] text-[#C23B3B]">
           <strong>Error:</strong> {error}
@@ -84,7 +84,7 @@ export function DataBreakdownShell({ bundle, error }: DataBreakdownShellProps) {
   if (!bundle) {
     return (
       <div className="mx-auto max-w-6xl px-6 py-8">
-        <h1 className="text-[24px] font-bold text-[#1A1A1A]">Data Breakdown</h1>
+        <h1 className="text-[24px] font-bold text-[#1A1A1A]">Methodology</h1>
         <p className="mt-3 text-[13px] text-[#6B6B60]">Loading…</p>
       </div>
     );
@@ -101,7 +101,7 @@ export function DataBreakdownShell({ bundle, error }: DataBreakdownShellProps) {
               className="text-[24px] font-bold text-[#1A1A1A]"
               style={{ fontFamily: "var(--font-heading), DM Sans, sans-serif" }}
             >
-              Data Breakdown
+              Methodology
             </h1>
           </div>
           <p className="mt-2 max-w-2xl text-[13px] text-[#6B6B60]">

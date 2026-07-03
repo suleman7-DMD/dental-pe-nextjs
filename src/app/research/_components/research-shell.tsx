@@ -51,12 +51,11 @@ export function ResearchShell({ sponsors, platforms, states }: ResearchShellProp
         {/* Header */}
         <div>
           <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">
-            Research Tools
+            Evidence
           </h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
-            Deep-dive into Illinois-relevant PE sponsors, platforms, states, or write custom SQL
-            queries. Use these tools to research companies and markets tied to the
-            Chicagoland practice universe.
+            Inspect the sponsor, platform, market, and SQL evidence behind ownership trees.
+            This is the reference library for claims that appear in the directory.
           </p>
         </div>
 

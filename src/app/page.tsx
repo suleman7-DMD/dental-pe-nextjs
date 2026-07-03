@@ -3,6 +3,7 @@ import { getDealStats, getRecentDeals } from '@/lib/supabase/queries/deals'
 import { getPracticeStats, getRetirementRiskCount, getAcquisitionTargetCount } from '@/lib/supabase/queries/practices'
 import { getWatchedZipCount } from '@/lib/supabase/queries/watched-zips'
 import { getRecentChanges } from '@/lib/supabase/queries/changes'
+import { getCensusSummary } from '@/lib/supabase/queries/census'
 import { HomeShell } from './_components/home-shell'
 import type { HomeSummary } from '@/lib/types'
 import type { DealStats } from '@/lib/supabase/types'
@@ -10,9 +11,9 @@ import type { DealStats } from '@/lib/supabase/types'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: 'Dental PE Intelligence Platform',
+  title: 'Chicagoland Dental Practice Census',
   description:
-    'Track private equity consolidation in US dentistry. Deal flow, market intelligence, buyability scoring, and pipeline monitoring.',
+    'Master Chicagoland GP practice directory with hand-verified ownership, job-hunt context, acquisition research, and PE deal reference data.',
 }
 
 export default async function HomePage() {
@@ -75,7 +76,7 @@ export default async function HomePage() {
     // latestDealDateResult = MAX(deal_date) — when the most recent deal was actually ANNOUNCED.
     //   Drives the honesty banner: if MAX(deal_date) is >30d old the banner fires regardless
     //   of how often sync runs, so stale upstream sources can't hide behind a healthy sync.
-    const [retirementRisk, acquisitionTargets, recentChanges, latestPipelineEvent, latestDealDateResult] =
+    const [retirementRisk, acquisitionTargets, recentChanges, latestPipelineEvent, latestDealDateResult, censusSummary] =
       await Promise.all([
         getRetirementRiskCount(supabase).catch((err) => {
           console.error('[HomePage] retirementRisk error:', err)
@@ -110,6 +111,7 @@ export default async function HomePage() {
             .limit(1)
           return data as { deal_date: string }[] | null
         })(),
+        getCensusSummary(supabase),
       ])
 
     const lastPipelineRun = latestPipelineEvent?.[0]?.timestamp
@@ -138,7 +140,14 @@ export default async function HomePage() {
       recentDeals,
     }
 
-    return <HomeShell summary={summary} acquisitionTargets={acquisitionTargets} recentChanges={recentChanges} />
+    return (
+      <HomeShell
+        summary={summary}
+        acquisitionTargets={acquisitionTargets}
+        recentChanges={recentChanges}
+        censusSummary={censusSummary}
+      />
+    )
   } catch (error) {
     console.error('HomePage error:', error)
     return (

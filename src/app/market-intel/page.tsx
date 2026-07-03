@@ -8,9 +8,9 @@ import { MarketIntelShell } from './_components/market-intel-shell'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: 'Market Intelligence | Dental PE Intelligence',
+  title: 'Ownership & Coverage | Chicagoland Census',
   description:
-    'Drill into watched neighborhoods to see ownership breakdown, consolidation levels, and market saturation across ZIP codes.',
+    'Track reviewed ownership tiers, unreviewed coverage, legacy detector floor, and ZIP-level ownership patterns.',
 }
 
 export default async function MarketIntelPage() {

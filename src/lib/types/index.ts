@@ -63,6 +63,13 @@ export interface Practice {
   created_at: string | null
   updated_at: string | null
   provider_last_name: string | null
+  location_id?: string | null
+  ownership_tier?: string | null
+  pe_backed?: boolean | null
+  ownership_evidence_basis?: string | null
+  ownership_evidence_urls?: string | null
+  ownership_confidence?: string | null
+  network_id?: string | null
 }
 
 export interface WatchedZip {

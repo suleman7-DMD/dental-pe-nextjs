@@ -272,7 +272,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
   if (analyzed.length === 0) {
     return (
       <div className="min-h-screen bg-[#FAFAF7] p-6">
-        <h1 className="font-sans font-bold text-2xl text-[#1A1A1A] mb-2">Buyability Scanner</h1>
+        <h1 className="font-sans font-bold text-2xl text-[#1A1A1A] mb-2">Acquisition Scout</h1>
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-8 text-center text-[#6B6B60] mt-6">
           <p className="font-medium text-[#1A1A1A] mb-2">No analyzed practices yet.</p>
           <p className="text-sm">
@@ -289,13 +289,11 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
       <div className="px-6 py-6 space-y-6">
         {/* Header */}
         <div>
-          <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">Buyability Scanner</h1>
+          <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">Acquisition Scout</h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
-            {analyzed.length} practices scored by acquisition likelihood. Acquisition Targets =
-            any independent practice (broad framework — includes lower-score independents; the
-            Home page&apos;s KPI uses a stricter buyability_score ≥ 50 cutoff). Dead Ends =
-            corporate/DSO. Job Targets = good associate opportunities. Specialists = ortho,
-            perio, endo, etc.
+            {analyzed.length} practices scored for succession, partnership, and acquisition
+            research. Treat this as a scout queue: legacy buyability signals become actionable
+            only after reviewed census ownership, operating status, and evidence checks.
           </p>
         </div>
 

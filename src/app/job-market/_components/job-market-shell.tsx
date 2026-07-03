@@ -528,11 +528,12 @@ function JobMarketShellInner({
         {/* Header */}
         <div>
           <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">
-            Job Market Intelligence
+            Master GP Directory
           </h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
-            Evaluate dental practice landscapes near your planned living locations --
-            where are independent practices, and where is consolidation squeezing out opportunity?
+            Search the Chicagoland general-dentistry roster by location, ownership signal,
+            job-market context, and acquisition relevance. Legacy detector fields remain visible,
+            but reviewed census tiers should become the primary truth as Fable&apos;s data lands.
           </p>
         </div>
 
@@ -813,7 +814,7 @@ export function JobMarketShell(props: JobMarketShellProps) {
         <div className="min-h-screen bg-[#FAFAF7]">
           <div className="px-6 py-6 space-y-6">
             <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">
-              Job Market Intelligence
+              Master GP Directory
             </h1>
             <p className="text-[#6B6B60] text-sm mt-1">Loading...</p>
           </div>

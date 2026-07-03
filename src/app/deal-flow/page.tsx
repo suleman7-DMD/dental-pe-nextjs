@@ -6,9 +6,9 @@ import { DealFlowShell } from './_components/deal-flow-shell'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: 'Deal Flow | Dental PE Intelligence',
+  title: 'PE Deals | Chicagoland Census',
   description:
-    'Illinois dental private equity deal activity -- buyouts, add-ons, recapitalizations, and more.',
+    'Separated dental private-equity deal archive and sponsor context for ownership research.',
 }
 
 export default async function DealFlowPage() {

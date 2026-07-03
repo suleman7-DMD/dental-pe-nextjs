@@ -13,9 +13,9 @@ import { JobMarketShell } from './_components/job-market-shell'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: 'Job Market Intelligence | Dental PE Intelligence',
+  title: 'Master GP Directory | Chicagoland Census',
   description:
-    'Evaluate dental practice landscapes near your planned living locations — independent vs consolidated markets.',
+    'Search Chicagoland GP locations by ownership, ZIP, job-hunt context, and acquisition relevance.',
 }
 
 export default async function JobMarketPage() {

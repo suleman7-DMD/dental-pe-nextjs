@@ -184,10 +184,10 @@ function MarketIntelShellInner({
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page header */}
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Market Intelligence</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Ownership & Coverage</h1>
           <p className="text-[#6B6B60] mt-1 text-sm">
-            Drill into Chicagoland ZIPs to see who owns what, which GP offices are
-            independent, and where documented consolidation is happening.
+            Read consolidation through census coverage first: reviewed ownership tiers,
+            unreviewed ZIPs, legacy detector floor, and owner-network patterns.
           </p>
         </div>
 

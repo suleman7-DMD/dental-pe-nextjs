@@ -1,19 +1,17 @@
 'use client'
 
 import React from 'react'
+import Link from 'next/link'
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { SearchInput } from '@/components/filters/search-input'
 import { FilterGroup, MultiSelect } from '@/components/filters/filter-bar'
 import { DataTable } from '@/components/data-display/data-table'
-import { StatusBadge } from '@/components/data-display/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { PracticeDetailDrawer } from './practice-detail-drawer'
-import { Download } from 'lucide-react'
+import { ArrowUpRight, Download } from 'lucide-react'
 import { exportToCsv } from '@/lib/utils/csv-export'
-import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
-import { formatStatusLabel } from '@/lib/utils/formatting'
+import { CensusBadge, ReviewStatusBadge } from '@/components/data-display/census-badge'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -110,6 +108,48 @@ function renderDataQualityStars(v: string): React.ReactElement {
   }, v || '\u2605')
 }
 
+function renderPracticeLink(valueOrPractice: unknown): React.ReactElement {
+  if (!valueOrPractice || typeof valueOrPractice !== 'object') {
+    throw new Error('Practice row expected')
+  }
+  const p = valueOrPractice as Practice & { display_name?: string | null }
+  const name = p.display_name ?? p.doing_business_as ?? p.practice_name ?? '--'
+  if (!p.location_id) {
+    return React.createElement('span', { className: 'font-medium text-[#1A1A1A]' }, name)
+  }
+  return React.createElement(
+    Link,
+    {
+      href: `/practice/${p.location_id}`,
+      onClick: (event: React.MouseEvent) => event.stopPropagation(),
+      className: 'inline-flex max-w-[260px] items-center gap-1.5 font-medium text-[#1A1A1A] hover:text-[#8B6508]',
+      title: `Open ${name}`,
+    },
+    React.createElement('span', { className: 'truncate' }, name),
+    React.createElement(ArrowUpRight, { className: 'h-3.5 w-3.5 shrink-0 text-[#B8860B]' })
+  )
+}
+
+function renderCensusBadge(valueOrPractice: unknown): React.ReactElement {
+  if (!valueOrPractice || typeof valueOrPractice !== 'object') {
+    throw new Error('Practice row expected')
+  }
+  const p = valueOrPractice as Practice
+  return React.createElement(CensusBadge, {
+    tier: p.ownership_tier,
+    peBacked: p.pe_backed,
+    compact: true,
+  })
+}
+
+function renderReviewBadge(valueOrPractice: unknown): React.ReactElement {
+  if (!valueOrPractice || typeof valueOrPractice !== 'object') {
+    throw new Error('Practice row expected')
+  }
+  const p = valueOrPractice as Practice
+  return React.createElement(ReviewStatusBadge, { tier: p.ownership_tier })
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Table columns
 // ────────────────────────────────────────────────────────────────────────────
@@ -137,7 +177,8 @@ function classificationWithInactiveWarning(v: string): React.ReactElement | stri
 }
 
 const EMPLOYMENT_COLUMNS = [
-  { key: 'display_name', header: 'Practice Name' },
+  { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   { key: 'city', header: 'City' },
@@ -153,7 +194,8 @@ const EMPLOYMENT_COLUMNS = [
 ]
 
 const OWNERSHIP_COLUMNS = [
-  { key: 'display_name', header: 'Practice Name' },
+  { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  { key: 'ownership_tier', header: 'Review', render: renderReviewBadge },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   { key: 'city', header: 'City' },
@@ -181,7 +223,8 @@ const OWNERSHIP_COLUMNS = [
 ]
 
 const ENRICHED_COLUMNS = [
-  { key: 'display_name', header: 'Practice Name' },
+  { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
@@ -214,7 +257,8 @@ const ENRICHED_COLUMNS = [
 ]
 
 const ALL_COLUMNS = [
-  { key: 'display_name', header: 'Practice Name' },
+  { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   {
@@ -375,6 +419,10 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       'city',
       'zip',
       'entity_classification',
+      'ownership_tier',
+      'ownership_confidence',
+      'pe_backed',
+      'network_id',
       'affiliated_dso',
       'employee_count',
       'estimated_revenue',
@@ -391,6 +439,10 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       city: 'City',
       zip: 'ZIP',
       entity_classification: 'Classification',
+      ownership_tier: 'Census Tier',
+      ownership_confidence: 'Census Confidence',
+      pe_backed: 'PE Backed',
+      network_id: 'Network',
       affiliated_dso: 'DSO',
       employee_count: 'Employees',
       estimated_revenue: 'Revenue',
@@ -413,8 +465,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   return (
     <div>
       <SectionHeader
-        title="GP Practice Directory"
-        helpText="Browse and search address-deduped general dental practices in the selected Chicagoland scope. Specialists, non-clinical records, duplicate shells, and unverified Data Axle rows are excluded."
+        title="Master GP Directory"
+        helpText="Search Chicagoland general dental locations, open the practice record, and separate verified ownership from rows still waiting on review."
       />
 
       {/* Search & Filters */}
@@ -474,8 +526,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       <Tabs value={activeView} onValueChange={setActiveView} className="mt-4">
         <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
           <TabsTrigger value="employment">Employment Opportunities</TabsTrigger>
-          <TabsTrigger value="ownership">Ownership Pipeline</TabsTrigger>
-          <TabsTrigger value="enriched">Enriched Practices (Data Axle)</TabsTrigger>
+          <TabsTrigger value="ownership">Acquisition Leads</TabsTrigger>
+          <TabsTrigger value="enriched">Business Data</TabsTrigger>
           <TabsTrigger value="all">All GP Offices</TabsTrigger>
         </TabsList>
 

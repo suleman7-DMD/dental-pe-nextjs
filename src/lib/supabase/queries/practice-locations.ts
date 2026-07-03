@@ -42,6 +42,12 @@ export const PRACTICE_LOCATION_SELECT = [
   "data_sources",
   "taxonomy_codes",
   "updated_at",
+  "ownership_tier",
+  "pe_backed",
+  "ownership_evidence_basis",
+  "ownership_evidence_urls",
+  "ownership_confidence",
+  "network_id",
 ].join(",")
 
 export interface PracticeLocationRecord {
@@ -76,6 +82,12 @@ export interface PracticeLocationRecord {
   data_sources: string | null
   taxonomy_codes: string | null
   updated_at: string | null
+  ownership_tier: string | null
+  pe_backed: boolean | null
+  ownership_evidence_basis: string | null
+  ownership_evidence_urls: string | null
+  ownership_confidence: string | null
+  network_id: string | null
 }
 
 export interface PracticeLocationFetchOptions {
@@ -222,6 +234,20 @@ export async function fetchGpPracticeLocations(
   return fetchPracticeLocations(supabase, { ...options, gpOnly: true })
 }
 
+export async function fetchPracticeLocationById(
+  supabase: SupabaseClient,
+  locationId: string
+): Promise<PracticeLocationRecord | null> {
+  const { data, error } = await supabase
+    .from("practice_locations")
+    .select(PRACTICE_LOCATION_SELECT)
+    .eq("location_id", locationId)
+    .maybeSingle()
+
+  if (error) throw error
+  return (data as unknown as PracticeLocationRecord | null) ?? null
+}
+
 export function isGpPracticeLocation(row: Pick<PracticeLocationRecord, "entity_classification">): boolean {
   return isGpLocationClassification(row.entity_classification)
 }
@@ -231,6 +257,7 @@ export function practiceLocationToLaunchpadRecord(
 ): LaunchpadPracticeRecord {
   return {
     id: stableNumericId(row.location_id),
+    location_id: row.location_id,
     npi: row.primary_npi ?? row.location_id,
     provider_npis: parseStringArray(row.provider_npis),
     practice_name: row.practice_name,
@@ -263,6 +290,12 @@ export function practiceLocationToLaunchpadRecord(
     data_source: row.data_sources,
     data_axle_import_date: row.data_axle_enriched ? row.updated_at : null,
     updated_at: row.updated_at,
+    ownership_tier: row.ownership_tier,
+    pe_backed: row.pe_backed,
+    ownership_evidence_basis: row.ownership_evidence_basis,
+    ownership_evidence_urls: row.ownership_evidence_urls,
+    ownership_confidence: row.ownership_confidence,
+    network_id: row.network_id,
   }
 }
 

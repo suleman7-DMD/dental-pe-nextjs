@@ -61,9 +61,9 @@ function formatCost(value: number | null | undefined): string {
 // ── Nav sections ─────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
-  { id: 'kpis', label: 'KPIs' },
-  { id: 'zip-intel', label: 'ZIP Intelligence' },
-  { id: 'practice-dossiers', label: 'Practice Dossiers' },
+  { id: 'kpis', label: 'Overview' },
+  { id: 'zip-intel', label: 'ZIP Notes' },
+  { id: 'practice-dossiers', label: 'Practice Notes' },
 ]
 
 // ── Confidence badge ─────────────────────────────────────────────────────────
@@ -399,10 +399,10 @@ export function IntelligenceShell({
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page header */}
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Intelligence</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Research Notes</h1>
           <p className="text-[#6B6B60] mt-1 text-sm">
-            AI-powered qualitative research — ZIP-level market signals, practice-level
-            due diligence, and acquisition readiness scoring.
+            ZIP and practice dossiers used for job-hunt color, liveness checks, and acquisition
+            context. Ownership claims still require source-backed census evidence.
           </p>
         </div>
 

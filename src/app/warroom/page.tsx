@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic"
 export const revalidate = 0
 
 export const metadata = {
-  title: "Warroom | Dental PE Intelligence",
+  title: "Review Desk | Chicagoland Directory",
   description:
-    "Chicagoland Dental Warroom — intent-driven god-mode market intelligence for acquisition hunting, consolidation research, and practice dossiers.",
+    "Review queues, maps, and practice dossiers for rows that need closer ownership attention.",
 }
 
 export default async function WarroomPage() {

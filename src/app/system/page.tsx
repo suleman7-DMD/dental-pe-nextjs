@@ -10,9 +10,9 @@ import { SystemShell } from './_components/system-shell'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: 'System Health | Dental PE Intelligence',
+  title: 'System Health | Chicagoland Census',
   description:
-    'Monitor data freshness, run diagnostics, and manually add data.',
+    'Monitor live sync, coverage, freshness, and census pipeline readiness.',
 }
 
 export default async function SystemPage() {

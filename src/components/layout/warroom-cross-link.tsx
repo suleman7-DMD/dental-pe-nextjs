@@ -3,7 +3,7 @@ import { ArrowRight, Crosshair } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface WarroomCrossLinkProps {
-  /** Short hint describing what the Warroom offers for this legacy surface. */
+  /** Short hint describing what the Review Desk offers for this legacy surface. */
   context?: string
   /** Optional querystring appended to /warroom (e.g. "?scope=chicagoland&mode=investigate"). */
   hrefSuffix?: string
@@ -11,7 +11,7 @@ interface WarroomCrossLinkProps {
 }
 
 export function WarroomCrossLink({
-  context = "Unified scope, ranked targets, and Living Map lenses in one place.",
+  context = "Maps, ranked lists, and practice dossiers for closer review.",
   hrefSuffix = "",
   className,
 }: WarroomCrossLinkProps) {
@@ -29,7 +29,7 @@ export function WarroomCrossLink({
         </span>
         <div className="min-w-0">
           <p className="text-[13px] font-semibold text-[#1A1A1A]">
-            Open the Chicagoland Warroom
+            Open the Review Desk
           </p>
           <p className="mt-0.5 text-[11px] text-[#6B6B60]">{context}</p>
         </div>

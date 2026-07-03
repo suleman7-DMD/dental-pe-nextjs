@@ -271,6 +271,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
 export interface LaunchpadPracticeRecord {
   id: number
   npi: string
+  location_id?: string | null
   provider_npis: string[]
   practice_name: string | null
   doing_business_as: string | null
@@ -302,6 +303,12 @@ export interface LaunchpadPracticeRecord {
   data_source: string | null
   data_axle_import_date: string | null
   updated_at: string | null
+  ownership_tier?: string | null
+  pe_backed?: boolean | null
+  ownership_evidence_basis?: string | null
+  ownership_evidence_urls?: string | null
+  ownership_confidence?: string | null
+  network_id?: string | null
 }
 
 export interface LaunchpadPracticeIntelRecord {

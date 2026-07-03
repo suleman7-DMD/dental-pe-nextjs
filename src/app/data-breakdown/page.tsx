@@ -5,9 +5,9 @@ import { DataBreakdownShell } from "./_components/data-breakdown-shell";
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: "Data Breakdown | Dental PE Intelligence",
+  title: "Methodology | Chicagoland Census",
   description:
-    "Verify every count on the dashboard — see exactly where each number comes from with per-segment breakdowns and source queries.",
+    "Verify every count, unit, and source behind the Chicagoland practice census.",
 };
 
 export default async function DataBreakdownPage() {
