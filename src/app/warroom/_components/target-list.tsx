@@ -508,6 +508,14 @@ export function TargetList({
                               Reviewed
                             </span>
                           )}
+                          {target.entityClassification === "solo_inactive" && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full border border-[#D4D0C8] bg-[#E8E5DE] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#6B6B60]"
+                              title="No phone and no website on record — may be closed or semi-retired. Verify before outreach."
+                            >
+                              Possibly inactive
+                            </span>
+                          )}
                           <span className="text-[11px] text-[#707064]">
                             {target.ownershipGroup} · {target.entityClassification ?? "—"}
                           </span>

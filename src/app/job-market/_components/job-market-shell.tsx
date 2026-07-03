@@ -579,9 +579,10 @@ function JobMarketShellInner({
             />
             <KpiCard
               icon={<CircleCheck className="h-5 w-5" />}
-              label="Independent %"
+              label="Not Confirmed Corp."
               value={kpiDisplay.indep_pct}
               accentColor="#2D8B4E"
+              tooltip="Share of GP clinic locations not detected as corporate. Includes verified independents and any stealth DSO-owned practices our detector has not yet identified. True independent share is likely somewhat lower."
             />
             <KpiCard
               icon={<BarChart3 className="h-5 w-5" />}

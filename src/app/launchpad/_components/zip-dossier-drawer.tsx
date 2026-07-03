@@ -333,13 +333,13 @@ export function LaunchpadZipDossierDrawer({
                   accent="#0D9488"
                 />
                 <StatBlock
-                  label="Corporate share"
+                  label="Corporate share (floor)"
                   value={
                     corporateSharePct != null
                       ? formatPercent(corporateSharePct * 100)
                       : "—"
                   }
-                  subtitle="dso_regional + dso_national"
+                  subtitle="Confirmed floor — verified DSO locations only; true share is likely higher"
                   accent="#C23B3B"
                 />
                 <StatBlock

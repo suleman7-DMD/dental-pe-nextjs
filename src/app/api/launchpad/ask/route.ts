@@ -36,6 +36,7 @@ function buildPrompt(body: AskIntelRequest): { system: string; user: string } {
     "If data is thin, say so explicitly. Never make up facts.",
     "2-4 sentences max, conversational, no markdown, no bullet points.",
     "Focus on what the grad should actually DO with this information.",
+    "IMPORTANT: Any corporate share percentage provided is a CONFIRMED FLOOR (verified minimum) — the true corporate share is likely higher because many DSOs operate under local names our detector cannot see. Present corporate percentages as floors, not totals.",
   ].join(" ")
 
   const parts: string[] = []
@@ -66,7 +67,7 @@ function buildPrompt(body: AskIntelRequest): { system: string; user: string } {
       z.metro ? `metro: ${z.metro}` : null,
       z.market_type ? `market: ${z.market_type}` : null,
       z.corporate_share_pct != null
-        ? `corporate share: ${Math.round(z.corporate_share_pct * 100)}%`
+        ? `confirmed corporate floor (verified minimum; true share likely higher): ${Math.round(z.corporate_share_pct * 100)}%`
         : null,
       z.dld_gp_per_10k != null ? `density: ${z.dld_gp_per_10k.toFixed(1)} GP/10k` : null,
       z.metrics_confidence ? `data confidence: ${z.metrics_confidence}` : null,

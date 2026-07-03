@@ -41,7 +41,7 @@ export function DSOPenetrationTable({ zipScores, watchedZips }: DSOPenetrationTa
     <div>
       <SectionHeader
         title="DSO Penetration by ZIP"
-        helpText="ZIP codes ranked by corporate share percentage. Corporate share = percentage of GP office locations classified as DSO-affiliated (dso_regional or dso_national). City names from watched ZIP records."
+        helpText="ZIP codes ranked by confirmed corporate share (floor). Corporate % = percentage of GP office locations classified as DSO-affiliated (dso_regional or dso_national). This is a verified floor — true corporate share is likely higher; many ZIPs are detector blind spots. City names from watched ZIP records."
       />
       <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
         <DataTable
@@ -57,7 +57,7 @@ export function DSOPenetrationTable({ zipScores, watchedZips }: DSOPenetrationTa
             },
             {
               key: 'corporate_share_pct',
-              header: 'Corporate Share %',
+              header: 'Corporate % (floor)',
               align: 'right' as const,
               render: (v: number | null) => {
                 if (v == null) return '--'

@@ -114,6 +114,28 @@ function renderDataQualityStars(v: string): React.ReactElement {
 // Table columns
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Returns classification label with a "· Possibly inactive" suffix for
+ * solo_inactive practices. DataTable supports React elements from render
+ * functions (see renderDataQualityStars above).
+ */
+function classificationWithInactiveWarning(v: string): React.ReactElement | string {
+  const label = classificationLabel(v)
+  if (v === 'solo_inactive') {
+    return React.createElement(
+      'span',
+      { title: 'No phone and no website on record — may be closed or semi-retired. Verify before outreach.' },
+      label,
+      React.createElement(
+        'span',
+        { style: { marginLeft: '4px', color: '#9C9C90', fontStyle: 'italic', fontSize: '0.9em' } },
+        '· Possibly inactive'
+      )
+    )
+  }
+  return label
+}
+
 const EMPLOYMENT_COLUMNS = [
   { key: 'display_name', header: 'Practice Name' },
   { key: 'address', header: 'Address' },
@@ -153,7 +175,7 @@ const OWNERSHIP_COLUMNS = [
   {
     key: 'entity_classification',
     header: 'Classification',
-    render: (v: string) => classificationLabel(v),
+    render: (v: string) => classificationWithInactiveWarning(v),
   },
   { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
 ]
@@ -198,7 +220,7 @@ const ALL_COLUMNS = [
   {
     key: 'entity_classification',
     header: 'Classification',
-    render: (v: string) => classificationLabel(v),
+    render: (v: string) => classificationWithInactiveWarning(v),
   },
   { key: 'affiliated_dso', header: 'DSO', render: (v: string | null) => v || '--' },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },

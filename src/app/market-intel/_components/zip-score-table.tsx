@@ -110,7 +110,7 @@ export function ZipScoreTable({ zipScores }: ZipScoreTableProps) {
     },
     {
       key: 'consolidation_pct',
-      header: 'Known Consol. %',
+      header: 'Corp. % (floor)',
       align: 'right' as const,
       render: (v: unknown) => {
         if (typeof v === 'number') return `${v.toFixed(1)}%`

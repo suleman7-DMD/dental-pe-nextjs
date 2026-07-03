@@ -157,7 +157,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
     return zipScores.length > 0 ? (lowCount / zipScores.length) * 100 : 0
   }, [zipScores])
 
-  const columns = ['ZIP', 'Town', 'Pop', 'MHI', 'GP Offices', 'DLD-GP/10k', 'Buyable %', 'Corporate %', 'Type', 'Confidence']
+  const columns = ['ZIP', 'Town', 'Pop', 'MHI', 'GP Offices', 'DLD-GP/10k', 'Buyable %', 'Corp. % (floor)', 'Type', 'Confidence']
 
   if (zipScores.length === 0) {
     return (
@@ -177,7 +177,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
     <div>
       <SectionHeader
         title="Saturation Analysis"
-        helpText="Cross-ZIP comparison of dental market metrics. DLD-GP/10k = GP dental offices per 10,000 residents (national avg ~6.1). Buyable % = share of GP offices that are independently owned solos. Corporate % = share of GP offices that are DSO/PE-affiliated. Color codes: green = favorable, yellow = moderate, red = high competition or limited opportunity."
+        helpText="Cross-ZIP comparison of dental market metrics. DLD-GP/10k = GP dental offices per 10,000 residents (national avg ~6.1). Buyable % = share of GP offices that are independently owned solos. Corp. % (floor) = confirmed DSO/PE-affiliated share — a verified floor; true corporate share is likely higher. Color codes: green = favorable, yellow = moderate, red = high competition or limited opportunity."
       />
 
       <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">

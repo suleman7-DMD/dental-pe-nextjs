@@ -256,7 +256,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
                 <span style="color:#2E7D32">&blacktriangleright; ${escapeHtml(props.independent)} independent</span> |
                 <span style="color:#E65100">${escapeHtml(props.consolCount)} consolidated (DSO+PE)</span><br/>
                 <span style="color:${consolPctVal >= 30 ? '#C23B3B' : consolPctVal >= 15 ? '#D4920B' : '#2D8B4E'}">
-                  Consolidation: ${consolPctVal.toFixed(1)}% of GP clinics
+                  Corp. floor: ${consolPctVal.toFixed(1)}% of GP clinics (verified minimum)
                 </span><br/>
                 <span style="color:#78909c;font-size:10px">Data confidence: ${escapeHtml(props.confidence)}</span>
               </div>`
@@ -294,7 +294,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
     <div>
       <SectionHeader
         title="Consolidation Map"
-        helpText="Each dot = one Chicagoland ZIP code. Size = GP clinic count. Color = documented corporate share of GP clinic locations. Faded areas = low data confidence."
+        helpText="Each dot = one Chicagoland ZIP code. Size = GP clinic count. Color = confirmed corporate floor (verified DSO-owned locations only — true share is likely higher). Faded areas = low data confidence."
       />
 
       {mapData.length > 0 ? (

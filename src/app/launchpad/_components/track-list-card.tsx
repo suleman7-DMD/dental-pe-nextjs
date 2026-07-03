@@ -193,6 +193,17 @@ export function TrackListCard({
             >
               {tierLabel}
             </span>
+            {practice.entity_classification === "solo_inactive" && (
+              <span
+                className={cn(
+                  "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                  "bg-[#E8E5DE] text-[#6B6B60] border-[#D4D0C8]"
+                )}
+                title="No phone and no website on record — may be closed or semi-retired. Verify before outreach."
+              >
+                Possibly inactive
+              </span>
+            )}
             {target.dsoTier && DSO_TIER_LABEL_MAP[target.dsoTier] && (
               <span
                 className={cn(

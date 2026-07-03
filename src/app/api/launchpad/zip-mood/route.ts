@@ -30,6 +30,7 @@ function buildPrompt(body: ZipMoodRequest): { system: string; user: string } {
     "You are a dental market analyst describing the career vibe of a ZIP code for a new graduate.",
     "Given ZIP stats and intel, write exactly 2 sentences: one naming the market pattern, one on what it means for a job-hunting grad.",
     "No markdown. Under 60 words total. Dry, specific, no generic phrases.",
+    "IMPORTANT: Any corporate share percentage is a CONFIRMED FLOOR (verified minimum) — true corporate presence is likely higher. Present it as a floor, not a complete count.",
   ].join(" ")
 
   const { zip_code, zip_context: z, zip_intel, practice_stats: ps } = body
@@ -39,7 +40,7 @@ function buildPrompt(body: ZipMoodRequest): { system: string; user: string } {
     z.metro ? `metro: ${z.metro}` : null,
     z.market_type ? `market type: ${z.market_type}` : null,
     z.corporate_share_pct != null
-      ? `corporate share: ${Math.round(z.corporate_share_pct * 100)}%`
+      ? `confirmed corporate floor (verified minimum; true share likely higher): ${Math.round(z.corporate_share_pct * 100)}%`
       : null,
     z.dld_gp_per_10k != null
       ? `GP density: ${z.dld_gp_per_10k.toFixed(1)} offices per 10k residents`

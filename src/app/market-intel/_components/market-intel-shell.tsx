@@ -266,9 +266,9 @@ function MarketIntelShellInner({
                   accentColor="#C23B3B"
                 />
                 <KpiCard
-                  label="Independent"
+                  label="Not Confirmed Corporate"
                   value={formatPct(kpis.indepPct)}
-                  tooltip={`Share of the ${kpis.gpDenom.toLocaleString()} GP clinic locations classified independent (solo, family, small/large group). Uses the same GP denominator as the corporate share.`}
+                  tooltip={`Share of the ${kpis.gpDenom.toLocaleString()} GP clinic locations not detected as corporate by our verification system. Includes verified independents AND practices whose DSO affiliation our detector has not yet identified (stealth local-name DSOs, friendly-PC structures). True independent count is likely somewhat lower than this figure.`}
                 />
                 <KpiCard
                   label="Unclassified GP"
@@ -287,8 +287,8 @@ function MarketIntelShellInner({
 
               <p className="text-[#707064] text-xs mt-2">
                 {kpis.gpDenom.toLocaleString()} GP clinic locations: Confirmed corporate {kpis.allSignalsPct.toFixed(1)}% ({kpis.corporateAll.toLocaleString()}) ·
-                Independent {kpis.indepPct.toFixed(1)}% ({kpis.indepCount.toLocaleString()}).
-                Corporate and independent share use GP clinic locations as the denominator (matches the headline).
+                Not confirmed corp. {kpis.indepPct.toFixed(1)}% ({kpis.indepCount.toLocaleString()}).
+                Corporate share and not-confirmed-corporate share use GP clinic locations as the denominator (matches the headline).
               </p>
             </>
           ) : (
