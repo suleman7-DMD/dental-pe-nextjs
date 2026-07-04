@@ -1,6 +1,7 @@
 'use client'
 
 import { SectionHeader } from '@/components/data-display/section-header'
+import { CensusSyncStatus } from './census-sync-status'
 import { DataCoverage } from './data-coverage'
 import { FreshnessIndicators } from './freshness-indicators'
 import { CompletenessBars } from './completeness-bars'
@@ -14,6 +15,7 @@ import type {
   DealSource,
   DealSourceFreshness,
 } from '@/lib/supabase/queries/system'
+import type { CensusSummary } from '@/lib/supabase/queries/census'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -23,6 +25,7 @@ interface SystemShellProps {
   initialSources: SourceCoverage[]
   initialCompleteness: CompletenessMetric[]
   initialDealSources: Record<DealSource, DealSourceFreshness>
+  censusSummary: CensusSummary
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -33,6 +36,7 @@ export function SystemShell({
   initialSources,
   initialCompleteness,
   initialDealSources,
+  censusSummary,
 }: SystemShellProps) {
   return (
     <div className="min-h-screen bg-[#FAFAF7]">
@@ -47,6 +51,16 @@ export function SystemShell({
             (updated within 7 days). Yellow = stale (7-30 days). Red = outdated (30+ days).
           </p>
         </div>
+
+        {/* Census truth-layer sync state — first, because every other page
+            renders from whatever has actually landed in the live database. */}
+        <section>
+          <SectionHeader
+            title="Census Truth Layer — Live Sync State"
+            description="What the live database actually holds right now. The hand-reviewed census is written locally first and lands here only when a sync is authorized; until then the app shows the smaller live counts and says so."
+          />
+          <CensusSyncStatus census={censusSummary} />
+        </section>
 
         {/* Data Source Coverage */}
         <section>

@@ -35,14 +35,13 @@ const MarketAnalytics = dynamic(() => import('./market-analytics').then(m => ({ 
 })
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { isIndependentClassification, isCorporateClassification, classifyPractice, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
-import { getCorporateBand, corporateBandTooltip, corporateBandSubtitle } from '@/lib/constants/consolidation-honesty'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
 import {
   fetchPracticeLocations,
   practiceLocationToLaunchpadRecord,
 } from '@/lib/supabase/queries/practice-locations'
-import { Hospital, CircleCheck, BarChart3, Target, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
+import { Hospital, Target, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
 
 import type { Practice, ZipScore, WatchedZip } from '@/lib/types'
 import type { ADABenchmark } from '@/lib/supabase/queries/ada-benchmarks'
@@ -531,9 +530,10 @@ function JobMarketShellInner({
             Master GP Directory
           </h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
-            Search the Chicagoland general-dentistry roster by location, ownership signal,
-            job-market context, and acquisition relevance. Legacy detector fields remain visible,
-            but reviewed census tiers should become the primary truth as Fable&apos;s data lands.
+            Search the Chicagoland general-dentistry roster by location, job-market context,
+            and acquisition relevance. Ownership truth comes from the hand-reviewed census —
+            see the Census column on each row. Locations without a reviewed conclusion say so;
+            nothing is guessed.
           </p>
         </div>
 
@@ -559,8 +559,12 @@ function JobMarketShellInner({
 
         {/* ── KPIs ──────────────────────────────────────────── */}
         <section id="kpis">
-          {/* Row 1: 6 KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Row 1: structural KPIs only. Ownership claims live in the census
+              column of the directory (per-row CensusBadge) — the old detector
+              "Confirmed Corporate" / "Not Confirmed Corp." cards were removed
+              rather than relabeled (user decision 2026-07-04): detector output
+              is no longer presented as an ownership answer anywhere. */}
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
               icon={<Hospital className="h-5 w-5" />}
               label="Tracked Clinics"
@@ -577,31 +581,6 @@ function JobMarketShellInner({
                 ) : undefined
               }
               tooltip="Headline = GP clinic locations in this living location (zip_scores.total_gp_locations — address-deduped, residential- and unverified-record-filtered). Subtitle = raw GP-class rows in practice_locations for the same scope; the small delta is residential-flagged addresses that the scored denominator drops."
-            />
-            <KpiCard
-              icon={<CircleCheck className="h-5 w-5" />}
-              label="Not Confirmed Corp."
-              value={kpiDisplay.indep_pct}
-              accentColor="#2D8B4E"
-              tooltip="Share of GP clinic locations not detected as corporate. Includes verified independents and any stealth DSO-owned practices our detector has not yet identified. True independent share is likely somewhat lower."
-            />
-            <KpiCard
-              icon={<BarChart3 className="h-5 w-5" />}
-              label="Confirmed Corporate"
-              value={kpiDisplay.allSignals_pct}
-              accentColor="#C23B3B"
-              tooltip={corporateBandTooltip(
-                getCorporateBand(parseFloat(kpiDisplay.allSignals_pct) || 0, 'mixed')
-              )}
-              subtitle={
-                <div className="space-y-1">
-                  <p className="text-[9px] text-[#707064] leading-tight">
-                    {corporateBandSubtitle(
-                      getCorporateBand(parseFloat(kpiDisplay.allSignals_pct) || 0, 'mixed')
-                    )}
-                  </p>
-                </div>
-              }
             />
             <KpiCard
               icon={<Target className="h-5 w-5" />}
@@ -666,18 +645,6 @@ function JobMarketShellInner({
             </div>
           </div>
 
-          {/* Unknown ownership warning */}
-          {kpiDisplay.unk_pct > 30 && kpiDisplay.total_p > 0 && (
-            <p className="text-xs text-[#D4920B] mt-3 flex items-start gap-1">
-              <span className="shrink-0">Warning:</span>
-              <span>
-                {kpiDisplay.unk_pct.toFixed(0)}% of practices have unknown ownership (
-                {kpiDisplay.unk_cnt.toLocaleString()} / {kpiDisplay.total_p.toLocaleString()}).
-                Known independent: {kpiDisplay.indep_cnt.toLocaleString()}. Real independent count is
-                likely higher. Add Data Axle exports to improve classification.
-              </span>
-            </p>
-          )}
         </section>
 
         {/* ── Tab Navigation ────────────────────────────────── */}

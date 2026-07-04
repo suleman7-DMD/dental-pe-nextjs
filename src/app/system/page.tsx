@@ -5,6 +5,7 @@ import {
   getDealSourceFreshness,
 } from '@/lib/supabase/queries/system'
 import type { SourceCoverage } from '@/lib/supabase/queries/system'
+import { getCensusSummary } from '@/lib/supabase/queries/census'
 import { SystemShell } from './_components/system-shell'
 
 export const dynamic = "force-dynamic"
@@ -18,10 +19,11 @@ export const metadata = {
 export default async function SystemPage() {
   const supabase = await createServerClient()
 
-  const [sourcesRaw, completeness, dealSources] = await Promise.all([
+  const [sourcesRaw, completeness, dealSources, censusSummary] = await Promise.all([
     getSourceCoverage(supabase),
     getCompletenessMetrics(supabase),
     getDealSourceFreshness(supabase),
+    getCensusSummary(supabase),
   ])
 
   // Transform Record<string, SourceCoverageDetail> to SourceCoverage[].
@@ -49,6 +51,7 @@ export default async function SystemPage() {
       initialSources={sources}
       initialCompleteness={completeness}
       initialDealSources={dealSources}
+      censusSummary={censusSummary}
     />
   )
 }

@@ -1,4 +1,9 @@
 import { cn } from "@/lib/utils"
+import {
+  OWNERSHIP_TIERS,
+  TIER_META as CONTRACT_TIER_META,
+  type OwnershipTier,
+} from "@/lib/census/ownership-truth"
 
 export type ReviewStatus = "verified" | "needs_evidence" | "not_reviewed"
 
@@ -12,43 +17,29 @@ interface OwnershipTierMeta {
 const BASE_BADGE =
   "inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-tight"
 
+// Chip styling is presentational and lives here; labels/descriptions come from
+// the ownership-truth contract so no badge can drift from ratified semantics.
+const TIER_CLASSNAMES: Record<OwnershipTier, string> = {
+  true_independent: "border-[#2563EB]/25 bg-[#EFF6FF] text-[#1D4ED8]",
+  single_loc_group: "border-[#0D9488]/25 bg-[#F0FDFA] text-[#0F766E]",
+  dentist_multi: "border-[#6366F1]/25 bg-[#EEF2FF] text-[#4F46E5]",
+  stealth_dso: "border-[#D4920B]/30 bg-[#FFF7E5] text-[#98690A]",
+  branded_dso: "border-[#C23B3B]/25 bg-[#FEF2F2] text-[#B91C1C]",
+  institutional: "border-[#6B7280]/25 bg-[#F3F4F6] text-[#4B5563]",
+}
+
 const TIER_META: Record<string, OwnershipTierMeta> = {
-  true_independent: {
-    label: "Verified Independent",
-    shortLabel: "Independent",
-    description: "Evidence supports independent ownership.",
-    className: "border-[#2563EB]/25 bg-[#EFF6FF] text-[#1D4ED8]",
-  },
-  single_loc_group: {
-    label: "Single-Site Group",
-    shortLabel: "Single-Site",
-    description: "A single-location group practice. This is not counted as consolidation.",
-    className: "border-[#0D9488]/25 bg-[#F0FDFA] text-[#0F766E]",
-  },
-  dentist_multi: {
-    label: "Dentist-Owned Network",
-    shortLabel: "Dentist Network",
-    description: "Multiple locations, but dentist-owned rather than DSO/PE-controlled.",
-    className: "border-[#6366F1]/25 bg-[#EEF2FF] text-[#4F46E5]",
-  },
-  stealth_dso: {
-    label: "Stealth DSO",
-    shortLabel: "Stealth DSO",
-    description: "DSO/MSO control is documented, but the consumer brand may look local.",
-    className: "border-[#D4920B]/30 bg-[#FFF7E5] text-[#98690A]",
-  },
-  branded_dso: {
-    label: "Branded DSO",
-    shortLabel: "Branded DSO",
-    description: "The location is tied to a named DSO brand or platform.",
-    className: "border-[#C23B3B]/25 bg-[#FEF2F2] text-[#B91C1C]",
-  },
-  institutional: {
-    label: "Institutional",
-    shortLabel: "Institutional",
-    description: "Hospital, university, public-health, or similar institutional setting.",
-    className: "border-[#6B7280]/25 bg-[#F3F4F6] text-[#4B5563]",
-  },
+  ...Object.fromEntries(
+    OWNERSHIP_TIERS.map((tier) => [
+      tier,
+      {
+        label: CONTRACT_TIER_META[tier].label,
+        shortLabel: CONTRACT_TIER_META[tier].shortLabel,
+        description: CONTRACT_TIER_META[tier].description,
+        className: TIER_CLASSNAMES[tier],
+      },
+    ])
+  ),
   undetermined: {
     label: "Needs Evidence",
     shortLabel: "Needs Evidence",
