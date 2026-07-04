@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebarContext } from "@/providers/sidebar-provider";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
@@ -166,6 +167,11 @@ function SidebarContent({
 
       {/* Separator */}
       <div className="mx-3 h-px bg-white/[0.06]" />
+
+      {/* Global practice search (⌘K) */}
+      <div className="px-2 pt-3">
+        <GlobalSearch collapsed={collapsed} />
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 flex flex-col gap-[2px] px-2 py-3 overflow-y-auto">
