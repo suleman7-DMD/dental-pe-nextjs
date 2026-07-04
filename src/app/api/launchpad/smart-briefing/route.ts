@@ -5,7 +5,11 @@ import type {
   SmartBriefingPractice,
   SmartBriefingPracticeResult,
 } from "@/lib/launchpad/ai-types"
-import { coerceStringArray, safeParseJson } from "@/lib/launchpad/ai-utils"
+import {
+  coerceStringArray,
+  describeCensusOwnership,
+  safeParseJson,
+} from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -49,12 +53,12 @@ function formatPractice(p: SmartBriefingPractice): string {
     `NPI: ${p.npi}`,
     `Name: ${s.name || "Unknown"}${s.dba ? ` (dba ${s.dba})` : ""}`,
     `Location: ${[s.city, s.state, s.zip].filter(Boolean).join(", ") || "unknown"}`,
-    `Entity: ${s.entity_classification ?? "unclassified"}`,
+    `Ownership (census): ${describeCensusOwnership(s)}`,
     `Age: ${age != null ? `${age} years` : "unknown"}`,
     `Employees: ${s.employee_count ?? "unknown"} | Providers: ${s.num_providers ?? "unknown"}`,
     `Revenue: ${s.estimated_revenue != null ? `$${s.estimated_revenue.toLocaleString()}` : "unknown"}`,
     `Buyability score: ${s.buyability_score ?? "unknown"}`,
-    `DSO: ${s.affiliated_dso ?? "none"}${s.dso_tier ? ` (${s.dso_tier})` : ""}`,
+    `Network employment rating (curated, not ownership): ${s.dso_employment_tier ?? "unrated"}`,
     `Signals: ${p.signals.length > 0 ? p.signals.join(", ") : "none"}`,
     `Scores — succession: ${p.scores.succession}, high_volume: ${p.scores.high_volume}, dso: ${p.scores.dso}`,
   ]

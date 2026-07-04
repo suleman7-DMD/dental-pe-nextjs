@@ -23,8 +23,28 @@ import type {
   ThesisQuestion,
 } from "@/lib/launchpad/ai-types"
 import type { LaunchpadTrack } from "@/lib/launchpad/signals"
+import { TIER_META, isOwnershipTier } from "@/lib/census/ownership-truth"
 import { safeExternalUrl } from "@/lib/utils/safe-url"
 import { LedgerCards } from "./ledger-cards"
+
+// Census-truth label for the structural summary: tier when reviewed, honest
+// unknown otherwise — never a detector estimate.
+function censusOwnershipLabel(
+  s: NonNullable<CompoundNarrativeResponse["structural_summary"]>
+): string {
+  if (s.ownership_tier) {
+    const label = isOwnershipTier(s.ownership_tier)
+      ? TIER_META[s.ownership_tier].label
+      : s.ownership_tier
+    const extras = [s.network, s.pe_backed ? "PE-backed" : null]
+      .filter(Boolean)
+      .join(" · ")
+    return extras ? `${label} (${extras})` : label
+  }
+  if (s.census_review_status === "undetermined") return "Needs evidence (census undetermined)"
+  if (s.census_review_status === "held") return "Held for census review"
+  return "Not census-reviewed yet"
+}
 
 interface CompoundThesisProps {
   npi: string
@@ -331,10 +351,10 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
                   <div className="flex flex-col">
                     <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
-                      Entity
+                      Census ownership
                     </dt>
                     <dd className="font-medium text-[#1A1A1A]">
-                      {data.structural_summary.entity_classification ?? "unclassified"}
+                      {censusOwnershipLabel(data.structural_summary)}
                     </dd>
                   </div>
                   <div className="flex flex-col">

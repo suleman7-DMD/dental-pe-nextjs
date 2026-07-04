@@ -4,7 +4,11 @@ import type {
   InterviewPrepResponse,
   InterviewCategory,
 } from "@/lib/launchpad/ai-types"
-import { coerceStringArray, safeParseJson } from "@/lib/launchpad/ai-utils"
+import {
+  coerceStringArray,
+  describeCensusOwnership,
+  safeParseJson,
+} from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -51,11 +55,11 @@ function buildPrompt(body: InterviewPrepRequest): { system: string; user: string
   const practiceLines = [
     `Name: ${p.name || "Unknown"}${p.dba ? ` (dba ${p.dba})` : ""}`,
     `Location: ${[p.city, p.state, p.zip].filter(Boolean).join(", ") || "unknown"}`,
-    `Entity: ${p.entity_classification ?? "unclassified"}`,
+    `Ownership (census): ${describeCensusOwnership(p)}`,
     `Age: ${age != null ? `${age} years` : "unknown"}`,
     `Employees: ${p.employee_count ?? "unknown"} | Providers: ${p.num_providers ?? "unknown"}`,
     `Buyability score: ${p.buyability_score ?? "unknown"}`,
-    `DSO affiliation: ${p.affiliated_dso ?? "none"}${p.dso_tier ? ` (${p.dso_tier})` : ""}`,
+    `Network employment rating (curated, not ownership): ${p.dso_employment_tier ?? "unrated"}`,
     `Track: ${track}`,
     `Active signals: ${signals.length > 0 ? signals.join(", ") : "none"}`,
   ]

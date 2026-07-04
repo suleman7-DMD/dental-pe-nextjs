@@ -1238,7 +1238,6 @@ export function PracticeDossier({
   const practiceSnapshot = {
     name: displayName,
     dba: practice.doing_business_as,
-    entity_classification: practice.entity_classification,
     city: practice.city,
     state: practice.state,
     zip: practice.zip,
@@ -1248,10 +1247,13 @@ export function PracticeDossier({
     estimated_revenue: practice.estimated_revenue,
     buyability_score: practice.buyability_score,
     website: practice.website,
-    affiliated_dso: practice.affiliated_dso,
-    dso_tier: dsoEntry ? DSO_TIER_LABELS[dsoEntry.tier] : null,
-    ownership_status: practice.ownership_status,
-    classification_confidence: practice.classification_confidence,
+    peer_class: practice.entity_classification,
+    ownership_tier: target.ownershipTier,
+    census_review_status: practice.census_review_status,
+    ownership_confidence: practice.ownership_confidence,
+    network: target.networkLabel,
+    pe_backed: target.peBacked,
+    dso_employment_tier: dsoEntry ? DSO_TIER_LABELS[dsoEntry.tier] : null,
   }
 
   const intelContext = intel

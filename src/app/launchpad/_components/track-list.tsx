@@ -55,21 +55,21 @@ function exportRankedCsv(targets: LaunchpadRankedTarget[], track: LaunchpadTrack
     score: Math.round(t.displayScore),
     tier: t.displayTier,
     commutable: t.commutable ? "yes" : "no",
-    dso_tier: t.dsoTier ?? "",
+    dso_employment_tier: t.dsoTier ?? "",
     signals: t.activeSignalIds.join("|"),
     warnings: t.warningSignalIds.join("|"),
   }))
   const columns = [
     "rank", "npi", "practice", "city", "state", "zip",
     "lane", "ownership_tier", "network", "pe_backed",
-    "best_track", "score", "tier", "commutable", "dso_tier", "signals", "warnings",
+    "best_track", "score", "tier", "commutable", "dso_employment_tier", "signals", "warnings",
   ]
   const headerMap: Record<string, string> = {
     rank: "Rank", npi: "NPI", practice: "Practice", city: "City", state: "State",
     zip: "ZIP", lane: "Lane", ownership_tier: "Census Ownership Tier",
     network: "Network", pe_backed: "PE-Backed",
     best_track: "Best Track", score: "Score", tier: "Fit Tier",
-    commutable: "Commutable", dso_tier: "DSO Employment Tier",
+    commutable: "Commutable", dso_employment_tier: "DSO Employment Tier",
     signals: "Opportunity Signals", warnings: "Warning Signals",
   }
   exportToCsv(

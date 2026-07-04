@@ -8,7 +8,6 @@
 export interface PracticeSnapshot {
   name: string
   dba?: string | null
-  entity_classification?: string | null
   city?: string | null
   state?: string | null
   zip?: string | null
@@ -18,10 +17,18 @@ export interface PracticeSnapshot {
   estimated_revenue?: number | null
   buyability_score?: number | null
   website?: string | null
-  affiliated_dso?: string | null
-  dso_tier?: string | null
-  ownership_status?: string | null
-  classification_confidence?: number | null
+  // NPPES practice-type peer group (general vs specialist). Percentile
+  // comparison key and specialty inference only — not an ownership claim.
+  peer_class?: string | null
+  // Census ownership truth — the only ownership fields prompts may state as
+  // fact. ownership_tier null means the census has no conclusion yet.
+  ownership_tier?: string | null
+  census_review_status?: string | null
+  ownership_confidence?: string | null
+  network?: string | null
+  pe_backed?: boolean | null
+  // Curated employment-quality rating of the network — not an ownership claim.
+  dso_employment_tier?: string | null
 }
 
 export interface ZipContext {
@@ -126,7 +133,10 @@ export interface CompoundNarrativeResponse {
   intel_age_days?: number | null
   structural_summary?: {
     name: string
-    entity_classification: string | null
+    ownership_tier: string | null
+    census_review_status: string | null
+    network: string | null
+    pe_backed: boolean | null
     years_in_operation: number | null
     providers: number | null
     employees: number | null

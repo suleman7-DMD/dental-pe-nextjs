@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { AskIntelRequest, AskIntelResponse } from "@/lib/launchpad/ai-types"
-import { coerceStringArray } from "@/lib/launchpad/ai-utils"
+import { coerceStringArray, describeCensusOwnership } from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -46,14 +46,16 @@ function buildPrompt(body: AskIntelRequest): { system: string; user: string } {
     const snap = [
       p.name,
       p.city && p.state ? `${p.city}, ${p.state}` : (p.city ?? p.state ?? null),
-      p.entity_classification ? `entity: ${p.entity_classification}` : null,
+      `ownership (census): ${describeCensusOwnership(p)}`,
       p.year_established != null
         ? `established ${p.year_established} (${new Date().getFullYear() - p.year_established}y)`
         : null,
       p.employee_count != null ? `${p.employee_count} employees` : null,
       p.num_providers != null ? `${p.num_providers} providers` : null,
       p.buyability_score != null ? `buyability: ${p.buyability_score}` : null,
-      p.affiliated_dso ? `DSO: ${p.affiliated_dso}` : null,
+      p.dso_employment_tier
+        ? `network employment rating (curated job-quality rating, not ownership): ${p.dso_employment_tier}`
+        : null,
     ]
       .filter(Boolean)
       .join(", ")

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { PracticeSnapshot, TrackScores } from "@/lib/launchpad/ai-types"
+import { describeCensusOwnership } from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -76,7 +77,7 @@ function buildPrompt(body: NarrativeRequest): { system: string; user: string } {
   const parts = [
     `Practice: ${p.name || "Unknown"}${p.dba ? ` (also known as ${p.dba})` : ""}`,
     `Location: ${[p.city, p.state, p.zip].filter(Boolean).join(", ") || "unknown"}`,
-    `Entity type: ${p.entity_classification ?? "unclassified"}`,
+    `Census ownership: ${describeCensusOwnership(p)}`,
     age != null ? `Years in operation: ${age}` : "Years in operation: unknown",
     p.employee_count != null ? `Employees: ${p.employee_count}` : null,
     p.num_providers != null ? `Providers: ${p.num_providers}` : null,
@@ -84,7 +85,9 @@ function buildPrompt(body: NarrativeRequest): { system: string; user: string } {
       ? `Estimated revenue: $${p.estimated_revenue.toLocaleString()}`
       : null,
     p.buyability_score != null ? `Buyability score: ${p.buyability_score}/100` : null,
-    p.affiliated_dso ? `DSO affiliation: ${p.affiliated_dso}${p.dso_tier ? ` (${p.dso_tier})` : ""}` : "Independent practice",
+    p.dso_employment_tier
+      ? `Network employment rating (curated job-quality rating, not an ownership claim): ${p.dso_employment_tier}`
+      : null,
     signals.length > 0
       ? `Active signals: ${signals.join(", ")}`
       : "Active signals: none",

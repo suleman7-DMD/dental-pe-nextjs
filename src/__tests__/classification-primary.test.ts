@@ -42,14 +42,6 @@ const ALLOWLIST: Record<string, string> = {
     "Admin form for manually editing ownership_status — pure CRUD.",
   "app/_components/home-shell.tsx":
     "Change log row label compares fieldChanged === 'ownership_status' — string match, not categorization.",
-  "app/launchpad/_components/practice-dossier.tsx":
-    "Builds a PracticeSnapshot payload for AI routes — pass-through, not categorization.",
-  "app/launchpad/_components/track-list-card.tsx":
-    "Builds a PracticeSnapshot payload for AI routes — pass-through, not categorization.",
-  "app/launchpad/_components/smart-briefing-builder.tsx":
-    "Builds a PracticeSnapshot payload for AI routes — pass-through, not categorization.",
-  "app/launchpad/_components/interview-prep-ai.tsx":
-    "Reads from a PracticeSnapshot payload assembled upstream — pass-through.",
   "app/job-market/_components/practice-detail-drawer.tsx":
     "Displays ownership_status as a separate informational field next to entity_classification — visual transparency, not logic.",
   "app/warroom/_components/dossier-drawer.tsx":

@@ -7,6 +7,7 @@ import type {
   ThesisContradiction,
   ThesisQuestion,
 } from "@/lib/launchpad/ai-types"
+import { describeCensusOwnership } from "@/lib/launchpad/ai-utils"
 import { getSupabaseServerClient } from "@/lib/supabase/server"
 import { getPracticeIntelByNpi, getZipIntelByZip } from "@/lib/supabase/queries/intel"
 import { getDealCompsForPractice, type DealCompsSummary } from "@/lib/supabase/queries/deals"
@@ -223,11 +224,11 @@ const EXTRACTOR_SYSTEM_PROMPT = [
   "  5. \"ZIP intel\" — use ONLY for the ZIP synthesis fields demand_outlook / supply_outlook / investment_thesis. Net-new ZIP specifics (median home price, employer names, demographics, dental landscape) should cite the named provider when given (Redfin, etc.) — fall back to \"ZIP intel\" only if no provider was named in the source.",
   "  CRITICAL: Do NOT tag practice-level intel facts as \"ZIP intel\" — that's the most common mislabel. ZIP intel is ONLY for market-level facts about the geography.",
   "  6. \"deal comps\" — use ONLY for facts in the '# Deal comp signals' section (state-level recent-deal volume, top acquirer, freshest deal date, deal size/multiple medians).",
-  "  7. \"peer percentile\" — use ONLY for facts in the '# Peer percentile signals' section (this practice's relative position vs. entity_classification peers, with or without ZIP scope).",
+  "  7. \"peer percentile\" — use ONLY for facts in the '# Peer percentile signals' section (this practice's relative position vs. practice-type peers, with or without ZIP scope).",
   "- category: one of {\"structural\", \"operational\", \"financial\", \"market\", \"signal\"}",
-  "  - structural: years in operation, providers, employees, entity classification, location",
+  "  - structural: years in operation, providers, employees, census ownership tier, location",
   "  - operational: services, technology, hiring activity, owner career stage, reviews",
-  "  - financial: revenue, comp signals, buyability score, ownership status",
+  "  - financial: revenue, comp signals, buyability score, PE backing",
   "  - market: ZIP-level demand/supply outlook, demographics, real estate, employers, dental landscape",
   "  - signal: red flags, green flags, acquisition rumors, succession intent",
   "- confidence: \"high\" if value is from a verified web source (URL or named provider), \"medium\" if from analyst-curated synthesis (demand_outlook, supply_outlook, investment_thesis, structural fields), \"low\" if from inference or partial evidence.",
@@ -275,14 +276,14 @@ function buildExtractorPrompt(
     `# Practice header (structural facts — source_label = "structural")`,
     `- Name: ${p.name || "Unknown"}${p.dba ? ` (dba ${p.dba})` : ""}`,
     `- Location: ${p.city ?? "?"}, ${p.state ?? "?"} ${p.zip ?? ""}`,
-    `- Entity classification: ${p.entity_classification ?? "unclassified"}`,
+    `- Census ownership: ${describeCensusOwnership(p)}`,
     `- Years in operation: ${age != null ? age : "unknown"}`,
     `- Year established: ${p.year_established ?? "unknown"}`,
     `- Providers: ${p.num_providers ?? "unknown"}`,
     `- Employees: ${p.employee_count ?? "unknown"}`,
     `- Estimated revenue: ${p.estimated_revenue != null ? `$${p.estimated_revenue.toLocaleString()}` : "unknown"}`,
     `- Buyability score: ${p.buyability_score ?? "unscored"}`,
-    `- Affiliated DSO: ${p.affiliated_dso ?? "none"}`,
+    `- Network employment rating (curated job-quality rating, NOT ownership): ${p.dso_employment_tier ?? "unrated"}`,
     `- Website on file: ${p.website ?? "none"}`,
     ``,
     `# Active structural signal IDs (DO NOT extract as atoms — these are pattern labels, not facts)`,
@@ -381,7 +382,7 @@ function buildExtractorPrompt(
   if (hasMeaningfulPercentile(percentiles) && percentiles) {
     lines.push(
       `# Peer percentile signals (source_label = "peer percentile"; category = "signal")`,
-      `- Methodology: percentiles compare this practice to other ${p.entity_classification ?? "same-class"} practices, scoped within ZIP and across the full class. Higher = more attractive on that dimension.`
+      `- Methodology: percentiles compare this practice to other ${p.peer_class ?? "same-class"} practices, scoped within ZIP and across the full class. Higher = more attractive on that dimension.`
     )
     if (percentiles.buyability_pctile_zip_class != null)
       lines.push(
@@ -924,8 +925,6 @@ function buildFallbackHaystack(
   if (practice.employee_count != null) parts.push(String(practice.employee_count))
   if (practice.estimated_revenue != null) parts.push(String(practice.estimated_revenue))
   if (practice.buyability_score != null) parts.push(String(practice.buyability_score))
-  if (practice.classification_confidence != null)
-    parts.push(String(practice.classification_confidence))
   parts.push(String(currentYear))
 
   const intelJson = JSON.stringify(intel)
@@ -1050,7 +1049,10 @@ function buildStructuralSummary(body: CompoundNarrativeRequest): NonNullable<
 
   return {
     name: p.name,
-    entity_classification: p.entity_classification ?? null,
+    ownership_tier: p.ownership_tier ?? null,
+    census_review_status: p.census_review_status ?? null,
+    network: p.network ?? null,
+    pe_backed: p.pe_backed ?? null,
     years_in_operation: age,
     providers: p.num_providers ?? null,
     employees: p.employee_count ?? null,
@@ -1100,7 +1102,7 @@ export async function POST(
   try {
     const supabase = getSupabaseServerClient()
     const inferredSpecialty =
-      body.practice.entity_classification === "specialist" ? null : "general"
+      body.practice.peer_class === "specialist" ? null : "general"
     const [intelResult, zipIntelResult, compsResult, percentilesResult] =
       await Promise.allSettled([
         getPracticeIntelByNpi(supabase, body.practice.npi),
@@ -1198,7 +1200,7 @@ export async function POST(
   // even when hasMeaningfulPercentile() is true, so we own the math directly.
   const injectedPercentileAtoms = buildPeerPercentileAtoms(
     percentiles,
-    body.practice.entity_classification
+    body.practice.peer_class
   )
   const mergedLedger = mergePeerPercentileAtoms(rawLedger, injectedPercentileAtoms)
   const normalizedLedger = normalizeLedger(mergedLedger)
