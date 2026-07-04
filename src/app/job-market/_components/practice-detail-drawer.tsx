@@ -1,10 +1,17 @@
 'use client'
 
 import { useMemo } from 'react'
+import Link from 'next/link'
+import { ArrowUpRight } from 'lucide-react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
 import { getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
 import { ownershipLabel, ownershipColor } from '@/lib/constants/design-tokens'
+import {
+  CensusBadge,
+  formatNetworkName,
+} from '@/components/data-display/census-badge'
+import { LEGACY_DETECTOR_CONTEXT_LABEL } from '@/lib/census/ownership-truth'
 
 import type { Practice } from '@/lib/types'
 
@@ -256,22 +263,39 @@ export function PracticeDetailDrawer({
         </SheetHeader>
 
         <div className="mt-5 space-y-0">
-          {/* ── Two-Column Info Grid ─────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4 px-4 pb-5">
-            {/* Left column */}
-            <DossierField label="Phone" value={p.phone} />
-            <DossierField
-              label="Ownership Status"
-              value={ownershipLabel(p.ownership_status)}
-              dotColor={osColor}
-            />
+          {/* ── Census Ownership (the truth record — always first) ── */}
+          <div className="px-4 pb-4">
+            <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <CensusBadge tier={p.ownership_tier ?? null} peBacked={p.pe_backed ?? null} />
+                {p.network_id ? (
+                  <span className="text-[11px] font-medium text-[#6B6B60]">
+                    {formatNetworkName(p.network_id)}
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-2 text-xs leading-5 text-[#6B6B60]">
+                {p.ownership_tier
+                  ? p.ownership_evidence_basis ??
+                    'Hand-reviewed census conclusion; evidence detail is on the full record.'
+                  : 'Not census-reviewed yet — ownership is unknown. Nothing below is an ownership conclusion.'}
+              </p>
+              {p.location_id ? (
+                <Link
+                  href={`/practice/${encodeURIComponent(p.location_id)}`}
+                  className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#8B6508] hover:text-[#1A1A1A]"
+                >
+                  Open full census record
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              ) : null}
+            </div>
+          </div>
 
+          {/* ── Two-Column Info Grid (business facts, no ownership) ── */}
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 px-4 pb-5">
+            <DossierField label="Phone" value={p.phone} />
             <DossierField label="Entity Type" value={entityTypeLabel(p.entity_type)} />
-            <DossierField
-              label="Entity Classification"
-              value={getEntityClassificationLabel(p.entity_classification ?? null)}
-              dotColor={ecColor}
-            />
 
             <DossierField
               label="Year Established"
@@ -281,21 +305,11 @@ export function PracticeDetailDrawer({
                   : null
               }
             />
-            <DossierField label="Affiliated DSO" value={p.affiliated_dso} />
-
             <DossierField
               label="Employees"
               value={
                 p.employee_count != null
                   ? Math.floor(Number(p.employee_count)).toString()
-                  : null
-              }
-            />
-            <DossierField
-              label="Buyability Score"
-              value={
-                p.buyability_score != null
-                  ? Number(p.buyability_score).toFixed(0)
                   : null
               }
             />
@@ -308,17 +322,48 @@ export function PracticeDetailDrawer({
                   : null
               }
             />
+            <DossierField
+              label="Buyability Score"
+              value={
+                p.buyability_score != null
+                  ? Number(p.buyability_score).toFixed(0)
+                  : null
+              }
+            />
+
             <DossierField label="NPI" value={p.npi} />
+            <DossierField
+              label="Census Confidence"
+              value={p.ownership_tier ? p.ownership_confidence ?? 'Not stated' : null}
+            />
           </div>
 
           {/* ── Divider ──────────────────────────────────────────── */}
           <div className="border-t border-[#E8E5DE]" />
 
-          {/* ── Classification Reasoning ─────────────────────────── */}
+          {/* ── Raw Source Audit — legacy detector (context only) ── */}
           <div className="px-4 py-4">
-            <h4 className="text-[11px] uppercase tracking-wider text-[#707064] font-medium mb-2">
-              Classification Reasoning
+            <h4 className="text-[11px] uppercase tracking-wider text-[#707064] font-medium mb-1">
+              Raw Source Audit
             </h4>
+            <p className="text-[11px] leading-4 text-[#9C9C90] mb-3">
+              {LEGACY_DETECTOR_CONTEXT_LABEL} — pre-census automated output, never an
+              ownership conclusion. The census record above is the only ownership truth.
+            </p>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-3">
+              <DossierField
+                label="Detector Classification"
+                value={getEntityClassificationLabel(p.entity_classification ?? null)}
+                dotColor={ecColor}
+              />
+              <DossierField
+                label="Detector Ownership Status"
+                value={ownershipLabel(p.ownership_status)}
+                dotColor={osColor}
+              />
+              <DossierField label="Detector DSO Attribution" value={p.affiliated_dso} />
+              <DossierField label="Detector Parent Company" value={p.parent_company} />
+            </div>
             {reasoning ? (
               <div
                 className="bg-[#FAFAF7] rounded-md p-3 font-mono text-xs text-[#1A1A1A] leading-relaxed whitespace-pre-wrap border-l-2"
@@ -332,7 +377,7 @@ export function PracticeDetailDrawer({
                 style={{ borderLeftColor: ecColor }}
               >
                 <p className="italic text-[#707064] mb-2 text-[11px] font-sans">
-                  Auto-generated observations (no stored reasoning):
+                  Auto-generated observations (no stored detector reasoning):
                 </p>
                 <ul className="space-y-1">
                   {observations.map((obs, i) => (
@@ -347,7 +392,7 @@ export function PracticeDetailDrawer({
               <div
                 className="bg-[#FAFAF7] rounded-md p-3 font-mono text-xs text-[#8F8E82] leading-relaxed border-l-2 border-l-[#B5B5A8]"
               >
-                No reasoning available.
+                No detector reasoning available.
               </div>
             )}
           </div>
@@ -411,7 +456,8 @@ export function PracticeDetailDrawer({
                   <p className="text-[13px] text-[#1A1A1A] mb-2">
                     This practice name appears in{' '}
                     <span className="font-medium text-[#C23B3B]">{totalZips}</span>{' '}
-                    ZIPs — likely a chain entity
+                    ZIPs — a name-match signal only; the census network assignment
+                    above is the ownership truth
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {multiZipData.zips.slice(0, 20).map((z) => (

@@ -43,7 +43,7 @@ const ALLOWLIST: Record<string, string> = {
   "app/_components/home-shell.tsx":
     "Change log row label compares fieldChanged === 'ownership_status' — string match, not categorization.",
   "app/job-market/_components/practice-detail-drawer.tsx":
-    "Displays ownership_status as a separate informational field next to entity_classification — visual transparency, not logic.",
+    "Displays ownership_status only inside the raw-source-audit section, labeled as legacy detector context — visual transparency, not logic.",
   "app/warroom/_components/dossier-drawer.tsx":
     "Displays ownership_status as supplementary info next to entity classification badge — visual.",
 }

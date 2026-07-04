@@ -11,8 +11,10 @@ FROM deals WHERE pe_sponsor = '[EDIT: sponsor name]'
 ORDER BY deal_date DESC`,
   },
   {
-    name: 'ZIP ownership',
-    query: `SELECT zip, city, state,
+    name: 'ZIP ownership (legacy detector)',
+    query: `-- entity_classification / ownership_status = legacy detector estimate (context).
+-- NOT census ownership truth — the reviewed census lives in practice_locations.ownership_tier.
+SELECT zip, city, state,
   SUM(CASE WHEN entity_classification IN ('solo_established','solo_new','solo_inactive','solo_high_volume','family_practice','small_group','large_group') THEN 1 ELSE 0 END) as independent,
   SUM(CASE WHEN entity_classification IN ('dso_regional','dso_national') THEN 1 ELSE 0 END) as corporate,
   SUM(CASE WHEN entity_classification = 'specialist' THEN 1 ELSE 0 END) as specialist,
@@ -57,8 +59,9 @@ WHERE wz.metro_area LIKE '%Chicagoland%'
 ORDER BY zs.dld_gp_per_10k ASC`,
   },
   {
-    name: 'Family Practices',
-    query: `SELECT p.zip, p.address, p.practice_name, p.provider_last_name,
+    name: 'Family Practices (legacy detector)',
+    query: `-- entity_classification = legacy detector estimate (context), not census ownership truth.
+SELECT p.zip, p.address, p.practice_name, p.provider_last_name,
   p.entity_classification, p.classification_reasoning,
   p.year_established, p.employee_count
 FROM practices p
@@ -67,8 +70,9 @@ WHERE p.zip IN (SELECT zip_code FROM watched_zips)
 ORDER BY p.zip, p.address`,
   },
   {
-    name: 'High-Vol Solos',
-    query: `SELECT p.practice_name, p.address, p.city, p.zip,
+    name: 'High-Vol Solos (legacy detector)',
+    query: `-- entity_classification / ownership_status = legacy detector estimate (context), not census truth.
+SELECT p.practice_name, p.address, p.city, p.zip,
   p.year_established, p.employee_count, p.estimated_revenue,
   p.buyability_score, p.ownership_status, p.entity_classification
 FROM practices p
