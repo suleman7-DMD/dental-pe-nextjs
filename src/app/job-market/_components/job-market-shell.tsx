@@ -34,14 +34,15 @@ const MarketAnalytics = dynamic(() => import('./market-analytics').then(m => ({ 
   loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
 })
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
-import { isIndependentClassification, isCorporateClassification, classifyPractice, DSO_FILTER_KEYWORDS } from '@/lib/constants/entity-classifications'
+import { summarizeBuckets, tierToBucket, type BucketSummary } from '@/lib/census/ownership-truth'
+import { CensusBucketSummaryCard } from '@/components/data-display/census-bucket-summary'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
 import {
   fetchPracticeLocations,
   practiceLocationToLaunchpadRecord,
 } from '@/lib/supabase/queries/practice-locations'
-import { Hospital, Target, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
+import { Hospital, ClipboardCheck, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
 
 import type { Practice, ZipScore, WatchedZip } from '@/lib/types'
 import type { ADABenchmark } from '@/lib/supabase/queries/ada-benchmarks'
@@ -51,16 +52,13 @@ import type { ADABenchmark } from '@/lib/supabase/queries/ada-benchmarks'
 // ────────────────────────────────────────────────────────────────────────────
 
 export interface ServerKpis {
+  /** GP-class location rows in scope (structural count, not an ownership claim). */
   total_p: number
-  indep_cnt: number
-  dso_cnt: number
-  pe_cnt: number
-  unk_cnt: number
-  highConfCorporate: number
-  allSignalsCorporate: number
   large_count: number
   retirement_risk: number
   highVolCount: number
+  /** The five-bucket census ownership summary — the ONLY ownership headline. */
+  bucketSummary: BucketSummary
 }
 
 interface JobMarketShellProps {
@@ -76,16 +74,22 @@ interface JobMarketShellProps {
   defaultLocationKey: string
 }
 
+/**
+ * Per-ZIP census bucket composition (GP scope). Counts are of tracked GP
+ * location rows in the ZIP; `unresolved_count` = rows without a reviewed
+ * census conclusion — always carried, never dropped or guessed.
+ */
 export interface ZipStats {
   zip_code: string
   city: string
   total_practices: number
-  independent_count: number
-  dso_affiliated_count: number
-  pe_backed_count: number
-  unknown_count: number
-  consolidated_count: number
-  consolidation_pct_of_total: number
+  solo_owner_count: number
+  dentist_owned_count: number
+  dso_pe_count: number
+  institutional_count: number
+  unresolved_count: number
+  reviewed_count: number
+  reviewed_pct: number
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -108,6 +112,74 @@ const FULL_DATA_TABS: TabId[] = ['map', 'directory', 'analytics']
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
+// GP-scope guard (non-ownership axis): specialists, labs, org-only NPIs,
+// unverified Data-Axle rows, and duplicate shells stay outside the GP
+// denominator. This is NOT an ownership claim — ownership comes only from
+// the census tier.
+const NON_GP_CLASSES = new Set([
+  'specialist',
+  'non_clinical',
+  'org_only_npi',
+  'da_unverified',
+  'duplicate_location',
+])
+
+function isGpRow(p: Practice): boolean {
+  return !NON_GP_CLASSES.has((p.entity_classification ?? '').trim().toLowerCase())
+}
+
+/** Live GP-clinic denominator for a ZIP set: SUM(zip_scores.total_gp_locations). */
+function universeForZips(zipScores: ZipScore[], zipList: string[]): number {
+  return zipScores
+    .filter((zs) => zipList.includes(zs.zip_code))
+    .map((zs) => zs.total_gp_locations)
+    .filter((v): v is number => v != null && !isNaN(v))
+    .reduce((a, b) => a + b, 0)
+}
+
+/**
+ * Census-first KPI bundle. Mirrors the server computation in page.tsx —
+ * ownership from `tierToBucket(ownership_tier)` only; structural KPIs
+ * (staff size, retirement age, volume) are census-scoped where they imply
+ * ownership (retirement/high-vol restrict to reviewed dentist-owned tiers).
+ */
+function computeCensusKpis(allPractices: Practice[], universe: number): ServerKpis {
+  const gpPractices = allPractices.filter(isGpRow)
+  const currentYear = new Date().getFullYear()
+  let large_count = 0
+  let retirement_risk = 0
+  let highVolCount = 0
+
+  for (const p of gpPractices) {
+    const bucket = tierToBucket(p.ownership_tier)
+    const dentistOwned =
+      bucket === 'true_solo_owner_operated' || bucket === 'dentist_owned_not_solo'
+    if ((p.employee_count ?? 0) >= 10) large_count++
+    const yr = p.year_established != null ? Number(p.year_established) : NaN
+    if (dentistOwned && !isNaN(yr) && yr > 0 && yr <= currentYear - 30) retirement_risk++
+    if (
+      p.ownership_tier === 'true_independent' &&
+      ((p.employee_count ?? 0) >= 5 || (p.estimated_revenue ?? 0) >= 800_000)
+    ) {
+      highVolCount++
+    }
+  }
+
+  return {
+    total_p: gpPractices.length,
+    large_count,
+    retirement_risk,
+    highVolCount,
+    bucketSummary: summarizeBuckets(
+      gpPractices.map((p) => ({
+        ownership_tier: p.ownership_tier ?? null,
+        pe_backed: p.pe_backed ?? null,
+      })),
+      universe
+    ),
+  }
+}
+
 function computeZipStats(practices: Practice[]): ZipStats[] {
   const byZip: Record<string, Practice[]> = {}
   for (const p of practices) {
@@ -118,51 +190,36 @@ function computeZipStats(practices: Practice[]): ZipStats[] {
   }
 
   return Object.entries(byZip).map(([zip_code, pList]) => {
-    const total_practices = pList.length
-    let independent_count = 0
-    let dso_affiliated_count = 0
-    const pe_backed_count = 0
-    let unknown_count = 0
-    let non_gp_count = 0 // specialist + non_clinical + org_only + da_unverified + duplicate_location — outside the GP denominator
     let city = ''
+    let gpTotal = 0
+    const counts = {
+      true_solo_owner_operated: 0,
+      dentist_owned_not_solo: 0,
+      dso_pe_corporate: 0,
+      institutional: 0,
+      unresolved: 0,
+    }
 
     for (const p of pList) {
       if (!city && p.city) city = p.city
-      const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      if (ec === 'specialist' || ec === 'non_clinical' || ec === 'org_only_npi' || ec === 'da_unverified' || ec === 'duplicate_location') {
-        non_gp_count++
-      }
-      const category = classifyPractice(p.entity_classification, p.ownership_status)
-      if (category === 'corporate') {
-        dso_affiliated_count++
-      } else if (category === 'independent') {
-        independent_count++
-      } else {
-        unknown_count++
-      }
+      if (!isGpRow(p)) continue
+      gpTotal++
+      counts[tierToBucket(p.ownership_tier)]++
     }
 
-    const consolidated_count = dso_affiliated_count + pe_backed_count
-    // Consolidation share uses the GP-clinic denominator (excludes specialists /
-    // non-clinical), matching the canonical corporate_location_count /
-    // total_gp_locations definition used by every headline KPI. Using all
-    // practices here would understate each ZIP's share vs the page headline.
-    const gp_count = Math.max(0, total_practices - non_gp_count)
-    const consolidation_pct_of_total =
-      gp_count > 0
-        ? Math.round((consolidated_count / gp_count) * 1000) / 10
-        : 0
+    const reviewed_count = gpTotal - counts.unresolved
 
     return {
       zip_code,
       city,
-      total_practices,
-      independent_count,
-      dso_affiliated_count,
-      pe_backed_count,
-      unknown_count,
-      consolidated_count,
-      consolidation_pct_of_total,
+      total_practices: gpTotal,
+      solo_owner_count: counts.true_solo_owner_operated,
+      dentist_owned_count: counts.dentist_owned_not_solo,
+      dso_pe_count: counts.dso_pe_corporate,
+      institutional_count: counts.institutional,
+      unresolved_count: counts.unresolved,
+      reviewed_count,
+      reviewed_pct: gpTotal > 0 ? Math.round((reviewed_count / gpTotal) * 1000) / 10 : 0,
     }
   })
 }
@@ -264,7 +321,7 @@ function JobMarketShellInner({
         setZipScores(filteredZs)
 
         // Compute client-side KPIs from fetched data
-        computeClientKpis(allPractices)
+        setClientKpis(computeCensusKpis(allPractices, universeForZips(initialZipScores, zipList)))
       } finally {
         setLoading(false)
       }
@@ -272,67 +329,7 @@ function JobMarketShellInner({
     [supabase, initialZipScores]
   )
 
-  // Compute KPIs client-side from full practice data (GP-scoped to match server)
-  const computeClientKpis = useCallback((allPractices: Practice[]) => {
-    const gpPractices = allPractices.filter((p) => {
-      const ec = (p.entity_classification ?? '').toLowerCase()
-      return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified' && ec !== 'duplicate_location'
-    })
-    const total_p = gpPractices.length
-    let indep_cnt = 0
-    let dso_cnt = 0
-    const pe_cnt = 0
-    let unk_cnt = 0
-    let dsoNationalReal = 0
-    let dsoRegionalStrong = 0
-    let highVolCount = 0
-    let large_count = 0
-    let retirement_risk = 0
-    const currentYear = new Date().getFullYear()
-
-    for (const p of gpPractices) {
-      const category = classifyPractice(p.entity_classification, p.ownership_status)
-      if (category === 'corporate') dso_cnt++
-      else if (category === 'independent') indep_cnt++
-      else unk_cnt++
-
-      const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      if (ec === 'dso_national') {
-        const dso = (p.affiliated_dso ?? '').trim()
-        const isTaxonomyLeak = dso && DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))
-        if (!isTaxonomyLeak) dsoNationalReal++
-      } else if (ec === 'dso_regional') {
-        const reasoning = (p.classification_reasoning ?? '').toLowerCase()
-        if (reasoning.includes('ein=') || reasoning.includes('generic brand') ||
-            reasoning.includes('parent_company') || reasoning.includes('franchise') ||
-            reasoning.includes('branch')) {
-          dsoRegionalStrong++
-        }
-      }
-
-      if (ec === 'solo_high_volume') highVolCount++
-      if (p.employee_count != null && Number(p.employee_count) >= 10) large_count++
-
-      const yr = p.year_established != null ? Number(p.year_established) : NaN
-      const isIndep = isIndependentClassification(p.entity_classification)
-      if (!isNaN(yr) && yr < currentYear - 30 && isIndep) retirement_risk++
-    }
-
-    setClientKpis({
-      total_p,
-      indep_cnt,
-      dso_cnt,
-      pe_cnt,
-      unk_cnt,
-      highConfCorporate: dsoNationalReal + dsoRegionalStrong,
-      allSignalsCorporate: dso_cnt + pe_cnt,
-      large_count,
-      retirement_risk,
-      highVolCount,
-    })
-  }, [])
-
-  // Fetch lightweight KPI counts for a location (no row data, just counts)
+  // Fetch practice rows for a location and compute census-first KPIs
   const fetchKpiCounts = useCallback(async (locationKey: string) => {
     const zipList = LIVING_LOCATIONS[locationKey]?.commutable_zips ?? []
     if (zipList.length === 0) return
@@ -341,57 +338,11 @@ function JobMarketShellInner({
       const allPracticesForKpis = (await fetchPracticeLocations(supabase, { zips: zipList, gpOnly: true }))
         .map(practiceLocationToLaunchpadRecord)
         .map(locationPracticeToPractice)
-      const practicesForKpis = allPracticesForKpis.filter((p) => {
-        const ec = (p.entity_classification ?? '').toLowerCase()
-        return ec !== 'specialist' && ec !== 'non_clinical' && ec !== 'org_only_npi' && ec !== 'da_unverified' && ec !== 'duplicate_location'
-      })
-      const corporate = practicesForKpis.filter((p) => isCorporateClassification(p.entity_classification)).length
-      const total_p = practicesForKpis.length
-      const indep_cnt = practicesForKpis.filter((p) => isIndependentClassification(p.entity_classification)).length
-      const largeStaffCount = practicesForKpis.filter((p) => (p.employee_count ?? 0) >= 10).length
-      const currentYear = new Date().getFullYear()
-      const retireCount = practicesForKpis.filter((p) =>
-        isIndependentClassification(p.entity_classification) &&
-        p.year_established != null &&
-        p.year_established < currentYear - 30
-      ).length
-      const hvCount = practicesForKpis.filter((p) => p.entity_classification === 'solo_high_volume').length
-
-      // Compute highConfCorporate from the canonical GP-only directory set.
-      let dsoNationalReal = 0
-      let dsoRegionalStrong = 0
-      for (const p of practicesForKpis) {
-        const ec = (p.entity_classification ?? '').trim().toLowerCase()
-        if (ec === 'dso_national') {
-          const dso = (p.affiliated_dso ?? '').trim()
-          const isTaxonomyLeak = dso && DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))
-          if (!isTaxonomyLeak) dsoNationalReal++
-        } else if (ec === 'dso_regional') {
-          const reasoning = (p.classification_reasoning ?? '').toLowerCase()
-          if (reasoning.includes('ein=') || reasoning.includes('generic brand') ||
-              reasoning.includes('parent_company') || reasoning.includes('franchise') ||
-              reasoning.includes('branch')) {
-            dsoRegionalStrong++
-          }
-        }
-      }
-
-      setClientKpis({
-        total_p,
-        indep_cnt,
-        dso_cnt: corporate,
-        pe_cnt: 0,
-        unk_cnt: Math.max(0, total_p - corporate - indep_cnt),
-        highConfCorporate: dsoNationalReal + dsoRegionalStrong,
-        allSignalsCorporate: corporate,
-        large_count: largeStaffCount,
-        retirement_risk: retireCount,
-        highVolCount: hvCount,
-      })
+      setClientKpis(computeCensusKpis(allPracticesForKpis, universeForZips(initialZipScores, zipList)))
     } catch {
       // Silently handle — KPIs will show server defaults
     }
-  }, [supabase])
+  }, [supabase, initialZipScores])
 
   // ── Unified effect: handle location changes AND tab-triggered data loads ──
   // Merging two separate effects prevents a race condition where both fire in
@@ -461,11 +412,6 @@ function JobMarketShellInner({
   // ── KPI display values ─────────────────────────────────────────────
   const kpiDisplay = useMemo(() => {
     const k = activeKpis
-    const total_p = k.total_p
-    const unk_pct = total_p > 0 ? (k.unk_cnt / total_p) * 100 : 100
-    const indep_pct = total_p > 0 ? ((k.indep_cnt / total_p) * 100).toFixed(1) + '%' : '--'
-    const highConf_pct = total_p > 0 ? ((k.highConfCorporate / total_p) * 100).toFixed(1) + '%' : '--'
-    const allSignals_pct = total_p > 0 ? ((k.allSignalsCorporate / total_p) * 100).toFixed(1) + '%' : '--'
 
     // Density and buyable ratio from zip_scores (already loaded)
     const filteredZs = zipScores.filter((zs) =>
@@ -494,30 +440,14 @@ function JobMarketShellInner({
       .filter((v): v is number => v != null && !isNaN(v))
       .reduce((a, b) => a + b, 0)
 
-    // Avg buyability — only available when full data is loaded
-    let avg_buy = '--'
-    if (practices) {
-      const buyScores = practices
-        .map((p) => (p.buyability_score != null ? Number(p.buyability_score) : NaN))
-        .filter((v) => !isNaN(v))
-      avg_buy = buyScores.length > 0
-        ? (buyScores.reduce((a, b) => a + b, 0) / buyScores.length).toFixed(1)
-        : '--'
-    }
-
     return {
       ...k,
-      unk_pct,
-      indep_pct,
-      highConf_pct,
-      allSignals_pct,
-      avg_buy,
       avgDldVal,
       avgBpr,
       bprConfidence,
       gpLocations,
     }
-  }, [activeKpis, zipScores, loc.commutable_zips, practices])
+  }, [activeKpis, zipScores, loc.commutable_zips])
 
   // ── Render ────────────────────────────────────────────────────────────
 
@@ -558,12 +488,16 @@ function JobMarketShellInner({
         )}
 
         {/* ── KPIs ──────────────────────────────────────────── */}
-        <section id="kpis">
-          {/* Row 1: structural KPIs only. Ownership claims live in the census
-              column of the directory (per-row CensusBadge) — the old detector
-              "Confirmed Corporate" / "Not Confirmed Corp." cards were removed
-              rather than relabeled (user decision 2026-07-04): detector output
+        <section id="kpis" className="space-y-4">
+          {/* The five-bucket census strip IS the ownership headline for this
+              scope. The old detector KPIs ("Confirmed Corporate" etc.) were
+              removed, not relabeled (user decision 2026-07-04): detector output
               is no longer presented as an ownership answer anywhere. */}
+          <CensusBucketSummaryCard
+            summary={activeKpis.bucketSummary}
+            scopeLabel={currentLocation}
+          />
+
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
               icon={<Hospital className="h-5 w-5" />}
@@ -583,9 +517,16 @@ function JobMarketShellInner({
               tooltip="Headline = GP clinic locations in this living location (zip_scores.total_gp_locations — address-deduped, residential- and unverified-record-filtered). Subtitle = raw GP-class rows in practice_locations for the same scope; the small delta is residential-flagged addresses that the scored denominator drops."
             />
             <KpiCard
-              icon={<Target className="h-5 w-5" />}
-              label="Avg Buyability"
-              value={kpiDisplay.avg_buy}
+              icon={<ClipboardCheck className="h-5 w-5" />}
+              label="Census Coverage"
+              value={`${activeKpis.bucketSummary.coveragePct.toFixed(1)}%`}
+              subtitle={
+                <span className="text-xs text-[#6B6B60]">
+                  {activeKpis.bucketSummary.reviewed.toLocaleString()} of{' '}
+                  {activeKpis.bucketSummary.universe.toLocaleString()} reviewed
+                </span>
+              }
+              tooltip="Share of this scope's GP clinics with a hand-reviewed ownership conclusion (ownership_tier). The remainder are Unresolved in the census strip above — shown honestly, never filled with estimates."
             />
             <KpiCard
               icon={<Users className="h-5 w-5" />}
@@ -597,6 +538,7 @@ function JobMarketShellInner({
               label="Retirement Risk"
               value={kpiDisplay.retirement_risk.toLocaleString()}
               accentColor="#C23B3B"
+              tooltip="Census dentist-owned clinics (T1–T3) established 30+ years ago. Unreviewed clinics are never counted here — they stay in the Unresolved bucket."
             />
           </div>
 
@@ -630,7 +572,8 @@ function JobMarketShellInner({
                 }
               />
               <p className="text-xs text-[#6B6B60] mt-1 px-1">
-                % of GP offices that are independently owned solos -- potential acquisition targets.
+                Legacy heuristic (zip_scores.buyable_practice_ratio) -- NOT a census ownership
+                claim. Kept until the census-based buyability reframe ships.
               </p>
             </div>
             <div>
@@ -640,7 +583,8 @@ function JobMarketShellInner({
                 value={kpiDisplay.highVolCount.toLocaleString()}
               />
               <p className="text-xs text-[#6B6B60] mt-1 px-1">
-                Solo practices with 5+ employees or $800k+ revenue. Likely need associate help.
+                Census solo owner-operated (T1) clinics with 5+ employees or $800k+ revenue.
+                Likely need associate help.
               </p>
             </div>
           </div>
@@ -744,18 +688,10 @@ function JobMarketShellInner({
                 <MarketOverviewCharts
                   practices={practices}
                   zipStats={zipStats}
-                  kpis={{
-                    indep_cnt: activeKpis.indep_cnt,
-                    dso_cnt: activeKpis.dso_cnt,
-                    pe_cnt: activeKpis.pe_cnt,
-                    unk_cnt: activeKpis.unk_cnt,
-                  }}
                 />
                 <OwnershipLandscape
                   practices={practices}
                   zipStats={zipStats}
-                  zipScores={zipScores}
-                  watchedZips={initialWatchedZips}
                 />
                 <MarketAnalytics
                   practices={practices}

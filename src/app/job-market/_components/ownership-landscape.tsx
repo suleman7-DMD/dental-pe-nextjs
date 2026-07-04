@@ -5,14 +5,13 @@ import { SectionHeader } from '@/components/data-display/section-header'
 import { BarChart } from '@/components/charts/bar-chart'
 import { DataTable } from '@/components/data-display/data-table'
 
-import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
+import { isGpLocationClassification } from '@/lib/constants/entity-classifications'
 import {
-  DSO_FILTER_KEYWORDS,
-  getEntityClassificationLabel,
-  isCorporateClassification,
-  isGpLocationClassification,
-} from '@/lib/constants/entity-classifications'
-import type { Practice, ZipScore, WatchedZip } from '@/lib/types'
+  BUCKET_META,
+  HEADLINE_BUCKETS,
+  tierToBucket,
+} from '@/lib/census/ownership-truth'
+import type { Practice } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -22,40 +21,47 @@ import type { ZipStats } from './job-market-shell'
 interface OwnershipLandscapeProps {
   practices: Practice[]
   zipStats: ZipStats[]
-  zipScores: ZipScore[]
-  watchedZips: WatchedZip[]
+}
+
+/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
+function formatNetworkId(id: string): string {
+  return id
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Component
+// Component — census truth layer only. The detector entity_classification
+// bars and the corporate_share_pct "penetration" table were removed, not
+// relabeled: detector output is never presented as an ownership answer.
 // ────────────────────────────────────────────────────────────────────────────
 
-export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips }: OwnershipLandscapeProps) {
-  // ── Defensive GP-only guard ───
+export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapeProps) {
+  // ── Defensive GP-only guard (scope axis, not an ownership claim) ───
   const filteredPractices = useMemo(
     () =>
       practices.filter((p) => isGpLocationClassification(p.entity_classification)),
     [practices]
   )
 
-  // ── Ownership Status Bar Chart ────────────────────────────────────────
+  // ── Census ownership bar (five buckets, always all five) ──────────────
   const ownershipData = useMemo(() => {
     const counts: Record<string, number> = {}
+    for (const b of HEADLINE_BUCKETS) counts[b] = 0
     for (const p of filteredPractices) {
-      const ec = (p.entity_classification ?? '').trim().toLowerCase() || 'unknown'
-      counts[ec] = (counts[ec] ?? 0) + 1
+      counts[tierToBucket(p.ownership_tier)]++
     }
 
-    return Object.entries(counts)
-      .map(([ec, count]) => ({
-        label: getEntityClassificationLabel(ec),
-        value: count,
-        color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#9C9C90',
-      }))
-      .sort((a, b) => b.value - a.value)
+    return HEADLINE_BUCKETS.map((b) => ({
+      label: BUCKET_META[b].label,
+      value: counts[b],
+      color: BUCKET_META[b].color,
+    }))
   }, [filteredPractices])
 
-  // ── Practice Size Distribution ────────────────────────────────────────
+  // ── Practice Size Distribution (structural, not an ownership claim) ───
   const sizeData = useMemo(() => {
     const sizes = { 'Solo (1-4)': 0, 'Small Group (5-9)': 0, 'Large Group (10+)': 0 }
 
@@ -75,44 +81,36 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
     return Object.entries(sizes).map(([label, value]) => ({ label, value }))
   }, [filteredPractices])
 
-  // ── Top DSOs table ────────────────────────────────────────────────────
-  const topDsos = useMemo(() => {
+  // ── Corporate networks table (census network_id) ──────────────────────
+  const topNetworks = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const p of filteredPractices) {
-      const dso = p.affiliated_dso
-      if (!dso || dso.trim() === '') continue
-      if (DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))) continue
-      if (!isCorporateClassification(p.entity_classification)) continue
-      counts[dso] = (counts[dso] ?? 0) + 1
+      if (tierToBucket(p.ownership_tier) !== 'dso_pe_corporate') continue
+      const label = p.network_id ? formatNetworkId(p.network_id) : 'Network not recorded'
+      counts[label] = (counts[label] ?? 0) + 1
     }
 
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
-      .map(([name, practices]) => ({ name, practices }))
+      .map(([name, clinics]) => ({ name, clinics }))
   }, [filteredPractices])
 
-  // ── DSO Penetration by ZIP ────────────────────────────────────────────
-  const wzCityMap = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const wz of watchedZips) {
-      if (wz.city) map.set(wz.zip_code, wz.city)
-    }
-    return map
-  }, [watchedZips])
-
-  const dsoPenetration = useMemo(() => {
-    if (!zipScores || zipScores.length === 0) return []
-    return [...zipScores]
-      .filter((zs) => zs.corporate_share_pct != null && zs.corporate_share_pct > 0)
-      .sort((a, b) => (b.corporate_share_pct ?? 0) - (a.corporate_share_pct ?? 0))
+  // ── Census ownership by ZIP table ─────────────────────────────────────
+  const censusByZip = useMemo(() => {
+    return [...zipStats]
+      .sort((a, b) => b.dso_pe_count - a.dso_pe_count || b.total_practices - a.total_practices)
       .map((zs) => ({
         zip: zs.zip_code,
-        city: wzCityMap.get(zs.zip_code) ?? zs.city ?? '--',
-        practices: zs.total_gp_locations ?? 0,
-        corporate_share_pct: (zs.corporate_share_pct ?? 0) * 100,
+        city: zs.city || '--',
+        total: zs.total_practices,
+        solo_owner: zs.solo_owner_count,
+        dentist_owned: zs.dentist_owned_count,
+        dso_pe: zs.dso_pe_count,
+        unresolved: zs.unresolved_count,
+        reviewed_pct: zs.reviewed_pct,
       }))
-  }, [zipScores, wzCityMap])
+  }, [zipStats])
 
   if (filteredPractices.length === 0) return null
 
@@ -120,18 +118,24 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
     <div>
       <SectionHeader
         title="Ownership Landscape"
-        helpText="Breakdown of practices by ownership status and size."
+        helpText="Census ownership buckets and corporate networks for this zone. All ownership reads come from the hand-reviewed census — unreviewed clinics stay Unresolved, never estimated."
       />
 
       <div className="mt-4 space-y-6">
-        {/* Ownership Status Bar */}
+        {/* Census ownership bar */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
+            Census Ownership Buckets
+          </h3>
+          <p className="text-xs text-[#6B6B60] mb-3">
+            Hand-reviewed ownership conclusions. Unresolved = no reviewed conclusion yet.
+          </p>
           <BarChart
             data={ownershipData}
             orientation="horizontal"
             height={300}
-            xAxisLabel="Practices"
-            tooltipFormat={(d) => `${d.label}: ${d.value.toLocaleString()} practices`}
+            xAxisLabel="Clinics"
+            tooltipFormat={(d) => `${d.label}: ${d.value.toLocaleString()} clinics`}
           />
         </div>
 
@@ -152,19 +156,22 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
           </div>
         )}
 
-        {/* Top DSOs Table */}
-        {topDsos.length > 0 && (
+        {/* Corporate networks table */}
+        {topNetworks.length > 0 && (
           <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">
-              Top DSOs in Zone
+            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
+              Corporate Networks in Zone
             </h3>
+            <p className="text-xs text-[#6B6B60] mb-3">
+              Census-reviewed DSO/PE clinics grouped by network (evidence-backed).
+            </p>
             <DataTable
-              data={topDsos}
+              data={topNetworks}
               columns={[
-                { key: 'name', header: 'DSO Name' },
+                { key: 'name', header: 'Network' },
                 {
-                  key: 'practices',
-                  header: 'Practices',
+                  key: 'clinics',
+                  header: 'Census DSO/PE Clinics',
                   render: (v: number) => v.toLocaleString(),
                 },
               ]}
@@ -173,26 +180,50 @@ export function OwnershipLandscape({ practices, zipStats, zipScores, watchedZips
           </div>
         )}
 
-        {/* DSO Penetration by ZIP */}
-        {dsoPenetration.length > 0 && (
+        {/* Census ownership by ZIP */}
+        {censusByZip.length > 0 && (
           <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">
-              DSO Penetration by ZIP
+            <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
+              Census Ownership by ZIP
             </h3>
+            <p className="text-xs text-[#6B6B60] mb-3">
+              Per-ZIP census bucket counts over tracked clinics. Coverage % = share of the
+              ZIP&apos;s tracked clinics with a reviewed conclusion.
+            </p>
             <DataTable
-              data={dsoPenetration}
+              data={censusByZip}
               columns={[
                 { key: 'zip', header: 'ZIP' },
                 { key: 'city', header: 'City' },
                 {
-                  key: 'practices',
-                  header: 'Practices',
-                  render: (v: number | null) => v != null ? v.toLocaleString() : '--',
+                  key: 'total',
+                  header: 'Tracked',
+                  render: (v: number | null) => (v != null ? v.toLocaleString() : '--'),
                 },
                 {
-                  key: 'corporate_share_pct',
-                  header: 'Corporate Share %',
-                  render: (v: number | null) => v != null ? `${Number(v).toFixed(1)}%` : '--',
+                  key: 'solo_owner',
+                  header: 'Solo Owner-Op',
+                  render: (v: number | null) => (v != null ? v.toLocaleString() : '--'),
+                },
+                {
+                  key: 'dentist_owned',
+                  header: 'Dentist-Owned',
+                  render: (v: number | null) => (v != null ? v.toLocaleString() : '--'),
+                },
+                {
+                  key: 'dso_pe',
+                  header: 'DSO / PE',
+                  render: (v: number | null) => (v != null ? v.toLocaleString() : '--'),
+                },
+                {
+                  key: 'unresolved',
+                  header: 'Unresolved',
+                  render: (v: number | null) => (v != null ? v.toLocaleString() : '--'),
+                },
+                {
+                  key: 'reviewed_pct',
+                  header: 'Coverage %',
+                  render: (v: number | null) => (v != null ? `${Number(v).toFixed(0)}%` : '--'),
                 },
               ]}
               rowKey="zip"

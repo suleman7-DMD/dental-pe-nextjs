@@ -4,11 +4,8 @@ import { getWatchedZips } from '@/lib/supabase/queries/watched-zips'
 import { getADABenchmarks } from '@/lib/supabase/queries/ada-benchmarks'
 import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
-import {
-  INDEPENDENT_CLASSIFICATIONS,
-  DSO_NATIONAL_TAXONOMY_LEAKS,
-} from '@/lib/constants/entity-classifications'
-import { JobMarketShell } from './_components/job-market-shell'
+import { summarizeBuckets, tierToBucket } from '@/lib/census/ownership-truth'
+import { JobMarketShell, type ServerKpis } from './_components/job-market-shell'
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -60,26 +57,6 @@ export default async function JobMarketPage() {
     // duplicate shells before the page computes KPIs or renders maps/lists.
     const gpLocations = locations
 
-    const locTotalCount = gpLocations.length
-    const locIndepCount = gpLocations.filter((p) =>
-      INDEPENDENT_CLASSIFICATIONS.includes(
-        p.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
-      )
-    ).length
-    const locDsoRegionalCount = gpLocations.filter((p) => p.entity_classification === 'dso_regional').length
-    const locDsoNationalCount = gpLocations.filter((p) => p.entity_classification === 'dso_national').length
-    const locDsoNationalRealCount = gpLocations.filter((p) => p.entity_classification === 'dso_national' && !(DSO_NATIONAL_TAXONOMY_LEAKS as readonly string[]).includes(p.affiliated_dso ?? '')).length
-    const locDsoRegionalStrongCount = gpLocations.filter((p) => p.entity_classification === 'dso_regional' && (p.ein || p.parent_company || p.classification_reasoning?.toLowerCase().includes('generic brand') || p.classification_reasoning?.toLowerCase().includes('franchise') || p.classification_reasoning?.toLowerCase().includes('branch'))).length
-    const locDsoSpecialistsCount = 0
-    const locHighVolCount = gpLocations.filter((p) => p.entity_classification === 'solo_high_volume').length
-    const locLargeStaffCount = gpLocations.filter((p) => (p.employee_count ?? 0) >= 10).length
-    const locRetirementCount = gpLocations.filter((p) =>
-      INDEPENDENT_CLASSIFICATIONS.includes(
-        p.entity_classification as (typeof INDEPENDENT_CLASSIFICATIONS)[number]
-      ) &&
-      p.year_established != null &&
-      p.year_established < new Date().getFullYear() - 30
-    ).length
     // Enriched count: scoped to the GP location set (data_axle_enriched=true).
     // This makes the freshness bar scope-aware: "21.7% in Chicagoland" instead of
     // "0.8% globally" (which used a frozen 381k denominator from data-snapshot.ts).
@@ -91,28 +68,49 @@ export default async function JobMarketPage() {
       lastUpdated: latestUpdate,
     }
 
-    // Compute server-side KPI counts using GP-scoped denominators
-    const corporate = locDsoRegionalCount + locDsoNationalCount
-    const highConfCorporate =
-      locDsoNationalRealCount +
-      locDsoRegionalStrongCount +
-      locDsoSpecialistsCount
-    const total_p = locTotalCount  // GP locations only — excludes specialist/non_clinical
-    const indep_cnt = locIndepCount
-    // unclassified = GP total - corporate - independent (specialist/non_clinical already excluded)
-    const unk_cnt = Math.max(0, total_p - corporate - indep_cnt)
+    // ── Census-first server KPIs ────────────────────────────────────────
+    // Ownership comes ONLY from the hand-reviewed census (ownership_tier).
+    // The universe denominator is live: SUM(zip_scores.total_gp_locations)
+    // for the scope's ZIPs — never a hardcoded tally.
+    const universe = zipScores
+      .filter((zs) => defaultZips.includes(zs.zip_code))
+      .map((zs) => zs.total_gp_locations)
+      .filter((v): v is number => v != null && !isNaN(v))
+      .reduce((a, b) => a + b, 0)
 
-    const serverKpis = {
-      total_p,
-      indep_cnt,
-      dso_cnt: corporate,
-      pe_cnt: 0,
-      unk_cnt,
-      highConfCorporate,
-      allSignalsCorporate: corporate,
-      large_count: locLargeStaffCount,
-      retirement_risk: locRetirementCount,
-      highVolCount: locHighVolCount,
+    const currentYear = new Date().getFullYear()
+    let large_count = 0
+    let retirement_risk = 0
+    let highVolCount = 0
+    for (const p of gpLocations) {
+      const bucket = tierToBucket(p.ownership_tier)
+      const dentistOwned =
+        bucket === 'true_solo_owner_operated' || bucket === 'dentist_owned_not_solo'
+      if ((p.employee_count ?? 0) >= 10) large_count++
+      if (
+        dentistOwned &&
+        p.year_established != null &&
+        p.year_established <= currentYear - 30
+      ) {
+        retirement_risk++
+      }
+      if (
+        p.ownership_tier === 'true_independent' &&
+        ((p.employee_count ?? 0) >= 5 || (p.estimated_revenue ?? 0) >= 800_000)
+      ) {
+        highVolCount++
+      }
+    }
+
+    const serverKpis: ServerKpis = {
+      total_p: gpLocations.length,
+      large_count,
+      retirement_risk,
+      highVolCount,
+      bucketSummary: summarizeBuckets(
+        gpLocations.map((p) => ({ ownership_tier: p.ownership_tier, pe_backed: p.pe_backed })),
+        universe
+      ),
     }
 
     return (
@@ -129,17 +127,12 @@ export default async function JobMarketPage() {
     // If the entire page fails, render with safe fallback data
     console.error('JobMarketPage failed:', error)
 
-    const fallbackKpis = {
+    const fallbackKpis: ServerKpis = {
       total_p: 0,
-      indep_cnt: 0,
-      dso_cnt: 0,
-      pe_cnt: 0,
-      unk_cnt: 0,
-      highConfCorporate: 0,
-      allSignalsCorporate: 0,
       large_count: 0,
       retirement_risk: 0,
       highVolCount: 0,
+      bucketSummary: summarizeBuckets([], 0),
     }
 
     return (

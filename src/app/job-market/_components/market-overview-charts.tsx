@@ -6,13 +6,12 @@ import { BarChart } from '@/components/charts/bar-chart'
 import { DonutChart } from '@/components/charts/donut-chart'
 import { HistogramChart } from '@/components/charts/histogram-chart'
 
-import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
+import { isGpLocationClassification } from '@/lib/constants/entity-classifications'
 import {
-  DSO_FILTER_KEYWORDS,
-  getEntityClassificationLabel,
-  isCorporateClassification,
-  isGpLocationClassification,
-} from '@/lib/constants/entity-classifications'
+  BUCKET_META,
+  HEADLINE_BUCKETS,
+  tierToBucket,
+} from '@/lib/census/ownership-truth'
 
 import type { Practice } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
@@ -24,107 +23,97 @@ import type { ZipStats } from './job-market-shell'
 interface MarketOverviewChartsProps {
   practices: Practice[]
   zipStats: ZipStats[]
-  kpis: {
-    indep_cnt: number
-    dso_cnt: number
-    pe_cnt: number
-    unk_cnt: number
-  }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-const EC_HISTOGRAM_COLORS: Record<string, string> = {
-  'Solo Established': '#2D8B4E',
-  'Solo New': '#81C784',
-  'Solo Inactive': '#9E9E9E',
-  'Solo High Volume': '#1B5E20',
-  'Family Practice': '#D4920B',
-  'Small Group': '#42A5F5',
-  'Large Group': '#1565C0',
-  'DSO Regional': '#FFA726',
-  'DSO National': '#C23B3B',
-  'Specialist': '#7C3AED',
-  'Non-Clinical': '#9C9C90',
-  'Unknown': '#9C9C90',
+/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
+function formatNetworkId(id: string): string {
+  return id
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
 
+const BUCKET_HISTOGRAM_ORDER = HEADLINE_BUCKETS.map((b) => BUCKET_META[b].shortLabel)
+
+const BUCKET_HISTOGRAM_COLORS: Record<string, string> = Object.fromEntries(
+  HEADLINE_BUCKETS.map((b) => [BUCKET_META[b].shortLabel, BUCKET_META[b].color])
+)
+
 // ────────────────────────────────────────────────────────────────────────────
-// Component
+// Component — every ownership visual here reads the census truth layer
+// (ownership_tier → headline bucket). The detector-era donut/top-DSO charts
+// were removed, not relabeled.
 // ────────────────────────────────────────────────────────────────────────────
 
 export function MarketOverviewCharts({
   practices,
   zipStats,
-  kpis,
 }: MarketOverviewChartsProps) {
-  // ── Defensive GP-only guard ───
+  // ── Defensive GP-only guard (scope axis, not an ownership claim) ───
   const filteredPractices = useMemo(
     () =>
       practices.filter((p) => isGpLocationClassification(p.entity_classification)),
     [practices]
   )
 
-  // ── Chart 1: Consolidation by ZIP ─────────────────────────────────────
-  const consolidationByZip = useMemo(() => {
-    const rows = zipStats
+  // ── Chart 1: Census DSO/PE share by ZIP ───────────────────────────────
+  // Reviewed-corporate count over ALL tracked clinics in the ZIP — a lower
+  // bound wherever census coverage < 100%, which the tooltip states.
+  const dsoPeByZip = useMemo(() => {
+    return zipStats
+      .filter((zs) => zs.dso_pe_count > 0)
       .map((zs) => ({
         label: zs.zip_code,
-        value: zs.consolidation_pct_of_total,
+        value: (zs.dso_pe_count / Math.max(zs.total_practices, 1)) * 100,
+        dsoPeCount: zs.dso_pe_count,
+        total: zs.total_practices,
+        unresolved: zs.unresolved_count,
       }))
       .sort((a, b) => a.value - b.value)
       .slice(-25)
-
-    return rows
   }, [zipStats])
 
-  // ── Chart 2: Ownership Donut ──────────────────────────────────────────
+  // ── Chart 2: Census ownership donut (five buckets, always) ────────────
   const donutData = useMemo(() => {
     const counts: Record<string, number> = {}
+    for (const b of HEADLINE_BUCKETS) counts[b] = 0
     for (const p of filteredPractices) {
-      const ec = (p.entity_classification ?? '').trim().toLowerCase() || 'unknown'
-      counts[ec] = (counts[ec] ?? 0) + 1
+      counts[tierToBucket(p.ownership_tier)]++
     }
 
-    const segments = Object.entries(counts)
-      .map(([key, value]) => ({
-        label: getEntityClassificationLabel(key),
-        value,
-        color: ENTITY_CLASSIFICATION_COLORS[key as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#9C9C90',
-      }))
-      .filter((s) => s.value > 0)
-      .sort((a, b) => b.value - a.value)
+    const segments = HEADLINE_BUCKETS.map((b) => ({
+      label: BUCKET_META[b].label,
+      value: counts[b],
+      color: BUCKET_META[b].color,
+    })).filter((s) => s.value > 0)
 
     const grandTotal = segments.reduce((s, seg) => s + seg.value, 0)
     return { segments, centerLabel: grandTotal.toLocaleString(), grandTotal }
   }, [filteredPractices])
 
-  // ── Chart 3: Practice Age Distribution ────────────────────────────────
+  // ── Chart 3: Practice age distribution, colored by census bucket ──────
   const ageHistogramData = useMemo(() => {
     const rows: Array<{ year: number; ownership: string }> = []
     for (const p of filteredPractices) {
       const yr = p.year_established != null ? Number(p.year_established) : NaN
       if (isNaN(yr) || yr < 1900 || yr > 2030) continue
-      const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      const ownership = getEntityClassificationLabel(ec || 'unknown')
-      rows.push({ year: yr, ownership })
+      rows.push({ year: yr, ownership: BUCKET_META[tierToBucket(p.ownership_tier)].shortLabel })
     }
     return rows
   }, [filteredPractices])
 
-  // ── Chart 4: Top DSOs in Zone ─────────────────────────────────────────
-  const topDsos = useMemo(() => {
+  // ── Chart 4: Top corporate networks (census network_id) ───────────────
+  const topNetworks = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const p of filteredPractices) {
-      const dso = p.affiliated_dso
-      if (!dso || dso.trim() === '') continue
-      // Filter out taxonomy description artifacts
-      if (DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))) continue
-      // Only count practices classified as corporate
-      if (!isCorporateClassification(p.entity_classification)) continue
-      counts[dso] = (counts[dso] ?? 0) + 1
+      if (tierToBucket(p.ownership_tier) !== 'dso_pe_corporate') continue
+      const label = p.network_id ? formatNetworkId(p.network_id) : 'Network not recorded'
+      counts[label] = (counts[label] ?? 0) + 1
     }
     return Object.entries(counts)
       .sort((a, b) => a[1] - b[1])
@@ -138,44 +127,53 @@ export function MarketOverviewCharts({
     <div>
       <SectionHeader
         title="Market Overview"
-        helpText="Visual snapshot of consolidation patterns, ownership mix, practice age, and top DSO presence across your commutable zone."
+        helpText="Census ownership mix, DSO/PE concentration by ZIP, practice age, and corporate networks in your commutable zone. All ownership reads come from the hand-reviewed census — unreviewed clinics stay Unresolved."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-        {/* 1. Consolidation by ZIP */}
+        {/* 1. Census DSO/PE share by ZIP */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">Consolidation by ZIP</h3>
-          {consolidationByZip.length > 0 ? (
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
+            Census DSO/PE Share by ZIP
+          </h3>
+          <p className="text-xs text-[#6B6B60] mb-3">
+            Reviewed DSO/PE/corporate clinics as % of all tracked clinics in the ZIP —
+            a lower bound where census coverage is incomplete.
+          </p>
+          {dsoPeByZip.length > 0 ? (
             <BarChart
-              data={consolidationByZip}
+              data={dsoPeByZip}
               orientation="horizontal"
               height={420}
-              xAxisLabel="Known Consolidated %"
+              xAxisLabel="Census DSO/PE % of tracked clinics"
               xRange={[0, 100]}
               colorScale={{
                 type: 'gradient',
                 min: 0,
-                max: Math.max(...consolidationByZip.map((d) => d.value), 1),
+                max: Math.max(...dsoPeByZip.map((d) => d.value), 1),
                 colors: ['#2D8B4E', '#D4920B', '#C23B3B'],
               }}
-              tooltipFormat={(d) => `ZIP ${d.label}: ${d.value.toFixed(1)}%`}
+              tooltipFormat={(d) => `ZIP ${d.label}: ${d.value.toFixed(1)}% census DSO/PE`}
             />
           ) : (
             <p className="text-sm text-[#6B6B60] text-center py-8">
-              No ZIP-level consolidation data available.
+              No reviewed DSO/PE clinics in this zone yet.
             </p>
           )}
         </div>
 
-        {/* 2. Ownership Breakdown Donut */}
+        {/* 2. Census ownership donut */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">Ownership Breakdown</h3>
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">Census Ownership Mix</h3>
+          <p className="text-xs text-[#6B6B60] mb-3">
+            Hand-reviewed ownership buckets. Unresolved = no reviewed conclusion yet.
+          </p>
           <DonutChart
             segments={donutData.segments}
             centerLabel={donutData.centerLabel}
             height={420}
             tooltipFormat={(d) =>
-              `${d.label}: ${d.value.toLocaleString()} practices (${
+              `${d.label}: ${d.value.toLocaleString()} clinics (${
                 ((d.value / Math.max(donutData.grandTotal, 1)) * 100).toFixed(1)
               }%)`
             }
@@ -190,23 +188,10 @@ export function MarketOverviewCharts({
               data={ageHistogramData}
               xField="year"
               colorField="ownership"
-              colorMap={EC_HISTOGRAM_COLORS}
-              categoryOrder={[
-                'Solo Established',
-                'Solo New',
-                'Solo Inactive',
-                'Solo High Volume',
-                'Family Practice',
-                'Small Group',
-                'Large Group',
-                'DSO Regional',
-                'DSO National',
-                'Specialist',
-                'Non-Clinical',
-                'Unknown',
-              ]}
+              colorMap={BUCKET_HISTOGRAM_COLORS}
+              categoryOrder={BUCKET_HISTOGRAM_ORDER}
               xAxisLabel="Year Established"
-              yAxisLabel="Practices"
+              yAxisLabel="Clinics"
               height={420}
               stacked
               verticalLines={[
@@ -225,21 +210,27 @@ export function MarketOverviewCharts({
           )}
         </div>
 
-        {/* 4. Top DSOs in Zone */}
+        {/* 4. Top corporate networks (census) */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">Top DSOs in Zone</h3>
-          {topDsos.length > 0 ? (
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
+            Corporate Networks in Zone
+          </h3>
+          <p className="text-xs text-[#6B6B60] mb-3">
+            Census-reviewed DSO/PE clinics grouped by network. Evidence-backed —
+            not detector brand-matching.
+          </p>
+          {topNetworks.length > 0 ? (
             <BarChart
-              data={topDsos}
+              data={topNetworks}
               orientation="horizontal"
               height={420}
-              xAxisLabel="Practices"
-              barColor="#FFB74D"
-              tooltipFormat={(d) => `${d.label}: ${d.value} practices`}
+              xAxisLabel="Clinics"
+              barColor="#C23B3B"
+              tooltipFormat={(d) => `${d.label}: ${d.value} census DSO/PE clinics`}
             />
           ) : (
             <p className="text-sm text-[#6B6B60] text-center py-8">
-              No DSO-affiliated practices found in this zone.
+              No census-reviewed DSO/PE clinics found in this zone.
             </p>
           )}
         </div>

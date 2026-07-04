@@ -6,11 +6,12 @@ import { BarChart } from '@/components/charts/bar-chart'
 import { StackedBarChart } from '@/components/charts/stacked-bar-chart'
 import { DataTable } from '@/components/data-display/data-table'
 
+import { isGpLocationClassification } from '@/lib/constants/entity-classifications'
 import {
-  DSO_FILTER_KEYWORDS,
-  isCorporateClassification,
-  isGpLocationClassification,
-} from '@/lib/constants/entity-classifications'
+  BUCKET_META,
+  HEADLINE_BUCKETS,
+  tierToBucket,
+} from '@/lib/census/ownership-truth'
 
 import type { Practice } from '@/lib/types'
 import type { ZipStats } from './job-market-shell'
@@ -24,8 +25,19 @@ interface MarketAnalyticsProps {
   zipStats: ZipStats[]
 }
 
+/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
+function formatNetworkId(id: string): string {
+  return id
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
 // ────────────────────────────────────────────────────────────────────────────
-// Component
+// Component — ownership analytics read the census truth layer only. The
+// detector Independent/Consolidated/Unknown stack and the affiliated_dso /
+// affiliated_pe_sponsor tables were removed, not relabeled.
 // ────────────────────────────────────────────────────────────────────────────
 
 export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
@@ -46,8 +58,8 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
       }))
   }, [zipStats])
 
-  // ── Consolidation Breakdown (top 25, stacked horizontal bar) ──────────
-  const consolidationData = useMemo(() => {
+  // ── Census ownership breakdown (top 25, five-segment stacked bar) ─────
+  const censusBreakdownData = useMemo(() => {
     const top25 = [...zipStats]
       .sort((a, b) => b.total_practices - a.total_practices)
       .slice(0, 25)
@@ -56,45 +68,56 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
       .sort((a, b) => a.total_practices - b.total_practices) // ascending for chart
       .map((zs) => {
         const total = Math.max(zs.total_practices, 1)
-        const consolidatedCount = Math.max(
-          total - (zs.independent_count ?? 0) - (zs.unknown_count ?? 0),
-          0
-        )
-        const independentPct = ((zs.independent_count ?? 0) / total) * 100
-        const consolidatedPct = (consolidatedCount / total) * 100
-        const unknownPct = ((zs.unknown_count ?? 0) / total) * 100
-
+        const pct = (n: number) => Math.round((n / total) * 1000) / 10
         return {
           label: zs.city ? `${zs.zip_code} (${zs.city})` : zs.zip_code,
           segments: [
-            { key: 'Independent', value: Math.round(independentPct * 10) / 10, color: '#2D8B4E' },
-            { key: 'Consolidated', value: Math.round(consolidatedPct * 10) / 10, color: '#C23B3B' },
-            { key: 'Unknown', value: Math.round(unknownPct * 10) / 10, color: '#9C9C90' },
+            {
+              key: BUCKET_META.true_solo_owner_operated.shortLabel,
+              value: pct(zs.solo_owner_count),
+              color: BUCKET_META.true_solo_owner_operated.color,
+            },
+            {
+              key: BUCKET_META.dentist_owned_not_solo.shortLabel,
+              value: pct(zs.dentist_owned_count),
+              color: BUCKET_META.dentist_owned_not_solo.color,
+            },
+            {
+              key: BUCKET_META.dso_pe_corporate.shortLabel,
+              value: pct(zs.dso_pe_count),
+              color: BUCKET_META.dso_pe_corporate.color,
+            },
+            {
+              key: BUCKET_META.institutional.shortLabel,
+              value: pct(zs.institutional_count),
+              color: BUCKET_META.institutional.color,
+            },
+            {
+              key: BUCKET_META.unresolved.shortLabel,
+              value: pct(zs.unresolved_count),
+              color: BUCKET_META.unresolved.color,
+            },
           ],
         }
       })
   }, [zipStats])
 
-  // ── DSO Market Share table ────────────────────────────────────────────
-  const dsoMarketShare = useMemo(() => {
+  // ── Corporate network share table (census network_id) ─────────────────
+  const networkShare = useMemo(() => {
     const totalInZone = filteredPractices.length
-    const dsoCounts: Record<string, { locations: number; zips: Set<string> }> = {}
+    const counts: Record<string, { locations: number; zips: Set<string> }> = {}
 
     for (const p of filteredPractices) {
-      const dso = p.affiliated_dso
-      if (!dso || dso.trim() === '') continue
-      // Filter out taxonomy description artifacts
-      if (DSO_FILTER_KEYWORDS.some(kw => dso.toLowerCase().includes(kw))) continue
-      // Only count practices classified as corporate
-      if (!isCorporateClassification(p.entity_classification)) continue
+      if (tierToBucket(p.ownership_tier) !== 'dso_pe_corporate') continue
+      const name = p.network_id ? formatNetworkId(p.network_id) : 'Network not recorded'
 
-      if (!dsoCounts[dso]) dsoCounts[dso] = { locations: 0, zips: new Set() }
-      dsoCounts[dso].locations++
+      if (!counts[name]) counts[name] = { locations: 0, zips: new Set() }
+      counts[name].locations++
       const zip5 = (p.zip ?? '').toString().slice(0, 5)
-      if (zip5) dsoCounts[dso].zips.add(zip5)
+      if (zip5) counts[name].zips.add(zip5)
     }
 
-    return Object.entries(dsoCounts)
+    return Object.entries(counts)
       .sort((a, b) => b[1].locations - a[1].locations)
       .slice(0, 15)
       .map(([name, data]) => ({
@@ -107,31 +130,19 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
       }))
   }, [filteredPractices])
 
-  // ── PE Sponsors Active table ──────────────────────────────────────────
-  const peSponsors = useMemo(() => {
-    const peCounts: Record<
-      string,
-      { dsos: Set<string>; totalLocations: number }
-    > = {}
-
+  // ── PE-backed clinics by network (census pe_backed flag) ──────────────
+  const peBackedNetworks = useMemo(() => {
+    const counts: Record<string, number> = {}
     for (const p of filteredPractices) {
-      const pe = p.affiliated_pe_sponsor
-      if (!pe || pe.trim() === '') continue
-
-      if (!peCounts[pe]) peCounts[pe] = { dsos: new Set(), totalLocations: 0 }
-      peCounts[pe].totalLocations++
-      const dso = p.affiliated_dso
-      if (dso && dso.trim()) peCounts[pe].dsos.add(dso)
+      if (p.pe_backed !== true) continue
+      const name = p.network_id ? formatNetworkId(p.network_id) : 'Network not recorded'
+      counts[name] = (counts[name] ?? 0) + 1
     }
 
-    return Object.entries(peCounts)
-      .sort((a, b) => b[1].totalLocations - a[1].totalLocations)
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
       .slice(0, 15)
-      .map(([name, data]) => ({
-        name,
-        portfolio_dsos: data.dsos.size,
-        total_locations: data.totalLocations,
-      }))
+      .map(([name, clinics]) => ({ name, clinics }))
   }, [filteredPractices])
 
   if (zipStats.length === 0) return null
@@ -140,7 +151,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
     <div>
       <SectionHeader
         title="Market Analytics"
-        helpText="ZIP-level density, consolidation breakdown, and competitive landscape analysis."
+        helpText="ZIP-level density, census ownership breakdown, and corporate-network landscape. All ownership reads come from the hand-reviewed census."
       />
 
       <div className="mt-4 space-y-6">
@@ -160,21 +171,24 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
           />
         </div>
 
-        {/* Consolidation Breakdown by ZIP */}
+        {/* Census ownership breakdown by ZIP */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">
-            Consolidation Breakdown by ZIP -- Top 25
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
+            Census Ownership Breakdown by ZIP -- Top 25
           </h3>
+          <p className="text-xs text-[#6B6B60] mb-3">
+            Five census buckets per ZIP. Unresolved = tracked clinics without a reviewed
+            conclusion — shown honestly, never redistributed.
+          </p>
           <StackedBarChart
-            data={consolidationData}
+            data={censusBreakdownData}
             orientation="horizontal"
-            height={Math.max(400, consolidationData.length * 22)}
-            xAxisLabel="Percentage of Practices"
-            legendItems={[
-              { key: 'Independent', color: '#2D8B4E' },
-              { key: 'Consolidated', color: '#C23B3B' },
-              { key: 'Unknown', color: '#9C9C90' },
-            ]}
+            height={Math.max(400, censusBreakdownData.length * 22)}
+            xAxisLabel="Percentage of Tracked Clinics"
+            legendItems={HEADLINE_BUCKETS.map((b) => ({
+              key: BUCKET_META[b].shortLabel,
+              color: BUCKET_META[b].color,
+            }))}
           />
         </div>
 
@@ -185,23 +199,23 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
           </h3>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* DSO Market Share */}
+            {/* Corporate network share (census) */}
             <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
               <h4 className="text-xs font-semibold text-[#6B6B60] uppercase tracking-wider mb-3">
-                DSO Market Share
+                Corporate Network Share (Census)
               </h4>
-              {dsoMarketShare.length === 0 ? (
+              {networkShare.length === 0 ? (
                 <p className="text-sm text-[#6B6B60] text-center py-4">
-                  No DSO-affiliated practices found.
+                  No census-reviewed DSO/PE clinics found.
                 </p>
               ) : (
                 <DataTable
-                  data={dsoMarketShare}
+                  data={networkShare}
                   columns={[
-                    { key: 'name', header: 'DSO Name' },
+                    { key: 'name', header: 'Network' },
                     {
                       key: 'locations',
-                      header: 'Locations',
+                      header: 'Clinics',
                       render: (v: unknown) => v != null ? Number(v).toLocaleString() : '--',
                     },
                     {
@@ -211,7 +225,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
                     },
                     {
                       key: 'market_share',
-                      header: 'Market Share %',
+                      header: 'Share of Tracked %',
                       render: (v: unknown) => v != null ? `${Number(v).toFixed(1)}%` : '--',
                     },
                   ]}
@@ -220,28 +234,23 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
               )}
             </div>
 
-            {/* PE Sponsors Active */}
+            {/* PE-backed clinics (census) */}
             <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
               <h4 className="text-xs font-semibold text-[#6B6B60] uppercase tracking-wider mb-3">
-                PE Sponsors Active
+                PE-Backed Clinics (Census)
               </h4>
-              {peSponsors.length === 0 ? (
+              {peBackedNetworks.length === 0 ? (
                 <p className="text-sm text-[#6B6B60] text-center py-4">
-                  No PE-backed practices found.
+                  No census-reviewed PE-backed clinics found.
                 </p>
               ) : (
                 <DataTable
-                  data={peSponsors}
+                  data={peBackedNetworks}
                   columns={[
-                    { key: 'name', header: 'PE Sponsor' },
+                    { key: 'name', header: 'Network' },
                     {
-                      key: 'portfolio_dsos',
-                      header: 'Portfolio DSOs',
-                      render: (v: unknown) => v != null ? Number(v).toLocaleString() : '--',
-                    },
-                    {
-                      key: 'total_locations',
-                      header: 'Total Locations',
+                      key: 'clinics',
+                      header: 'PE-Backed Clinics',
                       render: (v: unknown) => v != null ? Number(v).toLocaleString() : '--',
                     },
                   ]}

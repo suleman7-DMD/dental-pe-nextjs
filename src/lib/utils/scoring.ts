@@ -1,14 +1,19 @@
-import type { Practice } from "@/lib/supabase/types";
-import { isIndependentClassification, isCorporateClassification } from "@/lib/constants/entity-classifications";
+import type { Practice } from "@/lib/types";
+import { tierToBucket } from "@/lib/census/ownership-truth";
 
 /**
  * Compute job opportunity score for a practice (0-100).
- * Uses entity_classification with ownership_status fallback.
+ *
+ * Ownership points come ONLY from the hand-reviewed census truth layer
+ * (ownership_tier → headline bucket). Never from the legacy detector.
  *
  * Scoring factors:
- * - Independent status: +30
- * - Unknown status: +10
- * - Buyability >= 70: +25, 50-69: +15
+ * - Census dentist-owned (solo owner-op T1, or dentist group/network T2-T3): +30
+ * - Census unresolved (no reviewed conclusion yet): +10 — a capped
+ *   "needs research" contribution, never treated as verified independence
+ * - Census DSO/PE/corporate (T4-T5) or institutional (T6): +0
+ * - Buyability >= 70: +25, 50-69: +15 (legacy heuristic input — stays until
+ *   the census-based buyability reframe ships; see purge list /buyability)
  * - Employees >= 10: +20, 5-9: +10
  * - Established >= 2021: +15, 2016-2020: +8
  */
@@ -34,22 +39,12 @@ export function computeJobOpportunityScore(
   const practice = input;
   let score = 0;
 
-  // Ownership status — use entity_classification with ownership_status fallback
-  const ec = (practice.entity_classification ?? "").trim().toLowerCase();
-  if (ec) {
-    if (isIndependentClassification(ec)) {
-      score += 30;
-    } else if (!isCorporateClassification(ec) && ec !== "specialist" && ec !== "non_clinical" && ec !== "org_only_npi" && ec !== "da_unverified" && ec !== "duplicate_location") {
-      score += 10; // unknown/unrecognized
-    }
-  } else {
-    // Fallback to ownership_status
-    const status = (practice.ownership_status ?? "unknown").trim().toLowerCase();
-    if (status === "independent" || status === "likely_independent") {
-      score += 30;
-    } else if (status === "unknown" || status === "") {
-      score += 10;
-    }
+  // Ownership points from the census bucket
+  const bucket = tierToBucket(practice.ownership_tier);
+  if (bucket === "true_solo_owner_operated" || bucket === "dentist_owned_not_solo") {
+    score += 30;
+  } else if (bucket === "unresolved") {
+    score += 10;
   }
 
   // Buyability score
@@ -78,15 +73,15 @@ export function computeJobOpportunityScore(
 
 /**
  * Determine retirement risk for a practice.
- * Independent (by entity_classification or ownership_status fallback) + established 30+ years ago.
+ * Census dentist-owned (T1-T3) + established 30+ years ago.
+ * Unresolved locations return false — we never claim retirement risk for a
+ * clinic whose ownership hasn't been reviewed (they surface separately as
+ * "needs research").
  */
 export function isRetirementRisk(practice: Practice): boolean {
-  const ec = (practice.entity_classification ?? "").trim().toLowerCase();
-  if (ec) {
-    if (!isIndependentClassification(ec)) return false;
-  } else {
-    const status = (practice.ownership_status ?? "unknown").trim().toLowerCase();
-    if (status !== "independent" && status !== "likely_independent") return false;
+  const bucket = tierToBucket(practice.ownership_tier);
+  if (bucket !== "true_solo_owner_operated" && bucket !== "dentist_owned_not_solo") {
+    return false;
   }
 
   const yr = practice.year_established;
