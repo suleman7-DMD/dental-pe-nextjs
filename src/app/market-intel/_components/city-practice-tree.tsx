@@ -1,42 +1,53 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import Link from 'next/link'
 import { SectionHeader } from '@/components/data-display/section-header'
-import { StatusBadge } from '@/components/data-display/status-badge'
+import { CensusBadge, formatNetworkName } from '@/components/data-display/census-badge'
 import { createBrowserClient } from '@/lib/supabase/client'
 import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
-import { isIndependentClassification, isCorporateClassification } from '@/lib/constants/entity-classifications'
+import {
+  BUCKET_META,
+  SOURCE_CLASS_META,
+  deriveSourceClass,
+  tierToBucket,
+} from '@/lib/census/ownership-truth'
+import { tallyBucketCount, type ZipCensusTally } from '../_lib/zip-census'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 
-interface Practice {
-  npi: string
+interface CensusPractice {
+  locationId: string
   practice_name: string | null
-  ownership_status: string | null
-  affiliated_dso: string | null
-  affiliated_pe_sponsor: string | null
-  entity_type: string | null
-  entity_classification: string | null
   zip: string | null
+  ownership_tier: string | null
+  pe_backed: boolean | null
+  network_id: string | null
+  census_review_status: string | null
 }
 
 interface CityGroup {
   cityName: string
   zips: string[]
-  total: number
-  independent: number
-  dso: number
-  pe: number
+  universe: number
+  reviewed: number
+  dsoPe: number
+  unresolved: number
 }
 
 interface CityPracticeTreeProps {
   watchedZips: WatchedZip[]
   zipScores: ZipScore[]
   zipList: string[]
+  tallies: ZipCensusTally[]
 }
 
-export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracticeTreeProps) {
-  const [practices, setPractices] = useState<Practice[]>([])
+function narrowReviewStatus(value: string | null): 'held' | 'undetermined' | null {
+  return value === 'held' || value === 'undetermined' ? value : null
+}
+
+export function CityPracticeTree({ watchedZips, zipScores, zipList, tallies }: CityPracticeTreeProps) {
+  const [practices, setPractices] = useState<CensusPractice[]>([])
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [expandedCities, setExpandedCities] = useState<Set<string>>(new Set())
@@ -61,20 +72,19 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
     setLoading(true)
 
     const supabase = createBrowserClient()
-    const all: Practice[] = (await fetchPracticeLocations(supabase, {
+    const all: CensusPractice[] = (await fetchPracticeLocations(supabase, {
       zips: zipList,
       gpOnly: true,
       orderBy: 'practice_name',
       ascending: true,
     })).map((row) => ({
-      npi: row.primary_npi ?? row.location_id,
+      locationId: row.location_id,
       practice_name: row.practice_name,
-      ownership_status: row.ownership_status,
-      affiliated_dso: row.affiliated_dso,
-      affiliated_pe_sponsor: row.affiliated_pe_sponsor,
-      entity_type: null,
-      entity_classification: row.entity_classification,
       zip: row.zip,
+      ownership_tier: row.ownership_tier,
+      pe_backed: row.pe_backed,
+      network_id: row.network_id,
+      census_review_status: row.census_review_status,
     }))
 
     setPractices(all)
@@ -82,79 +92,64 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
     setLoading(false)
   }, [zipList, loaded, loading])
 
-  // Build zip_code -> ZipScore lookup for initial totals before practices are loaded
   const zipScoreMap = useMemo(() => {
     const map = new Map<string, ZipScore>()
-    for (const zs of zipScores) {
-      map.set(zs.zip_code, zs)
-    }
+    for (const zs of zipScores) map.set(zs.zip_code, zs)
     return map
   }, [zipScores])
 
-  // Compute city-level stats
-  // Before practices are loaded, use zip_scores for totals (avoids "0 practices" bug).
-  // After practices are loaded, use practice-level computation for accuracy.
+  const tallyByZip = useMemo(() => {
+    const map = new Map<string, ZipCensusTally>()
+    for (const t of tallies) map.set(t.zip, t)
+    return map
+  }, [tallies])
+
+  // City-level census rollups.
+  // Before practices are loaded, the server-built per-ZIP tallies supply the
+  // numbers; after load, per-row census fields do — same truth layer either way.
   const cityGroups = useMemo((): CityGroup[] => {
     return sortedCityNames.map(cityName => {
       const zips = cityZips[cityName]
 
       if (!loaded) {
-        // Use zip_scores data for initial totals.
-        let total = 0
-        let independent = 0
-        let dso = 0
-        let pe = 0
+        let universe = 0
+        let reviewed = 0
+        let dsoPe = 0
         for (const zip of zips) {
-          const zs = zipScoreMap.get(zip)
-          if (zs) {
-            const zipTotal = zs.total_gp_locations ?? 0
-            total += zipTotal
-            // Corporate count: prefer saturation metric (corporate_share_pct * GP locations)
-            const corpFromSat = zs.corporate_share_pct != null && zs.total_gp_locations != null
-              ? Math.round(zs.corporate_share_pct * zs.total_gp_locations)
-              : null
-            const corpCount = corpFromSat ?? ((zs.dso_affiliated_count ?? 0) + (zs.pe_backed_count ?? 0))
-            dso += corpCount
-            // Independent count: prefer DB value, else estimate from total minus corporate.
-            const indepFromDb = zs.independent_count != null && zs.independent_count > 0
-              ? zs.independent_count
-              : Math.max(0, zipTotal - corpCount)
-            independent += indepFromDb
-            pe += 0  // PE is folded into corporate count from saturation metrics
-          }
+          const tally = tallyByZip.get(zip)
+          universe += zipScoreMap.get(zip)?.total_gp_locations ?? tally?.rows ?? 0
+          reviewed += tally?.reviewed ?? 0
+          dsoPe += tally ? tallyBucketCount(tally, 'dso_pe_corporate') : 0
         }
         return {
           cityName,
           zips: [...zips].sort(),
-          total,
-          independent,
-          dso,
-          pe,
+          universe,
+          reviewed,
+          dsoPe,
+          unresolved: Math.max(universe - reviewed, 0),
         }
       }
 
-      // Practices have been loaded — use practice-level computation
-      const cityPractices = practices.filter(p => p.zip && zips.includes(p.zip))
+      const zipSet = new Set(zips)
+      const cityPractices = practices.filter(p => p.zip && zipSet.has(p.zip))
+      const universe = cityPractices.length
+      const reviewed = cityPractices.filter(
+        p => deriveSourceClass(p.ownership_tier, narrowReviewStatus(p.census_review_status)) === 'census_reviewed'
+      ).length
+      const dsoPe = cityPractices.filter(
+        p => tierToBucket(p.ownership_tier) === 'dso_pe_corporate'
+      ).length
       return {
         cityName,
         zips: [...zips].sort(),
-        total: cityPractices.length,
-        independent: cityPractices.filter(p => {
-          if (p.entity_classification) return isIndependentClassification(p.entity_classification)
-          return p.ownership_status === 'independent' || p.ownership_status === 'likely_independent'
-        }).length,
-        dso: cityPractices.filter(p => {
-          if (p.ownership_status === 'pe_backed') return false  // PE takes priority
-          if (p.entity_classification) return isCorporateClassification(p.entity_classification)
-          return p.ownership_status === 'dso_affiliated'
-        }).length,
-        pe: cityPractices.filter(p => {
-          const os = (p.ownership_status ?? '').trim().toLowerCase()
-          return os === 'pe_backed'
-        }).length,
+        universe,
+        reviewed,
+        dsoPe,
+        unresolved: Math.max(universe - reviewed, 0),
       }
     })
-  }, [sortedCityNames, cityZips, practices, loaded, zipScoreMap])
+  }, [sortedCityNames, cityZips, practices, loaded, zipScoreMap, tallyByZip])
 
   const toggleCity = useCallback(
     (city: string) => {
@@ -192,7 +187,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
     <div>
       <SectionHeader
         title="Practice Detail by City"
-        helpText="Address-deduped general dental practices grouped by city and ZIP. Specialists, non-clinical records, unverified Data Axle rows, and duplicate shells are excluded."
+        helpText="Address-deduped general dental practices grouped by city and ZIP. Ownership chips are hand-reviewed census conclusions; every location without one stays an explicit open item (held, undetermined, or not yet reviewed) — never estimated. Practice names link to the full census dossier."
       />
 
       <div className="mt-4 space-y-1">
@@ -216,12 +211,12 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                 </svg>
                 <span className="text-sm font-medium text-[#1A1A1A]">{cg.cityName}</span>
                 <span className="text-xs text-[#6B6B60]">
-                  {cg.total} GP offices across {cg.zips.length} ZIP{cg.zips.length > 1 ? 's' : ''}
+                  {cg.universe} GP offices across {cg.zips.length} ZIP{cg.zips.length > 1 ? 's' : ''}
                 </span>
                 <div className="ml-auto flex items-center gap-3 text-xs">
-                  <span className="text-[#2D8B4E]">{cg.independent} indep.</span>
-                  <span className="text-[#D4920B]">{cg.dso} DSO</span>
-                  <span className="text-[#C23B3B]">{cg.pe} PE</span>
+                  <span className="text-[#2D8B4E]">{cg.reviewed} reviewed</span>
+                  <span style={{ color: BUCKET_META.dso_pe_corporate.color }}>{cg.dsoPe} DSO/PE</span>
+                  <span style={{ color: BUCKET_META.unresolved.color }}>{cg.unresolved} unresolved</span>
                 </div>
               </button>
 
@@ -235,25 +230,33 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                   ) : (
                     <>
                       {/* City mini KPIs */}
-                      {cg.total > 0 && (
+                      {cg.universe > 0 && (
                         <div className="grid grid-cols-4 gap-3 px-4 py-3 bg-[#FAFAF7]/50">
                           <div className="text-center">
-                            <div className="text-lg font-mono font-semibold text-[#1A1A1A]">{cg.total}</div>
+                            <div className="text-lg font-mono font-semibold text-[#1A1A1A]">{cg.universe}</div>
                             <div className="text-[0.7rem] text-[#6B6B60]">GP Offices</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-lg font-mono font-semibold text-[#2D8B4E]">{cg.independent}</div>
-                            <div className="text-[0.7rem] text-[#6B6B60]">Independent</div>
+                            <div className="text-lg font-mono font-semibold text-[#2D8B4E]">{cg.reviewed}</div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">Census-Reviewed</div>
                           </div>
                           <div className="text-center">
-                            <div className="text-lg font-mono font-semibold text-[#D4920B]">{cg.dso + cg.pe}</div>
-                            <div className="text-[0.7rem] text-[#6B6B60]">DSO + PE</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="text-lg font-mono font-semibold text-[#1A1A1A]">
-                              {cg.total > 0 ? `${(((cg.dso + cg.pe) / cg.total) * 100).toFixed(0)}%` : '0%'}
+                            <div
+                              className="text-lg font-mono font-semibold"
+                              style={{ color: BUCKET_META.dso_pe_corporate.color }}
+                            >
+                              {cg.dsoPe}
                             </div>
-                            <div className="text-[0.7rem] text-[#6B6B60]">Known Consol. (of total)</div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">DSO/PE (census)</div>
+                          </div>
+                          <div className="text-center">
+                            <div
+                              className="text-lg font-mono font-semibold"
+                              style={{ color: BUCKET_META.unresolved.color }}
+                            >
+                              {cg.unresolved}
+                            </div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">Unresolved</div>
                           </div>
                         </div>
                       )}
@@ -262,14 +265,16 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                       {cg.zips.map(zip => {
                         const zipPractices = practices.filter(p => p.zip === zip)
                         const zipIsExpanded = expandedZips.has(zip)
-                        const zipScore = zipScores.find(z => z.zip_code === zip)
-                        const scoreTag = zipScore?.opportunity_score != null
-                          ? ` | Score: ${zipScore.opportunity_score}`
-                          : ''
-                        // Use zip_scores count before practices are loaded
+                        const tally = tallyByZip.get(zip)
+                        // Use tally/zip_scores counts before practices are loaded
                         const zipPracticeCount = loaded
                           ? zipPractices.length
-                          : (zipScore?.total_gp_locations ?? 0)
+                          : (zipScoreMap.get(zip)?.total_gp_locations ?? tally?.rows ?? 0)
+                        const zipReviewed = loaded
+                          ? zipPractices.filter(
+                              p => deriveSourceClass(p.ownership_tier, narrowReviewStatus(p.census_review_status)) === 'census_reviewed'
+                            ).length
+                          : (tally?.reviewed ?? 0)
 
                         return (
                           <div key={zip} className="border-t border-[#E8E5DE]/50">
@@ -287,7 +292,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                               </svg>
                               <span className="text-[0.82rem] text-[#1A1A1A]">{zip}</span>
                               <span className="text-xs text-[#6B6B60]">
-                                {zipPracticeCount} GP offices{scoreTag}
+                                {zipPracticeCount} GP offices &middot; {zipReviewed} census-reviewed
                               </span>
                             </button>
 
@@ -300,24 +305,44 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList }: CityPracti
                                     <thead>
                                       <tr className="border-b border-[#E8E5DE]">
                                         <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Practice Name</th>
-                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Status</th>
-                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">DSO</th>
-                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Entity Type</th>
+                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Ownership (census)</th>
+                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Network</th>
+                                        <th className="text-left py-1.5 px-2 text-[#6B6B60] font-medium">Review State</th>
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {zipPractices.map(p => (
-                                        <tr key={p.npi} className="border-b border-[#E8E5DE]/30 hover:bg-[#F7F7F4]">
-                                          <td className="py-1.5 px-2 text-[#1A1A1A]">{p.practice_name ?? '\u2014'}</td>
-                                          <td className="py-1.5 px-2">
-                                            <StatusBadge status={p.entity_classification ?? p.ownership_status} />
-                                          </td>
-                                          <td className="py-1.5 px-2 text-[#6B6B60]">
-                                            {p.affiliated_dso ?? p.affiliated_pe_sponsor ?? '\u2014'}
-                                          </td>
-                                          <td className="py-1.5 px-2 text-[#6B6B60]">{p.entity_type ?? '\u2014'}</td>
-                                        </tr>
-                                      ))}
+                                      {zipPractices.map(p => {
+                                        const sourceClass = deriveSourceClass(
+                                          p.ownership_tier,
+                                          narrowReviewStatus(p.census_review_status)
+                                        )
+                                        return (
+                                          <tr key={p.locationId} className="border-b border-[#E8E5DE]/30 hover:bg-[#F7F7F4]">
+                                            <td className="py-1.5 px-2">
+                                              <Link
+                                                href={`/practice/${encodeURIComponent(p.locationId)}`}
+                                                className="text-[#1A1A1A] hover:text-[#8B6508] hover:underline underline-offset-2"
+                                              >
+                                                {p.practice_name ?? '—'}
+                                              </Link>
+                                            </td>
+                                            <td className="py-1.5 px-2">
+                                              <CensusBadge tier={p.ownership_tier} peBacked={p.pe_backed} compact />
+                                            </td>
+                                            <td className="py-1.5 px-2 text-[#6B6B60]">
+                                              {formatNetworkName(p.network_id) ?? '—'}
+                                            </td>
+                                            <td className="py-1.5 px-2">
+                                              <span
+                                                className="text-[#6B6B60]"
+                                                title={SOURCE_CLASS_META[sourceClass].description}
+                                              >
+                                                {SOURCE_CLASS_META[sourceClass].label}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        )
+                                      })}
                                     </tbody>
                                   </table>
                                 )}

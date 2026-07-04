@@ -291,14 +291,15 @@ function MarketIntelShellInner({
 
         {activeTab === 'zip-analysis' && (
           <div className="space-y-6">
-            {/* ZIP Score Table */}
-            <ZipScoreTable zipScores={zipScores} />
+            {/* Census detail per ZIP */}
+            <ZipScoreTable zipScores={zipScores} tallies={scopedTallies} />
 
-            {/* Practice Detail Tree */}
+            {/* Practice detail tree — census rollups + per-location census rows */}
             <CityPracticeTree
               watchedZips={watchedZips}
               zipScores={zipScores}
               zipList={zipList}
+              tallies={scopedTallies}
             />
           </div>
         )}
