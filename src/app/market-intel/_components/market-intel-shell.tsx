@@ -273,16 +273,18 @@ function MarketIntelShellInner({
         {/* Tab content */}
         {activeTab === 'consolidation' && (
           <div className="space-y-6">
-            {/* DSO Penetration Table */}
+            {/* Census DSO/PE floor table */}
             <DSOPenetrationTable
               zipScores={zipScores}
               watchedZips={watchedZips}
+              tallies={scopedTallies}
             />
 
-            {/* Consolidation Map */}
+            {/* Census consolidation map */}
             <ConsolidationMap
               zipScores={zipScores}
               selectedMetro={selectedMetro}
+              tallies={scopedTallies}
             />
           </div>
         )}

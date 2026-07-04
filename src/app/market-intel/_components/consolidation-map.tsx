@@ -1,8 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useMemo } from 'react'
+import type mapboxgl from 'mapbox-gl'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { ZIP_CENTROIDS, METRO_CENTERS } from '@/lib/constants/zip-centroids'
+import { BUCKET_META } from '@/lib/census/ownership-truth'
+import { tallyBucketCount, type ZipCensusTally } from '../_lib/zip-census'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 
 /** Escape HTML special characters to prevent XSS in map tooltip .setHTML() */
@@ -13,25 +16,31 @@ function escapeHtml(s: unknown): string {
 interface ConsolidationMapProps {
   zipScores: ZipScore[]
   selectedMetro: string
+  tallies: ZipCensusTally[]
 }
 
+/** Dot color for a ZIP with zero census-reviewed locations — explicitly neutral. */
+const UNREVIEWED_GRAY = '#A9A79C'
+
 /**
- * Interpolate a consolidation percentage (0-30+) into a green-yellow-red color.
- * 0% = green (#2D8B4E), 15% = yellow (#D4920B), 30%+ = red (#C23B3B)
+ * Interpolate the census-documented DSO/PE floor (0-30+%) into a cream-amber-red
+ * ramp. The low end is NEUTRAL cream, not green — a 0% floor means "no documented
+ * DSO/PE yet", which is not a claim of independence while coverage is partial.
+ * 0% = #EDE8DC, 15% = #D4920B, 30%+ = #C23B3B.
  */
-function consolidationColor(pct: number): string {
+function censusFloorColor(pct: number): string {
   const clamped = Math.min(Math.max(pct, 0), 30)
   const ratio = clamped / 30
 
   if (ratio <= 0.5) {
-    // Green to yellow
+    // Cream to amber
     const t = ratio / 0.5
-    const r = Math.round(45 + (212 - 45) * t)
-    const g = Math.round(139 + (146 - 139) * t)
-    const b = Math.round(78 + (11 - 78) * t)
+    const r = Math.round(237 + (212 - 237) * t)
+    const g = Math.round(232 + (146 - 232) * t)
+    const b = Math.round(220 + (11 - 220) * t)
     return `rgb(${r},${g},${b})`
   } else {
-    // Yellow to red
+    // Amber to red
     const t = (ratio - 0.5) / 0.5
     const r = Math.round(212 + (194 - 212) * t)
     const g = Math.round(146 + (59 - 146) * t)
@@ -47,9 +56,15 @@ function markerSize(totalPractices: number): number {
   return Math.max(7, Math.min(24, 5 + Math.sqrt(totalPractices) * 1.3))
 }
 
-export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapProps) {
+export function ConsolidationMap({ zipScores, selectedMetro, tallies }: ConsolidationMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<mapboxgl.Map | null>(null)
+
+  const tallyByZip = useMemo(() => {
+    const map = new Map<string, ZipCensusTally>()
+    for (const t of tallies) map.set(t.zip, t)
+    return map
+  }, [tallies])
 
   // Build map data — only ZIPs with valid coordinates
   const mapData = useMemo(() => {
@@ -58,53 +73,45 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
         const coords = ZIP_CENTROIDS[zs.zip_code]
         if (!coords) return null
 
-        // Map the GP clinic denominator used by corporate_share_pct. Specialist
-        // locations are tracked separately and should not size/color the
-        // consolidation map.
-        const gpLoc = zs.total_gp_locations
+        const tally = tallyByZip.get(zs.zip_code)
+
+        // GP clinic denominator: zip_scores GP-location count, falling back to
+        // tracked census rows. Specialist locations never size/color the map.
+        const universe = zs.total_gp_locations
+          ?? tally?.rows
           ?? Math.max(0, (zs.total_practices ?? 0) - (zs.total_specialist_locations ?? 0))
-        const total = gpLoc
 
-        // Corporate count from saturation metrics (entity_classification-based, most accurate)
-        const corporateFromSaturation = zs.corporate_share_pct != null && zs.total_gp_locations != null
-          ? Math.round(zs.corporate_share_pct * zs.total_gp_locations)
-          : null
-        const corporateFromLegacy = (zs.dso_affiliated_count ?? 0) + (zs.pe_backed_count ?? 0)
-        const consolCount = corporateFromSaturation ?? corporateFromLegacy
+        const reviewed = tally?.reviewed ?? 0
+        const soloOwner = tally ? tallyBucketCount(tally, 'true_solo_owner_operated') : 0
+        const dentistOwned = tally ? tallyBucketCount(tally, 'dentist_owned_not_solo') : 0
+        const dsoPe = tally ? tallyBucketCount(tally, 'dso_pe_corporate') : 0
+        const institutional = tally ? tallyBucketCount(tally, 'institutional') : 0
+        const unresolved = Math.max(universe - reviewed, 0)
 
-        // Consolidation % — use corporate_share_pct directly when available (already 0-1)
-        const consolPct = zs.corporate_share_pct != null
-          ? zs.corporate_share_pct * 100
-          : total > 0
-            ? (consolCount / Math.max(total, 1)) * 100
-            : 0
+        // Census-documented DSO/PE floor: reviewed T4+T5 over ALL GP clinics in
+        // the ZIP. A floor by construction — unreviewed clinics add nothing.
+        const floorPct = universe > 0 ? (dsoPe / universe) * 100 : 0
+        const coveragePct = universe > 0 ? (reviewed / universe) * 100 : 0
 
-        // Independent count estimate
-        const indepCount = zs.independent_count != null && zs.independent_count > 0
-          ? zs.independent_count
-          : Math.max(0, gpLoc - consolCount)
-
-        // Confidence from metrics_confidence (saturation-based)
-        const confidence = zs.metrics_confidence
-          ? zs.metrics_confidence.charAt(0).toUpperCase() + zs.metrics_confidence.slice(1)
-          : 'Low'
-
-        const opacity = confidence === 'Low' ? 0.5 : 0.9
+        const isUnreviewed = reviewed === 0
 
         return {
           zip: zs.zip_code,
           city: zs.city ?? '',
           lat: coords[0],
           lon: coords[1],
-          total,
-          specialistCount: zs.total_specialist_locations ?? 0,
-          independent: indepCount,
-          consolCount,
-          consolPct,
-          opacity,
-          confidence,
-          size: markerSize(total),
-          color: consolidationColor(consolPct),
+          universe,
+          reviewed,
+          soloOwner,
+          dentistOwned,
+          dsoPe,
+          institutional,
+          unresolved,
+          floorPct,
+          coveragePct,
+          opacity: isUnreviewed ? 0.45 : coveragePct < 25 ? 0.6 : 0.9,
+          size: markerSize(universe),
+          color: isUnreviewed ? UNREVIEWED_GRAY : censusFloorColor(floorPct),
         }
       })
       .filter(Boolean) as Array<{
@@ -112,17 +119,20 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
       city: string
       lat: number
       lon: number
-      total: number
-      specialistCount: number
-      independent: number
-      consolCount: number
-      consolPct: number
+      universe: number
+      reviewed: number
+      soloOwner: number
+      dentistOwned: number
+      dsoPe: number
+      institutional: number
+      unresolved: number
+      floorPct: number
+      coveragePct: number
       opacity: number
-      confidence: string
       size: number
       color: string
     }>
-  }, [zipScores])
+  }, [zipScores, tallyByZip])
 
   // Compute map center
   const center = useMemo(() => {
@@ -172,11 +182,15 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
             properties: {
               zip: d.zip,
               city: d.city,
-              total: d.total,
-              independent: d.independent,
-              consolCount: d.consolCount,
-              consolPct: d.consolPct,
-              confidence: d.confidence,
+              universe: d.universe,
+              reviewed: d.reviewed,
+              soloOwner: d.soloOwner,
+              dentistOwned: d.dentistOwned,
+              dsoPe: d.dsoPe,
+              institutional: d.institutional,
+              unresolved: d.unresolved,
+              floorPct: d.floorPct,
+              coveragePct: d.coveragePct,
               size: d.size,
               color: d.color,
               opacity: d.opacity,
@@ -204,12 +218,12 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
         const labelFeatures: GeoJSON.FeatureCollection = {
           type: 'FeatureCollection',
           features: mapData
-            .filter(d => d.total >= labelThreshold)
+            .filter(d => d.universe >= labelThreshold)
             .map(d => ({
               type: 'Feature',
               geometry: { type: 'Point', coordinates: [d.lon, d.lat + 0.015] },
               properties: {
-                label: `${d.city} (${d.total})`,
+                label: `${d.city} (${d.universe})`,
               },
             })),
         }
@@ -236,7 +250,7 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
         const popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: false,
-          maxWidth: '300px',
+          maxWidth: '320px',
         })
 
         map.on('mouseenter', 'zip-circles', e => {
@@ -244,7 +258,19 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
           map.getCanvas().style.cursor = 'pointer'
           const props = e.features[0].properties!
           const coords = (e.features[0].geometry as GeoJSON.Point).coordinates.slice() as [number, number]
-          const consolPctVal = Number(props.consolPct)
+          const floorPctVal = Number(props.floorPct)
+          const reviewedVal = Number(props.reviewed)
+          const coverageVal = Number(props.coveragePct)
+
+          const censusLines = reviewedVal > 0
+            ? `<span style="color:#2563EB">${escapeHtml(props.soloOwner)} solo owner-op</span> |
+               <span style="color:#0D9488">${escapeHtml(props.dentistOwned)} dentist-owned</span> |
+               <span style="color:#C23B3B">${escapeHtml(props.dsoPe)} DSO/PE</span> |
+               <span style="color:#6B7280">${escapeHtml(props.institutional)} institutional</span><br/>
+               <span style="color:${floorPctVal >= 30 ? '#C23B3B' : floorPctVal >= 15 ? '#D4920B' : '#6B6B60'}">
+                 DSO/PE floor: ${floorPctVal.toFixed(1)}% of GP clinics (census-documented minimum)
+               </span><br/>`
+            : `<span style="color:#8F8E82">No census review in this ZIP yet — ownership is unresolved, not assumed.</span><br/>`
 
           popup
             .setLngLat(coords)
@@ -252,13 +278,9 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
               `<div style="font-family:system-ui;font-size:12px;line-height:1.5">
                 <strong style="font-size:14px">${escapeHtml(props.city)}</strong>
                 <span style="color:#90a4ae"> &middot; ${escapeHtml(props.zip)}</span><br/>
-                <span style="color:#333"><strong>${escapeHtml(props.total)}</strong> GP clinics</span><br/>
-                <span style="color:#2E7D32">&blacktriangleright; ${escapeHtml(props.independent)} independent</span> |
-                <span style="color:#E65100">${escapeHtml(props.consolCount)} consolidated (DSO+PE)</span><br/>
-                <span style="color:${consolPctVal >= 30 ? '#C23B3B' : consolPctVal >= 15 ? '#D4920B' : '#2D8B4E'}">
-                  Corp. floor: ${consolPctVal.toFixed(1)}% of GP clinics (verified minimum)
-                </span><br/>
-                <span style="color:#78909c;font-size:10px">Data confidence: ${escapeHtml(props.confidence)}</span>
+                <span style="color:#333"><strong>${escapeHtml(props.universe)}</strong> GP clinics &middot; ${escapeHtml(props.reviewed)} census-reviewed (${coverageVal.toFixed(0)}%)</span><br/>
+                ${censusLines}
+                <span style="color:#B8860B">${escapeHtml(props.unresolved)} unresolved (no census conclusion)</span>
               </div>`
             )
             .addTo(map)
@@ -293,8 +315,8 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
   return (
     <div>
       <SectionHeader
-        title="Consolidation Map"
-        helpText="Each dot = one Chicagoland ZIP code. Size = GP clinic count. Color = confirmed corporate floor (verified DSO-owned locations only — true share is likely higher). Faded areas = low data confidence."
+        title="Census Consolidation Map"
+        helpText="Each dot = one Chicagoland ZIP code. Size = GP clinic locations. Color = census-documented DSO/PE floor (hand-reviewed T4+T5 as a share of ALL GP clinics in the ZIP — a floor, not the true share). Gray dots = no census review yet. Faded dots = low census coverage. Hover for the full five-bucket breakdown."
       />
 
       {mapData.length > 0 ? (
@@ -308,16 +330,16 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
           {/* Legend */}
           <div className="grid grid-cols-3 gap-4 mt-3">
             <div className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full bg-[#2D8B4E]" />
-              <span className="text-[#6B6B60]">Mostly Independent</span>
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: UNREVIEWED_GRAY, opacity: 0.6 }} />
+              <span className="text-[#6B6B60]">Not yet census-reviewed</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="w-3 h-3 rounded-full bg-[#C23B3B]" />
-              <span className="text-[#6B6B60]">Mostly Known Consolidated (DSO/PE)</span>
+              <span className="text-[#6B6B60]">High documented DSO/PE floor</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <span className="w-3 h-3 rounded-full bg-[#9E9E9E] opacity-30" />
-              <span className="text-[#6B6B60]">Low confidence areas</span>
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: BUCKET_META.unresolved.color, opacity: 0.35 }} />
+              <span className="text-[#6B6B60]">Faded = low census coverage</span>
             </div>
           </div>
 
@@ -327,11 +349,13 @@ export function ConsolidationMap({ zipScores, selectedMetro }: ConsolidationMapP
             <div
               className="flex-1 h-2.5 rounded-full"
               style={{
-                background: 'linear-gradient(to right, #2D8B4E, #D4920B, #C23B3B)',
+                background: 'linear-gradient(to right, #EDE8DC, #D4920B, #C23B3B)',
               }}
             />
             <span className="text-[10px] text-[#6B6B60]">30%+</span>
-            <span className="text-[10px] text-[#707064] ml-1">Documented corporate % of GP clinics</span>
+            <span className="text-[10px] text-[#707064] ml-1">
+              Census-documented DSO/PE floor (0% means no documented DSO/PE yet — not &ldquo;independent&rdquo;)
+            </span>
           </div>
         </>
       ) : (
