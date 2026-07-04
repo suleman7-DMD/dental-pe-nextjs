@@ -2,25 +2,33 @@
 
 import { useState, useMemo, Suspense } from 'react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { KpiCard } from '@/components/data-display/kpi-card'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { formatPct, formatNumber } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils/formatting'
 import {
-  ENTITY_CLASSIFICATIONS,
-  getEntityClassificationLabel,
-} from '@/lib/constants/entity-classifications'
+  ADA_ANCHOR_UNIT_CAVEAT,
+  ADA_IL_PER_DENTIST_DSO_PCT,
+  BUCKET_META,
+  HEADLINE_BUCKETS,
+  NOT_SOLO_HEADLINE_LABEL,
+  SOURCE_CLASS_META,
+  TIER_CODE,
+  TIER_META,
+} from '@/lib/census/ownership-truth'
+import { CensusBucketSummaryCard } from '@/components/data-display/census-bucket-summary'
+import {
+  countSourceClasses,
+  summarizeTallies,
+  sumTierCounts,
+  type ZipCensusTally,
+} from '../_lib/zip-census'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 import { WarroomCrossLink } from '@/components/layout/warroom-cross-link'
 import { DSOPenetrationTable } from './dso-penetration-table'
-import { CorporateBandBar } from '@/components/data-display/corporate-band-bar'
-import {
-  getCorporateBand,
-  corporateBandTooltip,
-  corporateBandSubtitle,
-} from '@/lib/constants/consolidation-honesty'
 
 // Lazy-load heavy components (maps, large tables with sub-queries)
 const ConsolidationMap = dynamic(() => import('./consolidation-map').then(m => ({ default: m.ConsolidationMap })), {
@@ -38,26 +46,19 @@ interface MarketIntelShellProps {
   initialZipScores: ZipScore[]
   initialWatchedZips: WatchedZip[]
   metroAreas: string[]
-  adaBenchmarks: unknown[]
   freshness: {
     totalPractices: number
     daEnriched: number
     lastUpdated: string | null
   }
-  classificationCounts: {
-    total: number
-    corporate: number
-    corporateHighConf: number
-    independent: number
-    unknown: number
-  }
-  entityCounts: Record<string, number>
+  /** Per-ZIP census tallies — the only ownership aggregate this page receives. */
+  zipCensusTallies: ZipCensusTally[]
 }
 
 const TABS = [
   { id: 'consolidation', label: 'Consolidation' },
   { id: 'zip-analysis', label: 'ZIP Analysis' },
-  { id: 'ownership', label: 'Ownership' },
+  { id: 'ownership', label: 'Ownership Tiers' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -68,8 +69,7 @@ function MarketIntelShellInner({
   initialWatchedZips,
   metroAreas,
   freshness,
-  classificationCounts,
-  entityCounts,
+  zipCensusTallies,
 }: MarketIntelShellProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -107,77 +107,33 @@ function MarketIntelShellInner({
 
   const zipList = useMemo(() => watchedZips.map(z => z.zip_code), [watchedZips])
 
-  // Compute KPI values
-  const kpis = useMemo(() => {
-    // Location-deduped clinic count (sum of total_gp_locations across active ZIPs).
-    // Collapses NPI-1 + NPI-2 + suite-variant rows at the same physical building.
-    const totalGpLocations = zipScores
+  // Census tallies for the selected scope. The full-Chicagoland scope keeps
+  // every tallied ZIP; a metro scope keeps the metro's watched ZIPs.
+  const scopedTallies = useMemo(() => {
+    if (selectedMetro === ALL_CHICAGO_SCOPE) return zipCensusTallies
+    const zipSet = new Set(zipList)
+    return zipCensusTallies.filter(t => zipSet.has(t.zip))
+  }, [zipCensusTallies, zipList, selectedMetro])
+
+  // Five-bucket census summary for the scope. Universe = live GP-location
+  // denominator from zip_scores (falls back to tracked census rows).
+  const bucketSummary = useMemo(() => {
+    const gpUniverse = zipScores
       .map((z) => z.total_gp_locations)
       .filter((v): v is number => v != null && !isNaN(v))
       .reduce((a, b) => a + b, 0)
+    const universe = gpUniverse > 0
+      ? gpUniverse
+      : scopedTallies.reduce((sum, t) => sum + t.rows, 0)
+    return summarizeTallies(scopedTallies, universe)
+  }, [zipScores, scopedTallies])
 
-    if (selectedMetro === ALL_CHICAGO_SCOPE) {
-      const { total, corporate, corporateHighConf, independent } = classificationCounts
-      if (total === 0) return null
-      const gpDenom = totalGpLocations > 0 ? totalGpLocations : total
-      const unknownCount = Math.max(0, gpDenom - corporate - independent)
-      const highConfPct = (corporateHighConf / gpDenom) * 100
-      const allSignalsPct = (corporate / gpDenom) * 100
-      return {
-        totalP: total,
-        totalGpLocations,
-        gpDenom,
-        unknownCount,
-        corporateHighConf,
-        corporateAll: corporate,
-        indepCount: independent,
-        highConfPct,
-        allSignalsPct,
-        indepPct: (independent / gpDenom) * 100,
-      }
-    }
+  const sourceClasses = useMemo(
+    () => countSourceClasses(scopedTallies, bucketSummary.universe),
+    [scopedTallies, bucketSummary.universe]
+  )
 
-    if (zipScores.length === 0) return null
-    const totalP = totalGpLocations
-    let corporateCount = 0
-    for (const z of zipScores) {
-      if (z.corporate_share_pct != null && z.total_gp_locations != null) {
-        corporateCount += Math.round(z.corporate_share_pct * z.total_gp_locations)
-      } else {
-        corporateCount += (z.dso_affiliated_count ?? 0) + (z.pe_backed_count ?? 0)
-      }
-    }
-    const indepCount = zipScores.reduce((sum, z) => sum + (z.independent_count ?? 0), 0)
-    const corporateHighConf = zipScores.reduce((sum, z) => sum + (z.corporate_highconf_count ?? 0), 0)
-    const gpDenom = totalGpLocations > 0 ? totalGpLocations : totalP
-    const unknownCount = Math.max(0, gpDenom - corporateCount - indepCount)
-    const allSignalsPct = gpDenom > 0 ? (corporateCount / gpDenom) * 100 : 0
-    const highConfPct = gpDenom > 0 ? (corporateHighConf / gpDenom) * 100 : 0
-
-    return {
-      totalP,
-      totalGpLocations,
-      gpDenom,
-      unknownCount,
-      corporateHighConf,
-      corporateAll: corporateCount,
-      indepCount,
-      highConfPct,
-      allSignalsPct,
-      indepPct: gpDenom > 0 ? (indepCount / gpDenom) * 100 : 0,
-    }
-  }, [zipScores, selectedMetro, classificationCounts])
-
-  // Compute entity classification breakdown for Ownership tab
-  const ecBreakdown = useMemo(() => {
-    return ENTITY_CLASSIFICATIONS.map(ec => ({
-      value: ec.value,
-      label: ec.label,
-      description: ec.description,
-      category: ec.category,
-      count: entityCounts[ec.value] ?? 0,
-    }))
-  }, [entityCounts])
+  const tierCounts = useMemo(() => sumTierCounts(scopedTallies), [scopedTallies])
 
   return (
     <div className="min-h-screen bg-[#FAFAF7] text-[#1A1A1A] font-sans">
@@ -186,8 +142,12 @@ function MarketIntelShellInner({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Ownership & Coverage</h1>
           <p className="text-[#6B6B60] mt-1 text-sm">
-            Read consolidation through census coverage first: reviewed ownership tiers,
-            unreviewed ZIPs, legacy detector floor, and owner-network patterns.
+            The hand-reviewed ownership census, read honestly: five buckets, explicit
+            unresolved coverage, and owner-network patterns by ZIP. The legacy detector
+            methodology lives in{' '}
+            <Link href="/data-breakdown" className="text-[#8B6508] underline underline-offset-2 hover:text-[#B8860B]">
+              Methodology
+            </Link>.
           </p>
         </div>
 
@@ -235,68 +195,60 @@ function MarketIntelShellInner({
           </select>
         </div>
 
-        {/* Persistent KPIs (always visible above tabs) */}
-        <div id="kpis">
-          {kpis ? (
-            <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <KpiCard
-                  label="Tracked Clinics"
-                  value={
-                    kpis.totalGpLocations > 0
-                      ? formatNumber(kpis.totalGpLocations)
-                      : formatNumber(kpis.totalP)
-                  }
-                  subtitle={
-                    <span className="text-xs text-[#6B6B60]">
-                      Chicagoland GP directory scope
-                    </span>
-                  }
-                  tooltip="Address-deduped general dental clinic locations from zip_scores.total_gp_locations. Specialists, non-clinical records, unverified Data Axle rows, and duplicate shells are excluded from this directory scope."
-                />
-                <KpiCard
-                  label="Confirmed Corporate"
-                  value={formatPct(kpis.allSignalsPct)}
-                  subtitle={
-                    <span className="text-xs text-[#6B6B60]">
-                      {corporateBandSubtitle(getCorporateBand(kpis.allSignalsPct, 'mixed'))}
-                    </span>
-                  }
-                  tooltip={corporateBandTooltip(getCorporateBand(kpis.allSignalsPct, 'mixed'))}
-                  accentColor="#C23B3B"
-                />
-                <KpiCard
-                  label="Not Confirmed Corporate"
-                  value={formatPct(kpis.indepPct)}
-                  tooltip={`Share of the ${kpis.gpDenom.toLocaleString()} GP clinic locations not detected as corporate by our verification system. Includes verified independents AND practices whose DSO affiliation our detector has not yet identified (stealth local-name DSOs, friendly-PC structures). True independent count is likely somewhat lower than this figure.`}
-                />
-                <KpiCard
-                  label="Unclassified GP"
-                  value={formatNumber(kpis.unknownCount)}
-                  tooltip="GP directory rows not classified as independent or corporate. This should be zero when the classifier and practice_locations feed are in sync."
-                />
-              </div>
+        {/* Census headline (always visible above tabs) */}
+        <div id="kpis" className="space-y-3">
+          {/* The five-bucket census strip IS the ownership headline — all five
+              buckets always render, Unresolved included. */}
+          <CensusBucketSummaryCard summary={bucketSummary} scopeLabel={selectedMetro} />
 
-              {/* Tiered consolidation band — location floor → per-dentist floor → ADA anchor */}
-              <CorporateBandBar
-                className="mt-3"
-                band={getCorporateBand(kpis.allSignalsPct, 'mixed')}
-                title="Corporate consolidation — confirmed floor to ADA anchor"
-                caption={`${kpis.corporateAll.toLocaleString()} of ${kpis.gpDenom.toLocaleString()} GP clinic locations carry documented corporate evidence. The two red markers are OURS (confirmed corporate, by location then by dentist); the goldenrod marker is the external ADA per-dentist anchor.`}
-              />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <KpiCard
+              label="GP Clinic Locations"
+              value={formatNumber(bucketSummary.universe)}
+              subtitle={
+                <span className="text-xs text-[#6B6B60]">Census scope denominator</span>
+              }
+              tooltip="Address-deduped GP clinic locations (zip_scores.total_gp_locations) for the selected scope. Specialists, non-clinical records, unverified Data Axle rows, and duplicate shells are excluded."
+            />
+            <KpiCard
+              label="Census-Reviewed"
+              value={formatNumber(bucketSummary.reviewed)}
+              subtitle={
+                <span className="text-xs text-[#6B6B60]">
+                  {bucketSummary.coveragePct.toFixed(1)}% of scope reviewed
+                </span>
+              }
+              tooltip="Locations with a hand-reviewed ownership conclusion (ownership_tier) backed by cited evidence. Everything else stays Unresolved in the strip above — shown honestly, never filled with estimates."
+              accentColor="#2D8B4E"
+            />
+            <KpiCard
+              label={NOT_SOLO_HEADLINE_LABEL}
+              value={formatPct(bucketSummary.notSoloOwnerOperatedPctOfReviewed)}
+              subtitle={
+                <span className="text-xs text-[#6B6B60]">of reviewed clinics</span>
+              }
+              tooltip="Share of census-reviewed clinics that are NOT one dentist owning and operating one location (T1). Includes dentist-owned groups and networks — this is NOT a DSO share. The conventional DSO/PE number is the next card."
+            />
+            <KpiCard
+              label="DSO / PE / Corporate"
+              value={formatPct(bucketSummary.dsoPePctOfReviewed)}
+              subtitle={
+                <span className="text-xs text-[#6B6B60]">
+                  of reviewed &middot; ADA anchor {ADA_IL_PER_DENTIST_DSO_PCT}% (IL dentists)
+                </span>
+              }
+              tooltip={`Census-reviewed stealth-DSO (T4) + branded-DSO (T5) share of reviewed clinics: ${bucketSummary.counts.dso_pe_corporate.toLocaleString()} locations, ${bucketSummary.peBacked.toLocaleString()} with census-confirmed PE backing. External anchor: ADA HPI 2024 = ${ADA_IL_PER_DENTIST_DSO_PCT}% of IL dentists DSO-affiliated. ${ADA_ANCHOR_UNIT_CAVEAT}`}
+              accentColor="#C23B3B"
+            />
+          </div>
 
-              <p className="text-[#707064] text-xs mt-2">
-                {kpis.gpDenom.toLocaleString()} GP clinic locations: Confirmed corporate {kpis.allSignalsPct.toFixed(1)}% ({kpis.corporateAll.toLocaleString()}) ·
-                Not confirmed corp. {kpis.indepPct.toFixed(1)}% ({kpis.indepCount.toLocaleString()}).
-                Corporate share and not-confirmed-corporate share use GP clinic locations as the denominator (matches the headline).
-              </p>
-            </>
-          ) : (
-            <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60] text-sm">
-              No consolidation scores calculated yet. Run the merge_and_score pipeline to generate
-              ZIP-level scores.
-            </div>
-          )}
+          <p className="text-[#707064] text-xs">
+            Within Unresolved ({bucketSummary.counts.unresolved.toLocaleString()}):{' '}
+            {sourceClasses.held.toLocaleString()} held for adjudication &middot;{' '}
+            {sourceClasses.undetermined.toLocaleString()} undetermined after research &middot;{' '}
+            {sourceClasses.notYetReviewed.toLocaleString()} not yet reviewed.
+            Every number above is a census conclusion or an explicit open item — nothing is estimated.
+          </p>
         </div>
 
         {/* Tab navigation */}
@@ -351,57 +303,52 @@ function MarketIntelShellInner({
 
         {activeTab === 'ownership' && (
           <div className="space-y-6">
-            {/* Entity Classification Breakdown */}
             <div>
               <SectionHeader
-                title="Entity Classification System"
-                helpText="The 11-type entity classification system provides granular practice-type labels. This is the primary field for all ownership and consolidation analysis."
+                title="Census Ownership Tiers"
+                helpText="ownership_tier is the only ownership truth layer — assigned by hand review with cited evidence, one location at a time. Tiers roll up to the five headline buckets; anything without a reviewed tier stays Unresolved."
               />
 
               <div className="mt-4 space-y-4">
-                {/* Classification categories */}
-                {(['solo', 'group', 'corporate', 'other'] as const).map(category => {
-                  const categoryLabels: Record<string, string> = {
-                    solo: 'Solo Practices',
-                    group: 'Group Practices',
-                    corporate: 'Corporate / DSO',
-                    other: 'Other',
-                  }
-                  const categoryColors: Record<string, string> = {
-                    solo: '#2D8B4E',
-                    group: '#B8860B',
-                    corporate: '#C23B3B',
-                    other: '#7C3AED',
-                  }
-                  const classifications = ecBreakdown.filter(ec => ec.category === category)
-                  if (classifications.length === 0) return null
-
+                {/* Four reviewed buckets, each listing its member tiers */}
+                {HEADLINE_BUCKETS.filter(b => b !== 'unresolved').map(bucket => {
+                  const meta = BUCKET_META[bucket]
+                  const bucketCount = bucketSummary.counts[bucket]
                   return (
-                    <div key={category} className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">
-                      <div className="px-4 py-3 border-b border-[#E8E5DE] flex items-center gap-2">
+                    <div key={bucket} className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">
+                      <div className="px-4 py-3 border-b border-[#E8E5DE] flex items-center gap-2 flex-wrap">
                         <span
                           className="inline-block h-3 w-3 rounded-full"
-                          style={{ backgroundColor: categoryColors[category] }}
+                          style={{ backgroundColor: meta.color }}
                         />
-                        <h3 className="text-sm font-semibold text-[#1A1A1A]">
-                          {categoryLabels[category]}
-                        </h3>
+                        <h3 className="text-sm font-semibold text-[#1A1A1A]">{meta.label}</h3>
                         <span className="text-xs text-[#6B6B60]">
-                          ({classifications.reduce((s, c) => s + c.count, 0).toLocaleString()} practices)
+                          {bucketCount.toLocaleString()} reviewed locations
+                          {bucketSummary.reviewed > 0 && (
+                            <> ({bucketSummary.pctOfReviewed[bucket].toFixed(1)}% of reviewed)</>
+                          )}
                         </span>
+                        {bucket === 'dso_pe_corporate' && (
+                          <span
+                            className="text-[11px] text-[#8B6508] ml-auto"
+                            title={ADA_ANCHOR_UNIT_CAVEAT}
+                          >
+                            ADA anchor {ADA_IL_PER_DENTIST_DSO_PCT}% (IL dentists, per-dentist unit)
+                          </span>
+                        )}
                       </div>
                       <div className="divide-y divide-[#E8E5DE]">
-                        {classifications.map(ec => (
-                          <div key={ec.value} className="px-4 py-3 flex items-start gap-3">
+                        {meta.tiers.map(tier => (
+                          <div key={tier} className="px-4 py-3 flex items-start gap-3">
                             <code className="text-xs font-mono bg-[#F7F7F4] px-2 py-0.5 rounded text-[#6B6B60] whitespace-nowrap mt-0.5">
-                              {ec.value}
+                              {TIER_CODE[tier]}
                             </code>
                             <div className="flex-1">
-                              <div className="text-sm font-medium text-[#1A1A1A]">{ec.label}</div>
-                              <div className="text-xs text-[#6B6B60] mt-0.5">{ec.description}</div>
+                              <div className="text-sm font-medium text-[#1A1A1A]">{TIER_META[tier].label}</div>
+                              <div className="text-xs text-[#6B6B60] mt-0.5">{TIER_META[tier].description}</div>
                             </div>
                             <span className="text-sm font-mono font-semibold text-[#3D3D35] whitespace-nowrap mt-0.5">
-                              {ec.count.toLocaleString()}
+                              {tierCounts[tier].toLocaleString()}
                             </span>
                           </div>
                         ))}
@@ -410,50 +357,64 @@ function MarketIntelShellInner({
                   )
                 })}
 
-                {/* Signal Quality Explanation */}
-                <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-                  <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">
-                    Signal Quality & Tiered Confidence
-                  </h3>
-                  <div className="space-y-3 text-xs text-[#3D3D35]">
-                    <div className="flex gap-3">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#C23B3B] mt-1 flex-shrink-0" />
-                      <div>
-                        <strong className="text-[#1A1A1A]">High-confidence corporate</strong> -- Real DSO brand matches (dso_national, excluding taxonomy leaks) + dso_regional with EIN/brand/parent company/franchise signals. Most reliable indicator of actual GP corporate ownership.
+                {/* Unresolved — always visible, broken out by source class */}
+                <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-[#E8E5DE] flex items-center gap-2">
+                    <span
+                      className="inline-block h-3 w-3 rounded-full opacity-55"
+                      style={{ backgroundColor: BUCKET_META.unresolved.color }}
+                    />
+                    <h3 className="text-sm font-semibold text-[#1A1A1A]">{BUCKET_META.unresolved.label}</h3>
+                    <span className="text-xs text-[#6B6B60]">
+                      {bucketSummary.counts.unresolved.toLocaleString()} locations without a census conclusion
+                    </span>
+                  </div>
+                  <div className="divide-y divide-[#E8E5DE]">
+                    {([
+                      { key: 'held', count: sourceClasses.held },
+                      { key: 'undetermined', count: sourceClasses.undetermined },
+                      { key: 'unreviewed', count: sourceClasses.notYetReviewed },
+                    ] as const).map(({ key, count }) => (
+                      <div key={key} className="px-4 py-3 flex items-start gap-3">
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-[#1A1A1A]">{SOURCE_CLASS_META[key].label}</div>
+                          <div className="text-xs text-[#6B6B60] mt-0.5">{SOURCE_CLASS_META[key].description}</div>
+                        </div>
+                        <span className="text-sm font-mono font-semibold text-[#3D3D35] whitespace-nowrap mt-0.5">
+                          {count.toLocaleString()}
+                        </span>
                       </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#D4920B] mt-1 flex-shrink-0" />
-                      <div>
-                        <strong className="text-[#1A1A1A]">All-signals corporate</strong> -- Adds dso_regional locations carrying a single corporate signal: an affiliated DSO operating under a local name (~73% of regional locations), a shared EIN across 3+ ZIPs (~60%), or a corporate parent (~43%). After the 2026-05-30 reclassification these are documented signals (web-verified IL friendly-PC clusters + NPPES brand-mining) -- the legacy shared-phone heuristic is now ~0% of regional rows. Directional but evidence-backed.
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-[#2D8B4E] mt-1 flex-shrink-0" />
-                      <div>
-                        <strong className="text-[#1A1A1A]">Independent</strong> -- All 7 solo and group classifications (solo_established, solo_new, solo_inactive, solo_high_volume, family_practice, small_group, large_group). Practices not matching known DSO brand or corporate signal patterns.
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
-                {/* Classification Methodology */}
+                {/* How the census works */}
                 <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
                   <h3 className="text-sm font-semibold text-[#1A1A1A] mb-3">
-                    Classification Methodology
+                    How a location gets a tier
                   </h3>
                   <div className="space-y-2 text-xs text-[#3D3D35]">
                     <p>
-                      Entity classification is assigned by the DSO classifier pipeline (Pass 3: <code className="bg-[#F7F7F4] px-1 rounded">classify_entity_types()</code>). Classification uses provider count at address, last name matching, taxonomy codes, corporate signals from Data Axle enrichment, and known DSO brand matching.
+                      Every tier is a hand-reviewed conclusion: a reviewer researches the location,
+                      records an evidence basis (state business registrations, practice websites,
+                      NPI cross-references, DSO location pages), cites source URLs, and assigns a
+                      confidence level. Multi-location ownership is linked through a shared{' '}
+                      <code className="bg-[#F7F7F4] px-1 rounded">network_id</code>.
                     </p>
                     <p>
-                      <strong>GP directory classes:</strong> dso_national, dso_regional, family_practice, large_group, small_group, and solo variants. Specialist, non-clinical, da_unverified, org-only, and duplicate rows are excluded from the visible GP directory and maps.
+                      Locations the census could not settle stay visible as open items: held for
+                      adjudication when a blocker needs a second look, undetermined when the
+                      evidence was too thin. Nothing is backfilled with estimates.
                     </p>
                     <p>
-                      <strong>Confidence scores</strong> range from 0-100. Higher scores indicate stronger evidence for the classification (e.g., exact DSO brand match = high confidence vs. shared phone number alone = lower confidence).
-                    </p>
-                    <p>
-                      <strong>Metrics confidence</strong> on ZIP scores: &apos;high&apos; (classification coverage &gt;80% AND unknown &lt;20%), &apos;medium&apos; (coverage &gt;50% AND unknown &lt;40%), &apos;low&apos; (anything else). Market type is set to NULL when confidence is low.
+                      The pre-census automated detector (entity_classification) is no longer an
+                      ownership answer anywhere on this page. Its methodology, the confirmed-floor
+                      story, and the ADA anchor comparison live in{' '}
+                      <Link href="/data-breakdown" className="text-[#8B6508] underline underline-offset-2 hover:text-[#B8860B]">
+                        Methodology
+                      </Link>
+                      ; raw detector fields remain inspectable in raw-audit surfaces, always labeled
+                      &ldquo;{SOURCE_CLASS_META.legacy_detector.label}&rdquo;.
                     </p>
                   </div>
                 </div>
@@ -471,7 +432,7 @@ export function MarketIntelShell(props: MarketIntelShellProps) {
     <Suspense fallback={
       <div className="min-h-screen bg-[#FAFAF7] text-[#1A1A1A] font-sans">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
-          <h1 className="text-2xl font-bold tracking-tight">Market Intelligence</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Ownership &amp; Coverage</h1>
           <p className="text-[#6B6B60] mt-1 text-sm">Loading...</p>
         </div>
       </div>
