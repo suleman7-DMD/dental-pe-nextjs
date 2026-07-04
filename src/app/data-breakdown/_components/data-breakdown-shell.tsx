@@ -3,13 +3,21 @@
 import { useMemo, useState } from "react";
 import { BarChart3, Search } from "lucide-react";
 import { DataBreakdownChart } from "@/components/charts/data-breakdown-chart";
+import { CorporateBandBar } from "@/components/data-display/corporate-band-bar";
 import type { DataBreakdownBundle } from "@/lib/supabase/queries/data-breakdown";
+import type { CorporateBand } from "@/lib/constants/consolidation-honesty";
+import {
+  ADA_ANCHOR_UNIT_CAVEAT,
+  LEGACY_DETECTOR_CONTEXT_LABEL,
+} from "@/lib/census/ownership-truth";
 import { formatNumber } from "@/lib/utils/formatting";
 import { cn } from "@/lib/utils";
 
 interface DataBreakdownShellProps {
   bundle: DataBreakdownBundle | null;
   error: string | null;
+  /** Live legacy-detector floor band — this page is its ONLY home. */
+  detectorBand?: CorporateBand | null;
 }
 
 const CATEGORY_ORDER: Array<{ id: string; label: string; matcher: (title: string) => boolean }> = [
@@ -35,7 +43,7 @@ const CATEGORY_ORDER: Array<{ id: string; label: string; matcher: (title: string
   },
 ];
 
-export function DataBreakdownShell({ bundle, error }: DataBreakdownShellProps) {
+export function DataBreakdownShell({ bundle, error, detectorBand = null }: DataBreakdownShellProps) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [expandAll, setExpandAll] = useState(false);
@@ -226,6 +234,49 @@ export function DataBreakdownShell({ bundle, error }: DataBreakdownShellProps) {
           ))
         )}
       </div>
+
+      {/* Legacy detector exhibit — the floor-vs-census story. This is the one
+          place in the app where the pre-census detector still speaks. */}
+      {detectorBand && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2
+              className="text-[15px] font-semibold text-[#1A1A1A]"
+              style={{ fontFamily: "var(--font-heading), DM Sans, sans-serif" }}
+            >
+              The detector floor, before the census
+            </h2>
+            <span className="rounded-full border border-[#D4D0C8] bg-[#F7F7F4] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#6B6B60]">
+              {LEGACY_DETECTOR_CONTEXT_LABEL}
+            </span>
+          </div>
+          <div className="mt-2 max-w-3xl space-y-1.5 text-[12px] text-[#6B6B60]">
+            <p>
+              Before the hand-reviewed census, the app&rsquo;s ownership signal was an
+              automated detector (<code className="rounded bg-[#F5F5F0] px-1 font-mono text-[11px]">entity_classification</code>).
+              It counted a GP location corporate only on documented evidence — a known DSO
+              brand in its name, a corporate parent company, or an EIN shared across 3+
+              watched ZIPs — so its output was a floor by construction, never a
+              consolidation rate. DSOs that keep an acquired practice&rsquo;s local name
+              are invisible to it.
+            </p>
+            <p>
+              The census superseded it: <code className="rounded bg-[#F5F5F0] px-1 font-mono text-[11px]">ownership_tier</code>{" "}
+              — a per-location, hand-reviewed conclusion with cited evidence — is now the
+              app&rsquo;s only ownership truth layer, and locations without a conclusion
+              stay explicitly unresolved. The detector floor is kept here as methodology
+              context, and nowhere else.
+            </p>
+          </div>
+          <CorporateBandBar
+            band={detectorBand}
+            title="Legacy detector floor — confirmed corporate to ADA anchor"
+            caption="Per-location floor computed live from zip_scores (corporate_share_pct × GP locations); the per-dentist bridge and ADA anchor are cited measures with provenance."
+            className="mt-3"
+          />
+          <p className="mt-2 text-[11px] text-[#8B6508]">{ADA_ANCHOR_UNIT_CAVEAT}</p>
+        </div>
+      )}
 
       {/* Footer note */}
       <div className="mt-8 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] px-4 py-3 text-[11px] text-[#6B6B60]">
