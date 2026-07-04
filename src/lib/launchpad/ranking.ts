@@ -1,4 +1,4 @@
-import { resolveDsoTier, resolveDsoTierEntry } from "./dso-tiers"
+import { resolveDsoTierEntry } from "./dso-tiers"
 import { getPracticeDisplayName } from "./display"
 import {
   isZipCommutable,
@@ -6,10 +6,12 @@ import {
 } from "./scope"
 import {
   CONCRETE_LAUNCHPAD_TRACKS,
+  LAUNCHPAD_LANE_CAPS,
   LAUNCHPAD_SIGNALS,
   LAUNCHPAD_TIER_THRESHOLDS,
   type ConcreteLaunchpadTrack,
   type LaunchpadIntelAudit,
+  type LaunchpadLane,
   type LaunchpadPracticeIntelRecord,
   type LaunchpadPracticeRecord,
   type LaunchpadRankedTarget,
@@ -21,6 +23,15 @@ import {
   type LaunchpadTrackScore,
   type LaunchpadZipScoreRecord,
 } from "./signals"
+import {
+  TIER_META,
+  deriveSourceClass,
+  formatNetworkId,
+  isOwnershipTier,
+  tierToBucket,
+  type HeadlineBucket,
+  type OwnershipTier,
+} from "@/lib/census/ownership-truth"
 
 export const TRACK_MULTIPLIERS: Record<
   ConcreteLaunchpadTrack,
@@ -35,12 +46,12 @@ export const TRACK_MULTIPLIERS: Record<
     hiring_now_signal: 1.0,
     ffs_concierge_signal: 0.8,
     community_dso_signal: 0.0,
+    dso_employment_context: 1.0,
     tech_modern_signal: 0.7,
     mentor_density_zip_signal: 1.3,
     commutable_signal: 1.2,
     growing_undersupplied_signal: 1.3,
     dso_avoid_warning: 1.0,
-    family_dynasty_warning: 1.5,
     ghost_practice_warning: 1.0,
     recent_acquisition_warning: 1.2,
     associate_saturated_signal: 1.5,
@@ -57,12 +68,12 @@ export const TRACK_MULTIPLIERS: Record<
     hiring_now_signal: 1.5,
     ffs_concierge_signal: 1.2,
     community_dso_signal: 0.5,
+    dso_employment_context: 1.0,
     tech_modern_signal: 1.0,
     mentor_density_zip_signal: 0.8,
     commutable_signal: 1.0,
     growing_undersupplied_signal: 1.5,
     dso_avoid_warning: 1.0,
-    family_dynasty_warning: 1.0,
     ghost_practice_warning: 1.0,
     recent_acquisition_warning: 1.0,
     associate_saturated_signal: 0.5,
@@ -79,12 +90,12 @@ export const TRACK_MULTIPLIERS: Record<
     hiring_now_signal: 1.0,
     ffs_concierge_signal: 0.0,
     community_dso_signal: 2.0,
+    dso_employment_context: 1.0,
     tech_modern_signal: 0.8,
     mentor_density_zip_signal: 0.5,
     commutable_signal: 0.8,
     growing_undersupplied_signal: 0.5,
     dso_avoid_warning: 1.5,
-    family_dynasty_warning: 0.0,
     ghost_practice_warning: 1.0,
     recent_acquisition_warning: 0.8,
     associate_saturated_signal: 0.3,
@@ -95,8 +106,6 @@ export const TRACK_MULTIPLIERS: Record<
 }
 
 const BASE_SCORE = 50
-const CONFIDENCE_FLOOR = 40
-const CONFIDENCE_CAP = 70
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -105,15 +114,6 @@ function clamp(value: number, min: number, max: number): number {
 function round1(value: number): number {
   return Math.round(value * 10) / 10
 }
-
-const SOLO_CLASSIFICATIONS = new Set([
-  "solo_established",
-  "solo_new",
-  "solo_inactive",
-  "solo_high_volume",
-])
-
-const CORPORATE_CLASSIFICATIONS = new Set(["dso_regional", "dso_national"])
 
 function isTruthyFlag(value: number | boolean | null | undefined): boolean {
   if (value == null) return false
@@ -137,6 +137,74 @@ function stringFromRawJson(raw: Record<string, unknown> | null, key: string): st
   return typeof value === "string" ? value : null
 }
 
+// ---------------------------------------------------------------------------
+// Census truth accessors — ownership gates key ONLY on these.
+// The legacy detector (entity_classification / ownership_status /
+// affiliated_dso / affiliated_pe_sponsor) is never consulted for ownership.
+// ---------------------------------------------------------------------------
+
+function censusTier(practice: LaunchpadPracticeRecord): OwnershipTier | null {
+  return isOwnershipTier(practice.ownership_tier) ? practice.ownership_tier : null
+}
+
+function censusBucket(practice: LaunchpadPracticeRecord): HeadlineBucket {
+  return tierToBucket(practice.ownership_tier)
+}
+
+function censusNetworkLabel(practice: LaunchpadPracticeRecord): string | null {
+  return practice.network_id ? formatNetworkId(practice.network_id) : null
+}
+
+function reviewStatusOf(practice: LaunchpadPracticeRecord): "held" | "undetermined" | null {
+  const status = practice.census_review_status
+  return status === "held" || status === "undetermined" ? status : null
+}
+
+// ---------------------------------------------------------------------------
+// Lane assignment — census review state + intel presence. Rule §2.9:
+// no fake precision. Unknown ownership means a capped score and an
+// explicit reason, not a confident-looking number.
+// ---------------------------------------------------------------------------
+
+export interface LaneAssignment {
+  lane: LaunchpadLane
+  laneReason: string
+  cap: number | null
+}
+
+export function resolveLane(
+  practice: LaunchpadPracticeRecord,
+  intel: LaunchpadPracticeIntelRecord | null
+): LaneAssignment {
+  const tier = censusTier(practice)
+  if (!tier) {
+    const status = reviewStatusOf(practice)
+    const why =
+      status === "held"
+        ? "Census review is held for adjudication"
+        : status === "undetermined"
+          ? "Census-researched, but the evidence was too thin to classify"
+          : "Not yet census-reviewed"
+    return {
+      lane: "needs_research",
+      laneReason: `${why} — ownership unknown, so the score is capped at ${LAUNCHPAD_LANE_CAPS.needs_research}.`,
+      cap: LAUNCHPAD_LANE_CAPS.needs_research,
+    }
+  }
+  if (intel == null) {
+    return {
+      lane: "promising_lead",
+      laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}), but no accepted practice-level intel yet — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
+      cap: LAUNCHPAD_LANE_CAPS.promising_lead,
+    }
+  }
+  return {
+    lane: "verified_target",
+    laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}) with accepted practice intel on file.`,
+    cap: null,
+  }
+}
+
 export interface SignalEvaluationContext {
   practice: LaunchpadPracticeRecord
   intel: LaunchpadPracticeIntelRecord | null
@@ -154,8 +222,7 @@ export interface ActiveSignal {
 }
 
 function mentorRichFires(practice: LaunchpadPracticeRecord, nowYear: number): boolean {
-  const cls = practice.entity_classification
-  if (!cls || !SOLO_CLASSIFICATIONS.has(cls)) return false
+  if (censusTier(practice) !== "true_independent") return false
   if (practice.year_established == null || nowYear - practice.year_established < 25) return false
   if ((practice.num_providers ?? 1) < 1) return false
   if ((practice.employee_count ?? 0) < 2) return false
@@ -165,15 +232,18 @@ function mentorRichFires(practice: LaunchpadPracticeRecord, nowYear: number): bo
 export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
   const { practice, intel, zipScore, nowYear, scopeCommutableZips, mentorRichCountByZip, recentAcquisitionNpis } = ctx
   const active: ActiveSignal[] = []
-  const cls = practice.entity_classification
+  const tier = censusTier(practice)
+  const bucket = censusBucket(practice)
   const age = practice.year_established != null ? nowYear - practice.year_established : null
-  const dsoTier = resolveDsoTier(practice.affiliated_dso, practice.parent_company, practice.franchise_name)
+  const networkLabel = censusNetworkLabel(practice)
+  const dsoTier = networkLabel ? resolveDsoTierEntry(networkLabel)?.tier ?? "unknown" : "unknown"
+  const isCensusCorporate = bucket === "dso_pe_corporate"
 
   const mentorRich = mentorRichFires(practice, nowYear)
   if (mentorRich) {
     active.push({
       id: "mentor_rich_signal",
-      reasoning: `Solo practitioner · ${age ?? "?"}y in business · ${practice.employee_count ?? "?"} staff`,
+      reasoning: `Census-reviewed solo owner-operator · ${age ?? "?"}y in business · ${practice.employee_count ?? "?"} staff`,
     })
   }
 
@@ -184,7 +254,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
   ) {
     active.push({
       id: "succession_track_signal",
-      reasoning: `Mentor-rich + buyability ${practice.buyability_score} + no associate yet — classic succession setup.`,
+      reasoning: `Mentor-rich + legacy buyability heuristic ${practice.buyability_score} + no associate yet — classic succession setup.`,
     })
   }
 
@@ -205,11 +275,12 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
   }
 
   const zipIncome = zipScore?.median_household_income ?? null
-  const notCorporate = cls == null || !CORPORATE_CLASSIFICATIONS.has(cls)
+  const censusDentistOwned =
+    bucket === "true_solo_owner_operated" || bucket === "dentist_owned_not_solo"
   const highVolumeEthical =
     (practice.employee_count ?? 0) >= 5 &&
     ((practice.estimated_revenue ?? 0) >= 800_000 || (practice.num_providers ?? 0) >= 3) &&
-    notCorporate &&
+    censusDentistOwned &&
     (zipIncome == null || zipIncome >= 75_000)
 
   if (highVolumeEthical) {
@@ -217,7 +288,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
       id: "high_volume_ethical_signal",
       reasoning: `${practice.employee_count ?? "?"} staff · ${
         practice.num_providers ?? "?"
-      } providers · non-corporate · healthy income ZIP.`,
+      } providers · census-reviewed dentist-owned · healthy income ZIP.`,
     })
   }
 
@@ -231,13 +302,13 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
   }
 
   if (
-    cls === "solo_high_volume" &&
+    tier === "true_independent" &&
     (practice.estimated_revenue ?? 0) >= 1_000_000 &&
     techModern
   ) {
     active.push({
       id: "boutique_solo_signal",
-      reasoning: "High-revenue solo practice with modern tech — premium clinical setup.",
+      reasoning: "Census-reviewed solo owner-operator with $1M+ revenue and modern tech — premium clinical setup.",
     })
   }
 
@@ -250,10 +321,17 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
     })
   }
 
-  if (CORPORATE_CLASSIFICATIONS.has(cls ?? "") && (dsoTier === "tier1" || dsoTier === "tier2")) {
+  if (isCensusCorporate) {
+    active.push({
+      id: "dso_employment_context",
+      reasoning: `Census-confirmed ${networkLabel ?? (tier ? TIER_META[tier].label : "corporate")} location — an associate role here is DSO employment${practice.pe_backed === true ? " with PE backing" : ""}.`,
+    })
+  }
+
+  if (isCensusCorporate && (dsoTier === "tier1" || dsoTier === "tier2")) {
     active.push({
       id: "community_dso_signal",
-      reasoning: `${practice.affiliated_dso ?? "DSO"} is rated ${dsoTier === "tier1" ? "Tier 1" : "Tier 2"} — structured benefits + mentorship.`,
+      reasoning: `${networkLabel ?? "Network"} is rated ${dsoTier === "tier1" ? "Tier 1" : "Tier 2"} for employment — structured benefits + mentorship.`,
     })
   }
 
@@ -276,39 +354,31 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
   }
 
   const zipMentorCount = practice.zip ? mentorRichCountByZip.get(practice.zip) ?? 0 : 0
-  const zipCorpShare = zipScore?.corporate_share_pct ?? null
-  if (zipMentorCount >= 3 && (zipCorpShare == null || zipCorpShare < 0.25)) {
+  if (zipMentorCount >= 3) {
     active.push({
       id: "mentor_density_zip_signal",
-      reasoning: `${zipMentorCount} mentor-rich practices in this ZIP with low corporate share — deep fallback options.`,
+      reasoning: `${zipMentorCount} census-reviewed mentor-rich practices in this ZIP — deep fallback options.`,
     })
   }
 
-  if (cls === "dso_national" && dsoTier === "avoid") {
+  if (isCensusCorporate && dsoTier === "avoid") {
     active.push({
       id: "dso_avoid_warning",
-      reasoning: `${practice.affiliated_dso} is on the AVOID list (documented patient-harm or churn).`,
+      reasoning: `${networkLabel ?? "This network"} is on the AVOID list (documented patient-harm or churn).`,
     })
   }
 
-  if (cls === "dso_national" && (dsoTier === "tier3" || dsoTier === "avoid")) {
+  if (isCensusCorporate && (dsoTier === "tier3" || dsoTier === "avoid")) {
     active.push({
       id: "non_compete_radius_warning",
-      reasoning: "Tier 3 / AVOID DSO — historically aggressive non-compete enforcement.",
+      reasoning: "Tier 3 / AVOID network — historically aggressive non-compete enforcement.",
     })
   }
 
-  if (cls === "family_practice") {
-    active.push({
-      id: "family_dynasty_warning",
-      reasoning: "Shared last name at address — internal succession likely.",
-    })
-  }
-
-  if (cls === "solo_inactive") {
+  if (!practice.phone && !practice.website) {
     active.push({
       id: "ghost_practice_warning",
-      reasoning: "Solo-inactive — no phone AND no website. Likely dormant or retired.",
+      reasoning: "No phone AND no website on file — likely dormant or retired.",
     })
   }
 
@@ -319,7 +389,7 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
     })
   }
 
-  if (cls === "large_group" && (practice.num_providers ?? 0) >= 5) {
+  if ((practice.num_providers ?? 0) >= 5) {
     active.push({
       id: "associate_saturated_signal",
       reasoning: `${practice.num_providers} providers on site — mentorship time per associate is limited.`,
@@ -338,10 +408,10 @@ export function evaluateSignals(ctx: SignalEvaluationContext): ActiveSignal[] {
     })
   }
 
-  if (practice.affiliated_pe_sponsor) {
+  if (practice.pe_backed === true) {
     active.push({
       id: "pe_recap_volatility_warning",
-      reasoning: `PE-backed (${practice.affiliated_pe_sponsor}) — PE ownership introduces comp and contract volatility.`,
+      reasoning: `Census-confirmed PE-backed${networkLabel ? ` (${networkLabel})` : ""} — PE ownership introduces comp and contract volatility.`,
     })
   }
 
@@ -377,15 +447,6 @@ export function tierFromScore(score: number): LaunchpadTier {
   return "avoid"
 }
 
-function hasThinData(
-  practice: LaunchpadPracticeRecord,
-  intel: LaunchpadPracticeIntelRecord | null
-): boolean {
-  if (intel == null) return true
-  if ((practice.classification_confidence ?? 0) < CONFIDENCE_FLOOR) return true
-  return false
-}
-
 export function scoreForTrack(
   active: ActiveSignal[],
   track: ConcreteLaunchpadTrack,
@@ -396,10 +457,13 @@ export function scoreForTrack(
   const totalContribution = contributions.reduce((sum, c) => sum + c.contribution, 0)
   const raw = BASE_SCORE + totalContribution
   let final = clamp(raw, 0, 100)
+  const laneInfo = resolveLane(practice, intel)
   let capped = false
-  if (hasThinData(practice, intel) && final > CONFIDENCE_CAP) {
-    final = CONFIDENCE_CAP
+  let capReason: string | null = null
+  if (laneInfo.cap != null && final > laneInfo.cap) {
+    final = laneInfo.cap
     capped = true
+    capReason = laneInfo.laneReason
   }
   return {
     track,
@@ -408,6 +472,7 @@ export function scoreForTrack(
     tier: tierFromScore(final),
     contributions,
     confidenceCapped: capped,
+    capReason,
   }
 }
 
@@ -514,11 +579,10 @@ export function rankTargets(ctx: RankContext): LaunchpadRankedTarget[] {
     const warningSignalIds = activeSignalIds.filter(
       (id) => LAUNCHPAD_SIGNALS[id].category === "warning"
     )
-    const dsoEntry = resolveDsoTierEntry(
-      practice.affiliated_dso,
-      practice.parent_company,
-      practice.franchise_name
-    )
+
+    const laneInfo = resolveLane(practice, intel)
+    const networkLabel = censusNetworkLabel(practice)
+    const dsoEntry = networkLabel ? resolveDsoTierEntry(networkLabel) : null
 
     return {
       npi: practice.npi,
@@ -528,6 +592,13 @@ export function rankTargets(ctx: RankContext): LaunchpadRankedTarget[] {
       zipScore,
       commutable: scopeCommutableZips.has(practice.zip ?? ""),
       dsoTier: dsoEntry?.tier ?? null,
+      lane: laneInfo.lane,
+      laneReason: laneInfo.laneReason,
+      ownershipTier: censusTier(practice),
+      ownershipBucket: censusBucket(practice),
+      ownershipSource: deriveSourceClass(practice.ownership_tier, reviewStatusOf(practice)),
+      networkLabel,
+      peBacked: practice.pe_backed === true,
       bestTrack,
       bestScore,
       bestTier: tierFromScore(bestScore),
@@ -561,6 +632,10 @@ export function summarizeRankedTargets(
   mentorRich: number
   hiringNow: number
   avoidList: number
+  verifiedTargets: number
+  promisingLeads: number
+  needsResearch: number
+  censusReviewed: number
 } {
   let bestFit = 0
   let strong = 0
@@ -570,6 +645,10 @@ export function summarizeRankedTargets(
   let mentorRich = 0
   let hiringNow = 0
   let avoidList = 0
+  let verifiedTargets = 0
+  let promisingLeads = 0
+  let needsResearch = 0
+  let censusReviewed = 0
 
   for (const target of targets) {
     const scoreSource = track === "all" ? target.bestTier : target.displayTier
@@ -593,7 +672,32 @@ export function summarizeRankedTargets(
     if (target.activeSignalIds.includes("mentor_rich_signal")) mentorRich += 1
     if (target.activeSignalIds.includes("hiring_now_signal")) hiringNow += 1
     if (target.activeSignalIds.includes("dso_avoid_warning")) avoidList += 1
+    switch (target.lane) {
+      case "verified_target":
+        verifiedTargets += 1
+        break
+      case "promising_lead":
+        promisingLeads += 1
+        break
+      case "needs_research":
+        needsResearch += 1
+        break
+    }
+    if (target.ownershipTier != null) censusReviewed += 1
   }
 
-  return { bestFit, strong, maybe, low, avoid, mentorRich, hiringNow, avoidList }
+  return {
+    bestFit,
+    strong,
+    maybe,
+    low,
+    avoid,
+    mentorRich,
+    hiringNow,
+    avoidList,
+    verifiedTargets,
+    promisingLeads,
+    needsResearch,
+    censusReviewed,
+  }
 }

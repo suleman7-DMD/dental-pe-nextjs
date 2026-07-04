@@ -11,6 +11,7 @@ import {
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
 import { getPracticeDisplayName } from "@/lib/launchpad/display"
+import { CensusBadge } from "@/components/data-display/census-badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { CompoundThesis } from "./compound-thesis"
 
@@ -112,6 +113,7 @@ export function TrackListCard({
   // Confidence capped check
   const trackKey = resolveTrackKey(track, target.bestTrack)
   const confidenceCapped = target.trackScores[trackKey]?.confidenceCapped ?? false
+  const capReason = target.trackScores[trackKey]?.capReason ?? null
   const hasSourceBackedIntel = target.intel != null
 
   // Top contributions for hover tooltip
@@ -193,7 +195,13 @@ export function TrackListCard({
             >
               {tierLabel}
             </span>
-            {practice.entity_classification === "solo_inactive" && (
+            <CensusBadge
+              tier={target.ownershipTier ?? practice.census_review_status}
+              peBacked={target.peBacked}
+              compact
+              className="min-h-0 shrink-0 px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
+            />
+            {!practice.phone && !practice.website && (
               <span
                 className={cn(
                   "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
@@ -295,10 +303,10 @@ export function TrackListCard({
             </div>
           )}
 
-          {/* Thin data warning */}
+          {/* Score cap notice — lane-derived, states the actual reason */}
           {confidenceCapped && (
             <p className="mt-1 text-[10px] text-[#9C9C90]">
-              Thin data — capped at 70
+              {capReason ?? "Score capped — ownership or intel not yet verified"}
             </p>
           )}
 
@@ -404,7 +412,7 @@ export function TrackListCard({
                   )}
                   {confidenceCapped && (
                     <div className="border-t border-white/15 pt-1 text-[10px] opacity-80">
-                      Capped at 70 — thin data
+                      {capReason ?? "Score capped — ownership or intel not yet verified"}
                     </div>
                   )}
                   <div className="border-t border-white/15 pt-1 text-[10px] opacity-70">

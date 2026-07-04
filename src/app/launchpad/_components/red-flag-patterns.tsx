@@ -18,7 +18,6 @@ interface RedFlagPatternsProps {
 
 const WARNING_SIGNALS: LaunchpadSignalId[] = [
   "dso_avoid_warning",
-  "family_dynasty_warning",
   "ghost_practice_warning",
   "recent_acquisition_warning",
   "associate_saturated_signal",

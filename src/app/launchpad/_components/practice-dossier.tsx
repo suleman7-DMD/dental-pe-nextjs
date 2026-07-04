@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils/formatting"
 import { safeExternalUrl } from "@/lib/utils/safe-url"
-import { getEntityClassificationLabel } from "@/lib/constants/entity-classifications"
+import { CensusBadge, getOwnershipTierMeta } from "@/components/data-display/census-badge"
 import {
   resolveDsoTierEntry,
   DSO_TIER_LABELS,
@@ -156,9 +156,7 @@ function SnapshotTab({
 }) {
   const { practice, intel } = target
   const age = getPracticeAge(practice.year_established)
-  const dsoEntry = practice.affiliated_dso
-    ? resolveDsoTierEntry(practice.affiliated_dso, practice.parent_company, practice.franchise_name)
-    : null
+  const dsoEntry = target.networkLabel ? resolveDsoTierEntry(target.networkLabel) : null
 
   const trackScoreLabels = (["succession", "high_volume", "dso"] as const).map((t) => {
     const ts = target.trackScores?.[t]
@@ -254,7 +252,9 @@ function SnapshotTab({
           ) : isCapped ? (
             <>
               <div className="text-sm font-semibold text-[#D4920B]">Capped</div>
-              <div className="mt-1 text-[10px] text-[#D4920B]">Thin data</div>
+              <div className="mt-1 text-[10px] text-[#D4920B]">
+                {target.lane === "needs_research" ? "Ownership unreviewed" : "Intel unverified"}
+              </div>
             </>
           ) : (
             <>
@@ -283,8 +283,14 @@ function SnapshotTab({
         <SectionHeading>Quick facts</SectionHeading>
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <QuickFact
-            label="Classification"
-            value={getEntityClassificationLabel(practice.entity_classification)}
+            label="Ownership (census)"
+            value={
+              <CensusBadge
+                tier={target.ownershipTier ?? practice.census_review_status}
+                peBacked={target.peBacked}
+                compact
+              />
+            }
           />
           <QuickFact
             label="Providers"
@@ -311,10 +317,10 @@ function SnapshotTab({
             }
           />
           <QuickFact
-            label="DSO"
+            label="Network"
             value={
               <span className="flex items-center gap-1.5 flex-wrap">
-                <span>{practice.affiliated_dso ?? "Independent"}</span>
+                <span>{target.networkLabel ?? "None on record"}</span>
                 {dsoEntry && (
                   <span
                     className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
@@ -707,7 +713,7 @@ function ScoreTab({ target }: { target: LaunchpadRankedTarget }) {
           )}
           {capped && (
             <div className="border-t border-[#E8E5DE] bg-[#D4920B]/8 px-3 py-2 text-[11px] text-[#D4920B]">
-              Thin data — capped at 70. Run practice deep-dive to lift the cap.
+              {trackScore?.capReason ?? "Score capped — ownership or intel not yet verified."}
             </div>
           )}
 
@@ -732,8 +738,9 @@ function ScoreTab({ target }: { target: LaunchpadRankedTarget }) {
       {/* Footnote */}
       <div className="rounded-md border border-[#E8E5DE] bg-[#F5F5F0] px-3 py-2 text-[11px] text-[#6B6B60]">
         Scores combine 20 launchpad signals weighted per track. Subtotal of contributions is added
-        to the base score, clamped to 0–100, then capped at 70 when the practice has thin data
-        (no AI intel + low classification confidence).
+        to the base score and clamped to 0–100. Scores are then capped by lane: uncapped for
+        verified job targets, 70 for promising leads (intel unverified), 60 while ownership is not
+        yet census-reviewed.
       </div>
     </div>
   )
@@ -921,14 +928,7 @@ function CompensationTab({
   bundle: LaunchpadBundle | null
 }) {
   const { practice } = target
-  const dsoEntry =
-    practice.affiliated_dso
-      ? resolveDsoTierEntry(
-          practice.affiliated_dso,
-          practice.parent_company,
-          practice.franchise_name
-        )
-      : null
+  const dsoEntry = target.networkLabel ? resolveDsoTierEntry(target.networkLabel) : null
 
   return (
     <div className="space-y-5">
@@ -951,7 +951,6 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
   const age = getPracticeAge(practice.year_established)
   const isMentorRich = target.activeSignalIds.includes("mentor_rich_signal")
   const isSuccessionPublished = target.activeSignalIds.includes("succession_published_signal")
-  const isFamilyDynasty = target.activeSignalIds.includes("family_dynasty_warning")
 
   const mentorRichContribution = target.trackScores?.[target.bestTrack]?.contributions?.find(
     (c) => c.signalId === "mentor_rich_signal"
@@ -959,10 +958,10 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
 
   let notMentorRichReason = ""
   if (!isMentorRich) {
-    const cls = practice.entity_classification ?? ""
-    const soloTypes = ["solo_established", "solo_new", "solo_inactive", "solo_high_volume"]
-    if (!soloTypes.includes(cls)) {
-      notMentorRichReason = `Practice is classified as ${getEntityClassificationLabel(cls)} — mentor-rich requires a solo provider.`
+    if (target.ownershipTier !== "true_independent") {
+      notMentorRichReason = target.ownershipTier
+        ? `Census ownership is ${getOwnershipTierMeta(target.ownershipTier).label} — mentor-rich requires a census-reviewed solo owner-operator.`
+        : "Ownership not census-reviewed yet — mentor-rich requires a confirmed solo owner-operator."
     } else if (age != null && age < 25) {
       notMentorRichReason = `Practice age is only ${age} years — mentor-rich requires 25+ years in business.`
     } else if ((practice.employee_count ?? 0) < 2) {
@@ -1010,22 +1009,7 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
         </Banner>
       )}
 
-      {isFamilyDynasty && (
-        <Banner variant="amber">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <div className="font-semibold">Family dynasty risk</div>
-              <div className="mt-0.5 text-xs opacity-90">
-                Shared last name at address — likely internal succession. Ask directly if they are
-                open to a non-family associate track.
-              </div>
-            </div>
-          </div>
-        </Banner>
-      )}
-
-      {age != null && age >= 25 && practice.entity_classification?.startsWith("solo") && (
+      {age != null && age >= 25 && target.ownershipTier === "true_independent" && (
         <div>
           <SectionHeading>Ownership runway</SectionHeading>
           <p className="text-sm text-[#6B6B60]">
@@ -1114,12 +1098,12 @@ function MentorshipTab({ target }: { target: LaunchpadRankedTarget }) {
 // ---------------------------------------------------------------------------
 
 function RedFlagsTab({ target }: { target: LaunchpadRankedTarget }) {
-  const { practice, intel } = target
+  const { intel } = target
   const warnings = target.warningSignalIds
 
   const dsoEntry =
-    target.dsoTier === "avoid" && practice.affiliated_dso
-      ? resolveDsoTierEntry(practice.affiliated_dso, practice.parent_company, practice.franchise_name)
+    target.dsoTier === "avoid" && target.networkLabel
+      ? resolveDsoTierEntry(target.networkLabel)
       : null
 
   const aiRedFlags = intel?.red_flags && intel.red_flags.length > 0 ? intel.red_flags : null
@@ -1148,7 +1132,7 @@ function RedFlagsTab({ target }: { target: LaunchpadRankedTarget }) {
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
               <div className="font-semibold">
-                AVOID list — {practice.affiliated_dso}
+                AVOID list — {target.networkLabel}
               </div>
               <div className="mt-1 text-xs opacity-90">{dsoEntry.rationale}</div>
               {dsoEntry.citations.length > 0 && (
@@ -1247,14 +1231,7 @@ export function PracticeDossier({
   const displayName = getPracticeDisplayName(practice)
   const dba = getPracticeSecondaryName(practice)
 
-  const dsoEntry =
-    practice.affiliated_dso
-      ? resolveDsoTierEntry(
-          practice.affiliated_dso,
-          practice.parent_company,
-          practice.franchise_name
-        )
-      : null
+  const dsoEntry = target.networkLabel ? resolveDsoTierEntry(target.networkLabel) : null
 
   const locationLine = [practice.city, practice.state].filter(Boolean).join(", ")
 
@@ -1320,6 +1297,11 @@ export function PracticeDossier({
                       {locationLine}
                     </span>
                   )}
+                  <CensusBadge
+                    tier={target.ownershipTier ?? practice.census_review_status}
+                    peBacked={target.peBacked}
+                    compact
+                  />
                   {dsoEntry && (
                     <span
                       className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"

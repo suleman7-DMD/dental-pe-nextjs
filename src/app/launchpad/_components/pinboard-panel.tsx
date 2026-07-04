@@ -9,6 +9,7 @@ import {
   type LaunchpadRankedTarget,
 } from "@/lib/launchpad/signals"
 import { DSO_TIER_LABELS, resolveDsoTierEntry } from "@/lib/launchpad/dso-tiers"
+import { CensusBadge } from "@/components/data-display/census-badge"
 import { getPracticeDisplayName } from "@/lib/launchpad/display"
 
 interface PinboardPanelProps {
@@ -112,12 +113,8 @@ export function PinboardPanel({
                 .join(", ")
               const tierStyle =
                 TIER_BADGE_COLORS[target.displayTier] ?? TIER_BADGE_COLORS.low
-              const dsoEntry = target.practice.affiliated_dso
-                ? resolveDsoTierEntry(
-                    target.practice.affiliated_dso,
-                    target.practice.parent_company,
-                    target.practice.franchise_name
-                  )
+              const dsoEntry = target.networkLabel
+                ? resolveDsoTierEntry(target.networkLabel)
                 : null
 
               return (
@@ -164,6 +161,15 @@ export function PinboardPanel({
                         {LAUNCHPAD_TIER_LABELS[target.displayTier] ??
                           target.displayTier}
                       </span>
+                      <CensusBadge
+                        tier={
+                          target.ownershipTier ??
+                          target.practice.census_review_status
+                        }
+                        peBacked={target.peBacked}
+                        compact
+                        className="min-h-0 shrink-0 px-1.5 py-0.5 text-[9px] uppercase tracking-wider"
+                      />
                       {dsoEntry && (
                         <span className="inline-flex shrink-0 rounded-full border border-[#D4D0C8] bg-[#F5F5F0] px-1.5 py-0.5 text-[9px] font-medium text-[#6B6B60]">
                           {DSO_TIER_LABELS[dsoEntry.tier]}

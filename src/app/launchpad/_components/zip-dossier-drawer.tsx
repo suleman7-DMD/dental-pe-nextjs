@@ -5,7 +5,6 @@ import { useMemo } from "react"
 import {
   AlertTriangle,
   ArrowUpRight,
-  Building2,
   DollarSign,
   ExternalLink,
   Info,
@@ -13,6 +12,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react"
+import { CensusBadge } from "@/components/data-display/census-badge"
 import {
   Sheet,
   SheetContent,
@@ -430,12 +430,19 @@ export function LaunchpadZipDossierDrawer({
                             <p className="truncate text-sm font-semibold text-[#1A1A1A]">
                               {displayName}
                             </p>
-                            <p className="flex items-center gap-1.5 text-[11px] text-[#6B6B60]">
-                              <Building2 className="h-3 w-3" />
-                              {target.practice.entity_classification ?? "unclassified"}
+                            <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-[#6B6B60]">
+                              <CensusBadge
+                                tier={
+                                  target.ownershipTier ??
+                                  target.practice.census_review_status
+                                }
+                                peBacked={target.peBacked}
+                                compact
+                                className="min-h-0 shrink-0 px-1.5 py-0.5 text-[10px] uppercase tracking-wider"
+                              />
                               {target.practice.buyability_score != null && (
-                                <span className="ml-1 font-mono">
-                                  · buy {target.practice.buyability_score}
+                                <span className="font-mono">
+                                  buy {target.practice.buyability_score}
                                 </span>
                               )}
                             </p>

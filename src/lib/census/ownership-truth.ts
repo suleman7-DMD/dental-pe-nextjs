@@ -219,6 +219,15 @@ export const ADA_ANCHOR_UNIT_CAVEAT =
 /** Standing label for any legacy-detector surface. */
 export const LEGACY_DETECTOR_CONTEXT_LABEL = SOURCE_CLASS_META.legacy_detector.label
 
+/** Census network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
+export function formatNetworkId(id: string): string {
+  return id
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")
+}
+
 // ---------------------------------------------------------------------------
 // Per-location record — the canonical helper API
 // ---------------------------------------------------------------------------

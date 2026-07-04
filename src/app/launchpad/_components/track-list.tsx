@@ -5,11 +5,14 @@ import { ChevronDown, ChevronRight, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { exportToCsv } from "@/lib/utils/csv-export"
 import {
-  LAUNCHPAD_TIER_LABELS,
-  LAUNCHPAD_TIERS,
+  LAUNCHPAD_LANES,
+  LAUNCHPAD_LANE_CAPS,
+  LAUNCHPAD_LANE_COLORS,
+  LAUNCHPAD_LANE_DESCRIPTIONS,
+  LAUNCHPAD_LANE_LABELS,
   type LaunchpadBundle,
+  type LaunchpadLane,
   type LaunchpadRankedTarget,
-  type LaunchpadTier,
   type LaunchpadTrack,
 } from "@/lib/launchpad/signals"
 import { TrackListCard } from "./track-list-card"
@@ -27,17 +30,12 @@ interface TrackListProps {
   className?: string
 }
 
-const TIER_SECTION_COLORS: Record<LaunchpadTier, string> = {
-  best_fit: "text-[#2D8B4E]",
-  strong: "text-[#B8860B]",
-  maybe: "text-[#2563EB]",
-  low: "text-[#6B6B60]",
-  avoid: "text-[#C23B3B]",
-}
-
-const DEFAULT_EXPANDED_TIERS: ReadonlySet<LaunchpadTier> = new Set<LaunchpadTier>([
-  "best_fit",
-  "strong",
+// All three lanes start expanded — "Needs research" must stay visible, not
+// buried, because most of the pool lives there until the census reviews it.
+const DEFAULT_EXPANDED_LANES: ReadonlySet<LaunchpadLane> = new Set<LaunchpadLane>([
+  "verified_target",
+  "promising_lead",
+  "needs_research",
 ])
 const PAGE_SIZE = 100
 
@@ -49,6 +47,10 @@ function exportRankedCsv(targets: LaunchpadRankedTarget[], track: LaunchpadTrack
     city: t.practice.city ?? "",
     state: t.practice.state ?? "",
     zip: t.practice.zip ?? "",
+    lane: LAUNCHPAD_LANE_LABELS[t.lane],
+    ownership_tier: t.ownershipTier ?? "not_reviewed",
+    network: t.networkLabel ?? "",
+    pe_backed: t.peBacked ? "yes" : "no",
     best_track: t.bestTrack,
     score: Math.round(t.displayScore),
     tier: t.displayTier,
@@ -59,13 +61,16 @@ function exportRankedCsv(targets: LaunchpadRankedTarget[], track: LaunchpadTrack
   }))
   const columns = [
     "rank", "npi", "practice", "city", "state", "zip",
+    "lane", "ownership_tier", "network", "pe_backed",
     "best_track", "score", "tier", "commutable", "dso_tier", "signals", "warnings",
   ]
   const headerMap: Record<string, string> = {
     rank: "Rank", npi: "NPI", practice: "Practice", city: "City", state: "State",
-    zip: "ZIP", best_track: "Best Track", score: "Score", tier: "Tier",
-    commutable: "Commutable", dso_tier: "DSO Tier", signals: "Opportunity Signals",
-    warnings: "Warning Signals",
+    zip: "ZIP", lane: "Lane", ownership_tier: "Census Ownership Tier",
+    network: "Network", pe_backed: "PE-Backed",
+    best_track: "Best Track", score: "Score", tier: "Fit Tier",
+    commutable: "Commutable", dso_tier: "DSO Employment Tier",
+    signals: "Opportunity Signals", warnings: "Warning Signals",
   }
   exportToCsv(
     rows as Record<string, unknown>[],
@@ -85,8 +90,8 @@ export function TrackList({
   onOpenScore,
   className,
 }: TrackListProps) {
-  const [expandedTiers, setExpandedTiers] = useState<Set<LaunchpadTier>>(
-    () => new Set(DEFAULT_EXPANDED_TIERS)
+  const [expandedLanes, setExpandedLanes] = useState<Set<LaunchpadLane>>(
+    () => new Set(DEFAULT_EXPANDED_LANES)
   )
   const [page, setPage] = useState(1)
   const pinnedSet = useMemo(() => new Set(pinnedNpis ?? []), [pinnedNpis])
@@ -108,34 +113,34 @@ export function TrackList({
   }, [rankedTargets, safePage])
 
   const totalGrouped = useMemo(() => {
-    const map = new Map<LaunchpadTier, LaunchpadRankedTarget[]>()
-    for (const tier of LAUNCHPAD_TIERS) {
-      map.set(tier, [])
+    const map = new Map<LaunchpadLane, LaunchpadRankedTarget[]>()
+    for (const lane of LAUNCHPAD_LANES) {
+      map.set(lane, [])
     }
     for (const target of rankedTargets) {
-      const group = map.get(target.displayTier)
+      const group = map.get(target.lane)
       if (group) group.push(target)
     }
     return map
   }, [rankedTargets])
 
   const grouped = useMemo(() => {
-    const map = new Map<LaunchpadTier, LaunchpadRankedTarget[]>()
-    for (const tier of LAUNCHPAD_TIERS) {
-      map.set(tier, [])
+    const map = new Map<LaunchpadLane, LaunchpadRankedTarget[]>()
+    for (const lane of LAUNCHPAD_LANES) {
+      map.set(lane, [])
     }
     for (const target of paginatedTargets) {
-      const group = map.get(target.displayTier)
+      const group = map.get(target.lane)
       if (group) group.push(target)
     }
     return map
   }, [paginatedTargets])
 
-  const toggleTier = (tier: LaunchpadTier) => {
-    setExpandedTiers((current) => {
+  const toggleLane = (lane: LaunchpadLane) => {
+    setExpandedLanes((current) => {
       const next = new Set(current)
-      if (next.has(tier)) next.delete(tier)
-      else next.add(tier)
+      if (next.has(lane)) next.delete(lane)
+      else next.add(lane)
       return next
     })
   }
@@ -155,9 +160,9 @@ export function TrackList({
           </h2>
           {rankedTargets.length > 0 && (
             <p className="text-xs text-[#707064]">
-              Top score {Math.round(rankedTargets[0]?.displayScore ?? 0)} ·{" "}
-              {(totalGrouped.get("best_fit") ?? []).length.toLocaleString()} best-fit ·{" "}
-              {(totalGrouped.get("strong") ?? []).length.toLocaleString()} strong
+              {(totalGrouped.get("verified_target") ?? []).length.toLocaleString()} verified ·{" "}
+              {(totalGrouped.get("promising_lead") ?? []).length.toLocaleString()} promising ·{" "}
+              {(totalGrouped.get("needs_research") ?? []).length.toLocaleString()} need research
             </p>
           )}
         </div>
@@ -178,58 +183,75 @@ export function TrackList({
         </div>
       ) : (
         <div className="max-h-[800px] overflow-y-auto">
-          {LAUNCHPAD_TIERS.map((tier) => {
-            const items = grouped.get(tier) ?? []
-            if (items.length === 0) return null
-            const isExpanded = expandedTiers.has(tier)
-            const colorClass = TIER_SECTION_COLORS[tier]
+          {LAUNCHPAD_LANES.map((lane) => {
+            const items = grouped.get(lane) ?? []
+            const laneTotal = (totalGrouped.get(lane) ?? []).length
+            // Lane headers stay visible even when the lane has no rows on this
+            // page, so the three-lane structure never silently collapses.
+            if (laneTotal === 0) return null
+            const isExpanded = expandedLanes.has(lane)
+            const laneColor = LAUNCHPAD_LANE_COLORS[lane]
+            const laneCap = LAUNCHPAD_LANE_CAPS[lane]
 
             return (
-              <div key={tier} className="border-b border-[#E8E5DE] last:border-b-0">
-                {/* Section header */}
+              <div key={lane} className="border-b border-[#E8E5DE] last:border-b-0">
+                {/* Lane header */}
                 <button
                   type="button"
-                  onClick={() => toggleTier(tier)}
-                  className="flex w-full items-center justify-between px-4 py-2 text-left transition-colors hover:bg-[#FAFAF7]"
+                  onClick={() => toggleLane(lane)}
+                  className="flex w-full items-start justify-between gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[#FAFAF7]"
                   aria-expanded={isExpanded}
                 >
-                  <div className="flex items-center gap-2">
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-[#6B6B60]" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-[#6B6B60]" />
-                    )}
-                    <span
-                      className={cn(
-                        "text-[11px] font-bold uppercase tracking-wider",
-                        colorClass
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 shrink-0 text-[#6B6B60]" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[#6B6B60]" />
                       )}
-                    >
-                      {LAUNCHPAD_TIER_LABELS[tier]}
-                    </span>
-                    <span className="rounded-full bg-[#F7F7F4] px-2 py-0.5 text-[11px] font-medium text-[#6B6B60]">
-                      {(totalGrouped.get(tier) ?? []).length.toLocaleString()}
-                    </span>
+                      <span
+                        className="text-[11px] font-bold uppercase tracking-wider"
+                        style={{ color: laneColor }}
+                      >
+                        {LAUNCHPAD_LANE_LABELS[lane]}
+                      </span>
+                      <span className="rounded-full bg-[#F7F7F4] px-2 py-0.5 text-[11px] font-medium text-[#6B6B60]">
+                        {laneTotal.toLocaleString()}
+                      </span>
+                      {laneCap != null && (
+                        <span className="rounded-full border border-[#D4920B]/30 bg-[#D4920B]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#98690A]">
+                          scores capped at {laneCap}
+                        </span>
+                      )}
+                    </div>
+                    <p className="ml-6 mt-0.5 text-[11px] leading-snug text-[#9C9C90]">
+                      {LAUNCHPAD_LANE_DESCRIPTIONS[lane]}
+                    </p>
                   </div>
                 </button>
 
                 {/* Card list */}
-                {isExpanded && (
-                  <ol className="divide-y divide-[#E8E5DE]">
-                    {items.map((target) => (
-                      <TrackListCard
-                        key={target.npi}
-                        target={target}
-                        isSelected={selectedNpi === target.npi}
-                        onSelect={onSelect}
-                        track={track}
-                        isPinned={pinnedSet.has(target.npi)}
-                        onTogglePin={onTogglePin}
-                        onOpenScore={onOpenScore}
-                      />
-                    ))}
-                  </ol>
-                )}
+                {isExpanded &&
+                  (items.length > 0 ? (
+                    <ol className="divide-y divide-[#E8E5DE]">
+                      {items.map((target) => (
+                        <TrackListCard
+                          key={target.npi}
+                          target={target}
+                          isSelected={selectedNpi === target.npi}
+                          onSelect={onSelect}
+                          track={track}
+                          isPinned={pinnedSet.has(target.npi)}
+                          onTogglePin={onTogglePin}
+                          onOpenScore={onOpenScore}
+                        />
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="px-4 pb-3 pl-10 text-[11px] text-[#9C9C90]">
+                      None on this page — use the pager below to reach this lane&apos;s rows.
+                    </p>
+                  ))}
               </div>
             )
           })}

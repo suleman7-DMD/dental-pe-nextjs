@@ -551,17 +551,6 @@ async function fetchRecentAcquisitionNpis(
   }
 }
 
-/** Compute the median of a numeric array. Returns null for empty/all-null arrays. */
-function median(values: (number | null | undefined)[]): number | null {
-  const nums = values.filter((v): v is number => v != null && isFinite(v))
-  if (nums.length === 0) return null
-  const sorted = [...nums].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid]
-}
-
 // ---------------------------------------------------------------------------
 // Main export
 // ---------------------------------------------------------------------------
@@ -739,7 +728,8 @@ export async function getLaunchpadBundle(options: {
     )
   }
 
-  const corporateSharePct = median(zipScores.map((z) => z.corporate_share_pct))
+  const censusReviewedPct =
+    totalPractices > 0 ? Math.round((allSummary.censusReviewed / totalPractices) * 100) : 0
 
   const summary: LaunchpadSummary = {
     scopeId: scope,
@@ -774,7 +764,12 @@ export async function getLaunchpadBundle(options: {
       withIntel,
       pct: intelPct,
     },
-    corporateSharePct,
+    laneCounts: {
+      verified_target: allSummary.verifiedTargets,
+      promising_lead: allSummary.promisingLeads,
+      needs_research: allSummary.needsResearch,
+    },
+    censusReviewedPct,
   }
 
   // 10. Build dataHealth

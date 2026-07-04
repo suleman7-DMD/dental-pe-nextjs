@@ -1,4 +1,5 @@
 import type { LaunchpadScope } from "./scope"
+import type { HeadlineBucket, OwnershipTier, SourceClass } from "@/lib/census/ownership-truth"
 
 export type LaunchpadTrack = "succession" | "high_volume" | "dso" | "all"
 export type ConcreteLaunchpadTrack = Exclude<LaunchpadTrack, "all">
@@ -23,13 +24,55 @@ export const LAUNCHPAD_TRACK_SHORT_LABELS: Record<LaunchpadTrack, string> = {
 export const LAUNCHPAD_TRACK_DESCRIPTIONS: Record<LaunchpadTrack, string> = {
   all: "Explore mode — compute best-fit across all three tracks",
   succession:
-    "Apprentice to owner — mentor-rich solo practices with retirement runway and buyability signal",
+    "Apprentice to owner — census-reviewed solo owner-operators (T1) with retirement runway and mentorship capacity",
   high_volume:
-    "Fast clinical reps — busy private or group practices with high insurance mix and 3-5 providers",
-  dso: "Structured associate role with benefits — rated by DSO tier (Tier 1/2 preferred)",
+    "Fast clinical reps — busy census-reviewed dentist-owned practices with stable income mix and 3-5 providers",
+  dso: "Structured associate role with benefits — census-confirmed DSO locations rated by employment tier (Tier 1/2 preferred)",
 }
 
 export const DEFAULT_LAUNCHPAD_TRACK: LaunchpadTrack = "all"
+
+// ---------------------------------------------------------------------------
+// Lanes — the three honest groupings every ranked practice lands in.
+// Lane assignment is census-driven (ownership_tier + census_review_status)
+// plus intel presence. It is NEVER derived from the legacy detector.
+// ---------------------------------------------------------------------------
+
+export type LaunchpadLane = "verified_target" | "promising_lead" | "needs_research"
+
+export const LAUNCHPAD_LANES: LaunchpadLane[] = [
+  "verified_target",
+  "promising_lead",
+  "needs_research",
+]
+
+export const LAUNCHPAD_LANE_LABELS: Record<LaunchpadLane, string> = {
+  verified_target: "Verified job targets",
+  promising_lead: "Promising leads",
+  needs_research: "Needs research",
+}
+
+export const LAUNCHPAD_LANE_DESCRIPTIONS: Record<LaunchpadLane, string> = {
+  verified_target:
+    "Census-reviewed ownership with accepted practice-level intel — every ownership claim here is a reviewed conclusion.",
+  promising_lead:
+    "Census-reviewed ownership, but practice-level intel is thin — the structure looks right; the details are unverified.",
+  needs_research:
+    "Ownership is not a census conclusion yet (unreviewed, undetermined, or held) — scores are capped until the census answers.",
+}
+
+/** Score ceilings by lane. Null = uncapped (0–100). */
+export const LAUNCHPAD_LANE_CAPS: Record<LaunchpadLane, number | null> = {
+  verified_target: null,
+  promising_lead: 70,
+  needs_research: 60,
+}
+
+export const LAUNCHPAD_LANE_COLORS: Record<LaunchpadLane, string> = {
+  verified_target: "#2D8B4E",
+  promising_lead: "#B8860B",
+  needs_research: "#6B6B60",
+}
 
 export type LaunchpadTier = "best_fit" | "strong" | "maybe" | "low" | "avoid"
 
@@ -65,7 +108,7 @@ export type LaunchpadSignalId =
   | "growing_undersupplied_signal"
   | "succession_published_signal"
   | "dso_avoid_warning"
-  | "family_dynasty_warning"
+  | "dso_employment_context"
   | "ghost_practice_warning"
   | "recent_acquisition_warning"
   | "associate_saturated_signal"
@@ -93,7 +136,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "opportunity",
     baseWeight: 25,
     description:
-      "Solo practitioner, 25+ years in business, at least two staff members — retirement runway with mentorship capacity.",
+      "Census-reviewed solo owner-operator (T1), 25+ years in business, at least two staff members — retirement runway with mentorship capacity.",
   },
   succession_track_signal: {
     id: "succession_track_signal",
@@ -102,7 +145,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "opportunity",
     baseWeight: 30,
     description:
-      "Mentor-rich owner who is still a sole provider and has a strong buyability score — classic apprentice-to-owner setup.",
+      "Mentor-rich owner who is still the sole provider, with a strong legacy buyability heuristic — classic apprentice-to-owner setup.",
   },
   hiring_now_signal: {
     id: "hiring_now_signal",
@@ -120,7 +163,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "opportunity",
     baseWeight: 20,
     description:
-      "Busy private/group practice with stable income mix, 5+ employees, not corporate — maximum clinical reps without DSO pressure.",
+      "Busy census-reviewed dentist-owned practice with stable income mix and 5+ employees — maximum clinical reps without DSO pressure.",
   },
   boutique_solo_signal: {
     id: "boutique_solo_signal",
@@ -129,7 +172,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "opportunity",
     baseWeight: 25,
     description:
-      "High-volume solo practice with $1M+ revenue and modern technology (CBCT, iTero) — premium clinical environment.",
+      "Census-reviewed solo owner-operator with $1M+ revenue and modern technology (CBCT, iTero) — premium clinical environment.",
   },
   ffs_concierge_signal: {
     id: "ffs_concierge_signal",
@@ -157,7 +200,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "opportunity",
     baseWeight: 18,
     description:
-      "Affiliated with a Tier 1 or Tier 2 DSO (Mortenson, MB2, PDS, Benevis) — structured benefits + mentorship.",
+      "Census-confirmed DSO location whose network is rated Tier 1 or Tier 2 (Mortenson, MB2, PDS, Benevis) — structured benefits + mentorship.",
   },
   mentor_density_zip_signal: {
     id: "mentor_density_zip_signal",
@@ -165,7 +208,8 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     shortLabel: "Dense ZIP",
     category: "opportunity",
     baseWeight: 12,
-    description: "ZIP has 5+ mentor-rich practices and low corporate share — plenty of fallback options nearby.",
+    description:
+      "ZIP has 3+ census-reviewed mentor-rich practices — plenty of fallback options nearby.",
   },
   commutable_signal: {
     id: "commutable_signal",
@@ -200,16 +244,16 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "warning",
     baseWeight: -40,
     description:
-      "Affiliated with an AVOID-tier DSO (Aspen, Sage, Western, Smile Brands, Risas) — documented patient-harm or churn patterns.",
+      "Census-confirmed corporate location whose network is on the AVOID list (Aspen, Sage, Western, Smile Brands, Risas) — documented patient-harm or churn patterns.",
   },
-  family_dynasty_warning: {
-    id: "family_dynasty_warning",
-    label: "Family dynasty",
-    shortLabel: "Family",
-    category: "warning",
-    baseWeight: -15,
+  dso_employment_context: {
+    id: "dso_employment_context",
+    label: "DSO employment",
+    shortLabel: "DSO employer",
+    category: "context",
+    baseWeight: 0,
     description:
-      "Shared last name at the address suggests internal succession — new grad likely a placeholder role.",
+      "Census-confirmed DSO/PE/corporate location — an associate role here is DSO employment. Shown for context regardless of the network's employment rating.",
   },
   ghost_practice_warning: {
     id: "ghost_practice_warning",
@@ -217,7 +261,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     shortLabel: "Ghost",
     category: "warning",
     baseWeight: -30,
-    description: "Solo-inactive classification — no phone and no website. Likely retired or dormant.",
+    description: "No phone and no website on file — likely retired or dormant.",
   },
   recent_acquisition_warning: {
     id: "recent_acquisition_warning",
@@ -226,7 +270,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "warning",
     baseWeight: -20,
     description:
-      "Ownership flipped to DSO-affiliated in the past 18 months — expect contract and comp churn.",
+      "Ownership flipped to DSO-affiliated in the past 18 months (practice_changes record) — expect contract and comp churn.",
   },
   associate_saturated_signal: {
     id: "associate_saturated_signal",
@@ -235,7 +279,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "warning",
     baseWeight: -10,
     description:
-      "Large group with 5+ providers — less mentorship time per associate at this scale.",
+      "5+ providers on site — less mentorship time per associate at this scale.",
   },
   medicaid_mill_warning: {
     id: "medicaid_mill_warning",
@@ -254,7 +298,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "warning",
     baseWeight: -25,
     description:
-      "Tier 3 or AVOID DSO — documented aggressive non-compete enforcement (IL courts uphold 10–25mi / up to 2 years).",
+      "Census-confirmed corporate location whose network rates Tier 3 or AVOID — documented aggressive non-compete enforcement (IL courts uphold 10–25mi / up to 2 years).",
   },
   pe_recap_volatility_warning: {
     id: "pe_recap_volatility_warning",
@@ -263,7 +307,7 @@ export const LAUNCHPAD_SIGNALS: Record<LaunchpadSignalId, LaunchpadSignalDefinit
     category: "warning",
     baseWeight: -15,
     description:
-      "PE-sponsor-backed with a deal in the past 12 months — ownership churn typically disrupts associate comp.",
+      "Census-confirmed PE-backed location — PE ownership churn typically disrupts associate comp and contracts.",
   },
 }
 
@@ -309,6 +353,7 @@ export interface LaunchpadPracticeRecord {
   ownership_evidence_urls?: string | null
   ownership_confidence?: string | null
   network_id?: string | null
+  census_review_status?: string | null
 }
 
 export interface LaunchpadPracticeIntelRecord {
@@ -410,6 +455,8 @@ export interface LaunchpadTrackScore {
   tier: LaunchpadTier
   contributions: LaunchpadSignalContribution[]
   confidenceCapped: boolean
+  /** Explicit "why capped" sentence when confidenceCapped is true. */
+  capReason: string | null
 }
 
 export interface LaunchpadRankedTarget {
@@ -419,7 +466,16 @@ export interface LaunchpadRankedTarget {
   intelAudit: LaunchpadIntelAudit | null
   zipScore: LaunchpadZipScoreRecord | null
   commutable: boolean
+  /** Curated employment-quality rating of the census network (NOT an ownership claim). */
   dsoTier: string | null
+  lane: LaunchpadLane
+  laneReason: string
+  /** Census truth layer — null when the census has no conclusion yet. */
+  ownershipTier: OwnershipTier | null
+  ownershipBucket: HeadlineBucket
+  ownershipSource: SourceClass
+  networkLabel: string | null
+  peBacked: boolean
   bestTrack: ConcreteLaunchpadTrack
   bestScore: number
   bestTier: LaunchpadTier
@@ -454,7 +510,10 @@ export interface LaunchpadSummary {
   dsoCandidates: { bestFit: number; strong: number; avoidCount: number }
   medianCompRange: { low: number; high: number; source: string }
   intelCoverage: { total: number; withIntel: number; pct: number }
-  corporateSharePct: number | null
+  /** Honest lane split across the whole scope (all-tracks view). */
+  laneCounts: Record<LaunchpadLane, number>
+  /** % of scope practice rows with a census-reviewed ownership conclusion. */
+  censusReviewedPct: number
 }
 
 export interface LaunchpadDataHealth {

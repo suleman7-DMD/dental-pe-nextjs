@@ -1,15 +1,19 @@
 "use client"
 
 import {
+  BadgeCheck,
   Brain,
-  BriefcaseBusiness,
   Building2,
-  GraduationCap,
-  ShieldAlert,
+  ListChecks,
+  Microscope,
   Sparkles,
 } from "lucide-react"
 import { KpiCard } from "@/components/data-display/kpi-card"
-import type { LaunchpadBundle } from "@/lib/launchpad/signals"
+import {
+  LAUNCHPAD_LANE_COLORS,
+  LAUNCHPAD_LANE_LABELS,
+  type LaunchpadBundle,
+} from "@/lib/launchpad/signals"
 
 interface LaunchpadKpiStripProps {
   bundle: LaunchpadBundle | null
@@ -18,12 +22,6 @@ interface LaunchpadKpiStripProps {
 
 export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps) {
   const summary = bundle?.summary ?? null
-
-  const bestFitTotal = summary
-    ? summary.successionCandidates.bestFit +
-      summary.highVolumeCandidates.bestFit +
-      summary.dsoCandidates.bestFit
-    : 0
 
   const intelCoveragePct = bundle?.dataHealth?.intelCoveragePct ?? null
 
@@ -76,53 +74,55 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
         />
 
         <KpiCard
+          icon={<BadgeCheck className="h-4 w-4" />}
+          label={LAUNCHPAD_LANE_LABELS.verified_target}
+          value={summary ? summary.laneCounts.verified_target.toLocaleString() : "--"}
+          subtitle={
+            <span className="text-[11px] text-[#6B6B60]">
+              Census-reviewed + accepted intel
+            </span>
+          }
+          tooltip="Practices whose ownership is a census-reviewed conclusion AND that carry accepted source-backed practice intel. The only lane with uncapped scores — every ownership claim here has been human-reviewed with evidence."
+          accentColor={LAUNCHPAD_LANE_COLORS.verified_target}
+        />
+
+        <KpiCard
           icon={<Sparkles className="h-4 w-4" />}
-          label="Best-fit candidates"
-          value={summary ? bestFitTotal.toLocaleString() : "--"}
+          label={LAUNCHPAD_LANE_LABELS.promising_lead}
+          value={summary ? summary.laneCounts.promising_lead.toLocaleString() : "--"}
           subtitle={
-            <span className="text-[11px] text-[#6B6B60]">score ≥ 80 in any track</span>
+            <span className="text-[11px] text-[#6B6B60]">
+              Census-reviewed · scores ≤ 70
+            </span>
           }
-          tooltip="Practices scoring ≥ 80 in at least one of the three job tracks (Succession, High-volume, DSO)"
-          accentColor="#B8860B"
+          tooltip="Ownership is census-reviewed but practice-level intel is thin or unverified. Scores are capped at 70 until source-backed intel is accepted."
+          accentColor={LAUNCHPAD_LANE_COLORS.promising_lead}
         />
 
         <KpiCard
-          icon={<GraduationCap className="h-4 w-4" />}
-          label="Mentor-rich"
-          value={summary ? summary.mentorRichCount.toLocaleString() : "--"}
+          icon={<Microscope className="h-4 w-4" />}
+          label={LAUNCHPAD_LANE_LABELS.needs_research}
+          value={summary ? summary.laneCounts.needs_research.toLocaleString() : "--"}
           subtitle={
-            <span className="text-[11px] text-[#6B6B60]">Solo, 25+ yrs, 2+ staff</span>
+            <span className="text-[11px] text-[#6B6B60]">
+              Census pending · scores ≤ 60
+            </span>
           }
-          tooltip="Solo practitioners operating 25+ years with at least 2 support staff — classic mentorship capacity"
-          accentColor="#2D8B4E"
+          tooltip="Ownership is not a census conclusion yet — unreviewed, undetermined, or held for evidence. Scores are capped at 60 until the ownership census reviews these locations. This lane is never hidden: it is the honest size of what we don't know yet."
+          accentColor={LAUNCHPAD_LANE_COLORS.needs_research}
         />
 
         <KpiCard
-          icon={<BriefcaseBusiness className="h-4 w-4" />}
-          label="Hiring now"
-          value={summary ? summary.hiringNowCount.toLocaleString() : "--"}
+          icon={<ListChecks className="h-4 w-4" />}
+          label="Census coverage"
+          value={summary ? `${summary.censusReviewedPct.toFixed(0)}%` : "--"}
           subtitle={
-            <span className="text-[11px] text-[#6B6B60]">Source-backed openings</span>
+            <span className="text-[11px] text-[#6B6B60]">
+              of scope rows ownership-reviewed
+            </span>
           }
-          tooltip="Practices with active associate openings detected from source-backed practice_intel"
+          tooltip="Share of practice rows in this scope whose ownership_tier is a census-reviewed conclusion (evidence-backed human review). Everything else is unreviewed, undetermined, or held — never assumed."
           accentColor="#2563EB"
-        />
-
-        <KpiCard
-          icon={<ShieldAlert className="h-4 w-4" />}
-          label="Avoid-tier DSOs"
-          value={summary ? summary.avoidListCount.toLocaleString() : "--"}
-          subtitle={
-            summary && summary.avoidListCount > 0 ? (
-              <span className="text-[11px] text-[#C23B3B]">
-                {summary.avoidListCount} on AVOID list
-              </span>
-            ) : (
-              <span className="text-[11px] text-[#6B6B60]">Aspen, Sage, Risas, Western</span>
-            )
-          }
-          tooltip="DSOs rated AVOID due to documented patient-harm or excessive associate churn patterns"
-          accentColor="#C23B3B"
         />
 
         <KpiCard
@@ -138,7 +138,7 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           }
           tooltip={
             withIntelCount === 0
-              ? "0% source-backed evidence coverage — scores are capped at 70 for all practices. Run the weekly research pipeline to populate verified dossiers."
+              ? "0% source-backed evidence coverage — no practice can reach the verified-target lane. Run the weekly research pipeline to populate verified dossiers."
               : "Practices with source-backed practice_intel attached. Rejected raw rows do not lift scores or populate thesis claims."
           }
           accentColor="#7C3AED"
@@ -147,8 +147,8 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
 
       {intelCoveragePct !== null && intelCoveragePct < 10 && (
         <div className="mt-2 rounded-md border border-[#D4920B]/30 bg-[#D4920B]/5 px-3 py-2 text-xs text-[#6B6B60]">
-          Source-backed intel coverage thin ({intelCoveragePct.toFixed(0)}%) — scores capped at 70 for most
-          practices
+          Source-backed intel coverage thin ({intelCoveragePct.toFixed(0)}%) — most
+          census-reviewed practices sit in the promising-leads lane (scores ≤ 70)
         </div>
       )}
     </div>

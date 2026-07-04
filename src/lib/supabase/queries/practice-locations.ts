@@ -48,6 +48,7 @@ export const PRACTICE_LOCATION_SELECT = [
   "ownership_evidence_urls",
   "ownership_confidence",
   "network_id",
+  "census_review_status",
 ].join(",")
 
 export interface PracticeLocationRecord {
@@ -88,6 +89,7 @@ export interface PracticeLocationRecord {
   ownership_evidence_urls: string | null
   ownership_confidence: string | null
   network_id: string | null
+  census_review_status: string | null
 }
 
 export interface PracticeLocationFetchOptions {
@@ -296,6 +298,7 @@ export function practiceLocationToLaunchpadRecord(
     ownership_evidence_urls: row.ownership_evidence_urls,
     ownership_confidence: row.ownership_confidence,
     network_id: row.network_id,
+    census_review_status: row.census_review_status,
   }
 }
 
