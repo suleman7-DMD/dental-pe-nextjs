@@ -16,7 +16,7 @@ interface SaturationMapProps {
   centerLon: number
 }
 
-type MetricKey = 'dld' | 'buyable' | 'corporate'
+type MetricKey = 'dld' | 'buyable'
 
 interface MetricConfig {
   label: string
@@ -60,7 +60,7 @@ const METRICS: Record<MetricKey, MetricConfig> = {
   buyable: {
     label: 'Buyable Practice Ratio',
     shortLabel: 'Buyable %',
-    description: '% of GP offices that are independently owned solos — potential acquisition targets. Higher = more opportunity.',
+    description: 'Legacy heuristic (zip_scores.buyable_practice_ratio) — NOT a census ownership claim. Rough share of GP offices flagged as potential acquisition targets; census ownership by ZIP lives in the Analytics tab.',
     field: 'buyable_practice_ratio',
     transform: (v) => v * 100,
     format: (v) => `${v.toFixed(0)}%`,
@@ -72,28 +72,11 @@ const METRICS: Record<MetricKey, MetricConfig> = {
     ],
     legendMin: '0%',
     legendMax: '70%+',
-    legendNote: '% of GP offices that are buyable solos',
-  },
-  corporate: {
-    label: 'Corporate Share',
-    shortLabel: 'Corporate %',
-    description: '% of GP offices classified as DSO/PE-affiliated. Higher = more consolidated market.',
-    field: 'corporate_share_pct',
-    transform: (v) => v * 100,
-    format: (v) => `${v.toFixed(0)}%`,
-    // Low corporate (green/good) -> mid (yellow) -> high corporate (red/consolidated)
-    colorStops: [
-      { value: 0, color: [45, 139, 78] },     // #2D8B4E — green
-      { value: 15, color: [212, 146, 11] },    // #D4920B — yellow
-      { value: 35, color: [194, 59, 59] },     // #C23B3B — red
-    ],
-    legendMin: '0%',
-    legendMax: '35%+',
-    legendNote: '% of GP offices that are DSO/PE-affiliated',
+    legendNote: '% flagged buyable (legacy heuristic)',
   },
 }
 
-const METRIC_KEYS: MetricKey[] = ['dld', 'buyable', 'corporate']
+const METRIC_KEYS: MetricKey[] = ['dld', 'buyable']
 
 // ────────────────────────────────────────────────────────────────────────────
 // Color interpolation helper
@@ -153,7 +136,6 @@ function SaturationMapInner({
     gpLocations: number
     dldVal: number | null
     buyableVal: number | null
-    corporateVal: number | null
     confidence: string
     size: number
     color: string
@@ -205,7 +187,6 @@ function SaturationMapInner({
               gpLocations: d.gpLocations,
               dldVal: d.dldVal != null ? d.dldVal.toFixed(1) : '--',
               buyableVal: d.buyableVal != null ? `${d.buyableVal.toFixed(0)}%` : '--',
-              corporateVal: d.corporateVal != null ? `${d.corporateVal.toFixed(0)}%` : '--',
               confidence: d.confidence,
               size: d.size,
               color: d.color,
@@ -282,7 +263,6 @@ function SaturationMapInner({
           // Bold the active metric
           const dldBold = metric === 'dld' ? 'font-weight:700' : ''
           const buyBold = metric === 'buyable' ? 'font-weight:700' : ''
-          const corpBold = metric === 'corporate' ? 'font-weight:700' : ''
 
           popup
             .setLngLat(coords)
@@ -293,8 +273,7 @@ function SaturationMapInner({
                 <span style="color:#6B6B60">Pop:</span> <span>${props.population}</span>
                 <span style="color:#6B6B60"> &middot; GP Offices:</span> <strong>${props.gpLocations}</strong><br/>
                 <span style="color:#6B6B60;${dldBold}">DLD-GP/10k:</span> <span style="${dldBold}">${props.dldVal}</span><br/>
-                <span style="color:#6B6B60;${buyBold}">Buyable %:</span> <span style="${buyBold}">${props.buyableVal}</span><br/>
-                <span style="color:#6B6B60;${corpBold}">Corporate %:</span> <span style="${corpBold}">${props.corporateVal}</span><br/>
+                <span style="color:#6B6B60;${buyBold}">Buyable % (legacy heuristic):</span> <span style="${buyBold}">${props.buyableVal}</span><br/>
                 <span style="color:#9C9C90;font-size:10px">Confidence: ${props.confidence}</span>
               </div>`
             )
@@ -378,7 +357,6 @@ export function SaturationMap({
           gpLocations,
           dldVal: zs.dld_gp_per_10k,
           buyableVal: zs.buyable_practice_ratio != null ? zs.buyable_practice_ratio * 100 : null,
-          corporateVal: zs.corporate_share_pct != null ? zs.corporate_share_pct * 100 : null,
           confidence: confidence.charAt(0).toUpperCase() + confidence.slice(1),
           size: markerSize(gpLocations),
           color: rgbToHex(...color),
@@ -395,7 +373,6 @@ export function SaturationMap({
       gpLocations: number
       dldVal: number | null
       buyableVal: number | null
-      corporateVal: number | null
       confidence: string
       size: number
       color: string
@@ -411,7 +388,6 @@ export function SaturationMap({
       .map((d) => {
         if (activeMetric === 'dld') return d.dldVal
         if (activeMetric === 'buyable') return d.buyableVal
-        if (activeMetric === 'corporate') return d.corporateVal
         return null
       })
       .filter((v): v is number => v != null)
@@ -436,7 +412,7 @@ export function SaturationMap({
     <div>
       <SectionHeader
         title="Saturation Metrics Map"
-        helpText="Each dot = one watched ZIP. Size = number of GP offices. Color = selected metric value. Toggle between Density, Buyable %, and Corporate % to visualize different market dimensions. Faded dots = low data confidence or missing metric."
+        helpText="Each dot = one watched ZIP. Size = number of GP offices. Color = selected metric value. Toggle between Density and Buyable % (a legacy heuristic, not a census ownership claim). Census ownership by ZIP lives in the Analytics tab. Faded dots = low data confidence or missing metric."
       />
 
       {/* Metric toggle */}

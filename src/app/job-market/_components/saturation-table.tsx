@@ -29,15 +29,6 @@ function buyableColor(val: number | null): { bg: string; text: string } | null {
   return { bg: '#B71C1C', text: '#ffffff' }
 }
 
-// Corporate %: green <5% (low PE/DSO presence), amber 5–15%, red >15%
-function corporateColor(val: number | null): { bg: string; text: string } | null {
-  if (val == null) return null
-  const pct = val * 100
-  if (pct < 5) return { bg: '#1B5E20', text: '#ffffff' }
-  if (pct <= 15) return { bg: '#F57F17', text: '#ffffff' }
-  return { bg: '#B71C1C', text: '#ffffff' }
-}
-
 function confidenceStars(val: string | null): string {
   if (!val) return '\u2014'
   switch (val) {
@@ -69,8 +60,6 @@ interface SaturationRow {
   dldRaw: number | null
   buyable: string
   buyableRaw: number | null
-  corporate: string
-  corporateRaw: number | null
   type: string
   confidence: string
   confidenceRaw: string | null
@@ -99,8 +88,6 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
         dldRaw: zs.dld_gp_per_10k,
         buyable: zs.buyable_practice_ratio != null ? `${(zs.buyable_practice_ratio * 100).toFixed(0)}%` : '\u2014',
         buyableRaw: zs.buyable_practice_ratio,
-        corporate: zs.corporate_share_pct != null ? `${(zs.corporate_share_pct * 100).toFixed(0)}%` : '\u2014',
-        corporateRaw: zs.corporate_share_pct,
         type: formatMarketType(zs.market_type),
         confidence: confidenceStars(zs.metrics_confidence),
         confidenceRaw: zs.metrics_confidence,
@@ -117,8 +104,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
       MHI: r.mhi,
       'GP Offices': r.gpOffices,
       'DLD-GP/10k': r.dld,
-      'Buyable %': r.buyable,
-      'Corporate %': r.corporate,
+      'Buyable % (legacy heuristic)': r.buyable,
       Type: r.type,
       Confidence: r.confidenceRaw ?? '',
     }))
@@ -157,7 +143,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
     return zipScores.length > 0 ? (lowCount / zipScores.length) * 100 : 0
   }, [zipScores])
 
-  const columns = ['ZIP', 'Town', 'Pop', 'MHI', 'GP Offices', 'DLD-GP/10k', 'Buyable %', 'Corp. % (floor)', 'Type', 'Confidence']
+  const columns = ['ZIP', 'Town', 'Pop', 'MHI', 'GP Offices', 'DLD-GP/10k', 'Buyable %', 'Type', 'Confidence']
 
   if (zipScores.length === 0) {
     return (
@@ -177,7 +163,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
     <div>
       <SectionHeader
         title="Saturation Analysis"
-        helpText="Cross-ZIP comparison of dental market metrics. DLD-GP/10k = GP dental offices per 10,000 residents (national avg ~6.1). Buyable % = share of GP offices that are independently owned solos. Corp. % (floor) = confirmed DSO/PE-affiliated share — a verified floor; true corporate share is likely higher. Color codes: green = favorable, yellow = moderate, red = high competition or limited opportunity."
+        helpText="Cross-ZIP comparison of dental market metrics. DLD-GP/10k = GP dental offices per 10,000 residents (national avg ~6.1). Buyable % = legacy heuristic (zip_scores.buyable_practice_ratio) — NOT a census ownership claim; census ownership by ZIP lives in the Analytics tab. Color codes: green = favorable, yellow = moderate, red = high competition or limited opportunity."
       />
 
       <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] overflow-hidden">
@@ -199,7 +185,6 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
               {rows.map(row => {
                 const dldStyle = dldColor(row.dldRaw)
                 const buyableStyle = buyableColor(row.buyableRaw)
-                const corpStyle = corporateColor(row.corporateRaw)
 
                 return (
                   <tr key={row.zip} className="border-b border-[#E8E5DE] hover:bg-[#F7F7F4] transition-colors">
@@ -230,18 +215,6 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
                         </span>
                       ) : (
                         <span className="text-[#1A1A1A]">{row.buyable}</span>
-                      )}
-                    </td>
-                    <td className="px-2.5 py-1.5 whitespace-nowrap">
-                      {corpStyle ? (
-                        <span
-                          className="inline-block px-2 py-0.5 rounded text-xs font-medium"
-                          style={{ backgroundColor: corpStyle.bg, color: corpStyle.text }}
-                        >
-                          {row.corporate}
-                        </span>
-                      ) : (
-                        <span className="text-[#1A1A1A]">{row.corporate}</span>
                       )}
                     </td>
                     <td className="px-2.5 py-1.5 text-[#1A1A1A] whitespace-nowrap">{row.type}</td>

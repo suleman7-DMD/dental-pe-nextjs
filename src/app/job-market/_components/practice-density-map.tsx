@@ -3,13 +3,14 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import type mapboxgl from 'mapbox-gl'
 import { SectionHeader } from '@/components/data-display/section-header'
-import { MapContainer } from '@/components/maps/map-container'
 import { ZIP_CENTROIDS } from '@/lib/constants/zip-centroids'
+import { isGpLocationClassification } from '@/lib/constants/entity-classifications'
 import {
-  classifyPractice,
-  getEntityClassificationLabel,
-  isGpLocationClassification,
-} from '@/lib/constants/entity-classifications'
+  BUCKET_META,
+  HEADLINE_BUCKETS,
+  tierToBucket,
+  type HeadlineBucket,
+} from '@/lib/census/ownership-truth'
 
 import type { Practice } from '@/lib/types'
 
@@ -26,57 +27,55 @@ interface PracticeDensityMapProps {
 interface MapPractice {
   map_lat: number
   map_lon: number
-  status_clean: string
+  bucket: HeadlineBucket
   practice_name: string
   address: string
   city_zip: string
-  status_label: string
-  dso: string
+  ownership_label: string
+  network: string
   employees: string
   year: string
   color: [number, number, number, number]
-  radius: number
   is_approximate: boolean
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Color constants
+// Colors — census bucket colors from the ownership contract. Per the truth
+// charter, unresolved renders as NEUTRAL GRAY on maps (not the amber chip
+// color) so unreviewed clinics never read as a finding.
 // ────────────────────────────────────────────────────────────────────────────
 
-// Color buckets keyed by classifyPractice() return value (canonical EC-first helper).
-// "specialist" + "non_clinical" rendered separately so the headline GP dot map isn't
-// polluted by ortho/endo/labs.
-const STATUS_COLORS: Record<string, [number, number, number, number]> = {
-  independent: [34, 197, 94, 180],
-  corporate: [239, 68, 68, 200],
-  specialist: [13, 148, 136, 180], // teal
-  non_clinical: [156, 163, 175, 100], // muted gray
-  unknown: [100, 116, 139, 80],
+const UNRESOLVED_MAP_GRAY: [number, number, number] = [156, 163, 175]
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '')
+  return [
+    parseInt(h.slice(0, 2), 16),
+    parseInt(h.slice(2, 4), 16),
+    parseInt(h.slice(4, 6), 16),
+  ]
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  independent: 'Independent',
-  corporate: 'Corporate (DSO/PE)',
-  specialist: 'Specialist',
-  non_clinical: 'Non-Clinical',
-  unknown: 'Unknown',
+const BUCKET_DOT_COLORS: Record<HeadlineBucket, [number, number, number, number]> =
+  HEADLINE_BUCKETS.reduce(
+    (acc, b) => {
+      const rgb = b === 'unresolved' ? UNRESOLVED_MAP_GRAY : hexToRgb(BUCKET_META[b].color)
+      acc[b] = [rgb[0], rgb[1], rgb[2], b === 'unresolved' ? 110 : 200]
+      return acc
+    },
+    {} as Record<HeadlineBucket, [number, number, number, number]>
+  )
+
+const UNRESOLVED_LEGEND_GRAY = '#9CA3AF'
+
+/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
+function formatNetworkId(id: string): string {
+  return id
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
 }
-
-const INDEPENDENT_COLOR_RANGE = [
-  [187, 247, 208],
-  [74, 222, 128],
-  [34, 197, 94],
-  [22, 163, 74],
-  [21, 128, 61],
-]
-
-const CONSOLIDATED_COLOR_RANGE = [
-  [254, 202, 202],
-  [252, 165, 165],
-  [248, 113, 113],
-  [239, 68, 68],
-  [220, 38, 38],
-]
 
 // ────────────────────────────────────────────────────────────────────────────
 // NPI-based jitter (matches Python: hash(npi) % 2^32 → deterministic offset)
@@ -99,17 +98,15 @@ function getApproxColor(color: [number, number, number, number]): [number, numbe
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Component
+// Inner map — raw mapboxgl dot layer colored by census bucket
 // ────────────────────────────────────────────────────────────────────────────
 
 function PracticeMapInner({
   geocoded,
-  showIndividual,
   centerLat,
   centerLon,
 }: {
   geocoded: MapPractice[]
-  showIndividual: boolean
   centerLat: number
   centerLon: number
 }) {
@@ -146,12 +143,11 @@ function PracticeMapInner({
             type: 'Feature' as const,
             geometry: { type: 'Point' as const, coordinates: [d.map_lon, d.map_lat] },
             properties: {
-              status: d.status_clean,
               name: d.practice_name,
               address: d.address,
               city_zip: d.city_zip,
-              status_label: d.status_label,
-              dso: d.dso,
+              ownership_label: d.ownership_label,
+              network: d.network,
               employees: d.employees,
               year: d.year,
               r: d.color[0],
@@ -165,7 +161,7 @@ function PracticeMapInner({
 
         map.addSource('practices', { type: 'geojson', data: geojson })
 
-        // Circle layer — all practices as colored dots
+        // Circle layer — all practices as census-colored dots
         // Scale radius with zoom: tiny at zoom 9, bigger when zoomed in
         map.addLayer({
           id: 'practice-dots',
@@ -174,10 +170,10 @@ function PracticeMapInner({
           paint: {
             'circle-radius': [
               'interpolate', ['linear'], ['zoom'],
-              8, showIndividual ? 1.5 : 1,
-              10, showIndividual ? 3 : 2,
-              12, showIndividual ? 5 : 3.5,
-              14, showIndividual ? 8 : 5,
+              8, 1.5,
+              10, 3,
+              12, 5,
+              14, 8,
             ],
             'circle-color': [
               'rgb',
@@ -188,10 +184,10 @@ function PracticeMapInner({
             'circle-opacity': [
               'case',
               ['==', ['get', 'approx'], 1],
-              showIndividual ? 0.45 : 0.35,    // Approximate — 50% opacity reduction
-              showIndividual ? 0.9 : 0.7,       // Precise (Data Axle coords)
+              0.45,    // Approximate — 50% opacity reduction
+              0.9,     // Precise (Data Axle coords)
             ],
-            'circle-stroke-width': showIndividual ? 0.5 : 0,
+            'circle-stroke-width': 0.5,
             'circle-stroke-color': 'rgba(0,0,0,0.15)',
           },
         })
@@ -216,8 +212,8 @@ function PracticeMapInner({
                 <strong style="color:#1A1A1A">${props.name}</strong><br/>
                 <span style="color:#6B6B60">${props.address}</span><br/>
                 <span style="color:#6B6B60">${props.city_zip}</span><br/>
-                <span style="color:#6B6B60">Status:</span> <strong style="color:#1A1A1A">${props.status_label}</strong><br/>
-                <span style="color:#6B6B60">DSO:</span> <span style="color:#1A1A1A">${props.dso}</span><br/>
+                <span style="color:#6B6B60">Census ownership:</span> <strong style="color:#1A1A1A">${props.ownership_label}</strong><br/>
+                <span style="color:#6B6B60">Network:</span> <span style="color:#1A1A1A">${props.network}</span><br/>
                 <span style="color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">${props.employees}</span> <span style="color:#6B6B60">| Est:</span> <span style="color:#1A1A1A">${props.year}</span>
               </div>`
             )
@@ -237,7 +233,7 @@ function PracticeMapInner({
       if (map) map.remove()
       mapObjRef.current = null
     }
-  }, [geocoded, showIndividual, centerLat, centerLon])
+  }, [geocoded, centerLat, centerLon])
 
   return (
     <div
@@ -248,17 +244,24 @@ function PracticeMapInner({
   )
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Main component — census truth layer only. The detector green/red
+// independent-vs-consolidated coloring (and its never-rendered deck.gl hex
+// layers) were removed, not relabeled: every dot color now states a
+// hand-reviewed census conclusion, and unreviewed clinics are neutral gray.
+// ────────────────────────────────────────────────────────────────────────────
+
 export function PracticeDensityMap({
   practices,
   centerLat,
   centerLon,
 }: PracticeDensityMapProps) {
-  const [showIndividual, setShowIndividual] = useState(false)
-  const [hideUnknown, setHideUnknown] = useState(false)
+  const [hideUnresolved, setHideUnresolved] = useState(false)
 
-  // Canonical GP-only map layer. This excludes specialists, non-clinical rows,
-  // org-only NPIs, da_unverified records, and duplicate shells even if a caller
-  // accidentally passes the full mixed location table.
+  // Canonical GP-only map layer (scope axis, not an ownership claim). This
+  // excludes specialists, non-clinical rows, org-only NPIs, da_unverified
+  // records, and duplicate shells even if a caller accidentally passes the
+  // full mixed location table.
   const filteredPractices = useMemo(
     () =>
       practices.filter((p) => isGpLocationClassification(p.entity_classification)),
@@ -270,11 +273,8 @@ export function PracticeDensityMap({
     const results: MapPractice[] = []
 
     for (const p of filteredPractices) {
-      // Canonical classification: entity_classification primary, ownership_status fallback.
-      // classifyPractice() returns "independent" | "corporate" | "specialist" | "non_clinical" | "unknown".
-      const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      const status_clean = classifyPractice(p.entity_classification, p.ownership_status)
-      if (hideUnknown && status_clean === 'unknown') continue
+      const bucket = tierToBucket(p.ownership_tier)
+      if (hideUnresolved && bucket === 'unresolved') continue
 
       let lat: number | null = null
       let lon: number | null = null
@@ -307,143 +307,52 @@ export function PracticeDensityMap({
       if (lat == null || lon == null || isNaN(lat) || isNaN(lon)) continue
 
       const emp = p.employee_count != null ? Number(p.employee_count) : 0
-      const empClamped = Math.min(Math.max(emp || 1, 1), 50)
 
-      const baseColor = STATUS_COLORS[status_clean] ?? STATUS_COLORS.unknown
+      const baseColor = BUCKET_DOT_COLORS[bucket]
       const dotColor = is_approximate ? getApproxColor(baseColor) : baseColor
 
       results.push({
         map_lat: lat,
         map_lon: lon,
         is_approximate,
-        status_clean,
+        bucket,
         practice_name: p.practice_name ?? 'Unknown Practice',
         address: p.address ?? '--',
         city_zip: `${p.city ?? ''}, ${p.state ?? ''} ${(p.zip ?? '').toString().slice(0, 5)}`,
-        // Surface the granular EC label when present (e.g. "Solo High Volume", "DSO National");
-        // fall back to the bucket label for unclassified rows.
-        status_label: ec ? getEntityClassificationLabel(ec) ?? STATUS_LABELS[status_clean] : STATUS_LABELS[status_clean] ?? 'Unknown',
-        dso: p.affiliated_dso ?? '--',
+        ownership_label:
+          bucket === 'unresolved'
+            ? 'Unresolved — not yet reviewed'
+            : BUCKET_META[bucket].label,
+        network: p.network_id ? formatNetworkId(p.network_id) : '--',
         employees: emp ? emp.toString() : '--',
         year:
           p.year_established != null && Number(p.year_established) > 0
             ? Math.floor(Number(p.year_established)).toString()
             : '--',
         color: dotColor,
-        radius: 40 + (empClamped / 50) * 40,
       })
     }
 
     return results
-  }, [filteredPractices, hideUnknown])
+  }, [filteredPractices, hideUnresolved])
 
-  // Split into independent and consolidated for hex layers using canonical buckets.
-  const independentData = useMemo(
-    () =>
-      geocoded
-        .filter((d) => d.status_clean === 'independent')
-        .map((d) => ({ lat: d.map_lat, lon: d.map_lon })),
-    [geocoded]
-  )
-
-  const consolidatedData = useMemo(
-    () =>
-      geocoded
-        .filter((d) => d.status_clean === 'corporate')
-        .map((d) => ({ lat: d.map_lat, lon: d.map_lon })),
-    [geocoded]
-  )
-
-  const unknownCount = useMemo(
-    () => geocoded.filter((d) => d.status_clean === 'unknown').length,
-    [geocoded]
-  )
-
-  // Build deck.gl layer configs
-  const layers = useMemo(() => {
-    const result: Array<Record<string, unknown>> = []
-
-    // Layer 1: Independent hex density (green)
-    if (independentData.length > 0) {
-      result.push({
-        type: 'HexagonLayer',
-        id: 'hex-independent',
-        data: independentData,
-        getPosition: (d: { lat: number; lon: number }) => [d.lon, d.lat],
-        radius: 1000,
-        elevationScale: 0,
-        extruded: false,
-        opacity: 0.5,
-        colorRange: INDEPENDENT_COLOR_RANGE,
-        pickable: true,
-        autoHighlight: true,
-      })
+  const bucketCounts = useMemo(() => {
+    const counts: Record<HeadlineBucket, number> = {
+      true_solo_owner_operated: 0,
+      dentist_owned_not_solo: 0,
+      dso_pe_corporate: 0,
+      institutional: 0,
+      unresolved: 0,
     }
-
-    // Layer 2: Consolidated hex density (red)
-    if (consolidatedData.length > 0) {
-      result.push({
-        type: 'HexagonLayer',
-        id: 'hex-consolidated',
-        data: consolidatedData,
-        getPosition: (d: { lat: number; lon: number }) => [d.lon, d.lat],
-        radius: 1000,
-        elevationScale: 0,
-        extruded: false,
-        opacity: 0.6,
-        colorRange: CONSOLIDATED_COLOR_RANGE,
-        pickable: true,
-        autoHighlight: true,
-      })
-    }
-
-    // Layer 3 (optional): Individual practice dots
-    if (showIndividual) {
-      result.push({
-        type: 'ScatterplotLayer',
-        id: 'scatter-practices',
-        data: geocoded,
-        getPosition: (d: MapPractice) => [d.map_lon, d.map_lat],
-        getFillColor: (d: MapPractice) => d.color,
-        getRadius: (d: MapPractice) => d.radius,
-        radiusMinPixels: 2,
-        radiusMaxPixels: 12,
-        pickable: true,
-        autoHighlight: true,
-        highlightColor: [255, 255, 255, 80],
-      })
-    }
-
-    return result
-  }, [independentData, consolidatedData, geocoded, showIndividual])
-
-  const tooltip = showIndividual
-    ? {
-        html: `
-          <div style="font-family:Inter,sans-serif;padding:4px 0">
-            <b style="font-size:13px;color:#1A1A1A">{practice_name}</b><br/>
-            <span style="font-size:11px;color:#6B6B60">{address}</span><br/>
-            <span style="font-size:11px;color:#6B6B60">{city_zip}</span><br/>
-            <span style="font-size:11px;color:#6B6B60">Status:</span> <b style="color:#1A1A1A">{status_label}</b><br/>
-            <span style="font-size:11px;color:#6B6B60">DSO:</span> <span style="color:#1A1A1A">{dso}</span><br/>
-            <span style="font-size:11px;color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">{employees}</span><br/>
-            <span style="font-size:11px;color:#6B6B60">Established:</span> <span style="color:#1A1A1A">{year}</span>
-          </div>`,
-        style: {
-          backgroundColor: '#FFFFFF',
-          color: '#1A1A1A',
-          border: '1px solid #E8E5DE',
-          borderRadius: '8px',
-          padding: '8px 12px',
-        },
-      }
-    : undefined
+    for (const d of geocoded) counts[d.bucket]++
+    return counts
+  }, [geocoded])
 
   return (
     <div>
       <SectionHeader
-        title="Practice Density Map"
-        helpText="Hexagonal density shows address-deduped general dental practice concentration. Green = independent GP clusters. Red = DSO/PE GP clusters. Toggle individual dots for detail."
+        title="Census Ownership Map"
+        helpText="Each dot = one GP clinic, colored by its hand-reviewed census ownership conclusion (ownership_tier). Gray dots = unresolved — no reviewed conclusion yet, never estimated. Faded dots sit at a ZIP-centroid approximation instead of a precise address."
       />
 
       {geocoded.length === 0 ? (
@@ -457,63 +366,48 @@ export function PracticeDensityMap({
             <label className="flex items-center gap-2 text-sm text-[#1A1A1A] cursor-pointer">
               <input
                 type="checkbox"
-                checked={showIndividual}
-                onChange={(e) => setShowIndividual(e.target.checked)}
+                checked={hideUnresolved}
+                onChange={(e) => setHideUnresolved(e.target.checked)}
                 className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
               />
-              Show individual GP offices
-            </label>
-            <label className="flex items-center gap-2 text-sm text-[#1A1A1A] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hideUnknown}
-                onChange={(e) => setHideUnknown(e.target.checked)}
-                className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
-              />
-              Hide unclassified rows
+              Hide unresolved clinics
             </label>
           </div>
 
-          {/* Map — raw mapboxgl for data layers */}
+          {/* Map — raw mapboxgl dot layer */}
           <PracticeMapInner
             geocoded={geocoded}
-            showIndividual={showIndividual}
             centerLat={centerLat}
             centerLon={centerLon}
           />
 
-          {/* Legend */}
-          <div className="flex flex-wrap gap-6 mt-2 mb-1">
-            <span className="flex items-center gap-1.5 text-[13px] text-[#1A1A1A]">
-              <span
-                className="inline-block w-3.5 h-3.5 rounded-sm"
-                style={{
-                  background: 'linear-gradient(90deg, #BBF7D0, #15803D)',
-                }}
-              />
-              Independent density
-            </span>
-            <span className="flex items-center gap-1.5 text-[13px] text-[#1A1A1A]">
-              <span
-                className="inline-block w-3.5 h-3.5 rounded-sm"
-                style={{
-                  background: 'linear-gradient(90deg, #FECACA, #DC2626)',
-                }}
-              />
-              Consolidated density (DSO + PE)
-            </span>
-            <span className="text-[13px] text-[#6B6B60]">Overlap = competitive market</span>
+          {/* Legend — all five census buckets, always */}
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 mb-1">
+            {HEADLINE_BUCKETS.map((b) => (
+              <span key={b} className="flex items-center gap-1.5 text-[13px] text-[#1A1A1A]">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-full"
+                  style={{
+                    backgroundColor:
+                      b === 'unresolved' ? UNRESOLVED_LEGEND_GRAY : BUCKET_META[b].color,
+                  }}
+                />
+                {BUCKET_META[b].shortLabel}
+                <span className="text-[#6B6B60]">
+                  {bucketCounts[b].toLocaleString()}
+                </span>
+              </span>
+            ))}
           </div>
 
           {/* Summary counts */}
           <p className="text-xs text-[#6B6B60] mt-1">
-            Showing {geocoded.length.toLocaleString()} GP offices (
-            {independentData.length.toLocaleString()} independent,{' '}
-            {consolidatedData.length.toLocaleString()} consolidated,{' '}
-            {unknownCount.toLocaleString()} unknown)
+            Showing {geocoded.length.toLocaleString()} GP clinics
+            {hideUnresolved ? ' (unresolved hidden)' : ''}
             {' '}&middot;{' '}
             {geocoded.filter(d => !d.is_approximate).length.toLocaleString()} precise locations,{' '}
             {geocoded.filter(d => d.is_approximate).length.toLocaleString()} approximate (ZIP centroid)
+            {' '}&middot; Ownership colors come only from the hand-reviewed census.
           </p>
         </>
       )}

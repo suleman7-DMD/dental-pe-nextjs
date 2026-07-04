@@ -6,11 +6,11 @@ import { KpiCard } from '@/components/data-display/kpi-card'
 import { DataTable } from '@/components/data-display/data-table'
 import { ScatterChart } from '@/components/charts/scatter-chart'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { isIndependentClassification, getEntityClassificationLabel } from '@/lib/constants/entity-classifications'
-import { ENTITY_CLASSIFICATION_COLORS } from '@/lib/constants/colors'
+import { BUCKET_META, HEADLINE_BUCKETS, tierToBucket } from '@/lib/census/ownership-truth'
+import { isRetirementRisk } from '@/lib/utils/scoring'
 
 import { createBrowserClient } from '@/lib/supabase/client'
-import { Clock, Calendar, Target, RefreshCw, Pencil, MapPin, AlertCircle } from 'lucide-react'
+import { Clock, Calendar, Target, Search, RefreshCw, Pencil, MapPin, AlertCircle } from 'lucide-react'
 
 import type { Practice } from '@/lib/types'
 
@@ -45,19 +45,24 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
 
   const currentYear = new Date().getFullYear()
 
-  // ── Retirement Risk ───────────────────────────────────────────────────
+  // ── Retirement Risk (census dentist-owned T1–T3 + 30yr age) ───────────
+  // isRetirementRisk reads ONLY the census bucket — unreviewed clinics are
+  // never claimed at-risk; they surface separately as "needs research".
   const retirementData = useMemo(() => {
-    return practices.filter((p) => {
-      const yr = p.year_established != null ? Number(p.year_established) : NaN
-      const isIndep = isIndependentClassification(p.entity_classification) ||
-        (!p.entity_classification && ['independent', 'likely_independent'].includes(
-          (p.ownership_status ?? 'unknown').trim().toLowerCase()
-        ))
-      return !isNaN(yr) && yr > 0 && yr <= currentYear - 30 && isIndep
-    }).map((p) => ({
+    return practices.filter(isRetirementRisk).map((p) => ({
       ...p,
       practice_age: currentYear - Number(p.year_established),
     }))
+  }, [practices, currentYear])
+
+  // 30+ year clinics whose ownership is census-unresolved — would qualify as
+  // retirement risk IF a review lands. An honest research queue, not a claim.
+  const needsResearchCount = useMemo(() => {
+    return practices.filter((p) => {
+      if (tierToBucket(p.ownership_tier) !== 'unresolved') return false
+      const yr = p.year_established != null ? Number(p.year_established) : NaN
+      return !isNaN(yr) && yr > 0 && yr <= currentYear - 30
+    }).length
   }, [practices, currentYear])
 
   const retireKpis = useMemo(() => {
@@ -108,13 +113,13 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
           Number(p.employee_count) > 0
       )
       .map((p) => {
-        const ec = (p.entity_classification ?? '').trim().toLowerCase() || 'unknown'
+        const bucket = tierToBucket(p.ownership_tier)
         return {
           x: Number(p.buyability_score),
           y: Number(p.employee_count),
           label: p.practice_name ?? 'Unknown',
-          group: getEntityClassificationLabel(ec),
-          color: ENTITY_CLASSIFICATION_COLORS[ec as keyof typeof ENTITY_CLASSIFICATION_COLORS] ?? '#9C9C90',
+          group: BUCKET_META[bucket].shortLabel,
+          color: BUCKET_META[bucket].color,
           tooltip: `${p.practice_name ?? 'Unknown'}\n${p.city ?? ''}\nBuyability: ${Number(p.buyability_score).toFixed(0)}`,
         }
       })
@@ -211,7 +216,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
     <div>
       <SectionHeader
         title="Opportunity Signals"
-        helpText="Each practice scored 0-100: independent ownership (30), buyability (25), size (20), young practice (15), unknown status (10)."
+        helpText="Each practice scored 0-100: census dentist-owned (30), buyability (25), size (20), young practice (15), census-unresolved capped at (10). Ownership points come only from the hand-reviewed census — never the legacy detector."
       />
 
       <Tabs value={activeSignalTab} onValueChange={setActiveSignalTab} className="mt-4">
@@ -223,11 +228,12 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
 
         {/* ── Retirement Risk ──────────────────────────────────────────── */}
         <TabsContent value="retirement">
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <KpiCard
               icon={<Clock className="h-4 w-4" />}
               label="At-Risk Practices"
               value={retireKpis.count.toLocaleString()}
+              tooltip="Census dentist-owned clinics (T1–T3) established 30+ years ago. Only reviewed conclusions count."
             />
             <KpiCard
               icon={<Calendar className="h-4 w-4" />}
@@ -239,11 +245,18 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
               label="Avg Buyability"
               value={retireKpis.avgBuy}
             />
+            <KpiCard
+              icon={<Search className="h-4 w-4" />}
+              label="Needs Research"
+              value={needsResearchCount.toLocaleString()}
+              accentColor="#B8860B"
+              tooltip="30+ year clinics whose ownership is census-unresolved. They would join At-Risk if a review confirms dentist ownership — shown as a research queue, never counted as at-risk."
+            />
           </div>
 
           {retirementData.length === 0 ? (
             <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-              No independent practices with 30+ years of operation found in these ZIPs.
+              No census dentist-owned practices with 30+ years of operation found in these ZIPs.
             </div>
           ) : (
             <DataTable
@@ -299,15 +312,10 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                     xAxisLabel="Buyability Score"
                     yAxisLabel="Employee Count"
                     height={420}
-                    groups={[
-                      { label: 'Solo Established', color: '#2D8B4E' },
-                      { label: 'Solo High Volume', color: '#1B5E20' },
-                      { label: 'Family Practice', color: '#D4920B' },
-                      { label: 'Small Group', color: '#42A5F5' },
-                      { label: 'DSO Regional', color: '#FFA726' },
-                      { label: 'DSO National', color: '#C23B3B' },
-                      { label: 'Unknown', color: '#9C9C90' },
-                    ]}
+                    groups={HEADLINE_BUCKETS.map((b) => ({
+                      label: BUCKET_META[b].shortLabel,
+                      color: BUCKET_META[b].color,
+                    }))}
                   />
                 </div>
               )}
@@ -323,9 +331,10 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                     render: (v: string) => (v ?? '').toString().slice(0, 5),
                   },
                   {
-                    key: 'entity_classification',
-                    header: 'Classification',
-                    render: (v: string | null) => getEntityClassificationLabel(v),
+                    key: 'ownership_tier',
+                    header: 'Census Ownership',
+                    render: (v: string | null | undefined) =>
+                      BUCKET_META[tierToBucket(v ?? null)].shortLabel,
                   },
                   {
                     key: 'buyability_score',
