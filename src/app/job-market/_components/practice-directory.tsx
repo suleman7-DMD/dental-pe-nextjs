@@ -11,7 +11,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PracticeDetailDrawer } from './practice-detail-drawer'
 import { ArrowUpRight, Download } from 'lucide-react'
 import { exportToCsv } from '@/lib/utils/csv-export'
-import { CensusBadge, ReviewStatusBadge } from '@/components/data-display/census-badge'
+import { CensusBadge } from '@/components/data-display/census-badge'
+import {
+  BUCKET_META,
+  HEADLINE_BUCKETS,
+  OWNERSHIP_TIERS,
+  TIER_CODE,
+  TIER_META,
+  tierToBucket,
+} from '@/lib/census/ownership-truth'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -28,7 +36,7 @@ type PracticeWithJobScore = Practice & { job_opp_score?: number | null }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'job_score', label: 'Job Opp Score \u2193' },
-  { value: 'buyability', label: 'Buyability \u2193' },
+  { value: 'buyability', label: 'Buyability (legacy) \u2193' },
   { value: 'employees', label: 'Employees \u2193' },
   { value: 'year_est', label: 'Year Est. \u2191' },
   { value: 'name', label: 'Name A-Z' },
@@ -36,12 +44,37 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 
 const PAGE_SIZE = 100
 
+// Census filter options \u2014 labels derive from the ownership contract, and the
+// Maps translate the displayed option string back to its census key.
+const BUCKET_OPTIONS = HEADLINE_BUCKETS.map((b) => BUCKET_META[b].shortLabel)
+const bucketByOption = new Map(HEADLINE_BUCKETS.map((b) => [BUCKET_META[b].shortLabel, b]))
+const TIER_OPTIONS = OWNERSHIP_TIERS.map((t) => `${TIER_CODE[t]} ${TIER_META[t].shortLabel}`)
+const tierByOption = new Map(OWNERSHIP_TIERS.map((t) => [`${TIER_CODE[t]} ${TIER_META[t].shortLabel}`, t]))
+const CONFIDENCE_OPTIONS = ['High', 'Medium', 'Low', 'Not recorded']
+const EVIDENCE_OPTIONS = ['Evidence on file', 'No evidence recorded']
+const SPONSOR_OPTIONS = ['PE-backed (census-confirmed)', 'Not PE-confirmed']
+
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
 function isDataAxle(p: Practice): boolean {
   return p.data_axle_import_date != null && p.data_axle_import_date !== ''
+}
+
+/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
+function formatNetworkId(id: string): string {
+  return id
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
+function hasOwnershipEvidence(p: Practice): boolean {
+  const basis = (p.ownership_evidence_basis ?? '').trim()
+  const urls = (p.ownership_evidence_urls ?? '').trim()
+  return basis !== '' || (urls !== '' && urls !== '[]')
 }
 
 function matchesSearch(p: Practice, term: string): boolean {
@@ -52,7 +85,9 @@ function matchesSearch(p: Practice, term: string): boolean {
     (p.doing_business_as ?? '').toLowerCase().includes(t) ||
     (p.address ?? '').toLowerCase().includes(t) ||
     (p.city ?? '').toLowerCase().includes(t) ||
-    (p.affiliated_dso ?? '').toLowerCase().includes(t)
+    (p.zip ?? '').toString().startsWith(term.trim()) ||
+    (p.network_id ?? '').toLowerCase().includes(t) ||
+    (p.network_id ? formatNetworkId(p.network_id).toLowerCase().includes(t) : false)
   )
 }
 
@@ -86,26 +121,29 @@ function sortPractices<T extends Practice>(list: T[], sortBy: SortOption): T[] {
   }
 }
 
-function classificationLabel(ec: unknown): string {
-  if (ec == null || typeof ec !== 'string' || !ec) return '--'
-  return ec.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
-}
-
-/** Compute data quality stars string for a practice */
+/** Compute data-depth stars for a practice (provenance, not an ownership claim) */
 function computeDataQuality(p: Practice): string {
   const isDA = p.data_axle_import_date != null && p.data_axle_import_date !== ''
-  const hasEC = !!p.entity_classification && p.entity_classification.trim() !== ''
+  const censusReviewed = p.ownership_tier != null
   if (isDA) return '\u2605\u2605\u2605'
-  if (hasEC) return '\u2605\u2605'
+  if (censusReviewed) return '\u2605\u2605'
   return '\u2605'
 }
 
-/** Render gold-colored confidence stars */
+/** Render gold-colored data-depth stars */
 function renderDataQualityStars(v: string): React.ReactElement {
   return React.createElement('span', {
     style: { color: '#D4920B', letterSpacing: '1px' },
-    title: v === '\u2605\u2605\u2605' ? 'Data Axle enriched' : v === '\u2605\u2605' ? 'Entity classified' : 'NPPES only',
+    title: v === '\u2605\u2605\u2605' ? 'Data Axle enriched' : v === '\u2605\u2605' ? 'Census reviewed' : 'NPPES only',
   }, v || '\u2605')
+}
+
+function renderNetwork(v: string | null): string {
+  return v ? formatNetworkId(v) : '--'
+}
+
+function renderCensusConfidence(v: string | null): string {
+  return v ? v.charAt(0).toUpperCase() + v.slice(1) : '--'
 }
 
 function renderPracticeLink(valueOrPractice: unknown): React.ReactElement {
@@ -142,39 +180,12 @@ function renderCensusBadge(valueOrPractice: unknown): React.ReactElement {
   })
 }
 
-function renderReviewBadge(valueOrPractice: unknown): React.ReactElement {
-  if (!valueOrPractice || typeof valueOrPractice !== 'object') {
-    throw new Error('Practice row expected')
-  }
-  const p = valueOrPractice as Practice
-  return React.createElement(ReviewStatusBadge, { tier: p.ownership_tier })
-}
-
 // ────────────────────────────────────────────────────────────────────────────
-// Table columns
+// Table columns — census ownership only. The detector Entity Type /
+// Classification / DSO columns were removed, not relabeled: ownership in the
+// directory comes exclusively from the reviewed census (tier badge, network,
+// confidence). Buyability is a legacy heuristic and is labeled as such.
 // ────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns classification label with a "· Possibly inactive" suffix for
- * solo_inactive practices. DataTable supports React elements from render
- * functions (see renderDataQualityStars above).
- */
-function classificationWithInactiveWarning(v: string): React.ReactElement | string {
-  const label = classificationLabel(v)
-  if (v === 'solo_inactive') {
-    return React.createElement(
-      'span',
-      { title: 'No phone and no website on record — may be closed or semi-retired. Verify before outreach.' },
-      label,
-      React.createElement(
-        'span',
-        { style: { marginLeft: '4px', color: '#9C9C90', fontStyle: 'italic', fontSize: '0.9em' } },
-        '· Possibly inactive'
-      )
-    )
-  }
-  return label
-}
 
 const EMPLOYMENT_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
@@ -183,19 +194,14 @@ const EMPLOYMENT_COLUMNS = [
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   { key: 'city', header: 'City' },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
-  {
-    key: 'entity_classification',
-    header: 'Entity Type',
-    render: (v: string) => classificationLabel(v),
-  },
-  { key: 'affiliated_dso', header: 'DSO', render: (v: string | null) => v || '--' },
+  { key: 'network_id', header: 'Network', render: renderNetwork },
   { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
   { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 const OWNERSHIP_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
-  { key: 'ownership_tier', header: 'Review', render: renderReviewBadge },
+  { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   { key: 'city', header: 'City' },
@@ -206,19 +212,10 @@ const OWNERSHIP_COLUMNS = [
   },
   {
     key: 'buyability_score',
-    header: 'Buyability',
+    header: 'Buyability (legacy)',
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
-  {
-    key: 'classification_confidence',
-    header: 'Confidence',
-    render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
-  },
-  {
-    key: 'entity_classification',
-    header: 'Classification',
-    render: (v: string) => classificationWithInactiveWarning(v),
-  },
+  { key: 'ownership_confidence', header: 'Census Confidence', render: renderCensusConfidence },
   { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
 ]
 
@@ -228,12 +225,7 @@ const ENRICHED_COLUMNS = [
   { key: 'address', header: 'Address' },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
-  {
-    key: 'entity_classification',
-    header: 'Classification',
-    render: (v: string) => classificationLabel(v),
-  },
-  { key: 'affiliated_dso', header: 'DSO', render: (v: string | null) => v || '--' },
+  { key: 'network_id', header: 'Network', render: renderNetwork },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
   {
     key: 'estimated_revenue',
@@ -248,7 +240,7 @@ const ENRICHED_COLUMNS = [
   },
   {
     key: 'buyability_score',
-    header: 'Buyability',
+    header: 'Buyability (legacy)',
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
   { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
@@ -261,12 +253,7 @@ const ALL_COLUMNS = [
   { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
-  {
-    key: 'entity_classification',
-    header: 'Classification',
-    render: (v: string) => classificationWithInactiveWarning(v),
-  },
-  { key: 'affiliated_dso', header: 'DSO', render: (v: string | null) => v || '--' },
+  { key: 'network_id', header: 'Network', render: renderNetwork },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
   {
     key: 'year_established',
@@ -275,7 +262,7 @@ const ALL_COLUMNS = [
   },
   {
     key: 'buyability_score',
-    header: 'Buyability',
+    header: 'Buyability (legacy)',
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
   { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
@@ -288,7 +275,12 @@ const ALL_COLUMNS = [
 
 export function PracticeDirectory({ practices, allPractices }: PracticeDirectoryProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [selectedBuckets, setSelectedBuckets] = useState<string[]>([])
+  const [selectedTiers, setSelectedTiers] = useState<string[]>([])
+  const [selectedConfidence, setSelectedConfidence] = useState<string[]>([])
+  const [selectedEvidence, setSelectedEvidence] = useState<string[]>([])
+  const [selectedNetworks, setSelectedNetworks] = useState<string[]>([])
+  const [selectedSponsor, setSelectedSponsor] = useState<string[]>([])
   const [selectedSources, setSelectedSources] = useState<string[]>(['All'])
   const [sortBy, setSortBy] = useState<SortOption>('job_score')
   const [selectedPractice, setSelectedPractice] = useState<Practice | null>(null)
@@ -299,13 +291,18 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   useEffect(() => {
     setPage(1)
     setSearchTerm('')
-    setSelectedStatuses([])
+    setSelectedBuckets([])
+    setSelectedTiers([])
+    setSelectedConfidence([])
+    setSelectedEvidence([])
+    setSelectedNetworks([])
+    setSelectedSponsor([])
     setSelectedSources(['All'])
   }, [practices.length])
 
   useEffect(() => {
     setPage(1)
-  }, [activeView, searchTerm, selectedStatuses, selectedSources, sortBy])
+  }, [activeView, searchTerm, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
 
   const withDisplayName = useMemo(
     () =>
@@ -323,11 +320,11 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   )
   const enrichmentPct = totalPractices > 0 ? (enrichedCount / totalPractices) * 100 : 0
 
-  // Get unique classification values for filter
-  const classificationOptions = useMemo(() => {
+  // Networks present in the current location (census network_id only)
+  const networkOptions = useMemo(() => {
     const set = new Set<string>()
     for (const p of withDisplayName) {
-      set.add((p.entity_classification ?? '').trim().toLowerCase() || 'unknown')
+      if (p.network_id) set.add(formatNetworkId(p.network_id))
     }
     return Array.from(set).sort()
   }, [withDisplayName])
@@ -341,11 +338,59 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       result = result.filter((p) => matchesSearch(p, searchTerm))
     }
 
-    // Classification filter
-    if (selectedStatuses.length > 0) {
-      result = result.filter((p) =>
-        selectedStatuses.includes((p.entity_classification ?? '').trim().toLowerCase() || 'unknown')
+    // Census bucket filter (unresolved = no reviewed conclusion yet)
+    if (selectedBuckets.length > 0) {
+      const buckets = new Set(selectedBuckets.map((o) => bucketByOption.get(o)))
+      result = result.filter((p) => buckets.has(tierToBucket(p.ownership_tier ?? null)))
+    }
+
+    // Census tier filter (T1–T6; unreviewed rows have no tier)
+    if (selectedTiers.length > 0) {
+      const tiers = new Set<string>(
+        selectedTiers.flatMap((o) => {
+          const t = tierByOption.get(o)
+          return t ? [t] : []
+        })
       )
+      result = result.filter((p) => p.ownership_tier != null && tiers.has(p.ownership_tier))
+    }
+
+    // Census review confidence
+    if (selectedConfidence.length > 0) {
+      result = result.filter((p) => {
+        const conf = (p.ownership_confidence ?? '').trim().toLowerCase()
+        if (conf === '') return selectedConfidence.includes('Not recorded')
+        return selectedConfidence.includes(conf.charAt(0).toUpperCase() + conf.slice(1))
+      })
+    }
+
+    // Evidence status
+    if (selectedEvidence.length > 0) {
+      result = result.filter((p) => {
+        const has = hasOwnershipEvidence(p)
+        return (
+          (has && selectedEvidence.includes('Evidence on file')) ||
+          (!has && selectedEvidence.includes('No evidence recorded'))
+        )
+      })
+    }
+
+    // Network (census network_id)
+    if (selectedNetworks.length > 0) {
+      result = result.filter(
+        (p) => p.network_id != null && selectedNetworks.includes(formatNetworkId(p.network_id))
+      )
+    }
+
+    // PE sponsor status (census pe_backed only — never detector attribution)
+    if (selectedSponsor.length > 0) {
+      result = result.filter((p) => {
+        const confirmed = p.pe_backed === true
+        return (
+          (confirmed && selectedSponsor.includes('PE-backed (census-confirmed)')) ||
+          (!confirmed && selectedSponsor.includes('Not PE-confirmed'))
+        )
+      })
     }
 
     // Source filter
@@ -365,28 +410,28 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       ...p,
       data_quality: computeDataQuality(p),
     }))
-  }, [withDisplayName, searchTerm, selectedStatuses, selectedSources, sortBy])
+  }, [withDisplayName, searchTerm, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
 
   const filteredEnriched = useMemo(
     () => filtered.filter(isDataAxle).length,
     [filtered]
   )
 
-  // Tab-specific datasets
+  // Tab-specific datasets — census criteria only. Employment = high staffing
+  // or census-confirmed DSO/PE corporate; Acquisition = census-confirmed solo
+  // owner-operated. Detector entity_classification no longer selects rows.
   const employmentPractices = useMemo(() => {
     return filtered.filter((p) => {
       const emp = Number(p.employee_count) || 0
       if (emp >= 10) return true
-      const ec = p.entity_classification
-      return ec === 'large_group' || ec === 'dso_national' || ec === 'dso_regional'
+      return tierToBucket(p.ownership_tier ?? null) === 'dso_pe_corporate'
     }).sort((a, b) => (Number(b.employee_count) || 0) - (Number(a.employee_count) || 0))
   }, [filtered])
 
   const ownershipPractices = useMemo(() => {
-    return filtered.filter((p) => {
-      const ec = (p.entity_classification ?? '').trim().toLowerCase()
-      return ec === 'solo_established' || ec === 'solo_high_volume' || ec === 'solo_inactive'
-    }).sort((a, b) => (Number(b.buyability_score) || 0) - (Number(a.buyability_score) || 0))
+    return filtered
+      .filter((p) => tierToBucket(p.ownership_tier ?? null) === 'true_solo_owner_operated')
+      .sort((a, b) => (Number(b.buyability_score) || 0) - (Number(a.buyability_score) || 0))
   }, [filtered])
 
   const enrichedPractices = useMemo(
@@ -418,12 +463,11 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       'address',
       'city',
       'zip',
-      'entity_classification',
       'ownership_tier',
       'ownership_confidence',
+      'ownership_evidence_basis',
       'pe_backed',
       'network_id',
-      'affiliated_dso',
       'employee_count',
       'estimated_revenue',
       'year_established',
@@ -438,18 +482,17 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       address: 'Address',
       city: 'City',
       zip: 'ZIP',
-      entity_classification: 'Classification',
       ownership_tier: 'Census Tier',
       ownership_confidence: 'Census Confidence',
-      pe_backed: 'PE Backed',
+      ownership_evidence_basis: 'Census Evidence Basis',
+      pe_backed: 'PE Backed (census)',
       network_id: 'Network',
-      affiliated_dso: 'DSO',
       employee_count: 'Employees',
       estimated_revenue: 'Revenue',
       year_established: 'Year Est.',
-      buyability_score: 'Buyability',
+      buyability_score: 'Buyability (legacy heuristic)',
       job_opp_score: 'Job Score',
-      parent_company: 'Parent Company',
+      parent_company: 'Parent Company (Data Axle)',
       website: 'Website',
       data_source: 'Data Source',
     }
@@ -466,7 +509,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     <div>
       <SectionHeader
         title="Master GP Directory"
-        helpText="Search Chicagoland general dental locations, open the practice record, and separate verified ownership from rows still waiting on review."
+        helpText="Search Chicagoland general dental locations by name, city, ZIP, or network. Ownership filters and badges come only from the hand-reviewed census (ownership_tier); unresolved rows have no reviewed conclusion yet. Every row opens the full practice record."
       />
 
       {/* Search & Filters */}
@@ -474,17 +517,57 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <SearchInput
           value={searchTerm}
           onChange={setSearchTerm}
-          placeholder="Search by name, address, city, or DSO..."
+          placeholder="Search by name, address, city, ZIP, or network..."
           debounceMs={300}
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <FilterGroup label="Classification">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <FilterGroup label="Census Bucket">
             <MultiSelect
-              options={classificationOptions}
-              selected={selectedStatuses}
-              onChange={setSelectedStatuses}
-              placeholder="All Statuses"
+              options={BUCKET_OPTIONS}
+              selected={selectedBuckets}
+              onChange={setSelectedBuckets}
+              placeholder="All Buckets"
+            />
+          </FilterGroup>
+          <FilterGroup label="Census Tier">
+            <MultiSelect
+              options={TIER_OPTIONS}
+              selected={selectedTiers}
+              onChange={setSelectedTiers}
+              placeholder="All Tiers"
+            />
+          </FilterGroup>
+          <FilterGroup label="Review Confidence">
+            <MultiSelect
+              options={CONFIDENCE_OPTIONS}
+              selected={selectedConfidence}
+              onChange={setSelectedConfidence}
+              placeholder="All Confidence"
+            />
+          </FilterGroup>
+          <FilterGroup label="Evidence Status">
+            <MultiSelect
+              options={EVIDENCE_OPTIONS}
+              selected={selectedEvidence}
+              onChange={setSelectedEvidence}
+              placeholder="All Evidence"
+            />
+          </FilterGroup>
+          <FilterGroup label="Network">
+            <MultiSelect
+              options={networkOptions}
+              selected={selectedNetworks}
+              onChange={setSelectedNetworks}
+              placeholder="All Networks"
+            />
+          </FilterGroup>
+          <FilterGroup label="PE Sponsor">
+            <MultiSelect
+              options={SPONSOR_OPTIONS}
+              selected={selectedSponsor}
+              onChange={setSelectedSponsor}
+              placeholder="All"
             />
           </FilterGroup>
           <FilterGroup label="Data Source">
@@ -533,7 +616,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
         <TabsContent value="employment">
           <p className="text-sm text-[#6B6B60] mb-2">
-            GP offices with high patient volume that are likely hiring associates.
+            GP offices most likely to hire associates: high staffing levels (10+ employees) or
+            census-confirmed DSO / PE corporate networks.
           </p>
           {lowEnrichmentNote && (
             <p className="text-xs text-[#D4920B] mb-2">Warning: {lowEnrichmentNote}</p>
@@ -565,7 +649,9 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
         <TabsContent value="ownership">
           <p className="text-sm text-[#6B6B60] mb-2">
-            Independent GP offices with indicators suggesting the owner may be approaching transition.
+            Census-confirmed solo owner-operated GP offices (T1), sorted by the legacy buyability
+            heuristic — a screening score, not a census claim. Unresolved offices are excluded
+            until reviewed.
           </p>
           {lowEnrichmentNote && (
             <p className="text-xs text-[#D4920B] mb-2">Warning: {lowEnrichmentNote}</p>
