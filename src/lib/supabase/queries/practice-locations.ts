@@ -250,6 +250,77 @@ export async function fetchPracticeLocationById(
   return (data as unknown as PracticeLocationRecord | null) ?? null
 }
 
+/**
+ * All locations sharing a census network_id — the practice page's
+ * "Network siblings" tab. network_id is census truth (assigned during hand
+ * review), so membership here is a reviewed conclusion, never detector output.
+ */
+export async function fetchNetworkSiblings(
+  supabase: SupabaseClient,
+  networkId: string,
+  excludeLocationId?: string
+): Promise<PracticeLocationRecord[]> {
+  const { data, error } = await supabase
+    .from("practice_locations")
+    .select(PRACTICE_LOCATION_SELECT)
+    .eq("network_id", networkId)
+    .order("city", { ascending: true, nullsFirst: false })
+    .order("practice_name", { ascending: true, nullsFirst: false })
+    .limit(200)
+
+  if (error) throw error
+  const rows = (data as unknown as PracticeLocationRecord[]) ?? []
+  return excludeLocationId
+    ? rows.filter((row) => row.location_id !== excludeLocationId)
+    : rows
+}
+
+// PostgREST .or() filter strings treat commas/parens/dots as syntax, so the
+// search term is reduced to characters that cannot break out of the pattern.
+function sanitizeSearchTerm(term: string): string {
+  return term.replace(/[,().%\\]/g, " ").replace(/\s+/g, " ").trim()
+}
+
+/**
+ * Global search: name / city / ZIP → practice records. ZIP-looking input
+ * (3-5 digits) prefix-matches on zip; everything else substring-matches on
+ * practice_name, doing_business_as, and city. IL scope, residential rows
+ * excluded, capped small — this feeds a typeahead, not an export.
+ */
+export async function searchPracticeLocations(
+  supabase: SupabaseClient,
+  term: string,
+  limit = 20
+): Promise<PracticeLocationRecord[]> {
+  const sanitized = sanitizeSearchTerm(term)
+  if (sanitized.length < 2) return []
+
+  let query = supabase
+    .from("practice_locations")
+    .select(PRACTICE_LOCATION_SELECT)
+    .eq("state", PRIMARY_MARKET_STATE)
+    .or("is_likely_residential.eq.false,is_likely_residential.is.null")
+
+  if (/^\d{3,5}$/.test(sanitized)) {
+    query = query.ilike("zip", `${sanitized}%`)
+  } else {
+    query = query.or(
+      [
+        `practice_name.ilike.%${sanitized}%`,
+        `doing_business_as.ilike.%${sanitized}%`,
+        `city.ilike.%${sanitized}%`,
+      ].join(",")
+    )
+  }
+
+  const { data, error } = await query
+    .order("practice_name", { ascending: true, nullsFirst: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data as unknown as PracticeLocationRecord[]) ?? []
+}
+
 export function isGpPracticeLocation(row: Pick<PracticeLocationRecord, "entity_classification">): boolean {
   return isGpLocationClassification(row.entity_classification)
 }
