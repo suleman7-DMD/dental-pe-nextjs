@@ -1,25 +1,33 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 
+import {
+  summarizeBuckets,
+  type BucketSummary,
+} from "@/lib/census/ownership-truth"
+
 const PAGE_SIZE = 1000
 const PRIMARY_MARKET_STATE = "IL"
 
 export interface CensusSummary {
   universe: number
+  /** Rows with any non-null ownership_tier (classified + undetermined). */
   reviewed: number
+  /** Rows carrying one of the six census tiers — the only census truth rows. */
   classifiedReviewed: number
+  /** Researched, but evidence too thin to classify. Stays visible, never rolled up. */
   undeterminedReviewed: number
   unreviewed: number
   coveragePct: number
   tierCounts: Record<string, number>
   peBacked: number
-  independentReviewed: number
+  /**
+   * The ratified five-bucket law, computed by ownership-truth.ts —
+   * the ONLY legal source for headline ownership shares.
+   */
+  buckets: BucketSummary
+  /** T3–T5 structural slice (multi-location operators). NOT an ownership bucket. */
   multiLocationReviewed: number
   dsoPeReviewed: number
-  independentReviewedPct: number
-  multiLocationReviewedPct: number
-  dsoPeReviewedPct: number
-  independentWholeFloorPct: number
-  multiLocationWholeFloorPct: number
   dsoPeWholeFloorPct: number
   legacyCorporateLocations: number
   legacyCorporatePct: number
@@ -89,11 +97,10 @@ export async function getCensusSummary(
       fetchIlZipScores(supabase),
     ])
 
-    const universeFromZipScores = zipRows.reduce(
+    const universe = zipRows.reduce(
       (sum, row) => sum + (row.total_gp_locations ?? 0),
       0
     )
-    const universe = universeFromZipScores
     const tierCounts: Record<string, number> = {}
 
     for (const row of tieredRows) {
@@ -101,18 +108,18 @@ export async function getCensusSummary(
       tierCounts[tier] = (tierCounts[tier] ?? 0) + 1
     }
 
+    const buckets = summarizeBuckets(tieredRows, universe)
+
     const reviewed = tieredRows.length
     const undeterminedReviewed = tierCounts.undetermined ?? 0
-    const classifiedReviewed = Math.max(reviewed - undeterminedReviewed, 0)
-    const peBacked = tieredRows.filter((row) => row.pe_backed === true).length
-    const independentReviewed =
-      (tierCounts.true_independent ?? 0) + (tierCounts.single_loc_group ?? 0)
+    // Only the six census tiers count as classified — a stray non-tier value
+    // (e.g. a legacy detector label) must never inflate the truth count.
+    const classifiedReviewed = buckets.reviewed
+    const dsoPeReviewed = buckets.counts.dso_pe_corporate
     const multiLocationReviewed =
       (tierCounts.dentist_multi ?? 0) +
       (tierCounts.stealth_dso ?? 0) +
       (tierCounts.branded_dso ?? 0)
-    const dsoPeReviewed =
-      (tierCounts.stealth_dso ?? 0) + (tierCounts.branded_dso ?? 0)
     const legacyCorporateLocations = zipRows.reduce(
       (sum, row) => sum + (row.corporate_location_count ?? 0),
       0
@@ -126,16 +133,11 @@ export async function getCensusSummary(
       unreviewed: Math.max(universe - reviewed, 0),
       coveragePct: pct(reviewed, universe),
       tierCounts,
-      peBacked,
-      independentReviewed,
+      peBacked: buckets.peBacked,
+      buckets,
       multiLocationReviewed,
       dsoPeReviewed,
-      independentReviewedPct: pct(independentReviewed, reviewed),
-      multiLocationReviewedPct: pct(multiLocationReviewed, reviewed),
-      dsoPeReviewedPct: pct(dsoPeReviewed, reviewed),
-      independentWholeFloorPct: pct(independentReviewed, universe),
-      multiLocationWholeFloorPct: pct(multiLocationReviewed, universe),
-      dsoPeWholeFloorPct: pct(dsoPeReviewed, universe),
+      dsoPeWholeFloorPct: buckets.dsoPePctOfUniverse,
       legacyCorporateLocations,
       legacyCorporatePct: pct(legacyCorporateLocations, universe),
       liveDataAvailable: true,
@@ -151,14 +153,9 @@ export async function getCensusSummary(
       coveragePct: 0,
       tierCounts: {},
       peBacked: 0,
-      independentReviewed: 0,
+      buckets: summarizeBuckets([], 0),
       multiLocationReviewed: 0,
       dsoPeReviewed: 0,
-      independentReviewedPct: 0,
-      multiLocationReviewedPct: 0,
-      dsoPeReviewedPct: 0,
-      independentWholeFloorPct: 0,
-      multiLocationWholeFloorPct: 0,
       dsoPeWholeFloorPct: 0,
       legacyCorporateLocations: 0,
       legacyCorporatePct: 0,
