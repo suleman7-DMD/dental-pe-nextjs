@@ -31,7 +31,7 @@ function formatNetworkId(id: string): string {
     .replace(/^brand:/i, '')
     .split(/[_-]+/)
     .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .map((w) => (/\d/.test(w) || (w.length <= 3 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
     .join(' ')
   return `${prefix}${cleaned}`
 }

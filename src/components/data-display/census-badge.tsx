@@ -78,7 +78,10 @@ export function formatNetworkName(networkId: string | null | undefined): string 
     .replace(/^brand:/i, "")
     .replace(/^ao:/i, "")
     .replace(/[-_:]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => (/\d/.test(w) || (w.length <= 3 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .join(" ")
   return `${prefix}${cleaned}`
 }
 
