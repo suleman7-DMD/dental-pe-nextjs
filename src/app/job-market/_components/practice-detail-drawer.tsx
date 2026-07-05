@@ -92,7 +92,7 @@ function generateBasicObservations(row: Practice): string[] {
   const hasDa = row.data_axle_import_date != null && row.data_axle_import_date !== ''
   if (!hasDa) {
     observations.push(
-      'Limited business data -- NPPES registration data only. Employee count, revenue, and year established not available.'
+      'Limited business data -- basic registry data only. Employee count, revenue, and year established may be missing.'
     )
   }
 
@@ -121,6 +121,35 @@ function confidenceStarsInline(confidence: number | null | undefined): string {
 function displayValue(v: string | number | null | undefined): string {
   if (v == null || v === '') return '\u2014'
   return String(v)
+}
+
+function cleanNamePart(value: string | null | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (
+    trimmed === '' ||
+    /^<?\s*(?:unavail|unavailable|not available|none|null|n\/?a)\s*>?$/i.test(trimmed)
+  ) {
+    return null
+  }
+  return trimmed
+}
+
+function drawerPracticeName(p: Practice): string {
+  return (
+    cleanNamePart(p.doing_business_as) ??
+    cleanNamePart(p.practice_name) ??
+    (p.address ? `Practice at ${p.address}` : null) ??
+    'Unnamed practice'
+  )
+}
+
+function formatReliableRevenue(value: number | null | undefined): string | null {
+  if (value == null) return null
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return null
+  if (n < 10000) return 'Not reliable'
+  return `$${n.toLocaleString()}`
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -230,7 +259,7 @@ export function PracticeDetailDrawer({
         {/* ── Header ─────────────────────────────────────────────── */}
         <SheetHeader className="relative pr-12">
           <SheetTitle className="text-[#1A1A1A] font-bold text-lg leading-tight">
-            {p.practice_name ?? 'Unknown Practice'}
+            {drawerPracticeName(p)}
           </SheetTitle>
           <p className="text-[13px] text-[#6B6B60] mt-0.5">
             {[p.address, p.city, p.state ? `${p.state} ${(p.zip ?? '').toString().slice(0, 5)}` : null]
@@ -243,7 +272,7 @@ export function PracticeDetailDrawer({
             {isDaEnriched ? (
               <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(45,139,78,0.1)] text-[#2D8B4E] border border-[rgba(45,139,78,0.2)]">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D8B4E]" />
-                Data Axle Enriched
+                Business data available
                 {p.classification_confidence != null && (
                   <span className="ml-0.5 text-[10px]">{confidenceStarsInline(p.classification_confidence)}</span>
                 )}
@@ -251,12 +280,12 @@ export function PracticeDetailDrawer({
             ) : hasDa ? (
               <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(45,139,78,0.1)] text-[#2D8B4E] border border-[rgba(45,139,78,0.2)]">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D8B4E]" />
-                Data Axle Enriched
+                Business data available
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(156,156,144,0.1)] text-[#6B6B60] border border-[rgba(156,156,144,0.2)]">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#9C9C90]" />
-                NPPES Only
+                Basic registry only
               </span>
             )}
           </div>
@@ -277,15 +306,15 @@ export function PracticeDetailDrawer({
               <p className="mt-2 text-xs leading-5 text-[#6B6B60]">
                 {p.ownership_tier
                   ? p.ownership_evidence_basis ??
-                    'Hand-reviewed census conclusion; evidence detail is on the full record.'
-                  : 'Not census-reviewed yet — ownership is unknown. Nothing below is an ownership conclusion.'}
+                    'Reviewed ownership answer; evidence detail is on the full practice page.'
+                  : 'Not reviewed yet — ownership is unknown. Nothing below is an ownership conclusion.'}
               </p>
               {p.location_id ? (
                 <Link
                   href={`/practice/${encodeURIComponent(p.location_id)}`}
                   className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[#8B6508] hover:text-[#1A1A1A]"
                 >
-                  Open full census record
+                  Open full practice page
                   <ArrowUpRight className="h-3 w-3" />
                 </Link>
               ) : null}
@@ -316,14 +345,10 @@ export function PracticeDetailDrawer({
 
             <DossierField
               label="Revenue"
-              value={
-                p.estimated_revenue != null
-                  ? `$${Number(p.estimated_revenue).toLocaleString()}`
-                  : null
-              }
+              value={formatReliableRevenue(p.estimated_revenue)}
             />
             <DossierField
-              label="Buyability Score"
+              label="Lead Score"
               value={
                 p.buyability_score != null
                   ? Number(p.buyability_score).toFixed(0)
@@ -333,7 +358,7 @@ export function PracticeDetailDrawer({
 
             <DossierField label="NPI" value={p.npi} />
             <DossierField
-              label="Census Confidence"
+              label="Review Confidence"
               value={p.ownership_tier ? p.ownership_confidence ?? 'Not stated' : null}
             />
           </div>
@@ -344,25 +369,25 @@ export function PracticeDetailDrawer({
           {/* ── Raw Source Audit — legacy detector (context only) ── */}
           <div className="px-4 py-4">
             <h4 className="text-[11px] uppercase tracking-wider text-[#707064] font-medium mb-1">
-              Raw Source Audit
+              Older automated data
             </h4>
             <p className="text-[11px] leading-4 text-[#9C9C90] mb-3">
-              {LEGACY_DETECTOR_CONTEXT_LABEL} — pre-census automated output, never an
-              ownership conclusion. The census record above is the only ownership truth.
+              {LEGACY_DETECTOR_CONTEXT_LABEL}. These fields are kept only so you can audit
+              older inputs. The reviewed ownership box above is the answer to use.
             </p>
             <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-3">
               <DossierField
-                label="Detector Classification"
+                label="Old automated class"
                 value={getEntityClassificationLabel(p.entity_classification ?? null)}
                 dotColor={ecColor}
               />
               <DossierField
-                label="Detector Ownership Status"
+                label="Old ownership guess"
                 value={ownershipLabel(p.ownership_status)}
                 dotColor={osColor}
               />
-              <DossierField label="Detector DSO Attribution" value={p.affiliated_dso} />
-              <DossierField label="Detector Parent Company" value={p.parent_company} />
+              <DossierField label="Old DSO guess" value={p.affiliated_dso} />
+              <DossierField label="Imported parent company" value={p.parent_company} />
             </div>
             {reasoning ? (
               <div

@@ -10,9 +10,9 @@ import { JobMarketShell, type ServerKpis } from './_components/job-market-shell'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 export const metadata = {
-  title: 'Master GP Directory | Chicagoland Census',
+  title: 'Chicagoland Practice Directory',
   description:
-    'Search Chicagoland GP locations by ownership, ZIP, job-hunt context, and acquisition relevance.',
+    'Search Chicagoland general-dentistry offices by ownership, ZIP, job-hunt context, and acquisition relevance.',
 }
 
 export default async function JobMarketPage() {

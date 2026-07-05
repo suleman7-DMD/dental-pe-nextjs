@@ -45,7 +45,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: "DIRECTORY",
     items: [
       { label: "Home", href: "/", icon: LayoutDashboard },
-      { label: "Directory", href: "/job-market", icon: Briefcase },
+      { label: "Directory", href: "/directory", icon: Briefcase },
       { label: "Ownership", href: "/market-intel", icon: MapPin },
     ],
   },

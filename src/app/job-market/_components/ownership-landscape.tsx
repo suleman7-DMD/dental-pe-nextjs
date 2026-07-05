@@ -25,11 +25,15 @@ interface OwnershipLandscapeProps {
 
 /** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
 function formatNetworkId(id: string): string {
-  return id
+  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
+  const cleaned = id
+    .replace(/^ao:/i, '')
+    .replace(/^brand:/i, '')
     .split(/[_-]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
+  return `${prefix}${cleaned}`
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -118,17 +122,17 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
     <div>
       <SectionHeader
         title="Ownership Landscape"
-        helpText="Census ownership buckets and corporate networks for this zone. All ownership reads come from the hand-reviewed census — unreviewed clinics stay Unresolved, never estimated."
+        helpText="Reviewed ownership groups and corporate networks for this area. Unreviewed offices stay unresolved, never estimated."
       />
 
       <div className="mt-4 space-y-6">
         {/* Census ownership bar */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
-            Census Ownership Buckets
+            Ownership Groups
           </h3>
           <p className="text-xs text-[#6B6B60] mb-3">
-            Hand-reviewed ownership conclusions. Unresolved = no reviewed conclusion yet.
+            Reviewed ownership answers. Unresolved = no reviewed answer yet.
           </p>
           <BarChart
             data={ownershipData}
@@ -163,7 +167,7 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
               Corporate Networks in Zone
             </h3>
             <p className="text-xs text-[#6B6B60] mb-3">
-              Census-reviewed DSO/PE clinics grouped by network (evidence-backed).
+              Reviewed DSO/PE offices grouped by network.
             </p>
             <DataTable
               data={topNetworks}
@@ -171,7 +175,7 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
                 { key: 'name', header: 'Network' },
                 {
                   key: 'clinics',
-                  header: 'Census DSO/PE Clinics',
+                  header: 'Reviewed DSO/PE offices',
                   render: (v: number) => v.toLocaleString(),
                 },
               ]}
@@ -184,11 +188,11 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
         {censusByZip.length > 0 && (
           <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
             <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
-              Census Ownership by ZIP
+              Ownership by ZIP
             </h3>
             <p className="text-xs text-[#6B6B60] mb-3">
-              Per-ZIP census bucket counts over tracked clinics. Coverage % = share of the
-              ZIP&apos;s tracked clinics with a reviewed conclusion.
+              Per-ZIP ownership counts. Reviewed % = share of offices in that ZIP with a
+              reviewed ownership answer.
             </p>
             <DataTable
               data={censusByZip}
@@ -197,12 +201,12 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
                 { key: 'city', header: 'City' },
                 {
                   key: 'total',
-                  header: 'Tracked',
+                  header: 'Offices',
                   render: (v: number | null) => (v != null ? v.toLocaleString() : '--'),
                 },
                 {
                   key: 'solo_owner',
-                  header: 'Solo Owner-Op',
+                  header: 'True Independent',
                   render: (v: number | null) => (v != null ? v.toLocaleString() : '--'),
                 },
                 {

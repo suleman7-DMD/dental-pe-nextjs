@@ -123,7 +123,7 @@ export default async function PracticePage({
     <main className="min-h-screen bg-[#FAFAF7]">
       <div className="mx-auto max-w-6xl px-6 py-8">
         <Link
-          href="/job-market"
+          href="/directory"
           className="inline-flex items-center gap-2 text-sm font-medium text-[#6B6B60] hover:text-[#1A1A1A]"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -194,7 +194,7 @@ export default async function PracticePage({
         <section className="mt-6 grid gap-4 md:grid-cols-3">
           <MetricBlock
             icon={<ShieldCheck className="h-3.5 w-3.5" />}
-            label="Census Ownership"
+            label="Reviewed Ownership"
             value={
               row.ownership_tier
                 ? getOwnershipTierMeta(row.ownership_tier).label
@@ -212,7 +212,7 @@ export default async function PracticePage({
             icon={<Target className="h-3.5 w-3.5" />}
             label="Acquisition Scout"
             value={acquisitionValue}
-            note="Lead-filter score only — candidacy is gated on the census tier (dentist-owned T1/T2)."
+            note="Early lead score only. A real acquisition target still needs current ownership and succession review."
           />
         </section>
 
@@ -221,7 +221,7 @@ export default async function PracticePage({
         <section className="mt-6 rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-5">
           <div className="mb-4 flex items-center gap-2">
             <MapPin className="h-4 w-4 text-[#B8860B]" />
-            <h2 className="text-base font-semibold text-[#1A1A1A]">Use This Record</h2>
+            <h2 className="text-base font-semibold text-[#1A1A1A]">Where to use this</h2>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             <Link

@@ -78,26 +78,26 @@ export interface BucketMeta {
 
 export const BUCKET_META: Record<HeadlineBucket, BucketMeta> = {
   true_solo_owner_operated: {
-    label: "True Solo Owner-Operated",
-    shortLabel: "Solo Owner-Op",
+    label: "True Independent",
+    shortLabel: "True Independent",
     tiers: ["true_independent"],
-    description: "One dentist who both owns and operates a single location (T1).",
+    description: "One dentist owns and runs one office.",
     color: "#2563EB",
   },
   dentist_owned_not_solo: {
-    label: "Dentist-Owned, Not Solo",
+    label: "Dentist-Owned Group",
     shortLabel: "Dentist-Owned",
     tiers: ["single_loc_group", "dentist_multi"],
     description:
-      "Dentist-owned but not a solo owner-operator: single-location groups (T2) and dentist-owned multi-location networks (T3). NOT DSOs.",
+      "Dentist-owned, but not a true solo office: either multiple dentists at one site or a dentist-owned multi-location group.",
     color: "#0D9488",
   },
   dso_pe_corporate: {
-    label: "DSO / PE / Corporate Controlled",
+    label: "DSO / PE",
     shortLabel: "DSO / PE",
     tiers: ["stealth_dso", "branded_dso"],
     description:
-      "Conventional DSO/PE/corporate control: stealth DSOs (T4) and branded DSOs (T5). The ONLY bucket comparable to the ADA per-dentist anchor.",
+      "Corporate dental groups, including branded DSOs and local-looking offices with documented DSO/MSO control.",
     color: "#C23B3B",
   },
   institutional: {
@@ -150,25 +150,25 @@ export type SourceClass = (typeof SOURCE_CLASSES)[number]
 
 export const SOURCE_CLASS_META: Record<SourceClass, { label: string; description: string }> = {
   census_reviewed: {
-    label: "Census-reviewed",
-    description: "Hand-reviewed ownership conclusion backed by cited evidence.",
+    label: "Reviewed",
+    description: "A human-reviewed ownership answer backed by evidence.",
   },
   held: {
-    label: "Held for adjudication",
-    description: "Reviewed, but a blocker (verification, conflict, duplicate suspicion) holds the conclusion.",
+    label: "Needs decision",
+    description: "Reviewed, but a conflict, duplicate question, or verification blocker still needs a decision.",
   },
   undetermined: {
-    label: "Undetermined (researched)",
-    description: "Researched, but the evidence was too thin to classify. An honest open item.",
+    label: "Researched, still unclear",
+    description: "Researched, but the evidence was too thin to classify.",
   },
   unreviewed: {
-    label: "Not yet reviewed",
-    description: "The census has not researched this location yet.",
+    label: "Not reviewed yet",
+    description: "This location has not been reviewed yet.",
   },
   legacy_detector: {
-    label: "Legacy detector estimate (context)",
+    label: "Old automated estimate",
     description:
-      "Automated entity_classification signal from the pre-census detector. Context only — never census ownership truth.",
+      "Older automated signal from before the hand review. Audit context only, not the ownership answer.",
   },
   pe_deal_context: {
     label: "PE deal context",
@@ -221,11 +221,15 @@ export const LEGACY_DETECTOR_CONTEXT_LABEL = SOURCE_CLASS_META.legacy_detector.l
 
 /** Census network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
 export function formatNetworkId(id: string): string {
-  return id
+  const prefix = /^ao:/i.test(id) ? "Owner: " : /^brand:/i.test(id) ? "Group: " : ""
+  const cleaned = id
+    .replace(/^ao:/i, "")
+    .replace(/^brand:/i, "")
     .split(/[_-]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ")
+  return `${prefix}${cleaned}`
 }
 
 // ---------------------------------------------------------------------------
@@ -387,21 +391,21 @@ export interface TierMeta {
 
 export const TIER_META: Record<OwnershipTier, TierMeta> = {
   true_independent: {
-    label: "True Solo Owner-Operated",
-    shortLabel: "Solo Owner-Op",
-    description: "One dentist both owns and operates this single location (T1).",
+    label: "True Independent",
+    shortLabel: "True Independent",
+    description: "One dentist owns and runs one office.",
     color: BUCKET_META.true_solo_owner_operated.color,
   },
   single_loc_group: {
-    label: "Single-Location Group",
-    shortLabel: "Single-Loc Group",
-    description: "Dentist-owned single-location group practice (T2). Not solo, not a DSO.",
+    label: "Dentist-Owned Group",
+    shortLabel: "Dentist Group",
+    description: "One office with multiple dentists, dentist-owned.",
     color: BUCKET_META.dentist_owned_not_solo.color,
   },
   dentist_multi: {
-    label: "Dentist-Owned Network",
-    shortLabel: "Dentist Network",
-    description: "Dentist-owned multi-location network (T3). Not DSO/PE-controlled.",
+    label: "Dentist Consolidated",
+    shortLabel: "Dentist Consolidated",
+    description: "A dentist-owned multi-location group. Not DSO/PE-controlled.",
     color: BUCKET_META.dentist_owned_not_solo.color,
   },
   stealth_dso: {

@@ -457,13 +457,12 @@ function JobMarketShellInner({
         {/* Header */}
         <div>
           <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">
-            Master GP Directory
+            Chicagoland Practice Directory
           </h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
-            Search the Chicagoland general-dentistry roster by location, job-market context,
-            and acquisition relevance. Ownership truth comes from the hand-reviewed census —
-            see the Census column on each row. Locations without a reviewed conclusion say so;
-            nothing is guessed.
+            Search general-dentistry offices by location, ownership, hiring signals, and
+            acquisition leads. Ownership labels come from the reviewed data; offices we have
+            not reviewed yet are clearly marked.
           </p>
         </div>
 
@@ -518,15 +517,15 @@ function JobMarketShellInner({
             />
             <KpiCard
               icon={<ClipboardCheck className="h-5 w-5" />}
-              label="Census Coverage"
+              label="Ownership Reviewed"
               value={`${activeKpis.bucketSummary.coveragePct.toFixed(1)}%`}
               subtitle={
                 <span className="text-xs text-[#6B6B60]">
                   {activeKpis.bucketSummary.reviewed.toLocaleString()} of{' '}
-                  {activeKpis.bucketSummary.universe.toLocaleString()} reviewed
+                  {activeKpis.bucketSummary.universe.toLocaleString()} offices
                 </span>
               }
-              tooltip="Share of this scope's GP clinics with a hand-reviewed ownership conclusion (ownership_tier). The remainder are Unresolved in the census strip above — shown honestly, never filled with estimates."
+              tooltip="Share of offices where the ownership has been reviewed. The rest are still unresolved and are not filled with guesses."
             />
             <KpiCard
               icon={<Users className="h-5 w-5" />}
@@ -547,17 +546,18 @@ function JobMarketShellInner({
             <div>
               <KpiCard
                 icon={<MapPin className="h-5 w-5" />}
-                label="Avg Dental Density"
-                value={kpiDisplay.avgDldVal ? `${kpiDisplay.avgDldVal}/10k` : '--'}
+                label="Dentist Office Density"
+                value={kpiDisplay.avgDldVal ? `${kpiDisplay.avgDldVal} / 10k people` : '--'}
               />
               <p className="text-xs text-[#6B6B60] mt-1 px-1">
-                GP offices per 10k residents. National avg ~6.1. Lower = less competition.
+                General-dentistry offices per 10,000 residents. Around 6 is average; lower
+                means less local competition, higher means a crowded market.
               </p>
             </div>
             <div>
               <KpiCard
                 icon={<Store className="h-5 w-5" />}
-                label="Buyable Practice %"
+                label="Acquisition Lead Filter"
                 value={
                   kpiDisplay.avgBpr != null
                     ? `${(kpiDisplay.avgBpr * 100).toFixed(0)}%`
@@ -572,19 +572,19 @@ function JobMarketShellInner({
                 }
               />
               <p className="text-xs text-[#6B6B60] mt-1 px-1">
-                Legacy heuristic (zip_scores.buyable_practice_ratio) -- NOT a census ownership
-                claim. Kept until the census-based buyability reframe ships.
+                Early screening estimate for offices that may be worth acquisition research.
+                It is not a final recommendation.
               </p>
             </div>
             <div>
               <KpiCard
                 icon={<Zap className="h-5 w-5" />}
-                label="High-Volume Solos"
+                label="Busy Independents"
                 value={kpiDisplay.highVolCount.toLocaleString()}
               />
               <p className="text-xs text-[#6B6B60] mt-1 px-1">
-                Census solo owner-operated (T1) clinics with 5+ employees or $800k+ revenue.
-                Likely need associate help.
+                Reviewed true independent offices with larger staff or revenue. These may be
+                better associate targets than tiny solo offices.
               </p>
             </div>
           </div>
@@ -717,7 +717,7 @@ export function JobMarketShell(props: JobMarketShellProps) {
         <div className="min-h-screen bg-[#FAFAF7]">
           <div className="px-6 py-6 space-y-6">
             <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">
-              Master GP Directory
+              Chicagoland Practice Directory
             </h1>
             <p className="text-[#6B6B60] text-sm mt-1">Loading...</p>
           </div>

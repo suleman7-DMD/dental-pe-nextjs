@@ -1806,8 +1806,8 @@ function buildDeepLinks(target: RankedTarget): DeepLink[] {
   })
 
   links.push({
-    href: "/job-market?location=all_chicagoland&tab=directory",
-    label: "Job Market · Directory",
+    href: "/directory?location=all_chicagoland&tab=directory",
+    label: "Directory",
     description: "All Chicagoland practice directory",
     icon: Briefcase,
     color: "#0D9488",

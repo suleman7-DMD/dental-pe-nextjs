@@ -73,11 +73,13 @@ export function getReviewStatus(tier: string | null | undefined): ReviewStatus {
 
 export function formatNetworkName(networkId: string | null | undefined): string | null {
   if (!networkId) return null
-  return networkId
-    .replace(/^brand:/, "")
-    .replace(/^ao:/, "")
+  const prefix = /^ao:/i.test(networkId) ? "Owner: " : /^brand:/i.test(networkId) ? "Group: " : ""
+  const cleaned = networkId
+    .replace(/^brand:/i, "")
+    .replace(/^ao:/i, "")
     .replace(/[-_:]+/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase())
+  return `${prefix}${cleaned}`
 }
 
 export function CensusBadge({

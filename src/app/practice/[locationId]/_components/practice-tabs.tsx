@@ -61,14 +61,14 @@ interface PracticeTabsProps {
 function ownershipNode(row: PracticeLocationRecord): string {
   const tier = row.ownership_tier
   if (!tier) return "Awaiting review"
-  if (tier === "true_independent") return "Independent operator"
-  if (tier === "single_loc_group") return "Single-site group"
+  if (tier === "true_independent") return "True independent"
+  if (tier === "single_loc_group") return "Dentist-owned group"
   if (tier === "institutional") return "Institutional clinic"
   return formatNetworkName(row.network_id) ?? getOwnershipTierMeta(tier).label
 }
 
 function sponsorNode(row: PracticeLocationRecord): string {
-  if (row.pe_backed) return "PE-backed (census-confirmed)"
+  if (row.pe_backed) return "PE-backed"
   if (!row.ownership_tier) return "Awaiting review"
   if (row.ownership_tier === "stealth_dso" || row.ownership_tier === "branded_dso") {
     return "No PE sponsor cited"
@@ -131,7 +131,7 @@ function SourceClassChip({ record }: { record: OwnershipRecord }) {
       className="inline-flex items-center gap-1.5 rounded-full border border-[#E8E5DE] bg-[#FAFAF7] px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-[#6B6B60]"
       title={meta.description}
     >
-      Source: {meta.label}
+      {meta.label}
     </span>
   )
 }
@@ -139,7 +139,7 @@ function SourceClassChip({ record }: { record: OwnershipRecord }) {
 function OwnershipTree({ row }: { row: PracticeLocationRecord }) {
   const nodes = [
     { label: "Practice", value: displayName(row), icon: Building2 },
-    { label: "Owner / network", value: ownershipNode(row), icon: Network },
+    { label: "Owner / group", value: ownershipNode(row), icon: Network },
     { label: "Sponsor", value: sponsorNode(row), icon: ShieldCheck },
   ]
 
@@ -224,7 +224,7 @@ function jobHuntContext(row: PracticeLocationRecord): string {
     case "stealth_dso":
     case "branded_dso":
       return row.pe_backed
-        ? "DSO employment with census-confirmed PE ownership — associate roles here are corporate employment. Check the network's reputation before applying."
+        ? "DSO employment with reviewed PE ownership — associate roles here are corporate employment. Check the network's reputation before applying."
         : "DSO employment — associate roles here are corporate employment. Check the network's reputation before applying."
     case "institutional":
       return "Institutional setting (hospital / university / public health) — employment terms differ from private practice."
@@ -234,7 +234,7 @@ function jobHuntContext(row: PracticeLocationRecord): string {
     case "dentist_multi":
       return "Dentist-owned group — plausible associate hiring without corporate employment terms."
     default:
-      return "Ownership unresolved — treat the employment context as unknown until the census reviews this location."
+      return "Ownership unresolved — treat the employment context as unknown until this location is reviewed."
   }
 }
 
@@ -242,16 +242,16 @@ function acquisitionContext(row: PracticeLocationRecord): string {
   switch (row.ownership_tier) {
     case "true_independent":
     case "single_loc_group":
-      return "Census-qualified candidate: dentist-owned, single location. Succession signals below are worth reading."
+      return "Reviewed dentist-owned single-location office. Succession signals below are worth reading."
     case "dentist_multi":
       return "Dentist-owned multi-location network — an acquisition would involve the network, not just this site."
     case "stealth_dso":
     case "branded_dso":
-      return "Not an acquisition target — the census records DSO/corporate control of this location."
+      return "Not an acquisition target — reviewed as DSO/corporate controlled."
     case "institutional":
       return "Not an acquisition target — institutional setting."
     default:
-      return "Not census-reviewed yet — this location cannot be qualified as a candidate until ownership is resolved."
+      return "Not reviewed yet — this location cannot be qualified as a candidate until ownership is resolved."
   }
 }
 
@@ -282,16 +282,16 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
     <Tabs defaultValue="ownership" className="mt-6">
       <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-[#FFFFFF] border border-[#E8E5DE] p-1">
         <TabsTrigger value="ownership" className="px-3 py-1.5">
-          Ownership &amp; evidence
+          Ownership
         </TabsTrigger>
         <TabsTrigger value="job-hunt" className="px-3 py-1.5">
-          Job-hunt intel
+          Job Hunt
         </TabsTrigger>
         <TabsTrigger value="acquisition" className="px-3 py-1.5">
           Acquisition &amp; succession
         </TabsTrigger>
         <TabsTrigger value="network" className="px-3 py-1.5">
-          Network siblings
+          Related Offices
           {siblings.length > 0 ? (
             <span className="ml-1 rounded-full bg-[#F7F7F4] px-1.5 py-0.5 text-[10px] font-medium text-[#6B6B60]">
               {siblings.length}
@@ -299,13 +299,13 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
           ) : null}
         </TabsTrigger>
         <TabsTrigger value="raw-audit" className="px-3 py-1.5">
-          Raw source audit
+          Older data
         </TabsTrigger>
       </TabsList>
 
       {/* ── 1 · Ownership & evidence ──────────────────────────────────────── */}
       <TabsContent value="ownership" className="mt-4 space-y-4">
-        <Panel icon={<Network className="h-4 w-4 text-[#B8860B]" />} title="Ownership Record">
+        <Panel icon={<Network className="h-4 w-4 text-[#B8860B]" />} title="Reviewed Ownership">
           <div className="flex flex-wrap items-center gap-2">
             <CensusBadge tier={row.ownership_tier} peBacked={row.pe_backed} />
             <SourceClassChip record={record} />
@@ -326,15 +326,15 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
               label="Confidence"
               value={record.confidence ? formatTitle(record.confidence) : "Not stated"}
             />
-            <DetailItem label="Network" value={networkLabel ?? "Not assigned"} />
-            <DetailItem label="PE-backed" value={record.peBacked ? "Yes (census)" : "No"} />
+            <DetailItem label="Owner / group" value={networkLabel ?? "Not assigned"} />
+            <DetailItem label="PE-backed" value={record.peBacked ? "Yes" : "No"} />
           </dl>
           <div className="mt-5">
             <OwnershipTree row={row} />
           </div>
         </Panel>
 
-        <Panel icon={<FileCheck2 className="h-4 w-4 text-[#B8860B]" />} title="Evidence">
+        <Panel icon={<FileCheck2 className="h-4 w-4 text-[#B8860B]" />} title="Why we believe this">
           <p className="text-sm leading-6 text-[#3D3D35]">
             {row.ownership_evidence_basis ??
               "No ownership reasoning is synced for this row yet. It will appear here after the research batch is merged."}
@@ -382,13 +382,13 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
             <DetailItem label="Employees" value={row.employee_count} />
             <DetailItem label="Est. revenue" value={formatCurrency(row.estimated_revenue)} />
             <DetailItem
-              label="Buyability (lead filter)"
+              label="Acquisition lead score"
               value={row.buyability_score == null ? null : Math.round(row.buyability_score)}
             />
           </dl>
           <p className="mt-3 text-xs leading-5 text-[#8F8E82]">
-            Buyability is a legacy lead-filter score. Acquisition candidacy is gated on the
-            census tier (dentist-owned, T1/T2) — never on this number alone.
+            This is an early lead score. A real acquisition target still needs current
+            ownership and succession review.
           </p>
           <div className="mt-4">
             <CtaLink
@@ -401,11 +401,11 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
 
       {/* ── 4 · Network siblings ──────────────────────────────────────────── */}
       <TabsContent value="network" className="mt-4">
-        <Panel icon={<Building2 className="h-4 w-4 text-[#B8860B]" />} title="Network Siblings">
+        <Panel icon={<Building2 className="h-4 w-4 text-[#B8860B]" />} title="Related Offices">
           {row.network_id ? (
             <>
               <p className="text-sm leading-6 text-[#3D3D35]">
-                Census network <span className="font-semibold">{networkLabel}</span>
+                Reviewed group <span className="font-semibold">{networkLabel}</span>
                 {" — "}
                 {siblings.length > 0
                   ? `${siblings.length} other reviewed location${siblings.length === 1 ? "" : "s"} share this network assignment.`
@@ -442,8 +442,8 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
           ) : (
             <p className="text-sm leading-6 text-[#6B6B60]">
               {row.ownership_tier
-                ? "No census network assigned — this location is not recorded as part of a multi-location network."
-                : "Not census-reviewed yet — network membership is unknown until review."}
+                ? "No related offices are assigned — this location is not recorded as part of a multi-location group."
+                : "Not reviewed yet — related-office membership is unknown until review."}
             </p>
           )}
         </Panel>
@@ -456,10 +456,9 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
             {LEGACY_DETECTOR_CONTEXT_LABEL}
           </p>
           <p className="mt-1 text-xs leading-5 text-[#6B6B60]">
-            The fields below are raw source data: NPI registry rows, enrichment imports, and the
-            pre-census automated detector&apos;s output. They are shown for auditability only and are
-            never an ownership conclusion — the hand-reviewed census record above is the only
-            ownership truth.{" "}
+            These are older automated inputs and registry fields. They are useful for auditing
+            data problems, but they are not the ownership answer. Use the reviewed ownership
+            section above.{" "}
             <Link href="/data-breakdown" className="font-medium text-[#8B6508] underline hover:text-[#1A1A1A]">
               How the detector worked → Methodology
             </Link>
@@ -468,26 +467,26 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
 
         <Panel
           icon={<ArchiveRestore className="h-4 w-4 text-[#B8860B]" />}
-          title="Legacy Detector Output (context)"
+          title="Older Automated Estimate"
         >
           <dl className="grid grid-cols-2 gap-x-5 gap-y-4 md:grid-cols-3">
             <DetailItem
-              label="Detector class"
+              label="Old automated class"
               value={getEntityClassificationLabel(row.entity_classification)}
             />
-            <DetailItem label="Detector ownership status" value={formatTitle(row.ownership_status)} />
+            <DetailItem label="Old ownership guess" value={formatTitle(row.ownership_status)} />
             <DetailItem
-              label="Detector confidence"
+              label="Old confidence"
               value={row.classification_confidence == null ? null : `${Math.round(row.classification_confidence)} / 100`}
             />
-            <DetailItem label="Detector DSO attribution" value={row.affiliated_dso} />
-            <DetailItem label="Detector PE sponsor attribution" value={row.affiliated_pe_sponsor} />
-            <DetailItem label="Detector parent company" value={row.parent_company} />
+            <DetailItem label="Old DSO guess" value={row.affiliated_dso} />
+            <DetailItem label="Old PE sponsor guess" value={row.affiliated_pe_sponsor} />
+            <DetailItem label="Imported parent company" value={row.parent_company} />
           </dl>
           {row.classification_reasoning ? (
             <div className="mt-4">
               <p className="text-[11px] font-medium uppercase tracking-wider text-[#8F8E82]">
-                Detector reasoning (verbatim)
+                Old automated reasoning
               </p>
               <pre className="mt-2 whitespace-pre-wrap rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 font-mono text-xs leading-5 text-[#3D3D35]">
                 {row.classification_reasoning}
@@ -502,7 +501,7 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
             <DetailItem label="Provider NPIs" value={providerNpis.length || null} />
             <DetailItem label="EIN" value={row.ein} />
             <DetailItem
-              label="Data Axle enriched"
+              label="Business details"
               value={row.data_axle_enriched == null ? null : row.data_axle_enriched ? "Yes" : "No"}
             />
             <DetailItem label="Data sources" value={dataSources.join(", ") || null} />

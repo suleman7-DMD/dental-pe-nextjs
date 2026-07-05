@@ -70,11 +70,15 @@ const UNRESOLVED_LEGEND_GRAY = '#9CA3AF'
 
 /** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
 function formatNetworkId(id: string): string {
-  return id
+  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
+  const cleaned = id
+    .replace(/^ao:/i, '')
+    .replace(/^brand:/i, '')
     .split(/[_-]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
+  return `${prefix}${cleaned}`
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -351,8 +355,8 @@ export function PracticeDensityMap({
   return (
     <div>
       <SectionHeader
-        title="Census Ownership Map"
-        helpText="Each dot = one GP clinic, colored by its hand-reviewed census ownership conclusion (ownership_tier). Gray dots = unresolved — no reviewed conclusion yet, never estimated. Faded dots sit at a ZIP-centroid approximation instead of a precise address."
+        title="Ownership Map"
+        helpText="Each dot is a general-dentistry office. Color shows the reviewed ownership answer. Gray means not reviewed or still unresolved. Faded dots use the ZIP center because exact coordinates are missing."
       />
 
       {geocoded.length === 0 ? (
@@ -370,7 +374,7 @@ export function PracticeDensityMap({
                 onChange={(e) => setHideUnresolved(e.target.checked)}
                 className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
               />
-              Hide unresolved clinics
+              Hide unresolved offices
             </label>
           </div>
 
@@ -381,7 +385,7 @@ export function PracticeDensityMap({
             centerLon={centerLon}
           />
 
-          {/* Legend — all five census buckets, always */}
+          {/* Legend — all five ownership groups, always */}
           <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 mb-1">
             {HEADLINE_BUCKETS.map((b) => (
               <span key={b} className="flex items-center gap-1.5 text-[13px] text-[#1A1A1A]">
@@ -402,12 +406,12 @@ export function PracticeDensityMap({
 
           {/* Summary counts */}
           <p className="text-xs text-[#6B6B60] mt-1">
-            Showing {geocoded.length.toLocaleString()} GP clinics
+            Showing {geocoded.length.toLocaleString()} offices
             {hideUnresolved ? ' (unresolved hidden)' : ''}
             {' '}&middot;{' '}
             {geocoded.filter(d => !d.is_approximate).length.toLocaleString()} precise locations,{' '}
             {geocoded.filter(d => d.is_approximate).length.toLocaleString()} approximate (ZIP centroid)
-            {' '}&middot; Ownership colors come only from the hand-reviewed census.
+            {' '}&middot; Ownership colors use reviewed ownership data only.
           </p>
         </>
       )}

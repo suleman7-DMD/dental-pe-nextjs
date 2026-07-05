@@ -46,10 +46,10 @@ export function CensusBucketSummaryCard({
     <div className={`rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-4 ${className}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
         <h2 className="font-sans font-semibold text-sm text-[#1A1A1A]">
-          Ownership census — {scopeLabel}
+          Ownership review — {scopeLabel}
         </h2>
         <span className="text-xs text-[#6B6B60] font-mono">
-          {reviewed.toLocaleString()} of {universe.toLocaleString()} GP clinics reviewed
+          {reviewed.toLocaleString()} of {universe.toLocaleString()} general-dentistry offices reviewed
           {' '}({coveragePct.toFixed(1)}%)
         </span>
       </div>
@@ -101,9 +101,9 @@ export function CensusBucketSummaryCard({
       </div>
 
       <p className="text-[11px] text-[#8A8A7E] mt-2.5">
-        Source: hand-reviewed ownership census (evidence-backed tiers). Percentages are of the
-        full GP-clinic universe for this scope. Unresolved = no reviewed conclusion yet — shown
-        honestly, never filled with estimates.
+        These are human-reviewed ownership answers. Percentages use every general-dentistry
+        office in this area. Unresolved means the office is still not classified; the app does
+        not fill those rows with guesses.
       </p>
     </div>
   )

@@ -31,11 +31,15 @@ interface MarketOverviewChartsProps {
 
 /** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
 function formatNetworkId(id: string): string {
-  return id
+  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
+  const cleaned = id
+    .replace(/^ao:/i, '')
+    .replace(/^brand:/i, '')
     .split(/[_-]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
+  return `${prefix}${cleaned}`
 }
 
 const BUCKET_HISTOGRAM_ORDER = HEADLINE_BUCKETS.map((b) => BUCKET_META[b].shortLabel)
@@ -127,25 +131,25 @@ export function MarketOverviewCharts({
     <div>
       <SectionHeader
         title="Market Overview"
-        helpText="Census ownership mix, DSO/PE concentration by ZIP, practice age, and corporate networks in your commutable zone. All ownership reads come from the hand-reviewed census — unreviewed clinics stay Unresolved."
+        helpText="Ownership mix, DSO/PE concentration by ZIP, office age, and corporate groups in this area. Unreviewed offices stay unresolved."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-        {/* 1. Census DSO/PE share by ZIP */}
+        {/* 1. DSO/PE share by ZIP */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
-            Census DSO/PE Share by ZIP
+            DSO/PE Share by ZIP
           </h3>
           <p className="text-xs text-[#6B6B60] mb-3">
-            Reviewed DSO/PE/corporate clinics as % of all tracked clinics in the ZIP —
-            a lower bound where census coverage is incomplete.
+            Reviewed DSO/PE/corporate offices as a percent of all offices in the ZIP.
+            This is a lower bound where ownership review is incomplete.
           </p>
           {dsoPeByZip.length > 0 ? (
             <BarChart
               data={dsoPeByZip}
               orientation="horizontal"
               height={420}
-              xAxisLabel="Census DSO/PE % of tracked clinics"
+              xAxisLabel="Reviewed DSO/PE % of offices"
               xRange={[0, 100]}
               colorScale={{
                 type: 'gradient',
@@ -153,7 +157,7 @@ export function MarketOverviewCharts({
                 max: Math.max(...dsoPeByZip.map((d) => d.value), 1),
                 colors: ['#2D8B4E', '#D4920B', '#C23B3B'],
               }}
-              tooltipFormat={(d) => `ZIP ${d.label}: ${d.value.toFixed(1)}% census DSO/PE`}
+              tooltipFormat={(d) => `ZIP ${d.label}: ${d.value.toFixed(1)}% reviewed DSO/PE`}
             />
           ) : (
             <p className="text-sm text-[#6B6B60] text-center py-8">
@@ -162,11 +166,11 @@ export function MarketOverviewCharts({
           )}
         </div>
 
-        {/* 2. Census ownership donut */}
+        {/* 2. Ownership donut */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">Census Ownership Mix</h3>
+          <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">Ownership Mix</h3>
           <p className="text-xs text-[#6B6B60] mb-3">
-            Hand-reviewed ownership buckets. Unresolved = no reviewed conclusion yet.
+            Reviewed ownership groups. Unresolved = no reviewed answer yet.
           </p>
           <DonutChart
             segments={donutData.segments}
@@ -216,8 +220,7 @@ export function MarketOverviewCharts({
             Corporate Networks in Zone
           </h3>
           <p className="text-xs text-[#6B6B60] mb-3">
-            Census-reviewed DSO/PE clinics grouped by network. Evidence-backed —
-            not detector brand-matching.
+            Reviewed DSO/PE offices grouped by owner or network.
           </p>
           {topNetworks.length > 0 ? (
             <BarChart
@@ -226,11 +229,11 @@ export function MarketOverviewCharts({
               height={420}
               xAxisLabel="Clinics"
               barColor="#C23B3B"
-              tooltipFormat={(d) => `${d.label}: ${d.value} census DSO/PE clinics`}
+              tooltipFormat={(d) => `${d.label}: ${d.value} reviewed DSO/PE offices`}
             />
           ) : (
             <p className="text-sm text-[#6B6B60] text-center py-8">
-              No census-reviewed DSO/PE clinics found in this zone.
+              No reviewed DSO/PE offices found in this zone.
             </p>
           )}
         </div>

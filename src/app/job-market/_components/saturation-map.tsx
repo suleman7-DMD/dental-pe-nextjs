@@ -41,9 +41,9 @@ interface MetricConfig {
 
 const METRICS: Record<MetricKey, MetricConfig> = {
   dld: {
-    label: 'Dental Density (DLD-GP/10k)',
-    shortLabel: 'DLD-GP/10k',
-    description: 'GP dental offices per 10,000 residents. National avg ~6.1. Lower = less competition.',
+    label: 'Dentist Office Density',
+    shortLabel: 'Offices / 10k',
+    description: 'General-dentistry offices per 10,000 residents. Around 6 is average. Lower = less competition.',
     field: 'dld_gp_per_10k',
     transform: (v) => v,
     format: (v) => v.toFixed(1),
@@ -55,12 +55,12 @@ const METRICS: Record<MetricKey, MetricConfig> = {
     ],
     legendMin: '0',
     legendMax: '12+',
-    legendNote: 'GP offices per 10k residents',
+    legendNote: 'Offices per 10k people',
   },
   buyable: {
-    label: 'Buyable Practice Ratio',
-    shortLabel: 'Buyable %',
-    description: 'Legacy heuristic (zip_scores.buyable_practice_ratio) — NOT a census ownership claim. Rough share of GP offices flagged as potential acquisition targets; census ownership by ZIP lives in the Analytics tab.',
+    label: 'Acquisition Lead Filter',
+    shortLabel: 'Acq. lead %',
+    description: 'Early screening estimate for offices that may be worth acquisition research. Not a final acquisition recommendation.',
     field: 'buyable_practice_ratio',
     transform: (v) => v * 100,
     format: (v) => `${v.toFixed(0)}%`,
@@ -72,7 +72,7 @@ const METRICS: Record<MetricKey, MetricConfig> = {
     ],
     legendMin: '0%',
     legendMax: '70%+',
-    legendNote: '% flagged buyable (legacy heuristic)',
+    legendNote: '% flagged as acquisition leads',
   },
 }
 
@@ -272,8 +272,8 @@ function SaturationMapInner({
                 <span style="color:#9C9C90"> &middot; ${props.zip}</span><br/>
                 <span style="color:#6B6B60">Pop:</span> <span>${props.population}</span>
                 <span style="color:#6B6B60"> &middot; GP Offices:</span> <strong>${props.gpLocations}</strong><br/>
-                <span style="color:#6B6B60;${dldBold}">DLD-GP/10k:</span> <span style="${dldBold}">${props.dldVal}</span><br/>
-                <span style="color:#6B6B60;${buyBold}">Buyable % (legacy heuristic):</span> <span style="${buyBold}">${props.buyableVal}</span><br/>
+                <span style="color:#6B6B60;${dldBold}">Offices / 10k people:</span> <span style="${dldBold}">${props.dldVal}</span><br/>
+                <span style="color:#6B6B60;${buyBold}">Acquisition lead %:</span> <span style="${buyBold}">${props.buyableVal}</span><br/>
                 <span style="color:#9C9C90;font-size:10px">Confidence: ${props.confidence}</span>
               </div>`
             )
@@ -411,8 +411,8 @@ export function SaturationMap({
   return (
     <div>
       <SectionHeader
-        title="Saturation Metrics Map"
-        helpText="Each dot = one watched ZIP. Size = number of GP offices. Color = selected metric value. Toggle between Density and Buyable % (a legacy heuristic, not a census ownership claim). Census ownership by ZIP lives in the Analytics tab. Faded dots = low data confidence or missing metric."
+        title="ZIP Market Map"
+        helpText="Each dot is a ZIP. Bigger dots have more general-dentistry offices. Color shows either office density or acquisition-lead share. Faded dots have weaker data."
       />
 
       {/* Metric toggle */}

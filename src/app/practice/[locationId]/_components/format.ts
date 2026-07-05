@@ -3,8 +3,25 @@
 
 import type { PracticeLocationRecord } from "@/lib/supabase/queries/practice-locations"
 
+function cleanNamePart(value: string | null | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (
+    trimmed === "" ||
+    /^<?\s*(?:unavail|unavailable|not available|none|null|n\/?a)\s*>?$/i.test(trimmed)
+  ) {
+    return null
+  }
+  return trimmed
+}
+
 export function displayName(row: PracticeLocationRecord): string {
-  return row.doing_business_as ?? row.practice_name ?? "Unnamed practice"
+  return (
+    cleanNamePart(row.doing_business_as) ??
+    cleanNamePart(row.practice_name) ??
+    (row.normalized_address ? `Practice at ${row.normalized_address}` : null) ??
+    "Unnamed practice"
+  )
 }
 
 export function formatTitle(value: string | null | undefined): string {

@@ -35,10 +35,10 @@ type SortOption = 'job_score' | 'buyability' | 'employees' | 'year_est' | 'name'
 type PracticeWithJobScore = Practice & { job_opp_score?: number | null }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: 'job_score', label: 'Job Opp Score \u2193' },
-  { value: 'buyability', label: 'Buyability (legacy) \u2193' },
-  { value: 'employees', label: 'Employees \u2193' },
-  { value: 'year_est', label: 'Year Est. \u2191' },
+  { value: 'job_score', label: 'Hiring signal \u2193' },
+  { value: 'buyability', label: 'Acquisition lead score \u2193' },
+  { value: 'employees', label: 'Staff size \u2193' },
+  { value: 'year_est', label: 'Oldest first' },
   { value: 'name', label: 'Name A-Z' },
 ]
 
@@ -52,7 +52,7 @@ const TIER_OPTIONS = OWNERSHIP_TIERS.map((t) => `${TIER_CODE[t]} ${TIER_META[t].
 const tierByOption = new Map(OWNERSHIP_TIERS.map((t) => [`${TIER_CODE[t]} ${TIER_META[t].shortLabel}`, t]))
 const CONFIDENCE_OPTIONS = ['High', 'Medium', 'Low', 'Not recorded']
 const EVIDENCE_OPTIONS = ['Evidence on file', 'No evidence recorded']
-const SPONSOR_OPTIONS = ['PE-backed (census-confirmed)', 'Not PE-confirmed']
+const SPONSOR_OPTIONS = ['PE-backed', 'Not PE-backed']
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -64,11 +64,37 @@ function isDataAxle(p: Practice): boolean {
 
 /** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
 function formatNetworkId(id: string): string {
-  return id
+  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
+  const cleaned = id
+    .replace(/^ao:/i, '')
+    .replace(/^brand:/i, '')
     .split(/[_-]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
+  return `${prefix}${cleaned}`
+}
+
+function cleanDisplayPart(value: string | null | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (
+    trimmed === '' ||
+    /^<?\s*(?:unavail|unavailable|not available|none|null|n\/?a)\s*>?$/i.test(trimmed)
+  ) {
+    return null
+  }
+  return trimmed
+}
+
+function practiceDisplayName(p: Practice): string {
+  return (
+    cleanDisplayPart(p.doing_business_as) ??
+    cleanDisplayPart(p.practice_name) ??
+    (p.address ? `Practice at ${p.address}` : null) ??
+    (p.city ? `Practice in ${p.city}` : null) ??
+    'Unnamed practice'
+  )
 }
 
 function hasOwnershipEvidence(p: Practice): boolean {
@@ -114,7 +140,7 @@ function sortPractices<T extends Practice>(list: T[], sortBy: SortOption): T[] {
       )
     case 'name':
       return sorted.sort((a, b) =>
-        (a.doing_business_as ?? a.practice_name ?? '').localeCompare(b.doing_business_as ?? b.practice_name ?? '')
+        practiceDisplayName(a).localeCompare(practiceDisplayName(b))
       )
     default:
       return sorted
@@ -132,10 +158,16 @@ function computeDataQuality(p: Practice): string {
 
 /** Render gold-colored data-depth stars */
 function renderDataQualityStars(v: string): React.ReactElement {
+  const label =
+    v === '\u2605\u2605\u2605'
+      ? 'Business data'
+      : v === '\u2605\u2605'
+        ? 'Ownership reviewed'
+        : 'Basic registry'
   return React.createElement('span', {
-    style: { color: '#D4920B', letterSpacing: '1px' },
-    title: v === '\u2605\u2605\u2605' ? 'Data Axle enriched' : v === '\u2605\u2605' ? 'Census reviewed' : 'NPPES only',
-  }, v || '\u2605')
+    className: 'text-xs text-[#6B6B60]',
+    title: label,
+  }, label)
 }
 
 function renderNetwork(v: string | null): string {
@@ -189,19 +221,19 @@ function renderCensusBadge(valueOrPractice: unknown): React.ReactElement {
 
 const EMPLOYMENT_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
-  { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
+  { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   { key: 'city', header: 'City' },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
-  { key: 'network_id', header: 'Network', render: renderNetwork },
-  { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
-  { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
+  { key: 'network_id', header: 'Owner / Group', render: renderNetwork },
+  { key: 'job_opp_score', header: 'Hiring Signal', render: (v: number | null) => v ?? '--' },
+  { key: 'data_quality', header: 'Source', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 const OWNERSHIP_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
-  { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
+  { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
   { key: 'city', header: 'City' },
@@ -212,20 +244,20 @@ const OWNERSHIP_COLUMNS = [
   },
   {
     key: 'buyability_score',
-    header: 'Buyability (legacy)',
+    header: 'Lead Score',
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
-  { key: 'ownership_confidence', header: 'Census Confidence', render: renderCensusConfidence },
-  { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
+  { key: 'ownership_confidence', header: 'Confidence', render: renderCensusConfidence },
+  { key: 'data_quality', header: 'Source', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 const ENRICHED_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
-  { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
+  { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
-  { key: 'network_id', header: 'Network', render: renderNetwork },
+  { key: 'network_id', header: 'Owner / Group', render: renderNetwork },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
   {
     key: 'estimated_revenue',
@@ -240,20 +272,20 @@ const ENRICHED_COLUMNS = [
   },
   {
     key: 'buyability_score',
-    header: 'Buyability (legacy)',
+    header: 'Lead Score',
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
-  { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
+  { key: 'job_opp_score', header: 'Hiring Signal', render: (v: number | null) => v ?? '--' },
   { key: 'website', header: 'Website', render: (v: string | null) => v || '--' },
-  { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
+  { key: 'data_quality', header: 'Source', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 const ALL_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
-  { key: 'ownership_tier', header: 'Census', render: renderCensusBadge },
+  { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
-  { key: 'network_id', header: 'Network', render: renderNetwork },
+  { key: 'network_id', header: 'Owner / Group', render: renderNetwork },
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
   {
     key: 'year_established',
@@ -262,11 +294,11 @@ const ALL_COLUMNS = [
   },
   {
     key: 'buyability_score',
-    header: 'Buyability (legacy)',
+    header: 'Lead Score',
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
-  { key: 'job_opp_score', header: 'Job Score', render: (v: number | null) => v ?? '--' },
-  { key: 'data_quality', header: 'Data', render: (v: string) => renderDataQualityStars(v) },
+  { key: 'job_opp_score', header: 'Hiring Signal', render: (v: number | null) => v ?? '--' },
+  { key: 'data_quality', header: 'Source', render: (v: string) => renderDataQualityStars(v) },
 ]
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -308,7 +340,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     () =>
       practices.map((p) => ({
         ...p,
-        display_name: p.doing_business_as ?? p.practice_name ?? '--',
+        display_name: practiceDisplayName(p),
       })),
     [practices]
   )
@@ -387,8 +419,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       result = result.filter((p) => {
         const confirmed = p.pe_backed === true
         return (
-          (confirmed && selectedSponsor.includes('PE-backed (census-confirmed)')) ||
-          (!confirmed && selectedSponsor.includes('Not PE-confirmed'))
+          (confirmed && selectedSponsor.includes('PE-backed')) ||
+          (!confirmed && selectedSponsor.includes('Not PE-backed'))
         )
       })
     }
@@ -396,8 +428,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     // Source filter
     if (selectedSources.length > 0 && !selectedSources.includes('All')) {
       result = result.filter((p) => {
-        if (selectedSources.includes('Data Axle (Enriched)') && isDataAxle(p)) return true
-        if (selectedSources.includes('NPPES') && !isDataAxle(p)) return true
+        if (selectedSources.includes('Business details available') && isDataAxle(p)) return true
+        if (selectedSources.includes('Basic registry only') && !isDataAxle(p)) return true
         return false
       })
     }
@@ -482,17 +514,17 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       address: 'Address',
       city: 'City',
       zip: 'ZIP',
-      ownership_tier: 'Census Tier',
-      ownership_confidence: 'Census Confidence',
-      ownership_evidence_basis: 'Census Evidence Basis',
+      ownership_tier: 'Ownership Type',
+      ownership_confidence: 'Review Confidence',
+      ownership_evidence_basis: 'Ownership Evidence',
       pe_backed: 'PE Backed (census)',
       network_id: 'Network',
       employee_count: 'Employees',
       estimated_revenue: 'Revenue',
       year_established: 'Year Est.',
-      buyability_score: 'Buyability (legacy heuristic)',
-      job_opp_score: 'Job Score',
-      parent_company: 'Parent Company (Data Axle)',
+      buyability_score: 'Acquisition Lead Score',
+      job_opp_score: 'Hiring Signal',
+      parent_company: 'Imported Parent Company',
       website: 'Website',
       data_source: 'Data Source',
     }
@@ -508,8 +540,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   return (
     <div>
       <SectionHeader
-        title="Master GP Directory"
-        helpText="Search Chicagoland general dental locations by name, city, ZIP, or network. Ownership filters and badges come only from the hand-reviewed census (ownership_tier); unresolved rows have no reviewed conclusion yet. Every row opens the full practice record."
+        title="Chicagoland Practice Directory"
+        helpText="Search every general-dentistry office by name, city, ZIP, owner, or group. The Ownership column is the reviewed answer when we have one; rows marked Not Reviewed still need research."
       />
 
       {/* Search & Filters */}
@@ -522,23 +554,23 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          <FilterGroup label="Census Bucket">
+          <FilterGroup label="Ownership group">
             <MultiSelect
               options={BUCKET_OPTIONS}
               selected={selectedBuckets}
               onChange={setSelectedBuckets}
-              placeholder="All Buckets"
+              placeholder="All groups"
             />
           </FilterGroup>
-          <FilterGroup label="Census Tier">
+          <FilterGroup label="Detailed type">
             <MultiSelect
               options={TIER_OPTIONS}
               selected={selectedTiers}
               onChange={setSelectedTiers}
-              placeholder="All Tiers"
+              placeholder="All types"
             />
           </FilterGroup>
-          <FilterGroup label="Review Confidence">
+          <FilterGroup label="Confidence">
             <MultiSelect
               options={CONFIDENCE_OPTIONS}
               selected={selectedConfidence}
@@ -546,7 +578,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
               placeholder="All Confidence"
             />
           </FilterGroup>
-          <FilterGroup label="Evidence Status">
+          <FilterGroup label="Evidence">
             <MultiSelect
               options={EVIDENCE_OPTIONS}
               selected={selectedEvidence}
@@ -554,15 +586,15 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
               placeholder="All Evidence"
             />
           </FilterGroup>
-          <FilterGroup label="Network">
+          <FilterGroup label="Owner / group">
             <MultiSelect
               options={networkOptions}
               selected={selectedNetworks}
               onChange={setSelectedNetworks}
-              placeholder="All Networks"
+              placeholder="All owners/groups"
             />
           </FilterGroup>
-          <FilterGroup label="PE Sponsor">
+          <FilterGroup label="PE-backed">
             <MultiSelect
               options={SPONSOR_OPTIONS}
               selected={selectedSponsor}
@@ -570,9 +602,9 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
               placeholder="All"
             />
           </FilterGroup>
-          <FilterGroup label="Data Source">
+          <FilterGroup label="Business data">
             <MultiSelect
-              options={['All', 'Data Axle (Enriched)', 'NPPES']}
+              options={['All', 'Business details available', 'Basic registry only']}
               selected={selectedSources}
               onChange={setSelectedSources}
               placeholder="All Sources"
@@ -601,23 +633,23 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <div className="text-sm text-[#B8860B]">
           Showing <strong>{filtered.length.toLocaleString()}</strong> of{' '}
           <strong>{totalPractices.toLocaleString()}</strong> GP offices |{' '}
-          <strong>{filteredEnriched.toLocaleString()}</strong> enriched by Data Axle
+          <strong>{filteredEnriched.toLocaleString()}</strong> with business details
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeView} onValueChange={setActiveView} className="mt-4">
         <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
-          <TabsTrigger value="employment">Employment Opportunities</TabsTrigger>
+          <TabsTrigger value="employment">Hiring leads</TabsTrigger>
           <TabsTrigger value="ownership">Acquisition Leads</TabsTrigger>
-          <TabsTrigger value="enriched">Business Data</TabsTrigger>
-          <TabsTrigger value="all">All GP Offices</TabsTrigger>
+          <TabsTrigger value="enriched">Business details</TabsTrigger>
+          <TabsTrigger value="all">All practices</TabsTrigger>
         </TabsList>
 
         <TabsContent value="employment">
           <p className="text-sm text-[#6B6B60] mb-2">
-            GP offices most likely to hire associates: high staffing levels (10+ employees) or
-            census-confirmed DSO / PE corporate networks.
+            Offices most likely to need an associate: larger staff counts or reviewed DSO/PE ownership.
+            Treat this as a lead list and verify the role before applying.
           </p>
           {lowEnrichmentNote && (
             <p className="text-xs text-[#D4920B] mb-2">Warning: {lowEnrichmentNote}</p>
@@ -635,7 +667,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
                 rowKey="npi"
               />
               <p className="text-xs text-[#6B6B60] mt-2">
-              {employmentPractices.length} GP offices match employment criteria
+              {employmentPractices.length} offices match the hiring-lead criteria
               </p>
               <Pagination
                 total={employmentPractices.length}
@@ -649,9 +681,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
         <TabsContent value="ownership">
           <p className="text-sm text-[#6B6B60] mb-2">
-            Census-confirmed solo owner-operated GP offices (T1), sorted by the legacy buyability
-            heuristic — a screening score, not a census claim. Unresolved offices are excluded
-            until reviewed.
+            Reviewed true independent offices, sorted by an early acquisition lead score. This is
+            a screening list, not a final acquisition recommendation.
           </p>
           {lowEnrichmentNote && (
             <p className="text-xs text-[#D4920B] mb-2">Warning: {lowEnrichmentNote}</p>
@@ -669,7 +700,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
                 rowKey="npi"
               />
               <p className="text-xs text-[#6B6B60] mt-2">
-              {ownershipPractices.length} GP offices match ownership pipeline criteria
+              {ownershipPractices.length} offices match the acquisition-lead criteria
               </p>
               <Pagination
                 total={ownershipPractices.length}
@@ -684,14 +715,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <TabsContent value="enriched">
           {enrichedPractices.length === 0 ? (
             <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-              No Data Axle-enriched GP offices match the current filters.
+              No offices with added business details match the current filters.
             </div>
           ) : (
             <>
               {enrichedPractices.length > 500 && (
                 <p className="text-xs text-[#B8860B] mb-2">
                   Showing page {page} of {Math.ceil(enrichedPractices.length / PAGE_SIZE)} for{' '}
-                  {enrichedPractices.length.toLocaleString()} enriched GP offices. Download CSV for full list.
+                  {enrichedPractices.length.toLocaleString()} offices with business details. Download CSV for full list.
                 </p>
               )}
               <DataTable
@@ -713,14 +744,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <TabsContent value="all">
           {filtered.length === 0 ? (
             <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-              No GP offices match the current filters.
+              No offices match the current filters.
             </div>
           ) : (
             <>
               {filtered.length > 500 && (
                 <p className="text-xs text-[#B8860B] mb-2">
                   Showing page {page} of {Math.ceil(filtered.length / PAGE_SIZE)} for{' '}
-                  {filtered.length.toLocaleString()} GP offices. Download CSV for full list.
+                  {filtered.length.toLocaleString()} offices. Download CSV for full list.
                 </p>
               )}
               <DataTable
@@ -747,7 +778,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
           className="inline-flex items-center gap-2 rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-4 py-2 text-sm text-[#1A1A1A] hover:border-[#D4D0C8] hover:bg-[#F7F7F4] transition-colors"
         >
           <Download className="h-4 w-4" />
-          Download filtered GP offices (CSV)
+          Download filtered offices (CSV)
         </button>
       </div>
 

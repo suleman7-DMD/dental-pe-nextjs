@@ -34,6 +34,27 @@ interface PracticeChange {
   change_type: string
 }
 
+function cleanNamePart(value: string | null | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (
+    trimmed === '' ||
+    /^<?\s*(?:unavail|unavailable|not available|none|null|n\/?a)\s*>?$/i.test(trimmed)
+  ) {
+    return null
+  }
+  return trimmed
+}
+
+function practiceName(p: Practice): string {
+  return (
+    cleanNamePart(p.doing_business_as) ??
+    cleanNamePart(p.practice_name) ??
+    (p.address ? `Practice at ${p.address}` : null) ??
+    'Unnamed practice'
+  )
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Component
 // ────────────────────────────────────────────────────────────────────────────
@@ -93,7 +114,8 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
           (a, b) =>
             (Number(a.year_established) || 9999) - (Number(b.year_established) || 9999)
         )
-        .slice(0, 100),
+        .slice(0, 100)
+        .map((p) => ({ ...p, practice_name: practiceName(p) })),
     [retirementData]
   )
 
@@ -117,10 +139,10 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         return {
           x: Number(p.buyability_score),
           y: Number(p.employee_count),
-          label: p.practice_name ?? 'Unknown',
+          label: practiceName(p),
           group: BUCKET_META[bucket].shortLabel,
           color: BUCKET_META[bucket].color,
-          tooltip: `${p.practice_name ?? 'Unknown'}\n${p.city ?? ''}\nBuyability: ${Number(p.buyability_score).toFixed(0)}`,
+          tooltip: `${practiceName(p)}\n${p.city ?? ''}\nLead score: ${Number(p.buyability_score).toFixed(0)}`,
         }
       })
   }, [highBuyData])
@@ -131,7 +153,8 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
         .sort(
           (a, b) => (Number(b.buyability_score) || 0) - (Number(a.buyability_score) || 0)
         )
-        .slice(0, 100),
+        .slice(0, 100)
+        .map((p) => ({ ...p, practice_name: practiceName(p) })),
     [highBuyData]
   )
 
@@ -174,7 +197,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
               if (practice) {
                 allChanges.push({
                   change_date: row.change_date,
-                  practice_name: practice.practice_name ?? 'Unknown',
+                  practice_name: practiceName(practice),
                   city: practice.city ?? '',
                   zip: (practice.zip ?? '').toString().slice(0, 5),
                   field_changed: row.field_changed,
@@ -216,13 +239,13 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
     <div>
       <SectionHeader
         title="Opportunity Signals"
-        helpText="Each practice scored 0-100: census dentist-owned (30), buyability (25), size (20), young practice (15), census-unresolved capped at (10). Ownership points come only from the hand-reviewed census — never the legacy detector."
+        helpText="Simple lead lists for job hunting and acquisition research. Treat scores as screening signals, then verify the actual office before acting."
       />
 
       <Tabs value={activeSignalTab} onValueChange={setActiveSignalTab} className="mt-4">
         <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
           <TabsTrigger value="retirement">Retirement Risk</TabsTrigger>
-          <TabsTrigger value="buyability">High Buyability</TabsTrigger>
+          <TabsTrigger value="buyability">Acquisition Leads</TabsTrigger>
           <TabsTrigger value="changes">Recent Changes</TabsTrigger>
         </TabsList>
 
@@ -233,7 +256,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
               icon={<Clock className="h-4 w-4" />}
               label="At-Risk Practices"
               value={retireKpis.count.toLocaleString()}
-              tooltip="Census dentist-owned clinics (T1–T3) established 30+ years ago. Only reviewed conclusions count."
+              tooltip="Reviewed dentist-owned offices established 30+ years ago."
             />
             <KpiCard
               icon={<Calendar className="h-4 w-4" />}
@@ -242,7 +265,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
             />
             <KpiCard
               icon={<Target className="h-4 w-4" />}
-              label="Avg Buyability"
+              label="Avg Lead Score"
               value={retireKpis.avgBuy}
             />
             <KpiCard
@@ -250,13 +273,13 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
               label="Needs Research"
               value={needsResearchCount.toLocaleString()}
               accentColor="#B8860B"
-              tooltip="30+ year clinics whose ownership is census-unresolved. They would join At-Risk if a review confirms dentist ownership — shown as a research queue, never counted as at-risk."
+              tooltip="30+ year offices whose ownership is still unresolved. They are a research queue, not confirmed leads."
             />
           </div>
 
           {retirementData.length === 0 ? (
             <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-              No census dentist-owned practices with 30+ years of operation found in these ZIPs.
+              No reviewed dentist-owned practices with 30+ years of operation found in these ZIPs.
             </div>
           ) : (
             <DataTable
@@ -282,7 +305,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                 },
                 {
                   key: 'buyability_score',
-                  header: 'Buyability',
+                  header: 'Lead Score',
                   render: (v: number | null) =>
                     v != null ? Number(v).toFixed(0) : '--',
                 },
@@ -297,11 +320,11 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
           )}
         </TabsContent>
 
-        {/* ── High Buyability ──────────────────────────────────────────── */}
+        {/* ── Acquisition leads ──────────────────────────────────────────── */}
         <TabsContent value="buyability">
           {highBuyData.length === 0 ? (
             <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-              No practices with buyability score &gt;= 60 found in these ZIPs.
+              No practices with acquisition lead score &gt;= 60 found in these ZIPs.
             </div>
           ) : (
             <>
@@ -309,7 +332,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                 <div className="mb-4">
                   <ScatterChart
                     data={scatterData}
-                    xAxisLabel="Buyability Score"
+                    xAxisLabel="Acquisition Lead Score"
                     yAxisLabel="Employee Count"
                     height={420}
                     groups={HEADLINE_BUCKETS.map((b) => ({
@@ -332,13 +355,13 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
                   },
                   {
                     key: 'ownership_tier',
-                    header: 'Census Ownership',
+                    header: 'Ownership',
                     render: (v: string | null | undefined) =>
                       BUCKET_META[tierToBucket(v ?? null)].shortLabel,
                   },
                   {
                     key: 'buyability_score',
-                    header: 'Buyability',
+                    header: 'Lead Score',
                     render: (v: number | null) =>
                       v != null ? Number(v).toFixed(0) : '--',
                   },

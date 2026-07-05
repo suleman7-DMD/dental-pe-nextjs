@@ -27,11 +27,15 @@ interface MarketAnalyticsProps {
 
 /** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
 function formatNetworkId(id: string): string {
-  return id
+  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
+  const cleaned = id
+    .replace(/^ao:/i, '')
+    .replace(/^brand:/i, '')
     .split(/[_-]+/)
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ')
+  return `${prefix}${cleaned}`
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -151,7 +155,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
     <div>
       <SectionHeader
         title="Market Analytics"
-        helpText="ZIP-level density, census ownership breakdown, and corporate-network landscape. All ownership reads come from the hand-reviewed census."
+        helpText="ZIP-level density, ownership breakdown, and corporate-network landscape."
       />
 
       <div className="mt-4 space-y-6">
@@ -171,20 +175,19 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
           />
         </div>
 
-        {/* Census ownership breakdown by ZIP */}
+        {/* Ownership breakdown by ZIP */}
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">
-            Census Ownership Breakdown by ZIP -- Top 25
+            Ownership Breakdown by ZIP -- Top 25
           </h3>
           <p className="text-xs text-[#6B6B60] mb-3">
-            Five census buckets per ZIP. Unresolved = tracked clinics without a reviewed
-            conclusion — shown honestly, never redistributed.
+            Five ownership groups per ZIP. Unresolved = offices without a reviewed answer.
           </p>
           <StackedBarChart
             data={censusBreakdownData}
             orientation="horizontal"
             height={Math.max(400, censusBreakdownData.length * 22)}
-            xAxisLabel="Percentage of Tracked Clinics"
+            xAxisLabel="Percentage of offices"
             legendItems={HEADLINE_BUCKETS.map((b) => ({
               key: BUCKET_META[b].shortLabel,
               color: BUCKET_META[b].color,
@@ -199,14 +202,14 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
           </h3>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Corporate network share (census) */}
+            {/* Corporate network share */}
             <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
               <h4 className="text-xs font-semibold text-[#6B6B60] uppercase tracking-wider mb-3">
-                Corporate Network Share (Census)
+                Corporate Network Share
               </h4>
               {networkShare.length === 0 ? (
                 <p className="text-sm text-[#6B6B60] text-center py-4">
-                  No census-reviewed DSO/PE clinics found.
+                  No reviewed DSO/PE offices found.
                 </p>
               ) : (
                 <DataTable
@@ -215,7 +218,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
                     { key: 'name', header: 'Network' },
                     {
                       key: 'locations',
-                      header: 'Clinics',
+                      header: 'Offices',
                       render: (v: unknown) => v != null ? Number(v).toLocaleString() : '--',
                     },
                     {
@@ -225,7 +228,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
                     },
                     {
                       key: 'market_share',
-                      header: 'Share of Tracked %',
+                      header: 'Share of offices',
                       render: (v: unknown) => v != null ? `${Number(v).toFixed(1)}%` : '--',
                     },
                   ]}
@@ -234,14 +237,14 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
               )}
             </div>
 
-            {/* PE-backed clinics (census) */}
+            {/* PE-backed clinics */}
             <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
               <h4 className="text-xs font-semibold text-[#6B6B60] uppercase tracking-wider mb-3">
-                PE-Backed Clinics (Census)
+                PE-Backed Offices
               </h4>
               {peBackedNetworks.length === 0 ? (
                 <p className="text-sm text-[#6B6B60] text-center py-4">
-                  No census-reviewed PE-backed clinics found.
+                  No reviewed PE-backed offices found.
                 </p>
               ) : (
                 <DataTable
@@ -250,7 +253,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
                     { key: 'name', header: 'Network' },
                     {
                       key: 'clinics',
-                      header: 'PE-Backed Clinics',
+                      header: 'PE-backed offices',
                       render: (v: unknown) => v != null ? Number(v).toLocaleString() : '--',
                     },
                   ]}

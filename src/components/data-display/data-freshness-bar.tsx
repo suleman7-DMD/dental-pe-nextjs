@@ -27,13 +27,13 @@ export function DataFreshnessBar({
     <div className="flex flex-wrap items-center gap-4 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-xs">
       <div
         className="flex items-center gap-1.5 text-[var(--text-secondary)]"
-        title="Address-deduped location records tracked in the selected scope — all classes (GP, specialist, non-clinical, unverified). NOT raw federal NPI rows (NPPES emits ~2.4x more rows than physical locations) and NOT the GP-only clinic denominator used by the KPI cards."
+        title="Physical location records loaded for this area. This is not the raw federal provider-row count."
       >
         <Database className="h-3.5 w-3.5 text-[var(--accent-blue)]" />
         <span className="font-medium text-[var(--text-primary)]">
           {formatNumber(totalPractices)}
         </span>
-        <span>tracked locations</span>
+        <span>locations loaded</span>
       </div>
 
       <div className="h-3 w-px bg-[var(--border)]" />
@@ -43,7 +43,7 @@ export function DataFreshnessBar({
         <span className="font-medium text-[var(--text-primary)]">
           {formatNumber(resolvedEnriched)}
         </span>
-        <span>enriched ({enrichmentPct}%)</span>
+        <span>with business details ({enrichmentPct}%)</span>
       </div>
 
       {lastUpdated && (

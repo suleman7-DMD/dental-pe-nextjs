@@ -50,7 +50,7 @@ interface NavCard {
 
 const NAV_CARDS: NavCard[] = [
   {
-    href: '/job-market',
+    href: '/directory',
     icon: Database,
     title: 'Directory',
     description: 'Every Chicagoland GP location',
@@ -539,7 +539,7 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges, censusSu
               Start from the practice itself: address, ownership, evidence, job context, and
               acquisition signals in one place.
             </p>
-            <Link href="/job-market" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[#B8860B]">
+            <Link href="/directory" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[#B8860B]">
               Open Directory <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
