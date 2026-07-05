@@ -3,13 +3,23 @@ import type { LaunchpadPracticeRecord } from "./signals"
 type DisplayInput = Pick<
   LaunchpadPracticeRecord,
   "doing_business_as" | "practice_name" | "provider_last_name" | "npi"
->
+> & {
+  address?: string | null
+  city?: string | null
+}
 
 function clean(value: string | null | undefined): string | null {
   if (value == null) return null
   const trimmed = value.trim()
   if (trimmed.length === 0) return null
-  if (/^null$/i.test(trimmed) || /^none$/i.test(trimmed) || /^<?\s*unavail\s*>?$/i.test(trimmed)) return null
+  if (
+    /^null$/i.test(trimmed) ||
+    /^none$/i.test(trimmed) ||
+    /^n\/?a$/i.test(trimmed) ||
+    /^<?\s*(?:unavail|unavailable|not available)\s*>?$/i.test(trimmed)
+  ) {
+    return null
+  }
   return trimmed
 }
 
@@ -22,6 +32,12 @@ export function getPracticeDisplayName(practice: DisplayInput): string {
 
   const last = clean(practice.provider_last_name)
   if (last) return `Dr. ${last}`
+
+  const address = clean(practice.address)
+  if (address) return `Practice at ${address}`
+
+  const city = clean(practice.city)
+  if (city) return `Practice in ${city}`
 
   return `NPI ${practice.npi}`
 }

@@ -79,10 +79,10 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           value={summary ? summary.laneCounts.verified_target.toLocaleString() : "--"}
           subtitle={
             <span className="text-[11px] text-[#6B6B60]">
-              Census-reviewed + accepted intel
+              Census-reviewed + verified dossier
             </span>
           }
-          tooltip="Practices whose ownership is a census-reviewed conclusion AND that carry accepted source-backed practice intel. The only lane with uncapped scores — every ownership claim here has been human-reviewed with evidence."
+          tooltip="Practices whose ownership is a census-reviewed conclusion AND that carry a current verified practice dossier. Partial, stale, or conflicted intel cannot enter this lane."
           accentColor={LAUNCHPAD_LANE_COLORS.verified_target}
         />
 
@@ -92,10 +92,10 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           value={summary ? summary.laneCounts.promising_lead.toLocaleString() : "--"}
           subtitle={
             <span className="text-[11px] text-[#6B6B60]">
-              Census-reviewed · scores ≤ 70
+              Census-reviewed · scores ≤ 60
             </span>
           }
-          tooltip="Ownership is census-reviewed but practice-level intel is thin or unverified. Scores are capped at 70 until source-backed intel is accepted."
+          tooltip="Ownership is census-reviewed but practice-level intel is missing, partial, stale, or conflicted. Scores are capped at 60 until current verified intel is accepted."
           accentColor={LAUNCHPAD_LANE_COLORS.promising_lead}
         />
 
@@ -105,10 +105,10 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           value={summary ? summary.laneCounts.needs_research.toLocaleString() : "--"}
           subtitle={
             <span className="text-[11px] text-[#6B6B60]">
-              Census pending · scores ≤ 60
+              Census pending · scores ≤ 45
             </span>
           }
-          tooltip="Ownership is not a census conclusion yet — unreviewed, undetermined, or held for evidence. Scores are capped at 60 until the ownership census reviews these locations. This lane is never hidden: it is the honest size of what we don't know yet."
+          tooltip="Ownership is not a census conclusion yet — unreviewed, undetermined, or held for evidence. Scores are capped at 45 until the ownership census reviews these locations. This lane is never hidden: it is the honest size of what we don't know yet."
           accentColor={LAUNCHPAD_LANE_COLORS.needs_research}
         />
 
@@ -147,8 +147,8 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
 
       {intelCoveragePct !== null && intelCoveragePct < 10 && (
         <div className="mt-2 rounded-md border border-[#D4920B]/30 bg-[#D4920B]/5 px-3 py-2 text-xs text-[#6B6B60]">
-          Source-backed intel coverage thin ({intelCoveragePct.toFixed(0)}%) — most
-          census-reviewed practices sit in the promising-leads lane (scores ≤ 70)
+          Current verified intel coverage thin ({intelCoveragePct.toFixed(0)}%) — most
+          census-reviewed practices sit in the promising-leads lane (scores ≤ 60)
         </div>
       )}
     </div>

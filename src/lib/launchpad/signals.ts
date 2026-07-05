@@ -54,9 +54,9 @@ export const LAUNCHPAD_LANE_LABELS: Record<LaunchpadLane, string> = {
 
 export const LAUNCHPAD_LANE_DESCRIPTIONS: Record<LaunchpadLane, string> = {
   verified_target:
-    "Census-reviewed ownership with accepted practice-level intel — every ownership claim here is a reviewed conclusion.",
+    "Census-reviewed ownership with a current verified practice dossier — useful enough to prepare outreach.",
   promising_lead:
-    "Census-reviewed ownership, but practice-level intel is thin — the structure looks right; the details are unverified.",
+    "Census-reviewed ownership, but practice-level intel is missing, partial, stale, or conflicted — re-research before outreach.",
   needs_research:
     "Ownership is not a census conclusion yet (unreviewed, undetermined, or held) — scores are capped until the census answers.",
 }
@@ -64,8 +64,8 @@ export const LAUNCHPAD_LANE_DESCRIPTIONS: Record<LaunchpadLane, string> = {
 /** Score ceilings by lane. Null = uncapped (0–100). */
 export const LAUNCHPAD_LANE_CAPS: Record<LaunchpadLane, number | null> = {
   verified_target: null,
-  promising_lead: 70,
-  needs_research: 60,
+  promising_lead: 60,
+  needs_research: 45,
 }
 
 export const LAUNCHPAD_LANE_COLORS: Record<LaunchpadLane, string> = {

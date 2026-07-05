@@ -164,11 +164,8 @@ function SnapshotTab({
   })
 
   const isCapped = target.trackScores?.[target.bestTrack]?.confidenceCapped ?? false
-  // intelAudit present + status=rejected + verification_quality is insufficient/null means
-  // a dossier WAS researched but failed the anti-hallucination gate — needs re-research.
-  const needsReresearch =
-    target.intelAudit?.status === "rejected" &&
-    (target.intelAudit.verification_quality === "insufficient" || target.intelAudit.verification_quality == null)
+  const intelNeedsReview =
+    target.intelAudit?.status === "rejected" || target.intelAudit?.status === "legacy"
 
   return (
     <div className="space-y-5">
@@ -212,6 +209,20 @@ function SnapshotTab({
         )}
       </div>
 
+      {intelNeedsReview && (
+        <Banner variant={target.intelAudit?.status === "rejected" ? "red" : "amber"}>
+          <div className="font-semibold">
+            {target.intelAudit?.status === "rejected"
+              ? "Practice intel needs re-research"
+              : "Archived intel is not used for scoring"}
+          </div>
+          <div className="mt-1 text-xs opacity-90">
+            {target.intelAudit?.reason ??
+              "This practice has older or incomplete research. Verify current doctors, ownership, and hiring before outreach."}
+          </div>
+        </Banner>
+      )}
+
       {/* 3-column KPI row */}
       <div className="grid grid-cols-3 gap-3">
         {/* Fit Score */}
@@ -244,10 +255,10 @@ function SnapshotTab({
 
         {/* Confidence */}
         <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-          {needsReresearch ? (
+          {intelNeedsReview ? (
             <>
-              <div className="text-sm font-semibold text-[#C23B3B]">Stale</div>
-              <div className="mt-1 text-[10px] text-[#C23B3B]">Re-research</div>
+              <div className="text-sm font-semibold text-[#C23B3B]">Review</div>
+              <div className="mt-1 text-[10px] text-[#C23B3B]">Re-research intel</div>
             </>
           ) : isCapped ? (
             <>
@@ -350,7 +361,7 @@ function SnapshotTab({
       {intel?.overall_assessment && (
         <div>
           <SectionHeading>AI assessment</SectionHeading>
-          <p className="text-sm text-[#6B6B60]">{intel.overall_assessment}</p>
+          <p className="text-sm text-[#6B6B60]">{cleanIntelText(intel.overall_assessment)}</p>
         </div>
       )}
     </div>
@@ -419,7 +430,7 @@ function IntelList({
       <ul className="space-y-1.5">
         {items.map((item, index) => (
           <li key={`${title}-${index}`} className={cn("text-sm", color)}>
-            {item}
+            {cleanIntelText(item)}
           </li>
         ))}
       </ul>
@@ -427,12 +438,17 @@ function IntelList({
   )
 }
 
+function cleanIntelText(value: string): string {
+  return value
+    .replace(/\bsolo_established\b/g, "legacy solo detector class")
+    .replace(/\bsmall_group\b/g, "legacy small-group detector class")
+    .replace(/\blarge_group\b/g, "legacy large-group detector class")
+}
+
 function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
   const { intel, intelAudit } = target
 
-  const needsReresearch =
-    intelAudit?.status === "rejected" &&
-    (intelAudit.verification_quality === "insufficient" || intelAudit.verification_quality == null)
+  const needsReresearch = intelAudit?.status === "rejected"
 
   if (!intel) {
     return (
@@ -441,9 +457,8 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
           <Banner variant="red">
             <div className="font-semibold">Dossier needs re-research</div>
             <div className="mt-1 text-xs opacity-90">
-              A dossier was researched for this practice but failed the anti-hallucination gate
-              (verification_quality=insufficient, searches=
-              {intelAudit?.verification_searches ?? 0}). Re-run{" "}
+              A dossier was researched for this practice but is not safe for job-search
+              scoring. {intelAudit?.reason ?? "Re-run source verification before outreach."} Re-run{" "}
               <code className="rounded bg-white/20 px-1 py-0.5 font-mono text-[11px]">
                 python3 scrapers/dossier_batch/launch.py --npi {target.npi}
               </code>{" "}
@@ -452,7 +467,7 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
           </Banner>
         ) : (
           <Banner variant="amber">
-            <div className="font-semibold">No source-backed practice dossier attached</div>
+            <div className="font-semibold">No current verified practice dossier attached</div>
             <div className="mt-1 text-xs opacity-90">
               {intelAudit?.reason ??
                 "There is no practice_intel row for this location's provider NPIs."}
@@ -471,8 +486,9 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
           <EvidenceUrlList urls={intelAudit?.verification_urls ?? []} />
         </div>
         <div className="rounded-md border border-[#E8E5DE] bg-[#F5F5F0] px-3 py-2 text-xs text-[#6B6B60]">
-          This drawer is using structural NPPES/Data Axle fields only. Rejected raw research is
-          visible as an audit record, but it is not used for scoring, thesis, or evidence claims.
+          This drawer is using census ownership plus structural NPPES/Data Axle fields only.
+          Rejected or archived raw research is visible as an audit record, but it is not used
+          for scoring, thesis, or evidence claims.
         </div>
       </div>
     )
@@ -484,7 +500,7 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
         <div className="font-semibold">
           {intelAudit?.status === "legacy"
             ? "Practice dossier (pre-verification batch)"
-            : "Source-backed practice dossier"}
+            : "Current verified practice dossier"}
         </div>
         <div className="mt-1 text-xs opacity-90">
           {intel.verification_quality ?? "verified"} · {intel.verification_searches ?? 0} searches ·{" "}
@@ -502,7 +518,9 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
       {intel.overall_assessment && (
         <div>
           <SectionHeading>Assessment</SectionHeading>
-          <p className="text-sm leading-relaxed text-[#6B6B60]">{intel.overall_assessment}</p>
+          <p className="text-sm leading-relaxed text-[#6B6B60]">
+            {cleanIntelText(intel.overall_assessment)}
+          </p>
         </div>
       )}
 
@@ -541,19 +559,19 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
           {intel.website_analysis && (
             <div>
               <SectionHeading>Website notes</SectionHeading>
-              <p className="text-sm text-[#6B6B60]">{intel.website_analysis}</p>
+              <p className="text-sm text-[#6B6B60]">{cleanIntelText(intel.website_analysis)}</p>
             </div>
           )}
           {intel.provider_notes && (
             <div>
               <SectionHeading>Provider notes</SectionHeading>
-              <p className="text-sm text-[#6B6B60]">{intel.provider_notes}</p>
+              <p className="text-sm text-[#6B6B60]">{cleanIntelText(intel.provider_notes)}</p>
             </div>
           )}
           {intel.insurance_note && (
             <div>
               <SectionHeading>Insurance notes</SectionHeading>
-              <p className="text-sm text-[#6B6B60]">{intel.insurance_note}</p>
+              <p className="text-sm text-[#6B6B60]">{cleanIntelText(intel.insurance_note)}</p>
             </div>
           )}
         </div>
@@ -1373,14 +1391,8 @@ export function PracticeDossier({
               >
                 {(
                   [
-                    { value: "snapshot", label: "Snapshot" },
-                    { value: "intel", label: "Intel" },
-                    { value: "score", label: "Score" },
-                    { value: "compensation", label: "Comp" },
-                    { value: "mentorship", label: "Mentor" },
-                    { value: "redflags", label: "Red Flags" },
-                    { value: "interview", label: "Interview" },
-                    { value: "contract", label: "Contract" },
+                    { value: "snapshot", label: "Overview" },
+                    { value: "intel", label: "Evidence" },
                   ] as const
                 ).map((tab) => (
                   <TabsTrigger
@@ -1400,30 +1412,6 @@ export function PracticeDossier({
               </TabsContent>
               <TabsContent value="intel" className="p-4">
                 <IntelEvidenceTab target={target} />
-              </TabsContent>
-              <TabsContent value="score" className="p-4">
-                <ScoreTab target={target} />
-              </TabsContent>
-              <TabsContent value="compensation" className="p-4">
-                <CompensationTab target={target} bundle={bundle} />
-              </TabsContent>
-              <TabsContent value="mentorship" className="p-4">
-                <MentorshipTab target={target} />
-              </TabsContent>
-              <TabsContent value="redflags" className="p-4">
-                <RedFlagsTab target={target} />
-              </TabsContent>
-              <TabsContent value="interview" className="p-4">
-                <InterviewPrepAi
-                  npi={target.npi}
-                  practiceSnapshot={practiceSnapshot}
-                  signals={signalIds}
-                  intel={intelContext}
-                  track={track}
-                />
-              </TabsContent>
-              <TabsContent value="contract" className="p-4">
-                <ContractParser />
               </TabsContent>
             </div>
           </Tabs>

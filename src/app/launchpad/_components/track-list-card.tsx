@@ -22,8 +22,6 @@ interface TrackListCardProps {
   track: LaunchpadTrack
   isPinned?: boolean
   onTogglePin?: (npi: string) => void
-  /** Opens the dossier with the Score tab pre-selected — used by the "Why?" link */
-  onOpenScore?: (npi: string) => void
 }
 
 const TIER_STYLES: Record<
@@ -85,7 +83,6 @@ export function TrackListCard({
   track,
   isPinned = false,
   onTogglePin,
-  onOpenScore,
 }: TrackListCardProps) {
   const practice = target.practice
   const displayName = getPracticeDisplayName(practice)
@@ -275,36 +272,23 @@ export function TrackListCard({
             </div>
           )}
 
-          {/* Inline score breakdown — top 2 contributors so users see WHY without hover */}
+          {/* Human-readable signal summary. The numeric index sorts the list, but the row should read like a directory entry. */}
           {topContributions.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] leading-tight">
-              <span className="font-semibold uppercase tracking-wider text-[#9C9C90]">Why:</span>
-              {topContributions.slice(0, 2).map((c) => (
-                <span key={c.signalId} className="inline-flex items-center gap-1 text-[#1A1A1A]">
-                  <span
-                    className={cn(
-                      "font-mono font-semibold",
-                      c.contribution > 0 ? "text-[#2D8B4E]" : "text-[#C23B3B]"
-                    )}
-                  >
-                    {c.contribution > 0 ? "+" : ""}
-                    {c.contribution.toFixed(0)}
-                  </span>
-                  <span className="text-[#6B6B60]">{c.label}</span>
+              <span className="font-semibold uppercase tracking-wider text-[#9C9C90]">Signals:</span>
+              {topContributions.slice(0, 3).map((c) => (
+                <span
+                  key={c.signalId}
+                  className={cn(
+                    "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+                    c.contribution > 0
+                      ? "border-[#2D8B4E]/25 bg-[#2D8B4E]/8 text-[#2D8B4E]"
+                      : "border-[#C23B3B]/25 bg-[#C23B3B]/8 text-[#C23B3B]"
+                  )}
+                >
+                  {c.label}
                 </span>
               ))}
-              {onOpenScore && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenScore(target.npi)
-                  }}
-                  className="ml-1 rounded text-[10px] font-medium text-[#B8860B] underline-offset-2 hover:underline"
-                >
-                  full breakdown →
-                </button>
-              )}
             </div>
           )}
 
@@ -317,16 +301,16 @@ export function TrackListCard({
 
           {hasSourceBackedIntel && target.intelAudit?.status !== "legacy" ? (
             <p className="mt-1 text-[10px] text-[#2D8B4E]">
-              Source-backed intel · {target.intel?.verification_quality ?? "verified"} ·{" "}
+              Current verified dossier · {target.intel?.verification_quality ?? "verified"} ·{" "}
               {target.intel?.verification_urls?.length ?? 0} URLs
             </p>
           ) : hasSourceBackedIntel && target.intelAudit?.status === "legacy" ? (
             <p className="mt-1 text-[10px] text-[#6B6B60]">
-              Research available · unverified
+              Archived research only · not used for score
             </p>
           ) : target.intelAudit?.status === "rejected" ? (
             <p className="mt-1 text-[10px] text-[#D4920B]">
-              Raw research rejected — {target.intelAudit.reason.replace(/^Rejected:\s*/i, "")}
+              Needs re-research — {target.intelAudit.reason.replace(/^Rejected(?: for Job Hunt scoring)?:\s*/i, "")}
             </p>
           ) : null}
 
@@ -374,7 +358,7 @@ export function TrackListCard({
                 aria-label="Score breakdown"
               >
                 <span
-                  className="font-mono text-[28px] font-bold leading-none tracking-tight text-[#1A1A1A]"
+                  className="font-mono text-base font-semibold leading-none text-[#1A1A1A]"
                   style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)" }}
                 >
                   {Math.round(target.displayScore)}
@@ -384,7 +368,7 @@ export function TrackListCard({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between gap-3 text-[11px]">
                     <span className="font-semibold uppercase tracking-wider opacity-70">
-                      {LAUNCHPAD_TRACK_SHORT_LABELS[trackKey]} · base 50
+                      {LAUNCHPAD_TRACK_SHORT_LABELS[trackKey]} · internal signal index · base 35
                     </span>
                     <span className="font-mono font-bold">
                       → {Math.round(target.displayScore)}
@@ -421,14 +405,14 @@ export function TrackListCard({
                     </div>
                   )}
                   <div className="border-t border-white/15 pt-1 text-[10px] opacity-70">
-                    Open dossier → Score for full math
+                    Used only to sort the list; verify the dossier before outreach.
                   </div>
                 </div>
               </TooltipContent>
             </Tooltip>
           </div>
           <span className="text-[10px] font-medium uppercase tracking-wider text-[#9C9C90]">
-            {tierLabel}
+            Signal index
           </span>
         </div>
       </div>

@@ -8,14 +8,13 @@ export const revalidate = 0
 export const metadata = {
   title: 'Acquisition Scout | Chicagoland Census',
   description:
-    'Succession, partnership, and acquisition research queues built from the Chicagoland practice directory.',
+    'Census-first acquisition scouting: hand-reviewed dentist-owned locations first, legacy heuristics capped until the census confirms ownership.',
 }
 
 export default async function BuyabilityPage() {
   try {
     const supabase = await createServerClient()
     // Restrict to watched ZIPs so the table agrees with every other page.
-    // Pre-2026-04-26 this pulled 500 rows globally, ignoring scope entirely.
     const watchedZips = await getWatchedZips(supabase)
     const zips = watchedZips.map((z) => z.zip_code)
     const practices = await getBuyabilityPractices(supabase, { zips })
@@ -25,7 +24,7 @@ export default async function BuyabilityPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#FAFAF7] text-[#1A1A1A]">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-2">Buyability Scanner</h1>
+          <h1 className="text-2xl font-bold mb-2">Acquisition Scout</h1>
           <p className="text-[#6B6B60]">Data is loading. Please refresh in a moment.</p>
           <p className="text-[#707064] text-sm mt-4">
             Error: {error instanceof Error ? error.message : 'Unknown'}

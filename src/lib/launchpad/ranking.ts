@@ -105,7 +105,7 @@ export const TRACK_MULTIPLIERS: Record<
   },
 }
 
-const BASE_SCORE = 50
+const BASE_SCORE = 35
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
@@ -194,13 +194,13 @@ export function resolveLane(
   if (intel == null) {
     return {
       lane: "promising_lead",
-      laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}), but no accepted practice-level intel yet — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
+      laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}), but no current verified practice-level dossier yet — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
       cap: LAUNCHPAD_LANE_CAPS.promising_lead,
     }
   }
   return {
     lane: "verified_target",
-    laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}) with accepted practice intel on file.`,
+    laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}) with a current verified practice dossier on file.`,
     cap: null,
   }
 }

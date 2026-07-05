@@ -31,7 +31,21 @@ export const DEFAULT_RANK_LIMIT = 5000
  */
 const INTEL_FETCH_LIMIT = 200
 
-const SOURCE_BACKED_QUALITIES = new Set(["verified", "high", "partial"])
+const SOURCE_BACKED_QUALITIES = new Set(["verified", "high"])
+const CURRENT_INTEL_MAX_DAYS = 90
+const BLOCKING_INTEL_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
+  { pattern: /\bownership\/structure mismatch\b/i, reason: "ownership/structure mismatch" },
+  { pattern: /\bstructure mismatch\b/i, reason: "structure mismatch" },
+  { pattern: /\bownership mismatch\b/i, reason: "ownership mismatch" },
+  { pattern: /\binput data indicated\b/i, reason: "legacy data conflicts with web evidence" },
+  { pattern: /\bmultiple licensed dentists?\b/i, reason: "provider roster contradicts solo premise" },
+  { pattern: /\bmulti-doctor\b/i, reason: "multi-doctor structure needs review" },
+  { pattern: /\bmulti-location\b/i, reason: "multi-location structure needs review" },
+  { pattern: /\bsecondary location unconfirmed\b/i, reason: "unconfirmed second location" },
+  { pattern: /\bowner(ship)? unclear\b/i, reason: "ownership unclear" },
+  { pattern: /\bconflict(?:ing|s)?\b/i, reason: "conflicting evidence" },
+  { pattern: /\bcontradict(?:ed|s|ory)?\b/i, reason: "contradictory evidence" },
+]
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -78,7 +92,8 @@ function parseStringArray(value: unknown): string[] | null {
 function parseUrlArray(value: unknown): string[] {
   const arr = parseStringArray(value) ?? []
   return arr
-    .map((url) => url.trim())
+    .map((url) => url.match(/https?:\/\/[^\s)"\]]+/)?.[0] ?? "")
+    .map((url) => url.replace(/[),.;]+$/, ""))
     .filter((url) => url.startsWith("http") && url !== "no_results_found")
 }
 
@@ -158,7 +173,9 @@ function hasSourceBackedIntel(intel: LaunchpadPracticeIntelRecord): boolean {
   return (
     SOURCE_BACKED_QUALITIES.has(quality) &&
     (intel.verification_searches ?? 0) >= 2 &&
-    (intel.verification_urls?.length ?? 0) > 0
+    (intel.verification_urls?.length ?? 0) > 0 &&
+    intelAgeDays(intel) <= CURRENT_INTEL_MAX_DAYS &&
+    intelBlockingReasons(intel).length === 0
   )
 }
 
@@ -172,6 +189,29 @@ function hasSubstantiveIntel(intel: LaunchpadPracticeIntelRecord): boolean {
   )
 }
 
+function intelAgeDays(intel: LaunchpadPracticeIntelRecord): number {
+  if (!intel.research_date) return Number.POSITIVE_INFINITY
+  const t = Date.parse(intel.research_date)
+  if (!Number.isFinite(t)) return Number.POSITIVE_INFINITY
+  return Math.floor((Date.now() - t) / 86_400_000)
+}
+
+function intelBlockingReasons(intel: LaunchpadPracticeIntelRecord): string[] {
+  const haystack = [
+    intel.overall_assessment,
+    intel.provider_notes,
+    ...(intel.red_flags ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+
+  const reasons: string[] = []
+  for (const { pattern, reason } of BLOCKING_INTEL_PATTERNS) {
+    if (pattern.test(haystack) && !reasons.includes(reason)) reasons.push(reason)
+  }
+  return reasons
+}
+
 function auditForIntel(intel: LaunchpadPracticeIntelRecord): LaunchpadIntelAudit {
   const quality = intel.verification_quality?.toLowerCase() ?? null
   const searches = intel.verification_searches ?? 0
@@ -182,7 +222,16 @@ function auditForIntel(intel: LaunchpadPracticeIntelRecord): LaunchpadIntelAudit
   let reason: string
   if (sourceBacked) {
     status = "source_backed"
-    reason = "Accepted: source-backed practice_intel row."
+    reason = "Accepted: current verified practice_intel row."
+  } else if (intelBlockingReasons(intel).length > 0) {
+    status = "rejected"
+    reason = `Rejected for Job Hunt scoring: ${intelBlockingReasons(intel).join("; ")}.`
+  } else if ((quality === "partial" || quality === "insufficient") && substantive) {
+    status = "rejected"
+    reason = `Rejected for Job Hunt scoring: verification_quality=${quality}; re-research required.`
+  } else if (intelAgeDays(intel) > CURRENT_INTEL_MAX_DAYS && substantive) {
+    status = "legacy"
+    reason = `Accepted only as archived context: researched ${intelAgeDays(intel)} days ago.`
   } else if (substantive) {
     status = "legacy"
     reason = "Accepted: pre-verification intel with substantive content."
@@ -675,7 +724,7 @@ export async function getLaunchpadBundle(options: {
     if (!best) continue
     const audit = auditForIntel(best)
     intelAuditByNpi.set(practice.npi, audit)
-    if (audit.status === "source_backed" || audit.status === "legacy") {
+    if (audit.status === "source_backed") {
       intelByNpi.set(practice.npi, best)
     }
   }

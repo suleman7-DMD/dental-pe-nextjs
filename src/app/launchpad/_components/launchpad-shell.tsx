@@ -56,16 +56,8 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
     initialBundle,
   })
 
-  // Tracks which dossier tab to show when the dossier opens. Default "snapshot",
-  // but the "full breakdown →" link on each card switches it to "score".
+  // Tracks which dossier tab to show when the dossier opens.
   const [dossierTab, setDossierTab] = useState<string>("snapshot")
-  const openWithScoreTab = useCallback(
-    (npi: string) => {
-      setDossierTab("score")
-      setSelectedNpi(npi)
-    },
-    [setSelectedNpi]
-  )
   const closeDossier = useCallback(() => {
     setDossierTab("snapshot")
     clearSelection()
@@ -241,7 +233,6 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
               onSelect={setSelectedNpi}
               pinnedNpis={state.pinnedNpis}
               onTogglePin={togglePin}
-              onOpenScore={openWithScoreTab}
             />
           )}
         </div>
