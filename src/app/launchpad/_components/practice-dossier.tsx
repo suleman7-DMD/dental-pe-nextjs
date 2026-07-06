@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils/formatting"
 import { safeExternalUrl } from "@/lib/utils/safe-url"
 import { CensusBadge, getOwnershipTierMeta } from "@/components/data-display/census-badge"
+import { ManualCorrectionPanel } from "@/components/data-display/manual-correction-panel"
 import {
   resolveDsoTierEntry,
   DSO_TIER_LABELS,
@@ -166,6 +167,19 @@ function SnapshotTab({
   const isCapped = target.trackScores?.[target.bestTrack]?.confidenceCapped ?? false
   const intelNeedsReview =
     target.intelAudit?.status === "rejected" || target.intelAudit?.status === "legacy"
+  const sourceBackedIntel = target.intelAudit?.status === "source_backed"
+  const currentDoctors =
+    sourceBackedIntel && intel?.provider_notes
+      ? cleanIntelText(intel.provider_notes)
+      : null
+  const providerCount =
+    sourceBackedIntel && intel?.provider_count_web != null
+      ? intel.provider_count_web
+      : practice.num_providers
+  const providerCountSource =
+    sourceBackedIntel && intel?.provider_count_web != null
+      ? "website dossier"
+      : "registry count"
 
   return (
     <div className="space-y-5">
@@ -207,6 +221,31 @@ function SnapshotTab({
             </a>
           </div>
         )}
+      </div>
+
+      <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+        <SectionHeading>Ownership and doctors</SectionHeading>
+        <div className="grid grid-cols-1 gap-3">
+          <QuickFact
+            label="Owner / group"
+            value={target.networkLabel ?? "Not verified in structured data"}
+          />
+          <QuickFact
+            label="Doctors currently shown"
+            value={currentDoctors ?? "Not verified yet"}
+          />
+          <QuickFact
+            label="Provider count"
+            value={
+              <span>
+                {providerCount ?? "—"}
+                <span className="ml-1 text-xs font-normal text-[#6B6B60]">
+                  {providerCount != null ? providerCountSource : ""}
+                </span>
+              </span>
+            }
+          />
+        </div>
       </div>
 
       {intelNeedsReview && (
@@ -305,7 +344,7 @@ function SnapshotTab({
           />
           <QuickFact
             label="Providers"
-            value={practice.num_providers ?? "—"}
+            value={providerCount ?? "—"}
           />
           <QuickFact
             label="Employees"
@@ -364,6 +403,49 @@ function SnapshotTab({
           <p className="text-sm text-[#6B6B60]">{cleanIntelText(intel.overall_assessment)}</p>
         </div>
       )}
+
+      <ManualCorrectionPanel
+        locationId={practice.location_id}
+        npi={practice.npi}
+        practiceName={getPracticeDisplayName(practice)}
+        fields={[
+          {
+            key: "practice_name",
+            label: "Current practice name",
+            currentValue: getPracticeDisplayName(practice),
+            placeholder: "Name shown on the practice website",
+          },
+          {
+            key: "owner_doctor_or_group",
+            label: "Owner doctor / group",
+            currentValue: target.networkLabel,
+            placeholder: "Example: Dr. Jane Smith, DDS",
+          },
+          {
+            key: "operating_doctors",
+            label: "Doctors currently shown on website",
+            currentValue: currentDoctors,
+            placeholder: "Example: Dr. A; Dr. B; Dr. C",
+          },
+          {
+            key: "provider_count",
+            label: "Provider count",
+            currentValue: providerCount,
+            inputMode: "numeric",
+          },
+          {
+            key: "employee_count",
+            label: "Employee count",
+            currentValue: practice.employee_count,
+            inputMode: "numeric",
+          },
+          {
+            key: "website",
+            label: "Website",
+            currentValue: practice.website,
+          },
+        ]}
+      />
     </div>
   )
 }

@@ -24,6 +24,9 @@ const MarketOverviewCharts = dynamic(() => import('./market-overview-charts').th
 const PracticeDirectory = dynamic(() => import('./practice-directory').then(m => ({ default: m.PracticeDirectory })), {
   loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
 })
+const ConsolidatedPracticeTree = dynamic(() => import('./consolidated-practice-tree').then(m => ({ default: m.ConsolidatedPracticeTree })), {
+  loading: () => <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
+})
 const OpportunitySignals = dynamic(() => import('./opportunity-signals').then(m => ({ default: m.OpportunitySignals })), {
   loading: () => <div className="h-[200px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse" />,
 })
@@ -100,13 +103,14 @@ const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'map', label: 'Map' },
   { id: 'directory', label: 'Directory' },
+  { id: 'tree', label: 'Consolidated Tree' },
   { id: 'analytics', label: 'Analytics' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
 
 // Tabs that require the full practice dataset
-const FULL_DATA_TABS: TabId[] = ['map', 'directory', 'analytics']
+const FULL_DATA_TABS: TabId[] = ['map', 'directory', 'tree', 'analytics']
 
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -672,6 +676,19 @@ function JobMarketShellInner({
                 practices={practicesWithScore}
                 allPractices={practicesWithScore}
               />
+            ) : (
+              <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">
+                Loading practice data...
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Consolidated Tree Tab */}
+        {activeTab === 'tree' && (
+          <div key="tree">
+            {practices ? (
+              <ConsolidatedPracticeTree practices={practicesWithScore} />
             ) : (
               <div className="h-[300px] rounded-lg border border-[#E8E5DE] bg-[#F7F7F4] animate-pulse flex items-center justify-center text-[#707064] text-sm">
                 Loading practice data...

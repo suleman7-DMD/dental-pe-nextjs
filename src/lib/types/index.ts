@@ -70,6 +70,7 @@ export interface Practice {
   ownership_evidence_urls?: string | null
   ownership_confidence?: string | null
   network_id?: string | null
+  census_review_status?: string | null
 }
 
 export interface WatchedZip {

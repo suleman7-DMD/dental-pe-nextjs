@@ -11,6 +11,7 @@ import {
   CensusBadge,
   formatNetworkName,
 } from '@/components/data-display/census-badge'
+import { ManualCorrectionPanel } from '@/components/data-display/manual-correction-panel'
 import { LEGACY_DETECTOR_CONTEXT_LABEL } from '@/lib/census/ownership-truth'
 
 import type { Practice } from '@/lib/types'
@@ -360,6 +361,54 @@ export function PracticeDetailDrawer({
             <DossierField
               label="Review Confidence"
               value={p.ownership_tier ? p.ownership_confidence ?? 'Not stated' : null}
+            />
+          </div>
+
+          <div className="border-t border-[#E8E5DE]" />
+
+          <div className="px-4 py-4">
+            <ManualCorrectionPanel
+              compact
+              locationId={p.location_id}
+              npi={p.npi}
+              practiceName={drawerPracticeName(p)}
+              fields={[
+                {
+                  key: 'practice_name',
+                  label: 'Current practice name',
+                  currentValue: drawerPracticeName(p),
+                  placeholder: 'Name shown on the practice website',
+                },
+                {
+                  key: 'owner_doctor_or_group',
+                  label: 'Owner doctor / group',
+                  currentValue: p.network_id ? formatNetworkName(p.network_id) : null,
+                  placeholder: 'Example: Dr. Jane Smith, DDS',
+                },
+                {
+                  key: 'operating_doctors',
+                  label: 'Doctors currently shown on website',
+                  currentValue: null,
+                  placeholder: 'Example: Dr. A; Dr. B; Dr. C',
+                },
+                {
+                  key: 'provider_count',
+                  label: 'Provider count',
+                  currentValue: p.num_providers,
+                  inputMode: 'numeric',
+                },
+                {
+                  key: 'employee_count',
+                  label: 'Employee count',
+                  currentValue: p.employee_count,
+                  inputMode: 'numeric',
+                },
+                {
+                  key: 'website',
+                  label: 'Website',
+                  currentValue: p.website,
+                },
+              ]}
             />
           </div>
 
