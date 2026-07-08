@@ -23,7 +23,14 @@ import {
   type OwnershipTier,
 } from '@/lib/census/ownership-truth'
 import { displayName as practiceDisplayName } from '@/lib/census/display-name'
-import { JOB_LANE_META, JOB_LANE_ORDER, deriveJobLane } from '@/lib/census/job-lane'
+import {
+  JOB_LANE_META,
+  JOB_LANE_ORDER,
+  deriveJobLane,
+  type JobLaneResult,
+} from '@/lib/census/job-lane'
+import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
+import type { JobHuntVerificationRecord } from '@/lib/supabase/queries/job-hunt-verification'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -37,6 +44,12 @@ interface PracticeDirectoryProps {
 
 type SortOption = 'lane' | 'job_score' | 'buyability' | 'employees' | 'year_est' | 'name' | 'trust'
 type PracticeWithJobScore = Practice & { job_opp_score?: number | null }
+// Rows carry their precomputed lane (verification-aware) + verification record so
+// the module-level renderers don't need the hook's map threaded through props.
+type PracticeWithLane = Practice & {
+  __lane?: JobLaneResult
+  __verification?: JobHuntVerificationRecord | null
+}
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'lane', label: 'Actionable first (job-hunt lane)' },
@@ -89,7 +102,11 @@ function matchesSearch(p: Practice, term: string): boolean {
   )
 }
 
-function sortPractices<T extends Practice>(list: T[], sortBy: SortOption): T[] {
+function sortPractices<T extends Practice>(
+  list: T[],
+  sortBy: SortOption,
+  laneOf: (p: Practice) => JobLaneResult = (p) => deriveJobLane(p)
+): T[] {
   const sorted = [...list]
   switch (sortBy) {
     case 'job_score':
@@ -119,7 +136,7 @@ function sortPractices<T extends Practice>(list: T[], sortBy: SortOption): T[] {
     case 'lane':
       // Most actionable lane first; within a lane, most facts on file first
       return sorted.sort((a, b) => {
-        const rankDiff = deriveJobLane(b).rank - deriveJobLane(a).rank
+        const rankDiff = laneOf(b).rank - laneOf(a).rank
         return rankDiff !== 0 ? rankDiff : countTrustFacts(b) - countTrustFacts(a)
       })
     default:
@@ -131,8 +148,8 @@ function sortPractices<T extends Practice>(list: T[], sortBy: SortOption): T[] {
  * Count the job-hunt basics actually on file for an office (0\u20134):
  * ownership answer, website, staff estimate, year established. Used for the
  * "Most facts on file" sort. Current-doctor verification is intentionally NOT
- * in this count \u2014 it doesn't exist for any office yet, and pretending
- * otherwise would fake trust.
+ * in this count \u2014 it lives in the job-hunt verification layer and is
+ * surfaced through the lane badge, not folded into this base-fact tally.
  */
 function countTrustFacts(p: Practice): number {
   let n = 0
@@ -152,7 +169,7 @@ function renderTrustCell(valueOrPractice: unknown): React.ReactElement {
   if (!valueOrPractice || typeof valueOrPractice !== 'object') {
     throw new Error('Practice row expected')
   }
-  const p = valueOrPractice as Practice
+  const p = valueOrPractice as PracticeWithLane
   const hasOwner = p.ownership_tier != null
   const website = (p.website ?? '').trim()
   const hasStaff = p.employee_count != null
@@ -168,9 +185,18 @@ function renderTrustCell(valueOrPractice: unknown): React.ReactElement {
       : p.census_review_status === 'undetermined'
         ? 'Owner: no final answer \u2014 researched, inconclusive'
         : 'Owner: no final answer \u2014 research not started'
+  const verification = p.__verification ?? null
+  const verifiedDoctors = Array.isArray(verification?.doctors)
+    ? verification.doctors
+    : []
+  const doctorsLine = verification
+    ? verifiedDoctors.length > 0
+      ? `Current doctors: website-verified \u2014 ${verifiedDoctors.map((d) => d.name).join(', ')}`
+      : 'Current doctors: website checked \u2014 none published on the site (confirming needs a call)'
+    : 'Current doctors: not website-verified yet \u2014 the website check has not reached this office'
   const title = [
     ownerLine,
-    'Current doctors: not website-verified yet (true for every office \u2014 that research pass has not run)',
+    doctorsLine,
     website
       ? `Website: on file (${website})`
       : 'Website: none on file \u2014 this office may genuinely lack a researchable web presence',
@@ -212,14 +238,19 @@ function renderLaneBadge(valueOrPractice: unknown): React.ReactElement {
   if (!valueOrPractice || typeof valueOrPractice !== 'object') {
     throw new Error('Practice row expected')
   }
-  const lane = deriveJobLane(valueOrPractice as Practice)
+  const p = valueOrPractice as PracticeWithLane
+  const lane = p.__lane ?? deriveJobLane(p)
+  const gaps =
+    lane.missing.length > 0
+      ? `Still missing: ${lane.missing.join(' · ')}`
+      : 'Nothing missing — verified record on file.'
   return React.createElement(
     'span',
     {
       className:
         'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
       style: { color: lane.color, backgroundColor: lane.bg, border: `1px solid ${lane.color}33` },
-      title: `${lane.why}\nStill missing: ${lane.missing.join(' · ')}`,
+      title: `${lane.why}\n${gaps}`,
     },
     lane.label
   )
@@ -366,6 +397,13 @@ const ALL_COLUMNS = [
 // ────────────────────────────────────────────────────────────────────────────
 
 export function PracticeDirectory({ practices, allPractices }: PracticeDirectoryProps) {
+  // Website-check layer — {} while loading, so lanes fall back to base states
+  const verificationMap = useJobHuntVerificationMap()
+  const laneFor = useCallback(
+    (p: Practice) =>
+      deriveJobLane(p, p.location_id ? verificationMap[p.location_id] : undefined),
+    [verificationMap]
+  )
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedLanes, setSelectedLanes] = useState<string[]>([])
   const [selectedBuckets, setSelectedBuckets] = useState<string[]>([])
@@ -432,9 +470,9 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       result = result.filter((p) => matchesSearch(p, searchTerm))
     }
 
-    // Job-hunt lane filter (derived from ownership answer + website presence)
+    // Job-hunt lane filter (verification-aware — verified lanes are selectable)
     if (selectedLanes.length > 0) {
-      result = result.filter((p) => selectedLanes.includes(deriveJobLane(p).label))
+      result = result.filter((p) => selectedLanes.includes(laneFor(p).label))
     }
 
     // Census bucket filter (unresolved = no reviewed conclusion yet)
@@ -502,16 +540,23 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     }
 
     // Sort
-    result = sortPractices(result, sortBy)
+    result = sortPractices(result, sortBy, laneFor)
 
-    // Materialize the lane label and trust-fact count so the Job-Hunt Lane and
-    // What We Know columns have real keys (and CSV export gets the lane string)
-    return result.map(p => ({
-      ...p,
-      job_lane: deriveJobLane(p).label,
-      trust: countTrustFacts(p),
-    }))
-  }, [withDisplayName, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
+    // Materialize the lane (verification-aware) and trust-fact count so the
+    // Job-Hunt Lane and What We Know columns have real keys, the renderers
+    // see the same lane the sort used, and CSV export gets the lane string
+    return result.map(p => {
+      const verification = p.location_id ? verificationMap[p.location_id] ?? null : null
+      const lane = deriveJobLane(p, verification ?? undefined)
+      return {
+        ...p,
+        job_lane: lane.label,
+        trust: countTrustFacts(p),
+        __lane: lane,
+        __verification: verification,
+      }
+    })
+  }, [withDisplayName, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy, laneFor, verificationMap])
 
   const filteredEnriched = useMemo(
     () => filtered.filter(isDataAxle).length,
@@ -614,7 +659,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     <div>
       <SectionHeader
         title="Chicagoland Practice Directory"
-        helpText="Search every general-dentistry office by name, city, ZIP, owner, or group. The Job-Hunt Lane says whether you can act on a record and what check is still missing — no office is marked 'ready' because current doctors are not website-verified yet for any office. The Ownership column is the hand-reviewed answer when we have one; offices without one show why (not started, researched but inconclusive, or held for review)."
+        helpText="Search every general-dentistry office by name, city, ZIP, owner, or group. The Job-Hunt Lane says whether you can act on a record and what check is still missing. Offices with a website check on file show a verified lane (roster verified, hiring page found, call required…); every other office shows its base lane and the gaps. The Ownership column is the hand-reviewed answer when we have one; offices without one show why (not started, researched but inconclusive, or held for review)."
       />
 
       {/* Search & Filters */}

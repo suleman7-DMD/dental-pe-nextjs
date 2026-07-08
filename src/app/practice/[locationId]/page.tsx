@@ -6,6 +6,8 @@ import {
   fetchNetworkSiblings,
   fetchPracticeLocationById,
 } from "@/lib/supabase/queries/practice-locations"
+import { fetchJobHuntVerification } from "@/lib/supabase/queries/job-hunt-verification"
+import { JobHuntVerificationCard } from "@/components/data-display/job-hunt-verification-card"
 import {
   CensusBadge,
   ReviewStatusBadge,
@@ -39,7 +41,10 @@ export default async function PracticePage({
 }) {
   const { locationId } = await params
   const supabase = await createServerClient()
-  const row = await fetchPracticeLocationById(supabase, locationId)
+  const [row, verification] = await Promise.all([
+    fetchPracticeLocationById(supabase, locationId),
+    fetchJobHuntVerification(supabase, locationId),
+  ])
 
   if (!row) notFound()
 
@@ -65,7 +70,8 @@ export default async function PracticePage({
     row.ownership_tier,
     narrowReviewStatus(row.census_review_status)
   )
-  const lane = deriveJobLane(row)
+  const lane = deriveJobLane(row, verification)
+  const verifiedDoctors = verification?.doctors ?? []
 
   return (
     <main className="min-h-screen bg-[#FAFAF7]">
@@ -158,16 +164,30 @@ export default async function PracticePage({
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[#6B6B60]">Current doctors</span>
-                <span className="text-right text-[#8F8E82]">
-                  Not website-verified yet
-                </span>
+                {verifiedDoctors.length > 0 ? (
+                  <span className="text-right font-medium text-[#1A1A1A]">
+                    {verifiedDoctors.map((d) => d.name).join(", ")}
+                  </span>
+                ) : (
+                  <span className="text-right text-[#8F8E82]">
+                    Not website-verified yet
+                  </span>
+                )}
               </div>
               <p className="mt-1 border-t border-[#E8E5DE] pt-2 text-[11px] leading-4 text-[#6B6B60]">
-                Still missing: {lane.missing.join(" · ")}
+                {lane.missing.length > 0
+                  ? `Still missing: ${lane.missing.join(" · ")}`
+                  : "Nothing missing — verified record on file."}
               </p>
             </div>
           </div>
         </section>
+
+        {verification ? (
+          <section className="mt-6">
+            <JobHuntVerificationCard record={verification} lane={lane} />
+          </section>
+        ) : null}
 
         <UsePracticeCard row={row} />
 

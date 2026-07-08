@@ -15,6 +15,7 @@ import {
 } from '@/lib/census/ownership-truth'
 import { displayName } from '@/lib/census/display-name'
 import { deriveJobLane } from '@/lib/census/job-lane'
+import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
 import { escapeHtml } from '@/lib/utils/escape-html'
 
 import type { Practice } from '@/lib/types'
@@ -224,7 +225,7 @@ function PracticeMapInner({
                 <span style="color:#6B6B60">Owner / operator:</span> <strong style="color:#1A1A1A">${escapeHtml(props.network !== '--' ? props.network : props.ownership_label)}</strong><br/>
                 <span style="color:#6B6B60">Census ownership:</span> <span style="color:#1A1A1A">${escapeHtml(props.ownership_label)}</span><br/>
                 <span style="color:#6B6B60">Job-hunt lane:</span> <strong style="color:${escapeHtml(props.lane_color)}">${escapeHtml(props.lane_label)}</strong><br/>
-                <span style="color:#6B6B60">Still missing:</span> <span style="color:#1A1A1A">${escapeHtml(props.gaps)}</span><br/>
+                <span style="color:#6B6B60">Still missing:</span> <span style="color:#1A1A1A">${escapeHtml(props.gaps || 'Nothing — verified record on file')}</span><br/>
                 <span style="color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">${escapeHtml(props.employees)}</span> <span style="color:#6B6B60">| Est:</span> <span style="color:#1A1A1A">${escapeHtml(props.year)}</span><br/>
                 <span style="color:#8B6508">Click the dot to open the practice page</span>
               </div>`
@@ -278,6 +279,8 @@ export function PracticeDensityMap({
   centerLon,
 }: PracticeDensityMapProps) {
   const router = useRouter()
+  // Website-check layer — {} while loading, so lanes fall back to base states
+  const verificationMap = useJobHuntVerificationMap()
   // Action map: offices without an ownership answer are hidden by DEFAULT so
   // the first view is only records you can act on. The toggle adds them back.
   const [showUnanswered, setShowUnanswered] = useState(false)
@@ -334,7 +337,10 @@ export function PracticeDensityMap({
 
       const baseColor = BUCKET_DOT_COLORS[bucket]
       const dotColor = is_approximate ? getApproxColor(baseColor) : baseColor
-      const lane = deriveJobLane(p)
+      const lane = deriveJobLane(
+        p,
+        p.location_id ? verificationMap[p.location_id] : undefined
+      )
 
       results.push({
         map_lat: lat,
@@ -363,7 +369,7 @@ export function PracticeDensityMap({
     }
 
     return results
-  }, [filteredPractices, showUnanswered])
+  }, [filteredPractices, showUnanswered, verificationMap])
 
   const unansweredTotal = useMemo(
     () =>

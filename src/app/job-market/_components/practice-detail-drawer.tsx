@@ -15,6 +15,8 @@ import { ManualCorrectionPanel } from '@/components/data-display/manual-correcti
 import { LEGACY_DETECTOR_CONTEXT_LABEL } from '@/lib/census/ownership-truth'
 import { displayName } from '@/lib/census/display-name'
 import { deriveJobLane } from '@/lib/census/job-lane'
+import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
+import { JobHuntVerificationCard } from '@/components/data-display/job-hunt-verification-card'
 
 import type { Practice } from '@/lib/types'
 
@@ -149,6 +151,7 @@ export function PracticeDetailDrawer({
 }: PracticeDetailDrawerProps) {
   const isOpen = practice !== null
   const p = practice
+  const verificationMap = useJobHuntVerificationMap()
 
   // Find providers at same address
   const sameAddress = useMemo(() => {
@@ -235,7 +238,10 @@ export function PracticeDetailDrawer({
   const ecColor = ENTITY_CLASSIFICATION_COLORS[p.entity_classification ?? 'unknown'] ?? '#B5B5A8'
   const osColor = ownershipColor(p.ownership_status)
   const totalZips = multiZipData.count + 1 // current ZIP + others
-  const lane = deriveJobLane(p)
+  const verification = p.location_id
+    ? verificationMap[p.location_id] ?? null
+    : null
+  const lane = deriveJobLane(p, verification)
 
   return (
     <Sheet open={isOpen} onOpenChange={() => onClose()}>
@@ -290,10 +296,19 @@ export function PracticeDetailDrawer({
               </div>
               <p className="mt-1 text-xs leading-5 text-[#3D3D35]">{lane.why}</p>
               <p className="mt-1.5 text-[11px] leading-4 text-[#6B6B60]">
-                Still missing: {lane.missing.join(' · ')}
+                {lane.missing.length > 0
+                  ? `Still missing: ${lane.missing.join(' · ')}`
+                  : 'Nothing missing — verified record on file.'}
               </p>
             </div>
           </div>
+
+          {/* ── Job-hunt verification — what the practice's own website says ── */}
+          {verification ? (
+            <div className="px-4 pb-3">
+              <JobHuntVerificationCard record={verification} lane={lane} />
+            </div>
+          ) : null}
 
           {/* ── Census Ownership (the truth record — always first) ── */}
           <div className="px-4 pb-4">
@@ -334,7 +349,13 @@ export function PracticeDetailDrawer({
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-[#707064]">Current doctors</dt>
-                  <dd className="text-right text-[#8F8E82]">Not website-verified yet</dd>
+                  {verification && verification.doctors.length > 0 ? (
+                    <dd className="text-right font-medium text-[#1A1A1A]">
+                      {verification.doctors.map((d) => d.name).join(', ')}
+                    </dd>
+                  ) : (
+                    <dd className="text-right text-[#8F8E82]">Not website-verified yet</dd>
+                  )}
                 </div>
               </dl>
               {p.location_id ? (
