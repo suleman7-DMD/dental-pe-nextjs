@@ -15,6 +15,7 @@ import {
   SOURCE_CLASS_META,
   deriveSourceClass,
 } from "@/lib/census/ownership-truth"
+import { deriveJobLane } from "@/lib/census/job-lane"
 import { ManualCorrectionPanel } from "@/components/data-display/manual-correction-panel"
 import {
   displayName,
@@ -64,6 +65,7 @@ export default async function PracticePage({
     row.ownership_tier,
     narrowReviewStatus(row.census_review_status)
   )
+  const lane = deriveJobLane(row)
 
   return (
     <main className="min-h-screen bg-[#FAFAF7]">
@@ -114,7 +116,16 @@ export default async function PracticePage({
               </div>
             </div>
 
-            <div className="grid w-full gap-2 rounded-lg border border-[#E8E5DE] bg-[#FAFAF7] p-4 text-sm lg:w-[300px]">
+            <div className="grid w-full gap-2 rounded-lg border border-[#E8E5DE] bg-[#FAFAF7] p-4 text-sm lg:w-[340px]">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[#6B6B60]">Job-hunt lane</span>
+                <span
+                  className="text-right font-semibold"
+                  style={{ color: lane.color }}
+                >
+                  {lane.label}
+                </span>
+              </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[#6B6B60]">Review state</span>
                 <span className="text-right font-medium text-[#1A1A1A]">
@@ -128,11 +139,32 @@ export default async function PracticePage({
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-[#6B6B60]">Network</span>
+                <span className="text-[#6B6B60]">Owner on record</span>
+                <span className="text-right text-[#8F8E82]">Not on file yet</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[#6B6B60]">Operating group / network</span>
                 <span className="text-right font-medium text-[#1A1A1A]">
-                  {formatNetworkName(row.network_id) ?? "Not assigned"}
+                  {formatNetworkName(row.network_id) ?? "None assigned"}
                 </span>
               </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[#6B6B60]">PE sponsor</span>
+                <span className="text-right font-medium text-[#1A1A1A]">
+                  {row.pe_backed === true
+                    ? "PE-backed (census-confirmed)"
+                    : "None documented"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[#6B6B60]">Current doctors</span>
+                <span className="text-right text-[#8F8E82]">
+                  Not website-verified yet
+                </span>
+              </div>
+              <p className="mt-1 border-t border-[#E8E5DE] pt-2 text-[11px] leading-4 text-[#6B6B60]">
+                Still missing: {lane.missing.join(" · ")}
+              </p>
             </div>
           </div>
         </section>

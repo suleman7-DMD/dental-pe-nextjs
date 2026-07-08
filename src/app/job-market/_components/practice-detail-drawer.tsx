@@ -14,6 +14,7 @@ import {
 import { ManualCorrectionPanel } from '@/components/data-display/manual-correction-panel'
 import { LEGACY_DETECTOR_CONTEXT_LABEL } from '@/lib/census/ownership-truth'
 import { displayName } from '@/lib/census/display-name'
+import { deriveJobLane } from '@/lib/census/job-lane'
 
 import type { Practice } from '@/lib/types'
 
@@ -234,6 +235,7 @@ export function PracticeDetailDrawer({
   const ecColor = ENTITY_CLASSIFICATION_COLORS[p.entity_classification ?? 'unknown'] ?? '#B5B5A8'
   const osColor = ownershipColor(p.ownership_status)
   const totalZips = multiZipData.count + 1 // current ZIP + others
+  const lane = deriveJobLane(p)
 
   return (
     <Sheet open={isOpen} onOpenChange={() => onClose()}>
@@ -277,6 +279,22 @@ export function PracticeDetailDrawer({
         </SheetHeader>
 
         <div className="mt-5 space-y-0">
+          {/* ── Job-hunt lane — can you act on this record, and what's missing ── */}
+          <div className="px-4 pb-3">
+            <div
+              className="rounded-md border p-3"
+              style={{ borderColor: `${lane.color}55`, backgroundColor: lane.bg }}
+            >
+              <div className="text-[13px] font-semibold" style={{ color: lane.color }}>
+                {lane.label}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-[#3D3D35]">{lane.why}</p>
+              <p className="mt-1.5 text-[11px] leading-4 text-[#6B6B60]">
+                Still missing: {lane.missing.join(' · ')}
+              </p>
+            </div>
+          </div>
+
           {/* ── Census Ownership (the truth record — always first) ── */}
           <div className="px-4 pb-4">
             <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
@@ -294,6 +312,31 @@ export function PracticeDetailDrawer({
                     'Reviewed ownership answer; evidence detail is on the full practice page.'
                   : 'No ownership answer yet — ownership is unknown. Nothing below is an ownership conclusion.'}
               </p>
+              {/* Owner fields, separated — one messy field never does all the work */}
+              <dl className="mt-2 space-y-0.5 text-[11px] leading-4">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[#707064]">Owner on record</dt>
+                  <dd className="text-right text-[#8F8E82]">
+                    Not on file yet — census records ownership type, not the person
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[#707064]">Operating group / network</dt>
+                  <dd className="text-right text-[#1A1A1A]">
+                    {p.network_id ? formatNetworkName(p.network_id) : 'None assigned'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[#707064]">PE sponsor</dt>
+                  <dd className="text-right text-[#1A1A1A]">
+                    {p.pe_backed === true ? 'PE-backed (census-confirmed)' : 'None documented'}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-[#707064]">Current doctors</dt>
+                  <dd className="text-right text-[#8F8E82]">Not website-verified yet</dd>
+                </div>
+              </dl>
               {p.location_id ? (
                 <Link
                   href={`/practice/${encodeURIComponent(p.location_id)}`}

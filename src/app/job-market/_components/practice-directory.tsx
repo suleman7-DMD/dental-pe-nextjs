@@ -23,6 +23,7 @@ import {
   type OwnershipTier,
 } from '@/lib/census/ownership-truth'
 import { displayName as practiceDisplayName } from '@/lib/census/display-name'
+import { JOB_LANE_META, JOB_LANE_ORDER, deriveJobLane } from '@/lib/census/job-lane'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -34,10 +35,11 @@ interface PracticeDirectoryProps {
   allPractices: Practice[]  // For cross-reference (same-address lookup etc.)
 }
 
-type SortOption = 'job_score' | 'buyability' | 'employees' | 'year_est' | 'name' | 'trust'
+type SortOption = 'lane' | 'job_score' | 'buyability' | 'employees' | 'year_est' | 'name' | 'trust'
 type PracticeWithJobScore = Practice & { job_opp_score?: number | null }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'lane', label: 'Actionable first (job-hunt lane)' },
   { value: 'job_score', label: 'Hiring signal \u2193' },
   { value: 'buyability', label: 'Acquisition lead score \u2193' },
   { value: 'employees', label: 'Staff size \u2193' },
@@ -54,6 +56,7 @@ const BUCKET_OPTIONS = HEADLINE_BUCKETS.map((b) => BUCKET_META[b].shortLabel)
 const bucketByOption = new Map(HEADLINE_BUCKETS.map((b) => [BUCKET_META[b].shortLabel, b]))
 const TIER_OPTIONS = OWNERSHIP_TIERS.map((t) => `${TIER_CODE[t]} ${TIER_META[t].shortLabel}`)
 const tierByOption = new Map(OWNERSHIP_TIERS.map((t) => [`${TIER_CODE[t]} ${TIER_META[t].shortLabel}`, t]))
+const LANE_OPTIONS = JOB_LANE_ORDER.map((l) => JOB_LANE_META[l].label)
 const CONFIDENCE_OPTIONS = ['High', 'Medium', 'Low', 'Not recorded']
 const EVIDENCE_OPTIONS = ['Evidence on file', 'No evidence recorded']
 const SPONSOR_OPTIONS = ['PE-backed', 'Not PE-backed']
@@ -113,6 +116,12 @@ function sortPractices<T extends Practice>(list: T[], sortBy: SortOption): T[] {
       )
     case 'trust':
       return sorted.sort((a, b) => countTrustFacts(b) - countTrustFacts(a))
+    case 'lane':
+      // Most actionable lane first; within a lane, most facts on file first
+      return sorted.sort((a, b) => {
+        const rankDiff = deriveJobLane(b).rank - deriveJobLane(a).rank
+        return rankDiff !== 0 ? rankDiff : countTrustFacts(b) - countTrustFacts(a)
+      })
     default:
       return sorted
   }
@@ -195,6 +204,27 @@ function renderTrustCell(valueOrPractice: unknown): React.ReactElement {
   )
 }
 
+/**
+ * Job-hunt lane badge — the one per-row answer to "can I act on this office?"
+ * Tooltip carries the lane reason plus the exact gaps still missing.
+ */
+function renderLaneBadge(valueOrPractice: unknown): React.ReactElement {
+  if (!valueOrPractice || typeof valueOrPractice !== 'object') {
+    throw new Error('Practice row expected')
+  }
+  const lane = deriveJobLane(valueOrPractice as Practice)
+  return React.createElement(
+    'span',
+    {
+      className:
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
+      style: { color: lane.color, backgroundColor: lane.bg, border: `1px solid ${lane.color}33` },
+      title: `${lane.why}\nStill missing: ${lane.missing.join(' · ')}`,
+    },
+    lane.label
+  )
+}
+
 function renderNetwork(v: string | null): string {
   return v ? formatNetworkId(v) : '--'
 }
@@ -247,6 +277,7 @@ function renderCensusBadge(valueOrPractice: unknown): React.ReactElement {
 
 const EMPLOYMENT_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  { key: 'job_lane', header: 'Job-Hunt Lane', render: renderLaneBadge },
   { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
@@ -259,6 +290,7 @@ const EMPLOYMENT_COLUMNS = [
 
 const OWNERSHIP_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  { key: 'job_lane', header: 'Job-Hunt Lane', render: renderLaneBadge },
   { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
@@ -279,6 +311,7 @@ const OWNERSHIP_COLUMNS = [
 
 const ENRICHED_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  { key: 'job_lane', header: 'Job-Hunt Lane', render: renderLaneBadge },
   { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
   { key: 'city', header: 'City' },
@@ -308,6 +341,7 @@ const ENRICHED_COLUMNS = [
 
 const ALL_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  { key: 'job_lane', header: 'Job-Hunt Lane', render: renderLaneBadge },
   { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'city', header: 'City' },
   { key: 'zip', header: 'ZIP', render: (v: string) => (v ?? '').toString().slice(0, 5) },
@@ -333,6 +367,7 @@ const ALL_COLUMNS = [
 
 export function PracticeDirectory({ practices, allPractices }: PracticeDirectoryProps) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedLanes, setSelectedLanes] = useState<string[]>([])
   const [selectedBuckets, setSelectedBuckets] = useState<string[]>([])
   const [selectedTiers, setSelectedTiers] = useState<string[]>([])
   const [selectedConfidence, setSelectedConfidence] = useState<string[]>([])
@@ -340,7 +375,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   const [selectedNetworks, setSelectedNetworks] = useState<string[]>([])
   const [selectedSponsor, setSelectedSponsor] = useState<string[]>([])
   const [selectedSources, setSelectedSources] = useState<string[]>(['All'])
-  const [sortBy, setSortBy] = useState<SortOption>('job_score')
+  const [sortBy, setSortBy] = useState<SortOption>('lane')
   const [selectedPractice, setSelectedPractice] = useState<Practice | null>(null)
   const [page, setPage] = useState(1)
   const [activeView, setActiveView] = useState('employment')
@@ -349,6 +384,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   useEffect(() => {
     setPage(1)
     setSearchTerm('')
+    setSelectedLanes([])
     setSelectedBuckets([])
     setSelectedTiers([])
     setSelectedConfidence([])
@@ -360,7 +396,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
   useEffect(() => {
     setPage(1)
-  }, [activeView, searchTerm, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
+  }, [activeView, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
 
   const withDisplayName = useMemo(
     () =>
@@ -394,6 +430,11 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     // Search
     if (searchTerm) {
       result = result.filter((p) => matchesSearch(p, searchTerm))
+    }
+
+    // Job-hunt lane filter (derived from ownership answer + website presence)
+    if (selectedLanes.length > 0) {
+      result = result.filter((p) => selectedLanes.includes(deriveJobLane(p).label))
     }
 
     // Census bucket filter (unresolved = no reviewed conclusion yet)
@@ -463,12 +504,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     // Sort
     result = sortPractices(result, sortBy)
 
-    // Materialize the trust-fact count so the What We Know column has a real key
+    // Materialize the lane label and trust-fact count so the Job-Hunt Lane and
+    // What We Know columns have real keys (and CSV export gets the lane string)
     return result.map(p => ({
       ...p,
+      job_lane: deriveJobLane(p).label,
       trust: countTrustFacts(p),
     }))
-  }, [withDisplayName, searchTerm, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
+  }, [withDisplayName, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
 
   const filteredEnriched = useMemo(
     () => filtered.filter(isDataAxle).length,
@@ -518,6 +561,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   const handleDownloadCsv = () => {
     const downloadCols = [
       'display_name',
+      'job_lane',
       'address',
       'city',
       'zip',
@@ -538,6 +582,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     ]
     const headerMap: Record<string, string> = {
       display_name: 'Practice Name',
+      job_lane: 'Job-Hunt Lane',
       address: 'Address',
       city: 'City',
       zip: 'ZIP',
@@ -569,7 +614,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     <div>
       <SectionHeader
         title="Chicagoland Practice Directory"
-        helpText="Search every general-dentistry office by name, city, ZIP, owner, or group. The Ownership column is the hand-reviewed answer when we have one — offices without one show why (not started, researched but inconclusive, or held for review). 'What We Know' shows which job-hunt basics are on file per office; current doctors are not website-verified yet for any office."
+        helpText="Search every general-dentistry office by name, city, ZIP, owner, or group. The Job-Hunt Lane says whether you can act on a record and what check is still missing — no office is marked 'ready' because current doctors are not website-verified yet for any office. The Ownership column is the hand-reviewed answer when we have one; offices without one show why (not started, researched but inconclusive, or held for review)."
       />
 
       {/* Search & Filters */}
@@ -582,6 +627,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <FilterGroup label="Job-hunt lane">
+            <MultiSelect
+              options={LANE_OPTIONS}
+              selected={selectedLanes}
+              onChange={setSelectedLanes}
+              placeholder="All lanes"
+            />
+          </FilterGroup>
           <FilterGroup label="Ownership group">
             <MultiSelect
               options={BUCKET_OPTIONS}

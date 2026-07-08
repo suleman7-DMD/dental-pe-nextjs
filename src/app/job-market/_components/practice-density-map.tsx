@@ -14,6 +14,7 @@ import {
   type HeadlineBucket,
 } from '@/lib/census/ownership-truth'
 import { displayName } from '@/lib/census/display-name'
+import { deriveJobLane } from '@/lib/census/job-lane'
 import { escapeHtml } from '@/lib/utils/escape-html'
 
 import type { Practice } from '@/lib/types'
@@ -37,6 +38,9 @@ interface MapPractice {
   address: string
   city_zip: string
   ownership_label: string
+  lane_label: string
+  lane_color: string
+  gaps: string
   network: string
   employees: string
   year: string
@@ -149,6 +153,9 @@ function PracticeMapInner({
               address: d.address,
               city_zip: d.city_zip,
               ownership_label: d.ownership_label,
+              lane_label: d.lane_label,
+              lane_color: d.lane_color,
+              gaps: d.gaps,
               network: d.network,
               employees: d.employees,
               year: d.year,
@@ -214,8 +221,10 @@ function PracticeMapInner({
                 <strong style="color:#1A1A1A">${escapeHtml(props.name)}</strong><br/>
                 <span style="color:#6B6B60">${escapeHtml(props.address)}</span><br/>
                 <span style="color:#6B6B60">${escapeHtml(props.city_zip)}</span><br/>
-                <span style="color:#6B6B60">Census ownership:</span> <strong style="color:#1A1A1A">${escapeHtml(props.ownership_label)}</strong><br/>
-                <span style="color:#6B6B60">Network:</span> <span style="color:#1A1A1A">${escapeHtml(props.network)}</span><br/>
+                <span style="color:#6B6B60">Owner / operator:</span> <strong style="color:#1A1A1A">${escapeHtml(props.network !== '--' ? props.network : props.ownership_label)}</strong><br/>
+                <span style="color:#6B6B60">Census ownership:</span> <span style="color:#1A1A1A">${escapeHtml(props.ownership_label)}</span><br/>
+                <span style="color:#6B6B60">Job-hunt lane:</span> <strong style="color:${escapeHtml(props.lane_color)}">${escapeHtml(props.lane_label)}</strong><br/>
+                <span style="color:#6B6B60">Still missing:</span> <span style="color:#1A1A1A">${escapeHtml(props.gaps)}</span><br/>
                 <span style="color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">${escapeHtml(props.employees)}</span> <span style="color:#6B6B60">| Est:</span> <span style="color:#1A1A1A">${escapeHtml(props.year)}</span><br/>
                 <span style="color:#8B6508">Click the dot to open the practice page</span>
               </div>`
@@ -269,7 +278,9 @@ export function PracticeDensityMap({
   centerLon,
 }: PracticeDensityMapProps) {
   const router = useRouter()
-  const [hideUnresolved, setHideUnresolved] = useState(false)
+  // Action map: offices without an ownership answer are hidden by DEFAULT so
+  // the first view is only records you can act on. The toggle adds them back.
+  const [showUnanswered, setShowUnanswered] = useState(false)
 
   // Canonical GP-only map layer (scope axis, not an ownership claim). This
   // excludes specialists, non-clinical rows, org-only NPIs, da_unverified
@@ -287,7 +298,7 @@ export function PracticeDensityMap({
 
     for (const p of filteredPractices) {
       const bucket = tierToBucket(p.ownership_tier)
-      if (hideUnresolved && bucket === 'unresolved') continue
+      if (!showUnanswered && bucket === 'unresolved') continue
 
       let lat: number | null = null
       let lon: number | null = null
@@ -323,6 +334,7 @@ export function PracticeDensityMap({
 
       const baseColor = BUCKET_DOT_COLORS[bucket]
       const dotColor = is_approximate ? getApproxColor(baseColor) : baseColor
+      const lane = deriveJobLane(p)
 
       results.push({
         map_lat: lat,
@@ -337,6 +349,9 @@ export function PracticeDensityMap({
           bucket === 'unresolved'
             ? 'Needs ownership answer — no final answer yet'
             : BUCKET_META[bucket].label,
+        lane_label: lane.label,
+        lane_color: lane.color,
+        gaps: lane.missing.join(' · '),
         network: p.network_id ? formatNetworkId(p.network_id) : '--',
         employees: emp ? emp.toString() : '--',
         year:
@@ -348,7 +363,14 @@ export function PracticeDensityMap({
     }
 
     return results
-  }, [filteredPractices, hideUnresolved])
+  }, [filteredPractices, showUnanswered])
+
+  const unansweredTotal = useMemo(
+    () =>
+      filteredPractices.filter((p) => tierToBucket(p.ownership_tier) === 'unresolved')
+        .length,
+    [filteredPractices]
+  )
 
   const bucketCounts = useMemo(() => {
     const counts: Record<HeadlineBucket, number> = {
@@ -366,7 +388,7 @@ export function PracticeDensityMap({
     <div>
       <SectionHeader
         title="Ownership Map"
-        helpText="Each dot is a general-dentistry office. Color shows the reviewed ownership answer. Gray means the office still needs an ownership answer. Faded dots use the ZIP center because exact coordinates are missing. Click a dot to open the full practice page."
+        helpText="Action map: by default only offices WITH a reviewed ownership answer are shown, colored by that answer. Toggle on the gray dots to see offices that still need an ownership answer. Hovering a dot shows the office name, owner/operator, job-hunt lane, and exactly what is still missing. Faded dots use the ZIP center because exact coordinates are missing. Click a dot to open the full practice page."
       />
 
       {geocoded.length === 0 ? (
@@ -380,11 +402,11 @@ export function PracticeDensityMap({
             <label className="flex items-center gap-2 text-sm text-[#1A1A1A] cursor-pointer">
               <input
                 type="checkbox"
-                checked={hideUnresolved}
-                onChange={(e) => setHideUnresolved(e.target.checked)}
+                checked={showUnanswered}
+                onChange={(e) => setShowUnanswered(e.target.checked)}
                 className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
               />
-              Hide not-reviewed offices
+              Show offices without an ownership answer ({unansweredTotal.toLocaleString()} gray dots)
             </label>
           </div>
 
@@ -411,7 +433,9 @@ export function PracticeDensityMap({
                 />
                 {BUCKET_META[b].shortLabel}
                 <span className="text-[#6B6B60]">
-                  {bucketCounts[b].toLocaleString()}
+                  {b === 'unresolved' && !showUnanswered
+                    ? `${unansweredTotal.toLocaleString()} hidden`
+                    : bucketCounts[b].toLocaleString()}
                 </span>
               </span>
             ))}
@@ -420,7 +444,9 @@ export function PracticeDensityMap({
           {/* Summary counts */}
           <p className="text-xs text-[#6B6B60] mt-1">
             Showing {geocoded.length.toLocaleString()} offices
-            {hideUnresolved ? ' (not-reviewed offices hidden)' : ''}
+            {showUnanswered
+              ? ' (including offices without an ownership answer)'
+              : ` (${unansweredTotal.toLocaleString()} offices without an ownership answer hidden — toggle above to show)`}
             {' '}&middot;{' '}
             {geocoded.filter(d => !d.is_approximate).length.toLocaleString()} precise locations,{' '}
             {geocoded.filter(d => d.is_approximate).length.toLocaleString()} approximate (ZIP centroid)
