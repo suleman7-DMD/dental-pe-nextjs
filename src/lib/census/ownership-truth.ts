@@ -219,12 +219,17 @@ export const ADA_ANCHOR_UNIT_CAVEAT =
 /** Standing label for any legacy-detector surface. */
 export const LEGACY_DETECTOR_CONTEXT_LABEL = SOURCE_CLASS_META.legacy_detector.label
 
-/** Census network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
+/**
+ * Census network_id slugs ("heartland_dental") → display labels
+ * ("Heartland Dental"). The ONLY network formatter — every surface imports
+ * this one. Free-text ids (spaces, slashes, parens, commas — reviewer notes
+ * rather than slugs) pass through verbatim after the ao:/brand: prefix.
+ */
 export function formatNetworkId(id: string): string {
   const prefix = /^ao:/i.test(id) ? "Owner: " : /^brand:/i.test(id) ? "Group: " : ""
-  const cleaned = id
-    .replace(/^ao:/i, "")
-    .replace(/^brand:/i, "")
+  const body = id.replace(/^ao:/i, "").replace(/^brand:/i, "")
+  if (/[^a-z0-9_\-.]/i.test(body)) return `${prefix}${body.trim()}`
+  const cleaned = body
     .split(/[_-]+/)
     .filter(Boolean)
     .map((w) => (/\d/.test(w) || (w.length <= 3 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))

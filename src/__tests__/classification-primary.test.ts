@@ -36,10 +36,6 @@ const SRC_ROOT = path.resolve(__dirname, "..")
 const ALLOWLIST: Record<string, string> = {
   "lib/constants/entity-classifications.ts":
     "Defines `classifyPractice` itself — must reference the field by name.",
-  "app/api/practices/[npi]/route.ts":
-    "PATCH endpoint that writes ownership_status — pure CRUD, no categorization.",
-  "app/system/_components/manual-entry-forms.tsx":
-    "Admin form for manually editing ownership_status — pure CRUD.",
   "app/_components/home-shell.tsx":
     "Change log row label compares fieldChanged === 'ownership_status' — string match, not categorization.",
   "app/job-market/_components/practice-detail-drawer.tsx":

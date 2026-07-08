@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { AskIntelRequest, AskIntelResponse } from "@/lib/launchpad/ai-types"
-import { coerceStringArray, describeCensusOwnership } from "@/lib/launchpad/ai-utils"
+import {
+  coerceStringArray,
+  describeCensusOwnership,
+  gateIntelContext,
+} from "@/lib/launchpad/ai-utils"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -52,7 +56,9 @@ function buildPrompt(body: AskIntelRequest): { system: string; user: string } {
         : null,
       p.employee_count != null ? `${p.employee_count} employees` : null,
       p.num_providers != null ? `${p.num_providers} providers` : null,
-      p.buyability_score != null ? `buyability: ${p.buyability_score}` : null,
+      p.buyability_score != null
+        ? `buyability lead score (internal heuristic, not a verified valuation): ${p.buyability_score}`
+        : null,
       p.dso_employment_tier
         ? `network employment rating (curated job-quality rating, not ownership): ${p.dso_employment_tier}`
         : null,
@@ -79,8 +85,11 @@ function buildPrompt(body: AskIntelRequest): { system: string; user: string } {
     parts.push(`ZIP: ${zipBits}`)
   }
 
-  if (body.intel_context) {
-    const intel = body.intel_context
+  // Server-side audit: intel content only reaches the prompt when the row
+  // passes the shared source-backed audit; otherwise an honest one-liner.
+  const gatedIntel = gateIntelContext(body.intel_context)
+  if (gatedIntel.intel) {
+    const intel = gatedIntel.intel
     const greenFlags = coerceStringArray(intel.green_flags)
     const redFlags = coerceStringArray(intel.red_flags)
     const intelBits = [
@@ -100,6 +109,8 @@ function buildPrompt(body: AskIntelRequest): { system: string; user: string } {
         // raw_json contains a circular ref or non-serializable value — skip silently
       }
     }
+  } else if (gatedIntel.note) {
+    parts.push(`Intel: ${gatedIntel.note}`)
   }
 
   parts.push(`\nQuestion: ${body.question}`)

@@ -9,6 +9,7 @@ import {
   type LaunchpadScope,
 } from "@/lib/launchpad/scope"
 import { rankTargets, summarizeRankedTargets } from "@/lib/launchpad/ranking"
+import { auditIntel, chooseBestIntel } from "@/lib/launchpad/intel-audit"
 import type {
   LaunchpadBundle,
   LaunchpadDataHealth,
@@ -26,26 +27,11 @@ export const DEFAULT_RANK_LIMIT = 5000
 /**
  * How many structurally-ranked practices to fetch intel for.
  * These are the top practices by structural score (no intel) before the intel
- * boost is applied. Keeping this at 200 means 1 Supabase batch (500-row limit)
- * instead of 26, bringing intel fetch time from ~17 s (cold start) to <1 s.
+ * boost is applied. 1000 = 2 Supabase batches (500-row limit) — the price of
+ * letting the 2026-07 Lane-A intel landing (775 rows spread across the
+ * structural ranking, not clustered in the top 200) actually surface in audits.
  */
-const INTEL_FETCH_LIMIT = 200
-
-const SOURCE_BACKED_QUALITIES = new Set(["verified", "high"])
-const CURRENT_INTEL_MAX_DAYS = 90
-const BLOCKING_INTEL_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
-  { pattern: /\bownership\/structure mismatch\b/i, reason: "ownership/structure mismatch" },
-  { pattern: /\bstructure mismatch\b/i, reason: "structure mismatch" },
-  { pattern: /\bownership mismatch\b/i, reason: "ownership mismatch" },
-  { pattern: /\binput data indicated\b/i, reason: "legacy data conflicts with web evidence" },
-  { pattern: /\bmultiple licensed dentists?\b/i, reason: "provider roster contradicts solo premise" },
-  { pattern: /\bmulti-doctor\b/i, reason: "multi-doctor structure needs review" },
-  { pattern: /\bmulti-location\b/i, reason: "multi-location structure needs review" },
-  { pattern: /\bsecondary location unconfirmed\b/i, reason: "unconfirmed second location" },
-  { pattern: /\bowner(ship)? unclear\b/i, reason: "ownership unclear" },
-  { pattern: /\bconflict(?:ing|s)?\b/i, reason: "conflicting evidence" },
-  { pattern: /\bcontradict(?:ed|s|ory)?\b/i, reason: "contradictory evidence" },
-]
+const INTEL_FETCH_LIMIT = 1000
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -166,118 +152,6 @@ function normalizeIntelRow(row: Record<string, unknown>): LaunchpadPracticeIntel
     verification_urls: parseUrlArray(row.verification_urls),
     raw_json: parseRawJson(row.raw_json),
   }
-}
-
-function hasSourceBackedIntel(intel: LaunchpadPracticeIntelRecord): boolean {
-  const quality = intel.verification_quality?.toLowerCase() ?? ""
-  return (
-    SOURCE_BACKED_QUALITIES.has(quality) &&
-    (intel.verification_searches ?? 0) >= 2 &&
-    (intel.verification_urls?.length ?? 0) > 0 &&
-    intelAgeDays(intel) <= CURRENT_INTEL_MAX_DAYS &&
-    intelBlockingReasons(intel).length === 0
-  )
-}
-
-function hasSubstantiveIntel(intel: LaunchpadPracticeIntelRecord): boolean {
-  const quality = intel.verification_quality?.toLowerCase() ?? ""
-  if (quality === "insufficient") return false
-  return (
-    intel.overall_assessment != null ||
-    intel.website_url != null ||
-    intel.google_rating != null
-  )
-}
-
-function intelAgeDays(intel: LaunchpadPracticeIntelRecord): number {
-  if (!intel.research_date) return Number.POSITIVE_INFINITY
-  const t = Date.parse(intel.research_date)
-  if (!Number.isFinite(t)) return Number.POSITIVE_INFINITY
-  return Math.floor((Date.now() - t) / 86_400_000)
-}
-
-function intelBlockingReasons(intel: LaunchpadPracticeIntelRecord): string[] {
-  const haystack = [
-    intel.overall_assessment,
-    intel.provider_notes,
-    ...(intel.red_flags ?? []),
-  ]
-    .filter(Boolean)
-    .join(" ")
-
-  const reasons: string[] = []
-  for (const { pattern, reason } of BLOCKING_INTEL_PATTERNS) {
-    if (pattern.test(haystack) && !reasons.includes(reason)) reasons.push(reason)
-  }
-  return reasons
-}
-
-function auditForIntel(intel: LaunchpadPracticeIntelRecord): LaunchpadIntelAudit {
-  const quality = intel.verification_quality?.toLowerCase() ?? null
-  const searches = intel.verification_searches ?? 0
-  const urlCount = intel.verification_urls?.length ?? 0
-  const sourceBacked = hasSourceBackedIntel(intel)
-  const substantive = hasSubstantiveIntel(intel)
-  let status: LaunchpadIntelAudit["status"]
-  let reason: string
-  if (sourceBacked) {
-    status = "source_backed"
-    reason = "Accepted: current verified practice_intel row."
-  } else if (intelBlockingReasons(intel).length > 0) {
-    status = "rejected"
-    reason = `Rejected for Job Hunt scoring: ${intelBlockingReasons(intel).join("; ")}.`
-  } else if ((quality === "partial" || quality === "insufficient") && substantive) {
-    status = "rejected"
-    reason = `Rejected for Job Hunt scoring: verification_quality=${quality}; re-research required.`
-  } else if (intelAgeDays(intel) > CURRENT_INTEL_MAX_DAYS && substantive) {
-    status = "legacy"
-    reason = `Accepted only as archived context: researched ${intelAgeDays(intel)} days ago.`
-  } else if (substantive) {
-    status = "legacy"
-    reason = "Accepted: pre-verification intel with substantive content."
-  } else {
-    status = "rejected"
-    if (!quality) reason = "Rejected: missing verification_quality."
-    else if (!SOURCE_BACKED_QUALITIES.has(quality)) {
-      reason = `Rejected: verification_quality=${quality}.`
-    } else if (searches < 2) {
-      reason = `Rejected: only ${searches} web search${searches === 1 ? "" : "es"} reported.`
-    } else if (urlCount === 0) {
-      reason = "Rejected: no verification URLs stored."
-    } else {
-      reason = "Rejected: no substantive content."
-    }
-  }
-  return {
-    npi: intel.npi,
-    status,
-    research_date: intel.research_date,
-    verification_quality: intel.verification_quality,
-    verification_searches: intel.verification_searches,
-    verification_urls: intel.verification_urls ?? [],
-    reason,
-  }
-}
-
-function qualityScore(intel: LaunchpadPracticeIntelRecord): number {
-  const quality = intel.verification_quality?.toLowerCase()
-  if (quality === "verified" || quality === "high") return 3
-  if (quality === "partial") return 2
-  if (quality === "insufficient") return 1
-  return 0
-}
-
-function chooseBestIntel(
-  rows: LaunchpadPracticeIntelRecord[]
-): LaunchpadPracticeIntelRecord | null {
-  if (rows.length === 0) return null
-  return [...rows].sort((a, b) => {
-    const sourceBackedDelta = Number(hasSourceBackedIntel(b)) - Number(hasSourceBackedIntel(a))
-    if (sourceBackedDelta !== 0) return sourceBackedDelta
-    const qualityDelta = qualityScore(b) - qualityScore(a)
-    if (qualityDelta !== 0) return qualityDelta
-    return (b.research_date ?? "").localeCompare(a.research_date ?? "")
-  })[0]
 }
 
 function npisForPractice(practice: LaunchpadPracticeRecord): string[] {
@@ -722,7 +596,7 @@ export async function getLaunchpadBundle(options: {
       .filter((row): row is LaunchpadPracticeIntelRecord => row !== null)
     const best = chooseBestIntel(candidateRows)
     if (!best) continue
-    const audit = auditForIntel(best)
+    const audit = auditIntel(best)
     intelAuditByNpi.set(practice.npi, audit)
     if (audit.status === "source_backed") {
       intelByNpi.set(practice.npi, best)

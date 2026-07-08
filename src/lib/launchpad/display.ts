@@ -1,4 +1,5 @@
 import type { LaunchpadPracticeRecord } from "./signals"
+import { displayName, legalEntityName } from "@/lib/census/display-name"
 
 type DisplayInput = Pick<
   LaunchpadPracticeRecord,
@@ -8,43 +9,12 @@ type DisplayInput = Pick<
   city?: string | null
 }
 
-function clean(value: string | null | undefined): string | null {
-  if (value == null) return null
-  const trimmed = value.trim()
-  if (trimmed.length === 0) return null
-  if (
-    /^null$/i.test(trimmed) ||
-    /^none$/i.test(trimmed) ||
-    /^n\/?a$/i.test(trimmed) ||
-    /^<?\s*(?:unavail|unavailable|not available)\s*>?$/i.test(trimmed)
-  ) {
-    return null
-  }
-  return trimmed
-}
-
+// Both helpers delegate to the shared §2.1 display-name contract — the
+// launchpad keeps its historical function names but no private rules.
 export function getPracticeDisplayName(practice: DisplayInput): string {
-  const dba = clean(practice.doing_business_as)
-  if (dba) return dba
-
-  const name = clean(practice.practice_name)
-  if (name) return name
-
-  const last = clean(practice.provider_last_name)
-  if (last) return `Dr. ${last}`
-
-  const address = clean(practice.address)
-  if (address) return `Practice at ${address}`
-
-  const city = clean(practice.city)
-  if (city) return `Practice in ${city}`
-
-  return `NPI ${practice.npi}`
+  return displayName(practice)
 }
 
 export function getPracticeSecondaryName(practice: DisplayInput): string | null {
-  const dba = clean(practice.doing_business_as)
-  const name = clean(practice.practice_name)
-  if (dba && name && dba.toLowerCase() !== name.toLowerCase()) return name
-  return null
+  return legalEntityName(practice)
 }

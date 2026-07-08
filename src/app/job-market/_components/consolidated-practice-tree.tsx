@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { ArrowUpRight, Building2, Network, Search, Users } from 'lucide-react'
 import { CensusBadge } from '@/components/data-display/census-badge'
-import { TIER_META } from '@/lib/census/ownership-truth'
+import { TIER_META, formatNetworkId } from '@/lib/census/ownership-truth'
+import { displayName } from '@/lib/census/display-name'
 import type { Practice } from '@/lib/types'
 
 interface ConsolidatedPracticeTreeProps {
@@ -24,42 +25,8 @@ interface ConsolidatedGroup {
   tierCounts: Record<string, number>
 }
 
-function cleanNamePart(value: string | null | undefined): string | null {
-  if (!value) return null
-  const trimmed = value.trim()
-  if (
-    trimmed === '' ||
-    /^<?\s*(?:unavail|unavailable|not available|none|null|n\/?a)\s*>?$/i.test(trimmed)
-  ) {
-    return null
-  }
-  return trimmed
-}
-
 function displayPracticeName(p: Practice): string {
-  return (
-    cleanNamePart(p.doing_business_as) ??
-    cleanNamePart(p.practice_name) ??
-    (p.address ? `Practice at ${p.address}` : null) ??
-    'Unnamed practice'
-  )
-}
-
-function titleWord(word: string): string {
-  if (/\d/.test(word) || (word.length <= 3 && word === word.toUpperCase())) return word
-  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-}
-
-function formatGroupId(id: string): string {
-  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
-  const cleaned = id
-    .replace(/^ao:/i, '')
-    .replace(/^brand:/i, '')
-    .split(/[_-]+/)
-    .filter(Boolean)
-    .map(titleWord)
-    .join(' ')
-  return `${prefix}${cleaned}`
+  return displayName(p)
 }
 
 function parseEvidenceUrlCount(value: string | null | undefined): number {
@@ -105,7 +72,7 @@ function buildGroups(practices: Practice[]): ConsolidatedGroup[] {
       const cityCount = new Set(rows.map((r) => r.city).filter(Boolean)).size
       return {
         id,
-        label: formatGroupId(id),
+        label: formatNetworkId(id),
         kind,
         rows: rows.sort((a, b) =>
           `${a.city ?? ''} ${displayPracticeName(a)}`.localeCompare(`${b.city ?? ''} ${displayPracticeName(b)}`)

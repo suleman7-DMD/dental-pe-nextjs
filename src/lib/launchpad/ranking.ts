@@ -1,5 +1,6 @@
 import { resolveDsoTierEntry } from "./dso-tiers"
 import { getPracticeDisplayName } from "./display"
+import { auditIntel } from "./intel-audit"
 import {
   isZipCommutable,
   type LaunchpadScope,
@@ -195,6 +196,17 @@ export function resolveLane(
     return {
       lane: "promising_lead",
       laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}), but no current verified practice-level dossier yet — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
+      cap: LAUNCHPAD_LANE_CAPS.promising_lead,
+    }
+  }
+  // Defense in depth: the pipeline pre-filters intelByNpi to source-backed
+  // rows, but verified_target must never depend on a caller remembering to.
+  // Re-audit here so a raw intel row can't buy the verified lane.
+  const audit = auditIntel(intel)
+  if (audit.status !== "source_backed") {
+    return {
+      lane: "promising_lead",
+      laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}), but the intel on file failed the source-backed audit (${audit.reason}) — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
       cap: LAUNCHPAD_LANE_CAPS.promising_lead,
     }
   }

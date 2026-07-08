@@ -7,6 +7,7 @@ import type {
 import {
   coerceStringArray,
   describeCensusOwnership,
+  gateIntelContext,
   safeParseJson,
 } from "@/lib/launchpad/ai-utils"
 
@@ -58,19 +59,26 @@ function buildPrompt(body: InterviewPrepRequest): { system: string; user: string
     `Ownership (census): ${describeCensusOwnership(p)}`,
     `Age: ${age != null ? `${age} years` : "unknown"}`,
     `Employees: ${p.employee_count ?? "unknown"} | Providers: ${p.num_providers ?? "unknown"}`,
-    `Buyability score: ${p.buyability_score ?? "unknown"}`,
+    `Buyability lead score (internal heuristic, not a verified valuation): ${p.buyability_score ?? "unknown"}`,
     `Network employment rating (curated, not ownership): ${p.dso_employment_tier ?? "unrated"}`,
     `Track: ${track}`,
     `Active signals: ${signals.length > 0 ? signals.join(", ") : "none"}`,
   ]
 
-  if (intel) {
-    if (intel.overall_assessment) practiceLines.push(`Intel assessment: ${intel.overall_assessment}`)
-    if (intel.acquisition_readiness) practiceLines.push(`Readiness: ${intel.acquisition_readiness}`)
-    const greenFlags = coerceStringArray(intel.green_flags)
-    const redFlags = coerceStringArray(intel.red_flags)
+  // Server-side audit: intel content only reaches the prompt when the row
+  // passes the shared source-backed audit; otherwise an honest one-liner.
+  const gated = gateIntelContext(intel)
+  if (gated.intel) {
+    if (gated.intel.overall_assessment)
+      practiceLines.push(`Intel assessment: ${gated.intel.overall_assessment}`)
+    if (gated.intel.acquisition_readiness)
+      practiceLines.push(`Readiness: ${gated.intel.acquisition_readiness}`)
+    const greenFlags = coerceStringArray(gated.intel.green_flags)
+    const redFlags = coerceStringArray(gated.intel.red_flags)
     if (greenFlags.length > 0) practiceLines.push(`Green flags: ${greenFlags.join(", ")}`)
     if (redFlags.length > 0) practiceLines.push(`Red flags: ${redFlags.join(", ")}`)
+  } else if (gated.note) {
+    practiceLines.push(`Intel: ${gated.note}`)
   }
 
   const user = `Practice context:\n${practiceLines.map((l) => `- ${l}`).join("\n")}\n\nGenerate exactly 10 questions across 4 categories as JSON.`

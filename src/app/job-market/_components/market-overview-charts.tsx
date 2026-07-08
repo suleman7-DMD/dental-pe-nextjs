@@ -10,6 +10,7 @@ import { isGpLocationClassification } from '@/lib/constants/entity-classificatio
 import {
   BUCKET_META,
   HEADLINE_BUCKETS,
+  formatNetworkId,
   tierToBucket,
 } from '@/lib/census/ownership-truth'
 
@@ -28,19 +29,6 @@ interface MarketOverviewChartsProps {
 // ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
-
-/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
-function formatNetworkId(id: string): string {
-  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
-  const cleaned = id
-    .replace(/^ao:/i, '')
-    .replace(/^brand:/i, '')
-    .split(/[_-]+/)
-    .filter(Boolean)
-    .map((w) => (/\d/.test(w) || (w.length <= 3 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
-    .join(' ')
-  return `${prefix}${cleaned}`
-}
 
 const BUCKET_HISTOGRAM_ORDER = HEADLINE_BUCKETS.map((b) => BUCKET_META[b].shortLabel)
 

@@ -1,15 +1,14 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Check, AlertTriangle, Search } from 'lucide-react'
+import { Check, AlertTriangle } from 'lucide-react'
 import { US_STATES } from '@/lib/constants/us-states'
-import { createBrowserClient } from '@/lib/supabase/client'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Tabs
 // ────────────────────────────────────────────────────────────────────────────
 
-type FormTab = 'deal' | 'practice' | 'zip'
+type FormTab = 'deal' | 'zip'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Add Deal Form
@@ -209,207 +208,6 @@ function AddDealForm() {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Update Practice Form
-// ────────────────────────────────────────────────────────────────────────────
-
-function UpdatePracticeForm() {
-  const [npiLookup, setNpiLookup] = useState('')
-  const [practiceInfo, setPracticeInfo] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const supabase = createBrowserClient()
-
-  const lookupNpi = useCallback(async () => {
-    if (npiLookup.length !== 10) return
-
-    const { data } = await supabase
-      .from('practices')
-      .select('practice_name, city, state, zip, ownership_status, affiliated_dso')
-      .eq('npi', npiLookup)
-      .single()
-
-    if (data) {
-      const p = data as {
-        practice_name: string | null
-        city: string | null
-        state: string | null
-        zip: string | null
-        ownership_status: string | null
-        affiliated_dso: string | null
-      }
-      setPracticeInfo(
-        `${p.practice_name ?? '--'} | ${p.city ?? '--'}, ${p.state ?? '--'} ${p.zip ?? '--'} | Status: ${p.ownership_status ?? '--'} | DSO: ${p.affiliated_dso ?? '--'}`
-      )
-    } else {
-      setPracticeInfo('NPI not found.')
-    }
-  }, [npiLookup, supabase])
-
-  const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setSuccess(null)
-    setError(null)
-
-    const formData = new FormData(e.currentTarget)
-    const npi = (formData.get('npi') as string)?.trim()
-
-    if (!npi || npi.length !== 10) {
-      setError('Valid 10-digit NPI is required.')
-      return
-    }
-
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/practices/${npi}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ownership_status: formData.get('ownership_status') || 'unknown',
-          entity_classification: formData.get('entity_classification') || null,
-          affiliated_dso: (formData.get('affiliated_dso') as string)?.trim() || null,
-          affiliated_pe_sponsor: (formData.get('affiliated_pe_sponsor') as string)?.trim() || null,
-          notes: (formData.get('notes') as string)?.trim() || 'Manual update',
-        }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error ?? 'Failed to update practice.')
-      } else {
-        setSuccess(`Updated NPI ${npi}`)
-      }
-    } catch (err) {
-      setError(`Network error: ${err instanceof Error ? err.message : String(err)}`)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  return (
-    <div className="space-y-4">
-      {/* NPI Lookup */}
-      <div className="flex items-end gap-3">
-        <div className="flex-1">
-          <label className="text-xs text-[#6B6B60] mb-1 block uppercase tracking-wider">Look up NPI</label>
-          <input
-            type="text"
-            maxLength={10}
-            value={npiLookup}
-            onChange={(e) => setNpiLookup(e.target.value.replace(/\D/g, ''))}
-            placeholder="10-digit NPI"
-            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#B8860B]"
-          />
-        </div>
-        <button
-          onClick={lookupNpi}
-          disabled={npiLookup.length !== 10}
-          className="rounded-md border border-[#E8E5DE] bg-[#FFFFFF] px-3 py-2 text-sm text-[#6B6B60] hover:text-[#1A1A1A] disabled:opacity-50 transition-colors"
-        >
-          <Search className="h-4 w-4" />
-        </button>
-      </div>
-
-      {practiceInfo && (
-        <div className="rounded-md border border-[#E8E5DE] bg-[#F5F5F0] px-3 py-2 text-sm text-[#6B6B60]">
-          {practiceInfo}
-        </div>
-      )}
-
-      {/* Update form */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-xs text-[#6B6B60] mb-1 block uppercase tracking-wider">NPI Number</label>
-          <input
-            type="text"
-            name="npi"
-            maxLength={10}
-            required
-            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#B8860B]"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs text-[#6B6B60] mb-1 block uppercase tracking-wider">New Status</label>
-          <select
-            name="ownership_status"
-            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B]"
-          >
-            {['independent', 'dso_affiliated', 'pe_backed', 'unknown'].map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-xs text-[#6B6B60] mb-1 block uppercase tracking-wider">Entity Classification</label>
-          <select
-            name="entity_classification"
-            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B]"
-          >
-            <option value="">-- Keep Current --</option>
-            {[
-              'solo_established', 'solo_new', 'solo_inactive', 'solo_high_volume',
-              'family_practice', 'small_group', 'large_group',
-              'dso_regional', 'dso_national', 'specialist', 'non_clinical'
-            ].map((ec) => (
-              <option key={ec} value={ec}>{ec.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-xs text-[#6B6B60] mb-1 block uppercase tracking-wider">Affiliated DSO</label>
-          <input
-            type="text"
-            name="affiliated_dso"
-            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B]"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs text-[#6B6B60] mb-1 block uppercase tracking-wider">Affiliated PE Sponsor</label>
-          <input
-            type="text"
-            name="affiliated_pe_sponsor"
-            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#B8860B]"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs text-[#6B6B60] mb-1 block uppercase tracking-wider">Notes</label>
-          <textarea
-            name="notes"
-            rows={2}
-            className="w-full rounded-md border border-[#E8E5DE] bg-[#F5F5F0] text-[#1A1A1A] px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-[#B8860B]"
-          />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-md bg-[#B8860B] px-4 py-2 text-sm font-medium text-white hover:bg-[#996F00] transition-colors disabled:opacity-50"
-        >
-          {loading ? 'Updating...' : 'Update Practice'}
-        </button>
-
-        {success && (
-          <div className="flex items-center gap-2 text-sm text-[#2D8B4E]">
-            <Check className="h-4 w-4" /> {success}
-          </div>
-        )}
-        {error && (
-          <div className="flex items-center gap-2 text-sm text-[#C23B3B]">
-            <AlertTriangle className="h-4 w-4" /> {error}
-          </div>
-        )}
-      </form>
-    </div>
-  )
-}
-
-// ────────────────────────────────────────────────────────────────────────────
 // Add ZIP Form
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -540,7 +338,6 @@ export function ManualEntryForms() {
       <div className="flex border-b border-[#E8E5DE]">
         {[
           { id: 'deal' as FormTab, label: 'Add Deal' },
-          { id: 'practice' as FormTab, label: 'Update Practice' },
           { id: 'zip' as FormTab, label: 'Add ZIP to Watch' },
         ].map((tab) => (
           <button
@@ -563,7 +360,6 @@ export function ManualEntryForms() {
       {/* Tab content */}
       <div className="p-4">
         {activeTab === 'deal' && <AddDealForm />}
-        {activeTab === 'practice' && <UpdatePracticeForm />}
         {activeTab === 'zip' && <AddZipForm />}
       </div>
     </div>

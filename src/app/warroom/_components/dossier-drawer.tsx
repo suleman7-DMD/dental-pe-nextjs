@@ -922,11 +922,11 @@ function SnapshotTab({
           <DossierField label="Taxonomy" value={practice.taxonomy_description ?? practice.taxonomy_code} />
           <DossierField label="Location Type" value={practice.location_type} />
           <DossierField
-            label="Classification"
+            label="Detector Class (Old Automated Estimate)"
             value={`${entityLabel} · ${practice.ownership_status ?? "—"}`}
           />
           <DossierField
-            label="Confidence"
+            label="Detector Confidence"
             value={
               practice.classification_confidence != null
                 ? `${practice.classification_confidence}/100`

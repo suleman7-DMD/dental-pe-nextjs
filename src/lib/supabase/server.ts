@@ -13,7 +13,8 @@ export function getSupabaseServerClient(): SupabaseClient {
 
   if (!url || !key) {
     throw new Error(
-      "Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars"
+      "Missing Supabase env: need NEXT_PUBLIC_SUPABASE_URL plus one of " +
+        "SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY / NEXT_PUBLIC_SUPABASE_ANON_KEY"
     );
   }
 

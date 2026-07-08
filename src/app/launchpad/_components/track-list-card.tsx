@@ -111,7 +111,6 @@ export function TrackListCard({
   const trackKey = resolveTrackKey(track, target.bestTrack)
   const confidenceCapped = target.trackScores[trackKey]?.confidenceCapped ?? false
   const capReason = target.trackScores[trackKey]?.capReason ?? null
-  const hasSourceBackedIntel = target.intel != null
 
   // Top contributions for hover tooltip
   const topContributions =
@@ -299,12 +298,14 @@ export function TrackListCard({
             </p>
           )}
 
-          {hasSourceBackedIntel && target.intelAudit?.status !== "legacy" ? (
+          {/* Intel trust chip — driven ONLY by the audit verdict (§7.2):
+              source_backed is the sole status allowed to say "verified". */}
+          {target.intelAudit?.status === "source_backed" ? (
             <p className="mt-1 text-[10px] text-[#2D8B4E]">
-              Current verified dossier · {target.intel?.verification_quality ?? "verified"} ·{" "}
-              {target.intel?.verification_urls?.length ?? 0} URLs
+              Current verified dossier · {target.intelAudit.verification_quality ?? "verified"} ·{" "}
+              {target.intelAudit.verification_urls.length} URLs
             </p>
-          ) : hasSourceBackedIntel && target.intelAudit?.status === "legacy" ? (
+          ) : target.intelAudit?.status === "legacy" ? (
             <p className="mt-1 text-[10px] text-[#6B6B60]">
               Archived research only · not used for score
             </p>

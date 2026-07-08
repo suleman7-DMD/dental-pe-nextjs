@@ -8,6 +8,7 @@ import type {
 import {
   coerceStringArray,
   describeCensusOwnership,
+  gateIntelContext,
   safeParseJson,
 } from "@/lib/launchpad/ai-utils"
 
@@ -57,17 +58,22 @@ function formatPractice(p: SmartBriefingPractice): string {
     `Age: ${age != null ? `${age} years` : "unknown"}`,
     `Employees: ${s.employee_count ?? "unknown"} | Providers: ${s.num_providers ?? "unknown"}`,
     `Revenue: ${s.estimated_revenue != null ? `$${s.estimated_revenue.toLocaleString()}` : "unknown"}`,
-    `Buyability score: ${s.buyability_score ?? "unknown"}`,
+    `Buyability lead score (internal heuristic, not a verified valuation): ${s.buyability_score ?? "unknown"}`,
     `Network employment rating (curated, not ownership): ${s.dso_employment_tier ?? "unrated"}`,
     `Signals: ${p.signals.length > 0 ? p.signals.join(", ") : "none"}`,
     `Scores — succession: ${p.scores.succession}, high_volume: ${p.scores.high_volume}, dso: ${p.scores.dso}`,
   ]
-  if (p.intel) {
-    if (p.intel.overall_assessment) lines.push(`Intel: ${p.intel.overall_assessment}`)
-    const greenFlags = coerceStringArray(p.intel.green_flags)
-    const redFlags = coerceStringArray(p.intel.red_flags)
+  // Server-side audit: intel content only reaches the prompt when the row
+  // passes the shared source-backed audit; otherwise an honest one-liner.
+  const gated = gateIntelContext(p.intel)
+  if (gated.intel) {
+    if (gated.intel.overall_assessment) lines.push(`Intel: ${gated.intel.overall_assessment}`)
+    const greenFlags = coerceStringArray(gated.intel.green_flags)
+    const redFlags = coerceStringArray(gated.intel.red_flags)
     if (greenFlags.length > 0) lines.push(`Green flags: ${greenFlags.join(", ")}`)
     if (redFlags.length > 0) lines.push(`Red flags: ${redFlags.join(", ")}`)
+  } else if (gated.note) {
+    lines.push(`Intel: ${gated.note}`)
   }
   return lines.join("\n")
 }

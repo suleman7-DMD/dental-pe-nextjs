@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Download, PencilLine } from 'lucide-react'
 
 type CorrectionFieldKey =
@@ -70,6 +70,43 @@ function saveLocalQueue(rows: LocalCorrectionPayload[]) {
   }
 }
 
+// Retry queue rows that never reached Supabase. One flush per page load, no
+// matter how many panels mount (module-level flag also absorbs StrictMode's
+// dev double-mount) — without it, every mounted panel would re-POST the same
+// rows.
+let flushStarted = false
+
+async function flushLocalOnlyQueue() {
+  const pending = loadLocalQueue().filter((row) => row.api_status === 'local_only')
+  if (pending.length === 0) return
+
+  const succeeded = new Set<string>()
+  for (const row of pending) {
+    try {
+      const res = await fetch('/api/practice-corrections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(row),
+      })
+      if (res.ok) succeeded.add(`${row.location_id}|${row.created_at}`)
+    } catch {
+      // Still offline / API still unavailable — the row stays local_only
+      // and the next page load retries it.
+    }
+  }
+  if (succeeded.size === 0) return
+
+  // Re-read before writing so a submission made while the flush was in
+  // flight is not clobbered by a stale snapshot.
+  saveLocalQueue(
+    loadLocalQueue().map((row) =>
+      succeeded.has(`${row.location_id}|${row.created_at}`)
+        ? { ...row, api_status: 'queued_in_supabase' as const, api_error: undefined }
+        : row,
+    ),
+  )
+}
+
 function downloadJson(payload: unknown, filename: string) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
@@ -95,6 +132,12 @@ export function ManualCorrectionPanel({
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [lastPayload, setLastPayload] = useState<LocalCorrectionPayload | null>(null)
+
+  useEffect(() => {
+    if (flushStarted) return
+    flushStarted = true
+    void flushLocalOnlyQueue()
+  }, [])
 
   const oldValues = useMemo(
     () =>

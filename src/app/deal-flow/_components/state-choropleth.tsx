@@ -5,6 +5,7 @@ import { SectionHeader } from '@/components/data-display/section-header'
 import { MapContainer } from '@/components/maps/map-container'
 import { DataTable } from '@/components/data-display/data-table'
 import type { Deal } from '@/lib/supabase/queries/deals'
+import { escapeHtml } from '@/lib/utils/escape-html'
 
 interface StateChoroplethProps {
   deals: Deal[]
@@ -135,7 +136,7 @@ export function StateChoropleth({ deals }: StateChoroplethProps) {
             .setLngLat(e.lngLat)
             .setHTML(
               `<div style="font-family:system-ui;font-size:12px">
-                <strong>${stateCode ?? 'Unknown'}</strong>: ${dealCount} deal${dealCount !== 1 ? 's' : ''}
+                <strong>${escapeHtml(stateCode ?? 'Unknown')}</strong>: ${dealCount} deal${dealCount !== 1 ? 's' : ''}
               </div>`
             )
             .addTo(map)

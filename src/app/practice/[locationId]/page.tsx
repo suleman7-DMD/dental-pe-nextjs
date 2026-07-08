@@ -27,7 +27,9 @@ import {
   SOURCE_CLASS_META,
   deriveSourceClass,
 } from "@/lib/census/ownership-truth"
+import { ManualCorrectionPanel } from "@/components/data-display/manual-correction-panel"
 import {
+  acquisitionVerdict,
   displayName,
   formatTitle,
   narrowReviewStatus,
@@ -74,12 +76,7 @@ function getUseCaseText(row: PracticeLocationRecord) {
       : reviewed
         ? "Review in Job Hunt"
         : "Wait for review"
-  const acquisitionValue =
-    row.buyability_score != null
-      ? `${Math.round(row.buyability_score)} / 100`
-      : row.ownership_tier === "true_independent" || row.ownership_tier === "single_loc_group"
-        ? "Needs scoring"
-        : "Low priority"
+  const acquisitionValue = acquisitionVerdict(row)
 
   return { jobValue, acquisitionValue }
 }
@@ -217,6 +214,52 @@ export default async function PracticePage({
         </section>
 
         <PracticeTabs row={row} siblings={siblings} />
+
+        {/* Corrections — anything wrong on this page can be reported in place */}
+        <section className="mt-6 rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-5">
+          <ManualCorrectionPanel
+            locationId={row.location_id}
+            npi={row.primary_npi}
+            practiceName={name}
+            fields={[
+              {
+                key: "practice_name",
+                label: "Current practice name",
+                currentValue: name,
+                placeholder: "Name shown on the practice website",
+              },
+              {
+                key: "owner_doctor_or_group",
+                label: "Owner doctor / group",
+                currentValue: formatNetworkName(row.network_id),
+                placeholder: "Example: Dr. Jane Smith, DDS",
+              },
+              {
+                key: "operating_doctors",
+                label: "Doctors currently shown on website",
+                currentValue: null,
+                placeholder: "Example: Dr. A; Dr. B; Dr. C",
+              },
+              {
+                key: "provider_count",
+                label: "Provider count",
+                currentValue: row.provider_count,
+                inputMode: "numeric",
+              },
+              {
+                key: "employee_count",
+                label: "Employee count",
+                currentValue: row.employee_count,
+                inputMode: "numeric",
+              },
+              {
+                key: "website",
+                label: "Website",
+                currentValue: row.website,
+              },
+            ]}
+          />
+        </section>
 
         <section className="mt-6 rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-5">
           <div className="mb-4 flex items-center gap-2">

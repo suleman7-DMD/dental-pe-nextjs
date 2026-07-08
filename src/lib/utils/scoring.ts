@@ -2,7 +2,7 @@ import type { Practice } from "@/lib/types";
 import { tierToBucket } from "@/lib/census/ownership-truth";
 
 /**
- * Compute job opportunity score for a practice (0-100).
+ * Compute job opportunity score for a practice (0-65 points).
  *
  * Ownership points come ONLY from the hand-reviewed census truth layer
  * (ownership_tier → headline bucket). Never from the legacy detector.
@@ -12,10 +12,15 @@ import { tierToBucket } from "@/lib/census/ownership-truth";
  * - Census unresolved (no reviewed conclusion yet): +10 — a capped
  *   "needs research" contribution, never treated as verified independence
  * - Census DSO/PE/corporate (T4-T5) or institutional (T6): +0
- * - Buyability >= 70: +25, 50-69: +15 (legacy heuristic input — stays until
- *   the census-based buyability reframe ships; see purge list /buyability)
  * - Employees >= 10: +20, 5-9: +10
  * - Established >= 2021: +15, 2016-2020: +8
+ * - Employee/year points are HALVED when data_axle_import_date is absent —
+ *   without a Data Axle enrichment pass those structural fields are
+ *   unverified NPPES self-report.
+ *
+ * The buyability_score boost was removed 2026-07: buyability is itself a
+ * derived heuristic, so feeding it back in double-counted the same census
+ * and structural inputs and let an unverified score inflate this one.
  */
 /**
  * Overload: accepts array of practices and returns them with job_opp_score attached.
@@ -47,26 +52,26 @@ export function computeJobOpportunityScore(
     score += 10;
   }
 
-  // Buyability score
-  const buy = practice.buyability_score;
-  if (buy !== null && buy !== undefined) {
-    if (buy >= 70) score += 25;
-    else if (buy >= 50) score += 15;
-  }
+  // Structural fields are only verified when a Data Axle enrichment pass
+  // touched this row; otherwise they are NPPES self-report — half credit.
+  const enriched = practice.data_axle_import_date != null;
 
   // Employee count
   const emp = practice.employee_count;
+  let structural = 0;
   if (emp !== null && emp !== undefined) {
-    if (emp >= 10) score += 20;
-    else if (emp >= 5) score += 10;
+    if (emp >= 10) structural += 20;
+    else if (emp >= 5) structural += 10;
   }
 
   // Year established
   const yr = practice.year_established;
   if (yr !== null && yr !== undefined) {
-    if (yr >= 2021) score += 15;
-    else if (yr >= 2016) score += 8;
+    if (yr >= 2021) structural += 15;
+    else if (yr >= 2016) structural += 8;
   }
+
+  score += enriched ? structural : Math.round(structural / 2);
 
   return score;
 }

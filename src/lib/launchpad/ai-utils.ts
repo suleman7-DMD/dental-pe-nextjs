@@ -3,7 +3,8 @@
 // JSONB columns) and outputs (from Claude) can drift from the declared shape.
 
 import { TIER_META, isOwnershipTier } from "@/lib/census/ownership-truth"
-import type { PracticeSnapshot } from "./ai-types"
+import { auditIntel } from "./intel-audit"
+import type { IntelContext, PracticeSnapshot } from "./ai-types"
 
 // The ONLY ownership language AI prompts may inject about a practice: the
 // census tier when reviewed, an honest unknown otherwise. Never falls back to
@@ -26,6 +27,34 @@ export function describeCensusOwnership(p: PracticeSnapshot): string {
   if (p.census_review_status === "held")
     return "held — census review in progress; treat ownership as unknown"
   return "not census-reviewed yet — treat ownership as unknown (never assume independent or corporate)"
+}
+
+// Server-side trust gate for client-supplied practice intel. The AI routes
+// are unauthenticated endpoints: the payload may be stale, partial-quality
+// (e.g. the 2026-07 Lane-A census rows), or hand-crafted. Re-run the shared
+// audit here and withhold anything that is not source-backed — the prompt
+// gets an honest one-liner instead of unverified content.
+export function gateIntelContext(raw: IntelContext | null | undefined): {
+  intel: IntelContext | null
+  note: string | null
+} {
+  if (!raw) return { intel: null, note: null }
+  const audit = auditIntel({
+    research_date: typeof raw.research_date === "string" ? raw.research_date : null,
+    verification_quality:
+      typeof raw.verification_quality === "string" ? raw.verification_quality : null,
+    verification_searches:
+      typeof raw.verification_searches === "number" ? raw.verification_searches : null,
+    verification_urls: coerceStringArray(raw.verification_urls),
+    overall_assessment:
+      typeof raw.overall_assessment === "string" ? raw.overall_assessment : null,
+    red_flags: coerceStringArray(raw.red_flags),
+  })
+  if (audit.status === "source_backed") return { intel: raw, note: null }
+  return {
+    intel: null,
+    note: `A prior research row exists for this practice but failed the source-backed verification audit (${audit.reason.replace(/\.$/, "")}). Its content was withheld — treat any prior research claim about this practice as unverified.`,
+  }
 }
 
 export function coerceStringArray(value: unknown): string[] {

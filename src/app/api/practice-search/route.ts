@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSupabaseServerClient } from "@/lib/supabase/server"
 import { searchPracticeLocations } from "@/lib/supabase/queries/practice-locations"
+import { displayName } from "@/lib/census/display-name"
 
 export const dynamic = "force-dynamic"
 
@@ -21,7 +22,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       results: rows.map((row) => ({
         locationId: row.location_id,
-        name: row.doing_business_as ?? row.practice_name ?? "Unnamed practice",
+        name: displayName(row),
         address: row.normalized_address,
         city: row.city,
         zip: row.zip,

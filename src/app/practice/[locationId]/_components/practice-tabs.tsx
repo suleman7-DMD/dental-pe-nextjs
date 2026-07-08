@@ -29,6 +29,7 @@ import {
 } from "@/lib/census/ownership-truth"
 import { getEntityClassificationLabel } from "@/lib/constants/entity-classifications"
 import {
+  acquisitionVerdict,
   displayName,
   formatCurrency,
   formatTitle,
@@ -381,10 +382,7 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
             />
             <DetailItem label="Employees" value={row.employee_count} />
             <DetailItem label="Est. revenue" value={formatCurrency(row.estimated_revenue)} />
-            <DetailItem
-              label="Acquisition lead score"
-              value={row.buyability_score == null ? null : Math.round(row.buyability_score)}
-            />
+            <DetailItem label="Acquisition verdict" value={acquisitionVerdict(row)} />
           </dl>
           <p className="mt-3 text-xs leading-5 text-[#8F8E82]">
             This is an early lead score. A real acquisition target still needs current

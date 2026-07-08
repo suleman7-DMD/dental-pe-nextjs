@@ -9,6 +9,7 @@ import { isGpLocationClassification } from '@/lib/constants/entity-classificatio
 import {
   BUCKET_META,
   HEADLINE_BUCKETS,
+  formatNetworkId,
   tierToBucket,
 } from '@/lib/census/ownership-truth'
 import type { Practice } from '@/lib/types'
@@ -21,19 +22,6 @@ import type { ZipStats } from './job-market-shell'
 interface OwnershipLandscapeProps {
   practices: Practice[]
   zipStats: ZipStats[]
-}
-
-/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
-function formatNetworkId(id: string): string {
-  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
-  const cleaned = id
-    .replace(/^ao:/i, '')
-    .replace(/^brand:/i, '')
-    .split(/[_-]+/)
-    .filter(Boolean)
-    .map((w) => (/\d/.test(w) || (w.length <= 3 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
-    .join(' ')
-  return `${prefix}${cleaned}`
 }
 
 // ────────────────────────────────────────────────────────────────────────────

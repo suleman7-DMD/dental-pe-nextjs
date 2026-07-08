@@ -115,41 +115,6 @@ export async function getPracticeCountsByStatus(
   return counts;
 }
 
-export async function getPracticesWithCoords(
-  supabase: SupabaseClient,
-  zips: string[]
-): Promise<Practice[]> {
-  // Paginate to handle large ZIP sets (could exceed 1000 row default limit)
-  const allPractices: Practice[] = [];
-  const pageSize = 1000;
-  const chunkSize = 100;
-
-  for (let i = 0; i < zips.length; i += chunkSize) {
-    const zipChunk = zips.slice(i, i + chunkSize);
-    let page = 0;
-
-    while (true) {
-      const from = page * pageSize;
-      const to = from + pageSize - 1;
-      const { data, error } = await supabase
-        .from("practices")
-        .select("npi, practice_name, doing_business_as, city, state, zip, phone, website, entity_classification, ownership_status, affiliated_dso, buyability_score, classification_confidence, year_established, employee_count, estimated_revenue, latitude, longitude, num_providers, taxonomy_code, data_axle_import_date")
-        .in("zip", zipChunk)
-        .not("latitude", "is", null)
-        .not("longitude", "is", null)
-        .range(from, to);
-
-      if (error) throw error;
-      const batch = (data as Practice[]) ?? [];
-      allPractices.push(...batch);
-      if (batch.length < pageSize) break;
-      page++;
-    }
-  }
-
-  return allPractices;
-}
-
 /**
  * Aggregate practice statistics for watched ZIPs with tiered consolidation.
  * Returns full PracticeStats including high-confidence corporate count,

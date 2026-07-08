@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils"
 import {
   OWNERSHIP_TIERS,
   TIER_META as CONTRACT_TIER_META,
+  formatNetworkId,
   type OwnershipTier,
 } from "@/lib/census/ownership-truth"
 
@@ -71,18 +72,9 @@ export function getReviewStatus(tier: string | null | undefined): ReviewStatus {
   return "verified"
 }
 
+/** Null-tolerant wrapper around the contract's `formatNetworkId` — no local rules. */
 export function formatNetworkName(networkId: string | null | undefined): string | null {
-  if (!networkId) return null
-  const prefix = /^ao:/i.test(networkId) ? "Owner: " : /^brand:/i.test(networkId) ? "Group: " : ""
-  const cleaned = networkId
-    .replace(/^brand:/i, "")
-    .replace(/^ao:/i, "")
-    .replace(/[-_:]+/g, " ")
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => (/\d/.test(w) || (w.length <= 3 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
-    .join(" ")
-  return `${prefix}${cleaned}`
+  return networkId ? formatNetworkId(networkId) : null
 }
 
 export function CensusBadge({

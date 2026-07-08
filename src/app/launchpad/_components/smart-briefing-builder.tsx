@@ -83,6 +83,12 @@ function buildBriefingPractice(
           confidence: intel.confidence,
           green_flags: intel.green_flags,
           red_flags: intel.red_flags,
+          // Verification metadata — the route re-audits server-side and
+          // withholds intel content that is not source-backed.
+          research_date: intel.research_date,
+          verification_quality: intel.verification_quality,
+          verification_searches: intel.verification_searches,
+          verification_urls: intel.verification_urls,
         }
       : null,
   }

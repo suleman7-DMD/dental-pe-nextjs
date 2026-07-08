@@ -50,6 +50,13 @@ export interface IntelContext {
   confidence?: string | null
   green_flags?: string[] | null
   red_flags?: string[] | null
+  // Verification metadata — routes re-audit client-supplied intel server-side
+  // (gateIntelContext) and withhold content that is not source-backed.
+  // Omitting these fields makes the row audit as unverified, never as trusted.
+  research_date?: string | null
+  verification_quality?: string | null
+  verification_searches?: number | null
+  verification_urls?: string[] | null
 }
 
 export interface TrackScores {

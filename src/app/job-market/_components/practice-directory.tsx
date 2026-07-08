@@ -18,8 +18,10 @@ import {
   OWNERSHIP_TIERS,
   TIER_CODE,
   TIER_META,
+  formatNetworkId,
   tierToBucket,
 } from '@/lib/census/ownership-truth'
+import { displayName as practiceDisplayName } from '@/lib/census/display-name'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -60,41 +62,6 @@ const SPONSOR_OPTIONS = ['PE-backed', 'Not PE-backed']
 
 function isDataAxle(p: Practice): boolean {
   return p.data_axle_import_date != null && p.data_axle_import_date !== ''
-}
-
-/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
-function formatNetworkId(id: string): string {
-  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
-  const cleaned = id
-    .replace(/^ao:/i, '')
-    .replace(/^brand:/i, '')
-    .split(/[_-]+/)
-    .filter(Boolean)
-    .map((w) => (/\d/.test(w) || (w.length <= 3 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
-    .join(' ')
-  return `${prefix}${cleaned}`
-}
-
-function cleanDisplayPart(value: string | null | undefined): string | null {
-  if (!value) return null
-  const trimmed = value.trim()
-  if (
-    trimmed === '' ||
-    /^<?\s*(?:unavail|unavailable|not available|none|null|n\/?a)\s*>?$/i.test(trimmed)
-  ) {
-    return null
-  }
-  return trimmed
-}
-
-function practiceDisplayName(p: Practice): string {
-  return (
-    cleanDisplayPart(p.doing_business_as) ??
-    cleanDisplayPart(p.practice_name) ??
-    (p.address ? `Practice at ${p.address}` : null) ??
-    (p.city ? `Practice in ${p.city}` : null) ??
-    'Unnamed practice'
-  )
 }
 
 function hasOwnershipEvidence(p: Practice): boolean {
@@ -182,8 +149,8 @@ function renderPracticeLink(valueOrPractice: unknown): React.ReactElement {
   if (!valueOrPractice || typeof valueOrPractice !== 'object') {
     throw new Error('Practice row expected')
   }
-  const p = valueOrPractice as Practice & { display_name?: string | null }
-  const name = p.display_name ?? p.doing_business_as ?? p.practice_name ?? '--'
+  const p = valueOrPractice as Practice
+  const name = practiceDisplayName(p)
   if (!p.location_id) {
     return React.createElement('span', { className: 'font-medium text-[#1A1A1A]' }, name)
   }

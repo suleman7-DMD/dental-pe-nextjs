@@ -7,11 +7,7 @@ import { ZIP_CENTROIDS, METRO_CENTERS } from '@/lib/constants/zip-centroids'
 import { BUCKET_META } from '@/lib/census/ownership-truth'
 import { tallyBucketCount, type ZipCensusTally } from '../_lib/zip-census'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
-
-/** Escape HTML special characters to prevent XSS in map tooltip .setHTML() */
-function escapeHtml(s: unknown): string {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
+import { escapeHtml } from '@/lib/utils/escape-html'
 
 interface ConsolidationMapProps {
   zipScores: ZipScore[]

@@ -597,7 +597,7 @@ function JobMarketShellInner({
 
         {/* ── Tab Navigation ────────────────────────────────── */}
         <div className="border-b border-[#E8E5DE]">
-          <nav className="flex gap-0" aria-label="Job Market tabs">
+          <nav className="flex gap-0" aria-label="Practice Directory tabs">
             {TABS.map((tab) => (
               <button
                 key={tab.id}

@@ -13,6 +13,7 @@ import {
 } from '@/components/data-display/census-badge'
 import { ManualCorrectionPanel } from '@/components/data-display/manual-correction-panel'
 import { LEGACY_DETECTOR_CONTEXT_LABEL } from '@/lib/census/ownership-truth'
+import { displayName } from '@/lib/census/display-name'
 
 import type { Practice } from '@/lib/types'
 
@@ -124,25 +125,8 @@ function displayValue(v: string | number | null | undefined): string {
   return String(v)
 }
 
-function cleanNamePart(value: string | null | undefined): string | null {
-  if (!value) return null
-  const trimmed = value.trim()
-  if (
-    trimmed === '' ||
-    /^<?\s*(?:unavail|unavailable|not available|none|null|n\/?a)\s*>?$/i.test(trimmed)
-  ) {
-    return null
-  }
-  return trimmed
-}
-
 function drawerPracticeName(p: Practice): string {
-  return (
-    cleanNamePart(p.doing_business_as) ??
-    cleanNamePart(p.practice_name) ??
-    (p.address ? `Practice at ${p.address}` : null) ??
-    'Unnamed practice'
-  )
+  return displayName(p)
 }
 
 function formatReliableRevenue(value: number | null | undefined): string | null {

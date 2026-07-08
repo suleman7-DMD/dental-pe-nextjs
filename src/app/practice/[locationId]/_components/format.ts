@@ -2,26 +2,11 @@
 // No "use client" directive — server components import from here too.
 
 import type { PracticeLocationRecord } from "@/lib/supabase/queries/practice-locations"
-
-function cleanNamePart(value: string | null | undefined): string | null {
-  if (!value) return null
-  const trimmed = value.trim()
-  if (
-    trimmed === "" ||
-    /^<?\s*(?:unavail|unavailable|not available|none|null|n\/?a)\s*>?$/i.test(trimmed)
-  ) {
-    return null
-  }
-  return trimmed
-}
+import { displayName as sharedDisplayName } from "@/lib/census/display-name"
+import { tierToBucket } from "@/lib/census/ownership-truth"
 
 export function displayName(row: PracticeLocationRecord): string {
-  return (
-    cleanNamePart(row.doing_business_as) ??
-    cleanNamePart(row.practice_name) ??
-    (row.normalized_address ? `Practice at ${row.normalized_address}` : null) ??
-    "Unnamed practice"
-  )
+  return sharedDisplayName(row)
 }
 
 export function formatTitle(value: string | null | undefined): string {
@@ -73,4 +58,25 @@ export function narrowReviewStatus(
   value: string | null
 ): "held" | "undetermined" | null {
   return value === "held" || value === "undetermined" ? value : null
+}
+
+/**
+ * Acquisition verdict for a location — lane-style language instead of a bare
+ * "N / 100". A location page has no source-backed intel audit, so the honest
+ * ceiling here is "needs review"; "verified target" can only come from the
+ * Job Hunt pipeline. The census bucket decides the frame, the heuristic score
+ * only rides along inside it.
+ */
+export function acquisitionVerdict(row: PracticeLocationRecord): string {
+  const bucket = tierToBucket(row.ownership_tier)
+  if (bucket === "dso_pe_corporate" || bucket === "institutional" || row.pe_backed) {
+    return "Avoid — not dentist-owned"
+  }
+  if (bucket === "unresolved") {
+    return "Unreviewed — do not trust yet"
+  }
+  if (row.buyability_score != null) {
+    return `Lead score ${Math.round(row.buyability_score)} — needs review`
+  }
+  return "Dentist-owned — needs scoring"
 }

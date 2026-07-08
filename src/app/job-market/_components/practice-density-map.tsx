@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import type mapboxgl from 'mapbox-gl'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { ZIP_CENTROIDS } from '@/lib/constants/zip-centroids'
@@ -8,9 +9,12 @@ import { isGpLocationClassification } from '@/lib/constants/entity-classificatio
 import {
   BUCKET_META,
   HEADLINE_BUCKETS,
+  formatNetworkId,
   tierToBucket,
   type HeadlineBucket,
 } from '@/lib/census/ownership-truth'
+import { displayName } from '@/lib/census/display-name'
+import { escapeHtml } from '@/lib/utils/escape-html'
 
 import type { Practice } from '@/lib/types'
 
@@ -27,6 +31,7 @@ interface PracticeDensityMapProps {
 interface MapPractice {
   map_lat: number
   map_lon: number
+  location_id: string | null
   bucket: HeadlineBucket
   practice_name: string
   address: string
@@ -68,19 +73,6 @@ const BUCKET_DOT_COLORS: Record<HeadlineBucket, [number, number, number, number]
 
 const UNRESOLVED_LEGEND_GRAY = '#9CA3AF'
 
-/** network_id slugs ("heartland_dental") → display labels ("Heartland Dental"). */
-function formatNetworkId(id: string): string {
-  const prefix = /^ao:/i.test(id) ? 'Owner: ' : /^brand:/i.test(id) ? 'Group: ' : ''
-  const cleaned = id
-    .replace(/^ao:/i, '')
-    .replace(/^brand:/i, '')
-    .split(/[_-]+/)
-    .filter(Boolean)
-    .map((w) => (/\d/.test(w) || (w.length <= 3 && w === w.toUpperCase()) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
-    .join(' ')
-  return `${prefix}${cleaned}`
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // NPI-based jitter (matches Python: hash(npi) % 2^32 → deterministic offset)
 // ────────────────────────────────────────────────────────────────────────────
@@ -109,13 +101,18 @@ function PracticeMapInner({
   geocoded,
   centerLat,
   centerLon,
+  onOpenPractice,
 }: {
   geocoded: MapPractice[]
   centerLat: number
   centerLon: number
+  onOpenPractice: (locationId: string) => void
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapObjRef = useRef<mapboxgl.Map | null>(null)
+  // Ref so a changing callback identity never tears down and re-creates the map
+  const onOpenPracticeRef = useRef(onOpenPractice)
+  onOpenPracticeRef.current = onOpenPractice
 
   useEffect(() => {
     if (!mapRef.current || geocoded.length === 0) return
@@ -147,6 +144,7 @@ function PracticeMapInner({
             type: 'Feature' as const,
             geometry: { type: 'Point' as const, coordinates: [d.map_lon, d.map_lat] },
             properties: {
+              location_id: d.location_id ?? '',
               name: d.practice_name,
               address: d.address,
               city_zip: d.city_zip,
@@ -213,12 +211,13 @@ function PracticeMapInner({
             .setLngLat(coords)
             .setHTML(
               `<div style="font-family:system-ui;font-size:12px;line-height:1.5;background:#FFFFFF;color:#1A1A1A;border:1px solid #E8E5DE;border-radius:8px;padding:10px 14px;margin:-10px -14px">
-                <strong style="color:#1A1A1A">${props.name}</strong><br/>
-                <span style="color:#6B6B60">${props.address}</span><br/>
-                <span style="color:#6B6B60">${props.city_zip}</span><br/>
-                <span style="color:#6B6B60">Census ownership:</span> <strong style="color:#1A1A1A">${props.ownership_label}</strong><br/>
-                <span style="color:#6B6B60">Network:</span> <span style="color:#1A1A1A">${props.network}</span><br/>
-                <span style="color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">${props.employees}</span> <span style="color:#6B6B60">| Est:</span> <span style="color:#1A1A1A">${props.year}</span>
+                <strong style="color:#1A1A1A">${escapeHtml(props.name)}</strong><br/>
+                <span style="color:#6B6B60">${escapeHtml(props.address)}</span><br/>
+                <span style="color:#6B6B60">${escapeHtml(props.city_zip)}</span><br/>
+                <span style="color:#6B6B60">Census ownership:</span> <strong style="color:#1A1A1A">${escapeHtml(props.ownership_label)}</strong><br/>
+                <span style="color:#6B6B60">Network:</span> <span style="color:#1A1A1A">${escapeHtml(props.network)}</span><br/>
+                <span style="color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">${escapeHtml(props.employees)}</span> <span style="color:#6B6B60">| Est:</span> <span style="color:#1A1A1A">${escapeHtml(props.year)}</span><br/>
+                <span style="color:#8B6508">Click the dot to open the practice page</span>
               </div>`
             )
             .addTo(map)
@@ -228,6 +227,15 @@ function PracticeMapInner({
           if (!map) return
           map.getCanvas().style.cursor = ''
           popup.remove()
+        })
+
+        // Click-through to the practice page — location_id rides in the
+        // feature properties, so every dot deep-links to /practice/[locationId]
+        map.on('click', 'practice-dots', (e) => {
+          const locationId = e.features?.[0]?.properties?.location_id
+          if (typeof locationId === 'string' && locationId) {
+            onOpenPracticeRef.current(locationId)
+          }
         })
       })
     }
@@ -260,6 +268,7 @@ export function PracticeDensityMap({
   centerLat,
   centerLon,
 }: PracticeDensityMapProps) {
+  const router = useRouter()
   const [hideUnresolved, setHideUnresolved] = useState(false)
 
   // Canonical GP-only map layer (scope axis, not an ownership claim). This
@@ -318,9 +327,10 @@ export function PracticeDensityMap({
       results.push({
         map_lat: lat,
         map_lon: lon,
+        location_id: p.location_id ?? null,
         is_approximate,
         bucket,
-        practice_name: p.practice_name ?? 'Unknown Practice',
+        practice_name: displayName(p),
         address: p.address ?? '--',
         city_zip: `${p.city ?? ''}, ${p.state ?? ''} ${(p.zip ?? '').toString().slice(0, 5)}`,
         ownership_label:
@@ -356,7 +366,7 @@ export function PracticeDensityMap({
     <div>
       <SectionHeader
         title="Ownership Map"
-        helpText="Each dot is a general-dentistry office. Color shows the reviewed ownership answer. Gray means not reviewed or still unresolved. Faded dots use the ZIP center because exact coordinates are missing."
+        helpText="Each dot is a general-dentistry office. Color shows the reviewed ownership answer. Gray means not reviewed or still unresolved. Faded dots use the ZIP center because exact coordinates are missing. Click a dot to open the full practice page."
       />
 
       {geocoded.length === 0 ? (
@@ -383,6 +393,9 @@ export function PracticeDensityMap({
             geocoded={geocoded}
             centerLat={centerLat}
             centerLon={centerLon}
+            onOpenPractice={(locationId) =>
+              router.push(`/practice/${encodeURIComponent(locationId)}`)
+            }
           />
 
           {/* Legend — all five ownership groups, always */}

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { ZIP_CENTROIDS } from '@/lib/constants/zip-centroids'
 import type { ZipScore, WatchedZip } from '@/lib/types'
+import { escapeHtml } from '@/lib/utils/escape-html'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -268,13 +269,13 @@ function SaturationMapInner({
             .setLngLat(coords)
             .setHTML(
               `<div style="font-family:system-ui;font-size:12px;line-height:1.6;background:#FFFFFF;color:#1A1A1A;border:1px solid #E8E5DE;border-radius:8px;padding:10px 14px;margin:-10px -14px">
-                <strong style="font-size:14px;color:#1A1A1A">${props.city}</strong>
-                <span style="color:#9C9C90"> &middot; ${props.zip}</span><br/>
-                <span style="color:#6B6B60">Pop:</span> <span>${props.population}</span>
-                <span style="color:#6B6B60"> &middot; GP Offices:</span> <strong>${props.gpLocations}</strong><br/>
-                <span style="color:#6B6B60;${dldBold}">Offices / 10k people:</span> <span style="${dldBold}">${props.dldVal}</span><br/>
-                <span style="color:#6B6B60;${buyBold}">Acquisition lead %:</span> <span style="${buyBold}">${props.buyableVal}</span><br/>
-                <span style="color:#9C9C90;font-size:10px">Confidence: ${props.confidence}</span>
+                <strong style="font-size:14px;color:#1A1A1A">${escapeHtml(props.city)}</strong>
+                <span style="color:#9C9C90"> &middot; ${escapeHtml(props.zip)}</span><br/>
+                <span style="color:#6B6B60">Pop:</span> <span>${escapeHtml(props.population)}</span>
+                <span style="color:#6B6B60"> &middot; GP Offices:</span> <strong>${escapeHtml(props.gpLocations)}</strong><br/>
+                <span style="color:#6B6B60;${dldBold}">Offices / 10k people:</span> <span style="${dldBold}">${escapeHtml(props.dldVal)}</span><br/>
+                <span style="color:#6B6B60;${buyBold}">Acquisition lead %:</span> <span style="${buyBold}">${escapeHtml(props.buyableVal)}</span><br/>
+                <span style="color:#9C9C90;font-size:10px">Confidence: ${escapeHtml(props.confidence)}</span>
               </div>`
             )
             .addTo(map)
