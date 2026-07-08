@@ -1,27 +1,15 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import type { ReactNode } from "react"
-import {
-  ArrowLeft,
-  Briefcase,
-  DollarSign,
-  Globe2,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  Target,
-} from "lucide-react"
+import { ArrowLeft, Globe2, MapPin, Phone } from "lucide-react"
 import { createServerClient } from "@/lib/supabase/server"
 import {
   fetchNetworkSiblings,
   fetchPracticeLocationById,
-  type PracticeLocationRecord,
 } from "@/lib/supabase/queries/practice-locations"
 import {
   CensusBadge,
   ReviewStatusBadge,
   formatNetworkName,
-  getOwnershipTierMeta,
 } from "@/components/data-display/census-badge"
 import {
   SOURCE_CLASS_META,
@@ -29,7 +17,6 @@ import {
 } from "@/lib/census/ownership-truth"
 import { ManualCorrectionPanel } from "@/components/data-display/manual-correction-panel"
 import {
-  acquisitionVerdict,
   displayName,
   formatTitle,
   narrowReviewStatus,
@@ -39,47 +26,10 @@ import {
   PracticeTabs,
   type NetworkSiblingSummary,
 } from "./_components/practice-tabs"
+import { UsePracticeCard } from "./_components/use-practice-card"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
-
-function MetricBlock({
-  icon,
-  label,
-  value,
-  note,
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-  note: string
-}) {
-  return (
-    <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-4">
-      <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-[#8F8E82]">
-        {icon}
-        {label}
-      </div>
-      <div className="mt-3 text-xl font-bold text-[#1A1A1A]">{value}</div>
-      <p className="mt-1 text-xs leading-5 text-[#6B6B60]">{note}</p>
-    </div>
-  )
-}
-
-function getUseCaseText(row: PracticeLocationRecord) {
-  const reviewed = row.ownership_tier != null
-  const providerCount = row.provider_count ?? 0
-  const employeeCount = row.employee_count ?? 0
-  const jobValue =
-    providerCount >= 4 || employeeCount >= 10
-      ? "Strong hiring signal"
-      : reviewed
-        ? "Review in Job Hunt"
-        : "Wait for review"
-  const acquisitionValue = acquisitionVerdict(row)
-
-  return { jobValue, acquisitionValue }
-}
 
 export default async function PracticePage({
   params,
@@ -110,7 +60,6 @@ export default async function PracticePage({
     .filter(Boolean)
     .join(", ")
   const practiceWebsite = websiteHref(row.website)
-  const { jobValue, acquisitionValue } = getUseCaseText(row)
   const sourceClass = deriveSourceClass(
     row.ownership_tier,
     narrowReviewStatus(row.census_review_status)
@@ -188,30 +137,7 @@ export default async function PracticePage({
           </div>
         </section>
 
-        <section className="mt-6 grid gap-4 md:grid-cols-3">
-          <MetricBlock
-            icon={<ShieldCheck className="h-3.5 w-3.5" />}
-            label="Reviewed Ownership"
-            value={
-              row.ownership_tier
-                ? getOwnershipTierMeta(row.ownership_tier).label
-                : "Unresolved"
-            }
-            note={SOURCE_CLASS_META[sourceClass].description}
-          />
-          <MetricBlock
-            icon={<Briefcase className="h-3.5 w-3.5" />}
-            label="Job Hunt"
-            value={jobValue}
-            note="Uses provider count, staff size, and the census ownership record as a first-pass career signal."
-          />
-          <MetricBlock
-            icon={<Target className="h-3.5 w-3.5" />}
-            label="Acquisition Scout"
-            value={acquisitionValue}
-            note="Early lead score only. A real acquisition target still needs current ownership and succession review."
-          />
-        </section>
+        <UsePracticeCard row={row} />
 
         <PracticeTabs row={row} siblings={siblings} />
 
@@ -261,44 +187,6 @@ export default async function PracticePage({
           />
         </section>
 
-        <section className="mt-6 rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-[#B8860B]" />
-            <h2 className="text-base font-semibold text-[#1A1A1A]">Where to use this</h2>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <Link
-              href={`/launchpad?practice=${encodeURIComponent(row.location_id)}`}
-              className="rounded-lg border border-[#E8E5DE] bg-[#FAFAF7] p-4 hover:border-[#D4D0C8] hover:bg-[#F0EEE8]"
-            >
-              <Briefcase className="h-4 w-4 text-[#7C3AED]" />
-              <div className="mt-3 text-sm font-semibold text-[#1A1A1A]">Job Hunt</div>
-              <p className="mt-1 text-xs leading-5 text-[#6B6B60]">
-                Evaluate associate fit, practice pace, and ownership risk.
-              </p>
-            </Link>
-            <Link
-              href={`/buyability?practice=${encodeURIComponent(row.location_id)}`}
-              className="rounded-lg border border-[#E8E5DE] bg-[#FAFAF7] p-4 hover:border-[#D4D0C8] hover:bg-[#F0EEE8]"
-            >
-              <DollarSign className="h-4 w-4 text-[#D4920B]" />
-              <div className="mt-3 text-sm font-semibold text-[#1A1A1A]">Acquisition Scout</div>
-              <p className="mt-1 text-xs leading-5 text-[#6B6B60]">
-                Check succession, staffing, revenue, and independence signals.
-              </p>
-            </Link>
-            <Link
-              href={`/market-intel?zip=${encodeURIComponent(row.zip ?? "")}`}
-              className="rounded-lg border border-[#E8E5DE] bg-[#FAFAF7] p-4 hover:border-[#D4D0C8] hover:bg-[#F0EEE8]"
-            >
-              <MapPin className="h-4 w-4 text-[#2D8B4E]" />
-              <div className="mt-3 text-sm font-semibold text-[#1A1A1A]">Market View</div>
-              <p className="mt-1 text-xs leading-5 text-[#6B6B60]">
-                Compare this location against its ZIP and nearby ownership mix.
-              </p>
-            </Link>
-          </div>
-        </section>
       </div>
     </main>
   )

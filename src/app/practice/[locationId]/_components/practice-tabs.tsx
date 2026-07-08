@@ -4,14 +4,11 @@ import Link from "next/link"
 import type { ReactNode } from "react"
 import {
   ArchiveRestore,
-  ArrowUpRight,
-  Briefcase,
   Building2,
   ExternalLink,
   FileCheck2,
   Network,
   ShieldCheck,
-  Target,
 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { PracticeLocationRecord } from "@/lib/supabase/queries/practice-locations"
@@ -29,9 +26,7 @@ import {
 } from "@/lib/census/ownership-truth"
 import { getEntityClassificationLabel } from "@/lib/constants/entity-classifications"
 import {
-  acquisitionVerdict,
   displayName,
-  formatCurrency,
   formatTitle,
   narrowReviewStatus,
   normalizeUrl,
@@ -204,67 +199,10 @@ function EvidenceLinks({ urls }: { urls: string[] }) {
   )
 }
 
-function CtaLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1.5 rounded-md border border-[#E8E5DE] bg-[#FAFAF7] px-3 py-2 text-sm font-medium text-[#1A1A1A] hover:border-[#D4D0C8] hover:bg-[#F0EEE8]"
-    >
-      {label}
-      <ArrowUpRight className="h-3.5 w-3.5 text-[#8F8E82]" />
-    </Link>
-  )
-}
-
 // ────────────────────────────────────────────────────────────────────────────
-// Per-tab honest context lines (census tier drives every claim)
-// ────────────────────────────────────────────────────────────────────────────
-
-function jobHuntContext(row: PracticeLocationRecord): string {
-  switch (row.ownership_tier) {
-    case "stealth_dso":
-    case "branded_dso":
-      return row.pe_backed
-        ? "DSO employment with reviewed PE ownership — associate roles here are corporate employment. Check the network's reputation before applying."
-        : "DSO employment — associate roles here are corporate employment. Check the network's reputation before applying."
-    case "institutional":
-      return "Institutional setting (hospital / university / public health) — employment terms differ from private practice."
-    case "true_independent":
-      return "Solo owner-operator — associate demand is rare here; openings usually mean growth or succession."
-    case "single_loc_group":
-    case "dentist_multi":
-      return "Dentist-owned group — plausible associate hiring without corporate employment terms."
-    default:
-      return "Ownership unresolved — treat the employment context as unknown until this location is reviewed."
-  }
-}
-
-function acquisitionContext(row: PracticeLocationRecord): string {
-  switch (row.ownership_tier) {
-    case "true_independent":
-    case "single_loc_group":
-      return "Reviewed dentist-owned single-location office. Succession signals below are worth reading."
-    case "dentist_multi":
-      return "Dentist-owned multi-location network — an acquisition would involve the network, not just this site."
-    case "stealth_dso":
-    case "branded_dso":
-      return "Not an acquisition target — reviewed as DSO/corporate controlled."
-    case "institutional":
-      return "Not an acquisition target — institutional setting."
-    default:
-      return "Not reviewed yet — this location cannot be qualified as a candidate until ownership is resolved."
-  }
-}
-
-function hiringSignal(row: PracticeLocationRecord): string {
-  const providerCount = row.provider_count ?? 0
-  const employeeCount = row.employee_count ?? 0
-  if (providerCount >= 4 || employeeCount >= 10) return "Strong hiring signal"
-  return row.ownership_tier ? "Moderate — review in Job Hunt" : "Unknown — awaiting census review"
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// The five tabs (SPEC_TRUTH_APP_ROUTES_20260704.md §6)
+// The three tabs (DESIGN_TRUTH_APP_SOLUTIONS_20260707.md §7.1) — Overview /
+// Related offices / Older data. Job Hunt + Acquisition live in the
+// "Use this practice" header card on the page, not here.
 // ────────────────────────────────────────────────────────────────────────────
 
 export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
@@ -274,25 +212,15 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
   const dataSources = parseStringList(row.data_sources)
   const taxonomyCodes = parseStringList(row.taxonomy_codes)
   const networkLabel = row.network_id ? formatNetworkId(row.network_id) : null
-  const practiceAge =
-    row.year_established != null && row.year_established > 1900
-      ? new Date().getFullYear() - row.year_established
-      : null
 
   return (
-    <Tabs defaultValue="ownership" className="mt-6">
+    <Tabs defaultValue="overview" className="mt-6">
       <TabsList className="h-auto w-full flex-wrap justify-start gap-1 bg-[#FFFFFF] border border-[#E8E5DE] p-1">
-        <TabsTrigger value="ownership" className="px-3 py-1.5">
-          Ownership
-        </TabsTrigger>
-        <TabsTrigger value="job-hunt" className="px-3 py-1.5">
-          Job Hunt
-        </TabsTrigger>
-        <TabsTrigger value="acquisition" className="px-3 py-1.5">
-          Acquisition &amp; succession
+        <TabsTrigger value="overview" className="px-3 py-1.5">
+          Overview
         </TabsTrigger>
         <TabsTrigger value="network" className="px-3 py-1.5">
-          Related Offices
+          Related offices
           {siblings.length > 0 ? (
             <span className="ml-1 rounded-full bg-[#F7F7F4] px-1.5 py-0.5 text-[10px] font-medium text-[#6B6B60]">
               {siblings.length}
@@ -304,8 +232,8 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
         </TabsTrigger>
       </TabsList>
 
-      {/* ── 1 · Ownership & evidence ──────────────────────────────────────── */}
-      <TabsContent value="ownership" className="mt-4 space-y-4">
+      {/* ── 1 · Overview — census ownership + evidence ────────────────────── */}
+      <TabsContent value="overview" className="mt-4 space-y-4">
         <Panel icon={<Network className="h-4 w-4 text-[#B8860B]" />} title="Reviewed Ownership">
           <div className="flex flex-wrap items-center gap-2">
             <CensusBadge tier={row.ownership_tier} peBacked={row.pe_backed} />
@@ -346,58 +274,7 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
         </Panel>
       </TabsContent>
 
-      {/* ── 2 · Job-hunt intel ────────────────────────────────────────────── */}
-      <TabsContent value="job-hunt" className="mt-4">
-        <Panel icon={<Briefcase className="h-4 w-4 text-[#B8860B]" />} title="Job-Hunt Intel">
-          <p className="text-sm leading-6 text-[#3D3D35]">{jobHuntContext(row)}</p>
-          <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-4 md:grid-cols-4">
-            <DetailItem label="Hiring signal" value={hiringSignal(row)} />
-            <DetailItem label="Providers" value={row.provider_count} />
-            <DetailItem label="Employees" value={row.employee_count} />
-            <DetailItem label="Phone" value={row.phone} />
-          </dl>
-          <div className="mt-5">
-            <CtaLink
-              href={`/launchpad?practice=${encodeURIComponent(row.location_id)}`}
-              label="Open in Job Hunt"
-            />
-          </div>
-        </Panel>
-      </TabsContent>
-
-      {/* ── 3 · Acquisition & succession ──────────────────────────────────── */}
-      <TabsContent value="acquisition" className="mt-4">
-        <Panel icon={<Target className="h-4 w-4 text-[#B8860B]" />} title="Acquisition & Succession">
-          <p className="text-sm leading-6 text-[#3D3D35]">{acquisitionContext(row)}</p>
-          <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-4 md:grid-cols-4">
-            <DetailItem
-              label="Established"
-              value={
-                row.year_established != null
-                  ? practiceAge != null
-                    ? `${row.year_established} (${practiceAge} yrs)`
-                    : row.year_established
-                  : null
-              }
-            />
-            <DetailItem label="Employees" value={row.employee_count} />
-            <DetailItem label="Est. revenue" value={formatCurrency(row.estimated_revenue)} />
-            <DetailItem label="Acquisition verdict" value={acquisitionVerdict(row)} />
-          </dl>
-          <p className="mt-3 text-xs leading-5 text-[#8F8E82]">
-            This is an early lead score. A real acquisition target still needs current
-            ownership and succession review.
-          </p>
-          <div className="mt-4">
-            <CtaLink
-              href={`/buyability?practice=${encodeURIComponent(row.location_id)}`}
-              label="Open in Acquisition Scout"
-            />
-          </div>
-        </Panel>
-      </TabsContent>
-
-      {/* ── 4 · Network siblings ──────────────────────────────────────────── */}
+      {/* ── 2 · Related offices ───────────────────────────────────────────── */}
       <TabsContent value="network" className="mt-4">
         <Panel icon={<Building2 className="h-4 w-4 text-[#B8860B]" />} title="Related Offices">
           {row.network_id ? (
@@ -447,7 +324,7 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
         </Panel>
       </TabsContent>
 
-      {/* ── 5 · Raw source audit ──────────────────────────────────────────── */}
+      {/* ── 3 · Older data — raw source audit, quarantined ────────────────── */}
       <TabsContent value="raw-audit" className="mt-4 space-y-4">
         <div className="rounded-lg border border-[#D4920B]/40 bg-[#D4920B]/5 p-4">
           <p className="text-sm font-semibold text-[#8B6508]">
