@@ -166,7 +166,7 @@ function MarketIntelShellInner({
             </strong>{' '}
             GP clinic locations &nbsp;&middot;&nbsp;{' '}
             <strong className="text-[#1A1A1A]">{freshness.daEnriched.toLocaleString()}</strong>{' '}
-            Data Axle enriched GP locations
+            with staff/revenue estimates (separate from ownership answers)
             {freshness.lastUpdated && (
               <>
                 {' '}&nbsp;&middot;&nbsp;{' '}
@@ -198,7 +198,7 @@ function MarketIntelShellInner({
         <div id="kpis" className="space-y-3">
           {/* The five-bucket census strip IS the ownership headline — all five
               buckets always render, Unresolved included. */}
-          <CensusBucketSummaryCard summary={bucketSummary} scopeLabel={selectedMetro} />
+          <CensusBucketSummaryCard summary={bucketSummary} scopeLabel={selectedMetro} sourceClasses={sourceClasses} />
 
           {/* Canonical headline cards — same labels/formulas as Home and the
               Directory, all defined once in lib/census/headline-stats. */}
@@ -208,13 +208,6 @@ function MarketIntelShellInner({
             ))}
           </div>
 
-          <p className="text-[#707064] text-xs">
-            Within Not Reviewed Yet ({bucketSummary.counts.unresolved.toLocaleString()}):{' '}
-            {sourceClasses.held.toLocaleString()} held for adjudication &middot;{' '}
-            {sourceClasses.undetermined.toLocaleString()} undetermined after research &middot;{' '}
-            {sourceClasses.notYetReviewed.toLocaleString()} not yet reviewed.
-            Every number above is a census conclusion or an explicit open item — nothing is estimated.
-          </p>
         </div>
 
         {/* Tab navigation */}
@@ -275,7 +268,7 @@ function MarketIntelShellInner({
             <div>
               <SectionHeader
                 title="Census Ownership Tiers"
-                helpText="ownership_tier is the only ownership truth layer — assigned by hand review with cited evidence, one location at a time. Tiers roll up to the five headline groups; anything without a reviewed tier stays marked Not Reviewed Yet."
+                helpText="ownership_tier is the only ownership truth layer — assigned by hand review with cited evidence, one location at a time. Tiers roll up to the five headline groups; anything without a reviewed tier stays in Needs Ownership Answer."
               />
 
               <div className="mt-4 space-y-4">

@@ -58,7 +58,7 @@ export function DSOPenetrationTable({ zipScores, watchedZips, tallies }: DSOPene
     <div>
       <SectionHeader
         title="Census DSO/PE Floor by ZIP"
-        helpText="ZIPs with at least one census-documented DSO/PE clinic, ranked by the documented floor: hand-reviewed stealth-DSO (T4) + branded-DSO (T5) locations as a share of ALL GP clinics in the ZIP. A floor by construction — clinics we have not reviewed contribute nothing, so the Not Reviewed Yet column is the honest uncertainty. ZIPs absent from this table have no census-documented DSO/PE yet; that is not a claim of independence."
+        helpText="ZIPs with at least one census-documented DSO/PE clinic, ranked by the documented floor: hand-reviewed stealth-DSO (T4) + branded-DSO (T5) locations as a share of ALL GP clinics in the ZIP. A floor by construction — clinics we have not reviewed contribute nothing, so the Needs Answer column is the honest uncertainty. ZIPs absent from this table have no census-documented DSO/PE yet; that is not a claim of independence."
       />
       <div className="mt-4 rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
         <DataTable
@@ -105,7 +105,7 @@ export function DSOPenetrationTable({ zipScores, watchedZips, tallies }: DSOPene
             },
             {
               key: 'unresolved',
-              header: 'Not Reviewed Yet',
+              header: 'Needs Answer',
               align: 'right' as const,
               render: (v: number | null) => v != null ? (
                 <span style={{ color: '#B8860B' }}>{v.toLocaleString()}</span>

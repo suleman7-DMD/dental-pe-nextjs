@@ -158,7 +158,7 @@ export function MarketOverviewCharts({
         <div className="rounded-[10px] border border-[#E8E5DE] bg-[#FFFFFF] p-4">
           <h3 className="text-sm font-semibold text-[#1A1A1A] mb-1">Ownership Mix</h3>
           <p className="text-xs text-[#6B6B60] mb-3">
-            Reviewed ownership groups. &ldquo;Not Reviewed Yet&rdquo; = no reviewed answer yet.
+            Reviewed ownership groups. &ldquo;Needs Ownership Answer&rdquo; = no final answer yet.
           </p>
           <DonutChart
             segments={donutData.segments}

@@ -98,7 +98,7 @@ const CATEGORIES: { label: string; value: BuyabilityCategory | 'all' }[] = [
   { label: 'Dead Ends', value: 'dead_end' },
   { label: 'Job Targets', value: 'job_target' },
   { label: 'Specialists', value: 'specialist' },
-  { label: 'Not Reviewed Yet', value: 'unreviewed' },
+  { label: 'Needs Ownership Answer', value: 'unreviewed' },
 ]
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -276,7 +276,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
       case 'specialist':
         return 'Specialist'
       case 'unreviewed':
-        return 'Not Reviewed'
+        return 'Needs Answer'
     }
   }
 
@@ -338,7 +338,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
           />
           <KpiCard
             icon={<ShieldOff className="h-4 w-4" />}
-            label="Not Reviewed Yet"
+            label="Needs Ownership Answer"
             value={kpis.unrev.toLocaleString()}
             accentColor="#6B7280"
           />

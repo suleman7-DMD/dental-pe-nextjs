@@ -50,10 +50,34 @@ const TIER_META: Record<string, OwnershipTierMeta> = {
 }
 
 const NOT_REVIEWED_META: OwnershipTierMeta = {
-  label: "Not Reviewed Yet",
-  shortLabel: "Not Reviewed",
-  description: "No synced census conclusion yet.",
+  label: "Needs Ownership Answer",
+  shortLabel: "Needs Answer",
+  description: "No final ownership answer for this office yet.",
   className: "border-[#D4D0C8] bg-[#F7F7F4] text-[#6B6B60]",
+}
+
+// Sub-state refinements for offices without a final answer, keyed by the
+// synced census_review_status. Only used when the caller actually has the
+// column — an absent status stays the honest umbrella label above.
+const NEEDS_ANSWER_SUBSTATE_META: Record<"held" | "undetermined" | "not_started", OwnershipTierMeta> = {
+  held: {
+    label: "Held for Review",
+    shortLabel: "Held",
+    description: "Researched, but a conflict or verification blocker is holding the final call.",
+    className: "border-[#B8860B]/25 bg-[#FFFBEB] text-[#8B6508]",
+  },
+  undetermined: {
+    label: "Researched, Inconclusive",
+    shortLabel: "Inconclusive",
+    description: "Researched, but the evidence was too thin to classify.",
+    className: "border-[#B8860B]/25 bg-[#FFFBEB] text-[#8B6508]",
+  },
+  not_started: {
+    label: "Not Started Yet",
+    shortLabel: "Not Started",
+    description: "No one has researched this office's ownership yet.",
+    className: "border-[#D4D0C8] bg-[#F7F7F4] text-[#6B6B60]",
+  },
 }
 
 export function getOwnershipTierMeta(tier: string | null | undefined): OwnershipTierMeta {
@@ -80,15 +104,31 @@ export function formatNetworkName(networkId: string | null | undefined): string 
 export function CensusBadge({
   tier,
   peBacked,
+  reviewStatus,
   compact = false,
   className,
 }: {
   tier: string | null | undefined
   peBacked?: boolean | null
+  /**
+   * Synced census_review_status. Pass it (null included) only when the row
+   * actually carries the column: null then means "not started", 'held' /
+   * 'undetermined' name the real sub-state. Omit it and unanswered rows keep
+   * the generic "Needs Answer" label instead of claiming "not started".
+   */
+  reviewStatus?: string | null
   compact?: boolean
   className?: string
 }) {
-  const meta = getOwnershipTierMeta(tier)
+  const substate =
+    !tier && reviewStatus !== undefined
+      ? reviewStatus === "held"
+        ? NEEDS_ANSWER_SUBSTATE_META.held
+        : reviewStatus === "undetermined"
+          ? NEEDS_ANSWER_SUBSTATE_META.undetermined
+          : NEEDS_ANSWER_SUBSTATE_META.not_started
+      : null
+  const meta = substate ?? getOwnershipTierMeta(tier)
   const label = compact ? meta.shortLabel : meta.label
 
   return (
@@ -130,7 +170,7 @@ export function ReviewStatusBadge({
   }
   return (
     <span className={cn(BASE_BADGE, "border-[#D4D0C8] bg-[#F7F7F4] text-[#6B6B60]", className)}>
-      Not Reviewed
+      Needs Answer
     </span>
   )
 }

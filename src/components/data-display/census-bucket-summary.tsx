@@ -3,27 +3,36 @@
 import {
   BUCKET_META,
   HEADLINE_BUCKETS,
+  SOURCE_CLASS_META,
   type BucketSummary,
   type HeadlineBucket,
 } from '@/lib/census/ownership-truth'
+import type { SourceClassCounts } from '@/lib/census/zip-census'
 
 interface CensusBucketSummaryCardProps {
   summary: BucketSummary
   /** Human scope name, e.g. "All Chicagoland" — coverage is stated FOR this scope. */
   scopeLabel: string
+  /**
+   * Optional sub-state split of the Needs Ownership Answer bucket (not
+   * started / researched-inconclusive / held). When provided, the breakdown
+   * renders directly under the bar so the open work is never a mystery number.
+   */
+  sourceClasses?: SourceClassCounts
   className?: string
 }
 
 /**
  * The five-bucket census ownership strip: stacked bar + per-bucket chips +
  * coverage line. This is the ONLY headline ownership visual — all five
- * buckets always render (Unresolved included, rule §2: never collapsed).
- * Counts come from `summarizeBuckets` over live census rows; the universe is
- * the live GP-location denominator for the scope, never a constant.
+ * buckets always render (Needs Ownership Answer included, rule §2: never
+ * collapsed). Counts come from `summarizeBuckets` over live census rows; the
+ * universe is the live GP-location denominator for the scope, never a constant.
  */
 export function CensusBucketSummaryCard({
   summary,
   scopeLabel,
+  sourceClasses,
   className = '',
 }: CensusBucketSummaryCardProps) {
   const { universe, reviewed, coveragePct, counts, pctOfUniverse } = summary
@@ -46,11 +55,11 @@ export function CensusBucketSummaryCard({
     <div className={`rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-4 ${className}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2 mb-3">
         <h2 className="font-sans font-semibold text-sm text-[#1A1A1A]">
-          Ownership review — {scopeLabel}
+          Ownership answers — {scopeLabel}
         </h2>
         <span className="text-xs text-[#6B6B60] font-mono">
-          {reviewed.toLocaleString()} reviewed + {counts.unresolved.toLocaleString()} not reviewed yet
-          {' '}= {universe.toLocaleString()} offices ({coveragePct.toFixed(1)}% done)
+          {reviewed.toLocaleString()} classified + {counts.unresolved.toLocaleString()} need an ownership answer
+          {' '}= {universe.toLocaleString()} offices ({coveragePct.toFixed(1)}% classified)
         </span>
       </div>
 
@@ -100,11 +109,26 @@ export function CensusBucketSummaryCard({
         ))}
       </div>
 
+      {/* Sub-state split of the open bucket — the 1,259 is never a mystery */}
+      {sourceClasses && counts.unresolved > 0 && (
+        <p className="text-xs text-[#6B6B60] mt-2.5">
+          <span className="font-medium text-[#1A1A1A]">
+            Still need an ownership answer ({counts.unresolved.toLocaleString()}):
+          </span>{' '}
+          <span className="font-mono">{sourceClasses.notYetReviewed.toLocaleString()}</span>{' '}
+          {SOURCE_CLASS_META.unreviewed.label.toLowerCase()} &middot;{' '}
+          <span className="font-mono">{sourceClasses.undetermined.toLocaleString()}</span>{' '}
+          {SOURCE_CLASS_META.undetermined.label.toLowerCase()} &middot;{' '}
+          <span className="font-mono">{sourceClasses.held.toLocaleString()}</span>{' '}
+          {SOURCE_CLASS_META.held.label.toLowerCase()}
+        </p>
+      )}
+
       <p className="text-[11px] text-[#8A8A7E] mt-2.5">
         Every office in this area is in exactly one group, so the five counts add up to the
-        total. The first four groups are human-reviewed ownership answers; &ldquo;Not Reviewed
-        Yet&rdquo; means no one has classified that office, and the app never fills those in
-        with guesses.
+        total. The first four groups are human-reviewed ownership answers. &ldquo;Needs
+        Ownership Answer&rdquo; covers the rest — some not started, some researched without a
+        conclusive answer, some held for review — and the app never fills those in with guesses.
       </p>
     </div>
   )

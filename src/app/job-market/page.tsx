@@ -5,6 +5,7 @@ import { getADABenchmarks } from '@/lib/supabase/queries/ada-benchmarks'
 import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { summarizeBuckets, tierToBucket } from '@/lib/census/ownership-truth'
+import { countSourceClassesFromRows } from '@/lib/census/zip-census'
 import { JobMarketShell, type ServerKpis } from './_components/job-market-shell'
 
 export const dynamic = "force-dynamic"
@@ -111,6 +112,13 @@ export default async function JobMarketPage() {
         gpLocations.map((p) => ({ ownership_tier: p.ownership_tier, pe_backed: p.pe_backed })),
         universe
       ),
+      sourceClasses: countSourceClassesFromRows(
+        gpLocations.map((p) => ({
+          ownership_tier: p.ownership_tier,
+          census_review_status: p.census_review_status ?? null,
+        })),
+        universe
+      ),
     }
 
     return (
@@ -133,6 +141,7 @@ export default async function JobMarketPage() {
       retirement_risk: 0,
       highVolCount: 0,
       bucketSummary: summarizeBuckets([], 0),
+      sourceClasses: { censusReviewed: 0, held: 0, undetermined: 0, notYetReviewed: 0 },
     }
 
     return (

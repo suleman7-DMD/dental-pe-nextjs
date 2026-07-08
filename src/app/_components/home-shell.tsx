@@ -309,13 +309,13 @@ function CensusStatusModel({ census }: { census: CensusSummary }) {
         </div>
         <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 sm:col-span-2">
           <div className="text-xs font-medium uppercase tracking-wider text-[#6B6B60]">
-            Not Reviewed Yet
+            Not Started
           </div>
           <div className="mt-2 font-mono text-2xl font-bold text-[#1A1A1A]">
             {census.unreviewed.toLocaleString()}
           </div>
           <p className="mt-2 text-xs text-[#6B6B60]">
-            No synced ownership conclusion yet. These remain unknown.
+            Ownership research has not begun for these offices. They remain unknown.
           </p>
         </div>
       </div>
@@ -362,7 +362,7 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges, censusSu
               <span className="text-right font-mono font-bold text-[#1A1A1A]">
                 {censusSummary.reviewed.toLocaleString()}
               </span>
-              <span className="text-[#6B6B60]">Not reviewed</span>
+              <span className="text-[#6B6B60]">Needs answer</span>
               <span className="text-right font-mono font-bold text-[#1A1A1A]">
                 {censusSummary.unreviewed.toLocaleString()}
               </span>

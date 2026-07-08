@@ -318,7 +318,7 @@ export function PracticeTabs({ row, siblings }: PracticeTabsProps) {
             <p className="text-sm leading-6 text-[#6B6B60]">
               {row.ownership_tier
                 ? "No related offices are assigned — this location is not recorded as part of a multi-location group."
-                : "Not reviewed yet — related-office membership is unknown until review."}
+                : "No ownership answer yet — related-office membership is unknown until review."}
             </p>
           )}
         </Panel>

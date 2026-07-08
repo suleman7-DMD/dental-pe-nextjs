@@ -26,7 +26,7 @@ function jobHuntContext(row: PracticeLocationRecord): string {
     case "dentist_multi":
       return "Dentist-owned group — plausible associate hiring without corporate employment terms."
     default:
-      return "Ownership not reviewed yet — treat the employment context as unknown until this location is reviewed."
+      return "No ownership answer yet — treat the employment context as unknown until this office gets one."
   }
 }
 
@@ -43,7 +43,7 @@ function acquisitionContext(row: PracticeLocationRecord): string {
     case "institutional":
       return "Not an acquisition target — institutional setting."
     default:
-      return "Not reviewed yet — this location cannot be qualified as a candidate until ownership is resolved."
+      return "No ownership answer yet — this location cannot be qualified as a candidate until ownership is resolved."
   }
 }
 

@@ -85,11 +85,11 @@ export function gpLocationsStat(
 export function handReviewedStat(summary: BucketSummary): HeadlineStat {
   return {
     key: "hand_reviewed",
-    label: "Hand-Reviewed So Far",
+    label: "Ownership Classified",
     value: formatCount(summary.reviewed),
     sublabel: `${formatShare(summary.coveragePct)} of ${formatCount(summary.universe)} GP locations`,
     tooltip:
-      "Locations with a hand-reviewed ownership conclusion backed by cited evidence. Everything else is marked Not Reviewed Yet — shown honestly, never filled with estimates.",
+      "Locations with a hand-reviewed ownership answer backed by cited evidence. Held and researched-but-inconclusive offices are NOT counted here — they stay in Needs Ownership Answer, shown honestly, never filled with estimates.",
     accentColor: "#2D8B4E",
   }
 }

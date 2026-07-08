@@ -20,6 +20,7 @@ import {
   TIER_META,
   formatNetworkId,
   tierToBucket,
+  type OwnershipTier,
 } from '@/lib/census/ownership-truth'
 import { displayName as practiceDisplayName } from '@/lib/census/display-name'
 import type { Practice } from '@/lib/types'
@@ -33,7 +34,7 @@ interface PracticeDirectoryProps {
   allPractices: Practice[]  // For cross-reference (same-address lookup etc.)
 }
 
-type SortOption = 'job_score' | 'buyability' | 'employees' | 'year_est' | 'name'
+type SortOption = 'job_score' | 'buyability' | 'employees' | 'year_est' | 'name' | 'trust'
 type PracticeWithJobScore = Practice & { job_opp_score?: number | null }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -42,6 +43,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
   { value: 'employees', label: 'Staff size \u2193' },
   { value: 'year_est', label: 'Oldest first' },
   { value: 'name', label: 'Name A-Z' },
+  { value: 'trust', label: 'Most facts on file \u2193' },
 ]
 
 const PAGE_SIZE = 100
@@ -109,32 +111,88 @@ function sortPractices<T extends Practice>(list: T[], sortBy: SortOption): T[] {
       return sorted.sort((a, b) =>
         practiceDisplayName(a).localeCompare(practiceDisplayName(b))
       )
+    case 'trust':
+      return sorted.sort((a, b) => countTrustFacts(b) - countTrustFacts(a))
     default:
       return sorted
   }
 }
 
-/** Compute data-depth stars for a practice (provenance, not an ownership claim) */
-function computeDataQuality(p: Practice): string {
-  const isDA = p.data_axle_import_date != null && p.data_axle_import_date !== ''
-  const censusReviewed = p.ownership_tier != null
-  if (isDA) return '\u2605\u2605\u2605'
-  if (censusReviewed) return '\u2605\u2605'
-  return '\u2605'
+/**
+ * Count the job-hunt basics actually on file for an office (0\u20134):
+ * ownership answer, website, staff estimate, year established. Used for the
+ * "Most facts on file" sort. Current-doctor verification is intentionally NOT
+ * in this count \u2014 it doesn't exist for any office yet, and pretending
+ * otherwise would fake trust.
+ */
+function countTrustFacts(p: Practice): number {
+  let n = 0
+  if (p.ownership_tier != null) n += 1
+  if ((p.website ?? '').trim() !== '') n += 1
+  if (p.employee_count != null) n += 1
+  if (p.year_established != null) n += 1
+  return n
 }
 
-/** Render gold-colored data-depth stars */
-function renderDataQualityStars(v: string): React.ReactElement {
-  const label =
-    v === '\u2605\u2605\u2605'
-      ? 'Business data'
-      : v === '\u2605\u2605'
-        ? 'Ownership reviewed'
-        : 'Basic registry'
-  return React.createElement('span', {
-    className: 'text-xs text-[#6B6B60]',
-    title: label,
-  }, label)
+/**
+ * "What We Know" trust cell \u2014 four facts per office, known in green, missing
+ * in gray. The hover tooltip answers each trust question in plain language,
+ * including the honest negatives (no website found; doctors not yet verified).
+ */
+function renderTrustCell(valueOrPractice: unknown): React.ReactElement {
+  if (!valueOrPractice || typeof valueOrPractice !== 'object') {
+    throw new Error('Practice row expected')
+  }
+  const p = valueOrPractice as Practice
+  const hasOwner = p.ownership_tier != null
+  const website = (p.website ?? '').trim()
+  const hasStaff = p.employee_count != null
+  const hasEst = p.year_established != null
+
+  const tierLabel = hasOwner
+    ? TIER_META[p.ownership_tier as OwnershipTier]?.label ?? p.ownership_tier
+    : null
+  const ownerLine = hasOwner
+    ? `Owner: ${tierLabel} \u2014 hand-reviewed ownership answer`
+    : p.census_review_status === 'held'
+      ? 'Owner: no final answer \u2014 held for review'
+      : p.census_review_status === 'undetermined'
+        ? 'Owner: no final answer \u2014 researched, inconclusive'
+        : 'Owner: no final answer \u2014 research not started'
+  const title = [
+    ownerLine,
+    'Current doctors: not website-verified yet (true for every office \u2014 that research pass has not run)',
+    website
+      ? `Website: on file (${website})`
+      : 'Website: none on file \u2014 this office may genuinely lack a researchable web presence',
+    hasStaff
+      ? `Staff: ~${p.employee_count} employees (commercial estimate, not verified)`
+      : 'Staff: no estimate on file',
+    hasEst
+      ? `Established: ${Math.floor(Number(p.year_established))} (commercial estimate)`
+      : 'Established: unknown',
+  ].join('\n')
+
+  const facts: Array<[string, boolean]> = [
+    ['Owner', hasOwner],
+    ['Web', website !== ''],
+    ['Staff', hasStaff],
+    ['Est.', hasEst],
+  ]
+  return React.createElement(
+    'span',
+    { className: 'inline-flex items-center gap-1.5 text-[11px] whitespace-nowrap', title },
+    ...facts.map(([label, known]) =>
+      React.createElement(
+        'span',
+        {
+          key: label,
+          className: known ? 'font-medium text-[#2D7A3A]' : 'text-[#C4C0B4]',
+        },
+        label
+      )
+    )
+  )
 }
 
 function renderNetwork(v: string | null): string {
@@ -175,6 +233,7 @@ function renderCensusBadge(valueOrPractice: unknown): React.ReactElement {
   return React.createElement(CensusBadge, {
     tier: p.ownership_tier,
     peBacked: p.pe_backed,
+    reviewStatus: p.census_review_status ?? null,
     compact: true,
   })
 }
@@ -195,7 +254,7 @@ const EMPLOYMENT_COLUMNS = [
   { key: 'employee_count', header: 'Employees', render: (v: number | null) => v ?? '--' },
   { key: 'network_id', header: 'Owner / Group', render: renderNetwork },
   { key: 'job_opp_score', header: 'Hiring Signal', render: (v: number | null) => v ?? '--' },
-  { key: 'data_quality', header: 'Source', render: (v: string) => renderDataQualityStars(v) },
+  { key: 'trust', header: 'What We Know', render: renderTrustCell },
 ]
 
 const OWNERSHIP_COLUMNS = [
@@ -215,7 +274,7 @@ const OWNERSHIP_COLUMNS = [
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
   { key: 'ownership_confidence', header: 'Confidence', render: renderCensusConfidence },
-  { key: 'data_quality', header: 'Source', render: (v: string) => renderDataQualityStars(v) },
+  { key: 'trust', header: 'What We Know', render: renderTrustCell },
 ]
 
 const ENRICHED_COLUMNS = [
@@ -244,7 +303,7 @@ const ENRICHED_COLUMNS = [
   },
   { key: 'job_opp_score', header: 'Hiring Signal', render: (v: number | null) => v ?? '--' },
   { key: 'website', header: 'Website', render: (v: string | null) => v || '--' },
-  { key: 'data_quality', header: 'Source', render: (v: string) => renderDataQualityStars(v) },
+  { key: 'trust', header: 'What We Know', render: renderTrustCell },
 ]
 
 const ALL_COLUMNS = [
@@ -265,7 +324,7 @@ const ALL_COLUMNS = [
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
   { key: 'job_opp_score', header: 'Hiring Signal', render: (v: number | null) => v ?? '--' },
-  { key: 'data_quality', header: 'Source', render: (v: string) => renderDataQualityStars(v) },
+  { key: 'trust', header: 'What We Know', render: renderTrustCell },
 ]
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -404,10 +463,10 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     // Sort
     result = sortPractices(result, sortBy)
 
-    // Add data quality stars
+    // Materialize the trust-fact count so the What We Know column has a real key
     return result.map(p => ({
       ...p,
-      data_quality: computeDataQuality(p),
+      trust: countTrustFacts(p),
     }))
   }, [withDisplayName, searchTerm, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
 
@@ -463,6 +522,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       'city',
       'zip',
       'ownership_tier',
+      'census_review_status',
       'ownership_confidence',
       'ownership_evidence_basis',
       'pe_backed',
@@ -482,6 +542,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       city: 'City',
       zip: 'ZIP',
       ownership_tier: 'Ownership Type',
+      census_review_status: 'Open Review State (held / undetermined)',
       ownership_confidence: 'Review Confidence',
       ownership_evidence_basis: 'Ownership Evidence',
       pe_backed: 'PE Backed (census)',
@@ -508,7 +569,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     <div>
       <SectionHeader
         title="Chicagoland Practice Directory"
-        helpText="Search every general-dentistry office by name, city, ZIP, owner, or group. The Ownership column is the reviewed answer when we have one; rows marked Not Reviewed still need research."
+        helpText="Search every general-dentistry office by name, city, ZIP, owner, or group. The Ownership column is the hand-reviewed answer when we have one — offices without one show why (not started, researched but inconclusive, or held for review). 'What We Know' shows which job-hunt basics are on file per office; current doctors are not website-verified yet for any office."
       />
 
       {/* Search & Filters */}

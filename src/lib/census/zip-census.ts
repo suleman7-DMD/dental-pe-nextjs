@@ -172,3 +172,28 @@ export function countSourceClasses(tallies: ZipCensusTally[], universe: number):
     notYetReviewed: Math.max(universe - censusReviewed - held - undetermined, 0),
   }
 }
+
+/**
+ * Same ledger computed straight from location rows, for pages that hold full
+ * practice rows instead of per-ZIP tallies (/job-market server + client).
+ */
+export function countSourceClassesFromRows(
+  rows: Array<Pick<ZipCensusSourceRow, 'ownership_tier' | 'census_review_status'>>,
+  universe: number
+): SourceClassCounts {
+  let censusReviewed = 0
+  let held = 0
+  let undetermined = 0
+  for (const row of rows) {
+    const sourceClass = deriveSourceClass(row.ownership_tier, narrowReviewStatus(row.census_review_status))
+    if (sourceClass === 'census_reviewed') censusReviewed += 1
+    else if (sourceClass === 'held') held += 1
+    else if (sourceClass === 'undetermined') undetermined += 1
+  }
+  return {
+    censusReviewed,
+    held,
+    undetermined,
+    notYetReviewed: Math.max(universe - censusReviewed - held - undetermined, 0),
+  }
+}

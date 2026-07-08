@@ -110,7 +110,7 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
     <div>
       <SectionHeader
         title="Ownership Landscape"
-        helpText="Reviewed ownership groups and corporate networks for this area. Offices we have not reviewed stay marked Not Reviewed Yet, never estimated."
+        helpText="Reviewed ownership groups and corporate networks for this area. Offices without a final answer stay in Needs Ownership Answer, never estimated."
       />
 
       <div className="mt-4 space-y-6">
@@ -120,7 +120,7 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
             Ownership Groups
           </h3>
           <p className="text-xs text-[#6B6B60] mb-3">
-            Reviewed ownership answers. &ldquo;Not Reviewed Yet&rdquo; = no reviewed answer yet.
+            Reviewed ownership answers. &ldquo;Needs Ownership Answer&rdquo; = no final answer yet.
           </p>
           <BarChart
             data={ownershipData}
@@ -209,7 +209,7 @@ export function OwnershipLandscape({ practices, zipStats }: OwnershipLandscapePr
                 },
                 {
                   key: 'unresolved',
-                  header: 'Not Reviewed Yet',
+                  header: 'Needs Answer',
                   render: (v: number | null) => (v != null ? v.toLocaleString() : '--'),
                 },
                 {

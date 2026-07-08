@@ -49,7 +49,7 @@ export function CensusSyncStatus({ census }: { census: CensusSummary }) {
           </div>
           <p className="mt-1 text-xs text-[#6B6B60]">
             Of {census.universe.toLocaleString()} GP locations in the watched
-            universe. Everything else renders as Not Reviewed Yet — never guessed.
+            universe. Everything else renders as Needs Ownership Answer — never guessed.
           </p>
         </div>
         <div className="rounded-md border border-[#D4920B]/40 bg-[#FFF7E5] p-3">

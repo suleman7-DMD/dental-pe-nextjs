@@ -41,7 +41,7 @@ function parseEvidenceUrlCount(value: string | null | undefined): number {
 }
 
 function tierLabel(tier: string | null | undefined): string {
-  if (!tier) return 'Not reviewed'
+  if (!tier) return 'Needs answer'
   return TIER_META[tier as keyof typeof TIER_META]?.shortLabel ?? tier.replace(/_/g, ' ')
 }
 

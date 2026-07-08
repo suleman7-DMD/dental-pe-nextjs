@@ -292,7 +292,7 @@ export function PracticeDetailDrawer({
                 {p.ownership_tier
                   ? p.ownership_evidence_basis ??
                     'Reviewed ownership answer; evidence detail is on the full practice page.'
-                  : 'Not reviewed yet — ownership is unknown. Nothing below is an ownership conclusion.'}
+                  : 'No ownership answer yet — ownership is unknown. Nothing below is an ownership conclusion.'}
               </p>
               {p.location_id ? (
                 <Link

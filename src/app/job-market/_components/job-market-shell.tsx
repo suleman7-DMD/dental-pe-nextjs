@@ -4,8 +4,6 @@ import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'rea
 import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { KpiCard } from '@/components/data-display/kpi-card'
-import { HeadlineKpiCard } from '@/components/data-display/headline-kpi-card'
-import { gpLocationsStat, handReviewedStat } from '@/lib/census/headline-stats'
 import { DataFreshnessBar } from '@/components/data-display/data-freshness-bar'
 import { LivingLocationSelector } from './living-location-selector'
 import { SaturationTable } from './saturation-table'
@@ -40,6 +38,7 @@ const MarketAnalytics = dynamic(() => import('./market-analytics').then(m => ({ 
 })
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { summarizeBuckets, tierToBucket, type BucketSummary } from '@/lib/census/ownership-truth'
+import { countSourceClassesFromRows, type SourceClassCounts } from '@/lib/census/zip-census'
 import { CensusBucketSummaryCard } from '@/components/data-display/census-bucket-summary'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
@@ -47,7 +46,7 @@ import {
   fetchPracticeLocations,
   practiceLocationToLaunchpadRecord,
 } from '@/lib/supabase/queries/practice-locations'
-import { Hospital, ClipboardCheck, Users, Clock, MapPin, Store, Zap } from 'lucide-react'
+import { Users, Clock, MapPin, Store, Zap } from 'lucide-react'
 
 import type { Practice, ZipScore, WatchedZip } from '@/lib/types'
 import type { ADABenchmark } from '@/lib/supabase/queries/ada-benchmarks'
@@ -64,6 +63,8 @@ export interface ServerKpis {
   highVolCount: number
   /** The five-bucket census ownership summary — the ONLY ownership headline. */
   bucketSummary: BucketSummary
+  /** Sub-state split of the Needs Ownership Answer bucket for this scope. */
+  sourceClasses: SourceClassCounts
 }
 
 interface JobMarketShellProps {
@@ -183,6 +184,13 @@ function computeCensusKpis(allPractices: Practice[], universe: number): ServerKp
       })),
       universe
     ),
+    sourceClasses: countSourceClassesFromRows(
+      gpPractices.map((p) => ({
+        ownership_tier: p.ownership_tier ?? null,
+        census_review_status: p.census_review_status ?? null,
+      })),
+      universe
+    ),
   }
 }
 
@@ -270,8 +278,10 @@ function JobMarketShellInner({
   const loc = LIVING_LOCATIONS[currentLocation]
 
   // Tab state from URL
+  // The searchable table is the default landing view — the page leads with
+  // what the user came to do (look up offices), not pipeline milestones.
   const urlTab = searchParams.get('tab')
-  const activeTab: TabId = TABS.some(t => t.id === urlTab) ? (urlTab as TabId) : 'overview'
+  const activeTab: TabId = TABS.some(t => t.id === urlTab) ? (urlTab as TabId) : 'directory'
 
   const handleTabChange = useCallback((tab: TabId) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -459,17 +469,11 @@ function JobMarketShellInner({
           </h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
             Search general-dentistry offices by location, ownership, hiring signals, and
-            acquisition leads. Ownership labels come from the reviewed data; offices we have
-            not reviewed yet are clearly marked.
+            acquisition leads. Ownership labels come from the hand-reviewed census; every
+            office without a final answer is tagged with why — not started, researched but
+            inconclusive, or held for review.
           </p>
         </div>
-
-        {/* Data Freshness Banner */}
-        <DataFreshnessBar
-          totalPractices={freshness.totalPractices}
-          daEnriched={freshness.daEnriched}
-          lastUpdated={freshness.lastUpdated}
-        />
 
         {/* Living Location Selector */}
         <LivingLocationSelector
@@ -484,28 +488,53 @@ function JobMarketShellInner({
           </div>
         )}
 
-        {/* ── KPIs ──────────────────────────────────────────── */}
-        <section id="kpis" className="space-y-4">
+        {/* ── Trust header — the only numbers before the table ─────────── */}
+        <section id="kpis" className="space-y-3">
           {/* The five-bucket census strip IS the ownership headline for this
-              scope. The old detector KPIs ("Confirmed Corporate" etc.) were
-              removed, not relabeled (user decision 2026-07-04): detector output
-              is no longer presented as an ownership answer anywhere. */}
+              scope, with the Needs Ownership Answer sub-state split rendered
+              inside the card. The old detector KPIs ("Confirmed Corporate"
+              etc.) were removed, not relabeled (user decision 2026-07-04). */}
           <CensusBucketSummaryCard
             summary={activeKpis.bucketSummary}
             scopeLabel={currentLocation}
+            sourceClasses={activeKpis.sourceClasses}
           />
 
-          {/* First two cards are canonical headline stats (lib/census/headline-stats)
-              — same labels/formulas as Home and Ownership. */}
-          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <HeadlineKpiCard
-              stat={gpLocationsStat(activeKpis.bucketSummary, { gpRowCount: activeKpis.total_p })}
-              icon={<Hospital className="h-5 w-5" />}
-            />
-            <HeadlineKpiCard
-              stat={handReviewedStat(activeKpis.bucketSummary)}
-              icon={<ClipboardCheck className="h-5 w-5" />}
-            />
+          {/* Extra business data — a separate axis, stated as such */}
+          <DataFreshnessBar
+            totalPractices={freshness.totalPractices}
+            daEnriched={freshness.daEnriched}
+            lastUpdated={freshness.lastUpdated}
+          />
+        </section>
+
+        {/* ── Tab Navigation ────────────────────────────────── */}
+        <div className="border-b border-[#E8E5DE]">
+          <nav className="flex gap-0" aria-label="Practice Directory tabs">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`px-5 py-2.5 text-sm font-medium transition-colors relative ${
+                  activeTab === tab.id
+                    ? 'text-[#B8860B] border-b-2 border-[#B8860B]'
+                    : 'text-[#6B6B60] hover:text-[#1A1A1A] border-b-2 border-transparent'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* ── Tab Content ───────────────────────────────────── */}
+
+        {/* Overview Tab -- uses zipScores (already loaded), no full practice data required */}
+        {activeTab === 'overview' && (
+          <div key="overview" className="space-y-6">
+          {/* Market-level KPI cards live here, off the landing view — the
+              Directory leads with the searchable table instead. */}
+          <div className="grid grid-cols-2 gap-4">
             <KpiCard
               icon={<Users className="h-5 w-5" />}
               label="10+ Staff"
@@ -516,7 +545,7 @@ function JobMarketShellInner({
               label="Retirement Risk"
               value={kpiDisplay.retirement_risk.toLocaleString()}
               accentColor="#C23B3B"
-              tooltip="Census dentist-owned clinics (T1–T3) established 30+ years ago. Offices we have not reviewed are never counted here — they stay in the Not Reviewed Yet group."
+              tooltip="Census dentist-owned clinics (T1–T3) established 30+ years ago. Offices without a final ownership answer are never counted here — they stay in the Needs Ownership Answer group."
             />
           </div>
 
@@ -568,32 +597,6 @@ function JobMarketShellInner({
             </div>
           </div>
 
-        </section>
-
-        {/* ── Tab Navigation ────────────────────────────────── */}
-        <div className="border-b border-[#E8E5DE]">
-          <nav className="flex gap-0" aria-label="Practice Directory tabs">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`px-5 py-2.5 text-sm font-medium transition-colors relative ${
-                  activeTab === tab.id
-                    ? 'text-[#B8860B] border-b-2 border-[#B8860B]'
-                    : 'text-[#6B6B60] hover:text-[#1A1A1A] border-b-2 border-transparent'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* ── Tab Content ───────────────────────────────────── */}
-
-        {/* Overview Tab -- uses zipScores (already loaded), no full practice data required */}
-        {activeTab === 'overview' && (
-          <div key="overview" className="space-y-6">
             <SaturationTable
               zipScores={zipScores}
               watchedZips={initialWatchedZips}

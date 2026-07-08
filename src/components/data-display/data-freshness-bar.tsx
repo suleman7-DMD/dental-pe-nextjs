@@ -33,21 +33,21 @@ export function DataFreshnessBar({
         <span className="font-medium text-[var(--text-primary)]">
           {formatNumber(totalPractices)}
         </span>
-        <span>locations loaded</span>
+        <span>GP offices tracked</span>
       </div>
 
       <div className="h-3 w-px bg-[var(--border)]" />
 
       <div
         className="flex items-center gap-1.5 text-[var(--text-secondary)]"
-        title="Offices matched to a commercial business database that adds staff size and revenue estimates. This is a different measurement from ownership review — an office can have this extra data and still be Not Reviewed Yet, or be reviewed with no extra data."
+        title="Offices matched to a commercial business database that adds staff size and revenue estimates. Business fields present — NOT an ownership answer and NOT a doctor/owner verification. An office can have this data and still need an ownership answer, or be classified with no extra data."
       >
         <BarChart3 className="h-3.5 w-3.5 text-[var(--accent-cyan)]" />
         <span className="font-medium text-[var(--text-primary)]">
           {formatNumber(resolvedEnriched)}
         </span>
         <span>
-          have extra staff/revenue data ({enrichmentPct}%) — separate from ownership review
+          have staff/revenue estimates ({enrichmentPct}%) — separate from ownership answers or doctor verification
         </span>
       </div>
 

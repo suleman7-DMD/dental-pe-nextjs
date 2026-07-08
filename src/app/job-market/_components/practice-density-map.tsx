@@ -335,7 +335,7 @@ export function PracticeDensityMap({
         city_zip: `${p.city ?? ''}, ${p.state ?? ''} ${(p.zip ?? '').toString().slice(0, 5)}`,
         ownership_label:
           bucket === 'unresolved'
-            ? 'Not reviewed yet — no ownership answer'
+            ? 'Needs ownership answer — no final answer yet'
             : BUCKET_META[bucket].label,
         network: p.network_id ? formatNetworkId(p.network_id) : '--',
         employees: emp ? emp.toString() : '--',
@@ -366,7 +366,7 @@ export function PracticeDensityMap({
     <div>
       <SectionHeader
         title="Ownership Map"
-        helpText="Each dot is a general-dentistry office. Color shows the reviewed ownership answer. Gray means not reviewed yet. Faded dots use the ZIP center because exact coordinates are missing. Click a dot to open the full practice page."
+        helpText="Each dot is a general-dentistry office. Color shows the reviewed ownership answer. Gray means the office still needs an ownership answer. Faded dots use the ZIP center because exact coordinates are missing. Click a dot to open the full practice page."
       />
 
       {geocoded.length === 0 ? (

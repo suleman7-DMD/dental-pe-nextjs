@@ -108,11 +108,11 @@ export const BUCKET_META: Record<HeadlineBucket, BucketMeta> = {
     color: "#6B7280",
   },
   unresolved: {
-    label: "Not Reviewed Yet",
-    shortLabel: "Not Reviewed Yet",
+    label: "Needs Ownership Answer",
+    shortLabel: "Needs Answer",
     tiers: [],
     description:
-      "Offices without a hand-reviewed ownership answer yet (including a few researched-but-undetermined or held rows). Always shown — never rolled into another bucket, never filled with guesses.",
+      "Offices without a final ownership answer, in three sub-states: not started, researched but inconclusive, or held for review. Always shown — never rolled into another bucket, never filled with guesses.",
     color: "#B8860B",
   },
 }
@@ -154,16 +154,16 @@ export const SOURCE_CLASS_META: Record<SourceClass, { label: string; description
     description: "A human-reviewed ownership answer backed by evidence.",
   },
   held: {
-    label: "Needs decision",
-    description: "Reviewed, but a conflict, duplicate question, or verification blocker still needs a decision.",
+    label: "Held for review",
+    description: "Researched, but a conflict, duplicate question, or verification blocker is holding the final call.",
   },
   undetermined: {
-    label: "Researched, still unclear",
+    label: "Researched, inconclusive",
     description: "Researched, but the evidence was too thin to classify.",
   },
   unreviewed: {
-    label: "Not reviewed yet",
-    description: "This location has not been reviewed yet.",
+    label: "Not started",
+    description: "No one has researched this office's ownership yet.",
   },
   legacy_detector: {
     label: "Old automated estimate",
