@@ -4,7 +4,8 @@ import { getPracticeStats, getRetirementRiskCount, getAcquisitionTargetCount } f
 import { getWatchedZipCount } from '@/lib/supabase/queries/watched-zips'
 import { getRecentChanges } from '@/lib/supabase/queries/changes'
 import { getCensusSummary } from '@/lib/supabase/queries/census'
-import { HomeShell } from './_components/home-shell'
+import { displayName } from '@/lib/census/display-name'
+import { HomeShell, type PracticeChangeFeedItem } from './_components/home-shell'
 import type { HomeSummary } from '@/lib/types'
 import type { DealStats } from '@/lib/supabase/types'
 
@@ -88,11 +89,39 @@ export default async function HomePage() {
         }),
         getRecentChanges(supabase, undefined, 90)
           .then((changes) => changes.slice(0, 8))
+          .then(async (changes): Promise<PracticeChangeFeedItem[]> => {
+            // Resolve the (≤8) NPIs to directory locations so the feed
+            // headlines practice names, not raw registry IDs (§7.1).
+            if (changes.length === 0) return []
+            const npis = [...new Set(changes.map((c) => c.npi).filter(Boolean))]
+            const { data } = await supabase
+              .from('practice_locations')
+              .select('location_id, primary_npi, practice_name, doing_business_as, city')
+              .in('primary_npi', npis)
+            type LocRow = {
+              location_id: string
+              primary_npi: string | null
+              practice_name: string | null
+              doing_business_as: string | null
+              city: string | null
+            }
+            const byNpi = new Map(
+              (((data as LocRow[] | null) ?? [])).map((r) => [r.primary_npi ?? '', r])
+            )
+            return changes.map((c) => {
+              const loc = byNpi.get(c.npi)
+              return {
+                ...c,
+                practiceName: displayName({ ...(loc ?? {}), npi: c.npi }),
+                locationId: loc?.location_id ?? null,
+              }
+            })
+          })
           .catch((err) => {
             console.error('[HomePage] recentChanges error:', err)
             // Return null to distinguish fetch-failure from genuinely empty data.
             // HomeShell renders "Activity feed unavailable" for null vs empty-state for [].
-            return null as import('@/lib/types').PracticeChange[] | null
+            return null as PracticeChangeFeedItem[] | null
           }),
         (async () => {
           const { data } = await supabase

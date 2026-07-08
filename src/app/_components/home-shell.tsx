@@ -2,16 +2,10 @@
 
 import Link from 'next/link'
 import {
-  BarChart3,
-  Target,
-  Briefcase,
-  Microscope,
   ArrowRight,
   Zap,
   Building2,
   RefreshCw,
-  Brain,
-  Crosshair,
   AlertTriangle,
   Database,
   FileCheck2,
@@ -34,113 +28,25 @@ import type { CensusSummary } from '@/lib/supabase/queries/census'
 // Types
 // ────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Change row enriched server-side with the practice's display name and
+ * location link, so the feed never headlines a raw registry NPI (§7.1).
+ */
+export interface PracticeChangeFeedItem extends PracticeChange {
+  practiceName: string
+  locationId: string | null
+}
+
 interface HomeShellProps {
   summary: HomeSummary
   acquisitionTargets: number
-  recentChanges: PracticeChange[] | null
+  recentChanges: PracticeChangeFeedItem[] | null
   censusSummary: CensusSummary
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Nav cards config
-// ────────────────────────────────────────────────────────────────────────────
-
-interface NavCard {
-  href: string
-  icon: React.ElementType
-  title: string
-  description: string
-  accentColor: string
-}
-
-const NAV_CARDS: NavCard[] = [
-  {
-    href: '/directory',
-    icon: Database,
-    title: 'Directory',
-    description: 'Every Chicagoland GP location',
-    accentColor: '#B8860B',
-  },
-  {
-    href: '/market-intel',
-    icon: GitBranch,
-    title: 'Ownership',
-    description: 'Census coverage and owner trees',
-    accentColor: '#2D8B4E',
-  },
-  {
-    href: '/launchpad',
-    icon: Briefcase,
-    title: 'Job Hunt',
-    description: 'Career search from verified ownership',
-    accentColor: '#7C3AED',
-  },
-  {
-    href: '/buyability',
-    icon: Target,
-    title: 'Acquisition Scout',
-    description: 'Succession and buy-side research',
-    accentColor: '#D4920B',
-  },
-  {
-    href: '/warroom',
-    icon: Crosshair,
-    title: 'Review Desk',
-    description: 'Rows that need a closer look',
-    accentColor: '#C23B3B',
-  },
-  {
-    href: '/deal-flow',
-    icon: BarChart3,
-    title: 'PE Deals',
-    description: 'Separated deal archive and sponsors',
-    accentColor: '#6366F1',
-  },
-  {
-    href: '/research',
-    icon: Microscope,
-    title: 'Evidence',
-    description: 'Sponsor, platform, and proof library',
-    accentColor: '#06B6D4',
-  },
-  {
-    href: '/intelligence',
-    icon: Brain,
-    title: 'Research Notes',
-    description: 'Practice and ZIP context',
-    accentColor: '#8B5CF6',
-  },
-]
-
-// ────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ────────────────────────────────────────────────────────────────────────────
-
-function NavCardComponent({ card }: { card: NavCard }) {
-  const Icon = card.icon
-
-  return (
-    <Link
-      href={card.href}
-      className="group rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-5 flex flex-col gap-3 hover:border-[#D4D0C8] hover:bg-[#F7F7F4] hover:scale-[1.01] transition-all duration-200"
-    >
-      <div className="flex items-start justify-between">
-        <div
-          className="rounded-lg p-2"
-          style={{ backgroundColor: `color-mix(in srgb, ${card.accentColor} 10%, #FFFFFF)` }}
-        >
-          <Icon className="h-5 w-5" style={{ color: card.accentColor }} />
-        </div>
-        <ArrowRight className="h-4 w-4 text-[#8F8E82] group-hover:text-[var(--accent-color)] transition-colors" style={{ '--accent-color': card.accentColor } as React.CSSProperties} />
-      </div>
-
-      <div>
-        <h3 className="font-semibold text-[#1A1A1A] text-[15px]">{card.title}</h3>
-        <p className="text-xs text-[#6B6B60] mt-0.5">{card.description}</p>
-      </div>
-    </Link>
-  )
-}
 
 function RecentDealsTable({ deals }: { deals: HomeSummary['recentDeals'] }) {
   if (!deals || deals.length === 0) {
@@ -231,7 +137,7 @@ function formatChangeDescription(change: PracticeChange): string {
   return `${friendlyField} updated`
 }
 
-function RecentActivityFeed({ changes }: { changes: PracticeChange[] | null }) {
+function RecentActivityFeed({ changes }: { changes: PracticeChangeFeedItem[] | null }) {
   if (changes === null) {
     // Fetch failed — surface the error instead of silently showing empty state
     return (
@@ -271,9 +177,18 @@ function RecentActivityFeed({ changes }: { changes: PracticeChange[] | null }) {
               {getChangeIcon(change.change_type, change.field_changed)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-[#1A1A1A] truncate">
-                NPI: {change.npi}
-              </p>
+              {change.locationId ? (
+                <Link
+                  href={`/practice/${encodeURIComponent(change.locationId)}`}
+                  className="block truncate text-[13px] font-medium text-[#1A1A1A] hover:text-[#8B6508]"
+                >
+                  {change.practiceName}
+                </Link>
+              ) : (
+                <p className="text-[13px] font-medium text-[#1A1A1A] truncate">
+                  {change.practiceName}
+                </p>
+              )}
               <p className="text-xs text-[#6B6B60] mt-0.5 truncate">
                 {formatChangeDescription(change)}
               </p>
@@ -392,7 +307,7 @@ function CensusStatusModel({ census }: { census: CensusSummary }) {
             The team looked, but the public evidence was not strong enough.
           </p>
         </div>
-        <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
+        <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3 sm:col-span-2">
           <div className="text-xs font-medium uppercase tracking-wider text-[#6B6B60]">
             Not Reviewed Yet
           </div>
@@ -401,17 +316,6 @@ function CensusStatusModel({ census }: { census: CensusSummary }) {
           </div>
           <p className="mt-2 text-xs text-[#6B6B60]">
             No synced ownership conclusion yet. These remain unknown.
-          </p>
-        </div>
-        <div className="rounded-md border border-[#E8E5DE] bg-[#FAFAF7] p-3">
-          <div className="text-xs font-medium uppercase tracking-wider text-[#6B6B60]">
-            Batch Progress
-          </div>
-          <div className="mt-2 text-sm font-semibold text-[#1A1A1A]">
-            Appears after sync
-          </div>
-          <p className="mt-2 text-xs text-[#6B6B60]">
-            Research batches will show here once Fable syncs their review status into the app.
           </p>
         </div>
       </div>
@@ -542,17 +446,6 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges, censusSu
             <Link href="/research" className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[#B8860B]">
               Open Evidence <ArrowRight className="h-3 w-3" />
             </Link>
-          </div>
-        </div>
-
-        <div>
-          <h2 className="mb-4 font-sans text-lg font-semibold text-[#1A1A1A]">
-            Where to Go
-          </h2>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {NAV_CARDS.map((card) => (
-              <NavCardComponent key={card.href} card={card} />
-            ))}
           </div>
         </div>
 
