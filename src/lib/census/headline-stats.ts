@@ -153,32 +153,32 @@ export function multiLocationReviewedStat(multiLocationReviewed: number): Headli
 }
 
 /**
- * The strict acquisition-lead cut (Home). Strict and broad are intentionally
- * different numbers from the same pre-census importer queue — so they carry
- * different labels and each tooltip names the other by definition, never by a
- * hardcoded count.
+ * The two acquisition-lead cards measure DIFFERENT things by design — one is
+ * an automated score signal, the other a hand-reviewed candidate set — so
+ * they carry different labels and each tooltip names the other by definition,
+ * never by a hardcoded count. Neither is a subset of the other.
  */
 export function acquisitionLeadsStrictStat(strictCount: number): HeadlineStat {
   return {
     key: "acquisition_leads_strict",
     label: "High-Score Acquisition Leads",
     value: formatCount(strictCount),
-    sublabel: "early signal — ownership not yet vetted",
+    sublabel: "older automated score — ownership not yet vetted",
     tooltip:
-      "Independent-classified practices with a buyability score of 50 or more from the pre-census importer. An early lead list only: Acquisition Scout holds the broad queue this is cut from, and every lead still needs its hand-reviewed ownership record checked before action.",
+      "GP locations with a buyability score of 50 or more from the older automated importer. An early lead list only, not an ownership claim: Acquisition Scout builds its candidate set from hand-reviewed ownership instead, so the two cards measure different things. Every lead here still needs its reviewed ownership record checked before action.",
     accentColor: "#2D8B4E",
   }
 }
 
-/** The broad acquisition-lead queue (Acquisition Scout). */
+/** The reviewed dentist-owned candidate set (Acquisition Scout). */
 export function acquisitionLeadsBroadStat(broadCount: number): HeadlineStat {
   return {
     key: "acquisition_leads_broad",
-    label: "Acquisition Leads (Broad)",
+    label: "Acquisition Leads (Reviewed)",
     value: formatCount(broadCount),
-    sublabel: "every independent-classified practice",
+    sublabel: "hand-reviewed solo owner-operated + single-location groups",
     tooltip:
-      "Every independent-classified practice regardless of buyability score. Home shows the strict cut of this same queue (score 50 or more), so the two cards intentionally differ: broad queue here, short list there. Both are early signals to screen against hand-reviewed ownership.",
+      "Practices whose hand-reviewed ownership qualifies them as single-site acquisition candidates: true solo owner-operated offices and dentist-owned single-location groups. Reviewed DSO/PE and institutional rows are dead ends; not-reviewed rows stay quarantined in their own lane. Home's high-score card is a different basis — the older automated score, not this reviewed set.",
     accentColor: "#2D8B4E",
   }
 }

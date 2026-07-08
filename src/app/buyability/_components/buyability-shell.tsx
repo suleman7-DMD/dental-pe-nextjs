@@ -17,17 +17,21 @@ import { KpiCard } from '@/components/data-display/kpi-card'
 import { HeadlineKpiCard } from '@/components/data-display/headline-kpi-card'
 import { acquisitionLeadsBroadStat } from '@/lib/census/headline-stats'
 import { SectionHeader } from '@/components/data-display/section-header'
-import { StatusBadge } from '@/components/data-display/status-badge'
+import { CensusBadge } from '@/components/data-display/census-badge'
+import { BUCKET_META, tierToBucket } from '@/lib/census/ownership-truth'
 import {
   getEntityClassificationLabel,
-  isIndependentClassification,
   isCorporateClassification,
 } from '@/lib/constants/entity-classifications'
 import { toCSVString } from '@/lib/utils/csv-export'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
-// Category assignment — computed from actual data, not notes
+// Category assignment — the reviewed census tier is the basis (§7.1). The
+// candidate set is census T1/T2 (solo owner-operated + dentist-owned
+// single-location). Rows without a reviewed tier are quarantined as
+// "unreviewed" — they never rank as acquisition targets, no matter what the
+// older automated classification or score said.
 // ────────────────────────────────────────────────────────────────────────────
 
 type BuyabilityCategory =
@@ -35,27 +39,25 @@ type BuyabilityCategory =
   | 'dead_end'
   | 'job_target'
   | 'specialist'
+  | 'unreviewed'
 
 function categorize(p: Practice): BuyabilityCategory {
+  // Hand-reviewed rows: the census tier decides, the old detector never does.
+  if (p.ownership_tier) {
+    const bucket = tierToBucket(p.ownership_tier)
+    if (bucket === 'dso_pe_corporate' || bucket === 'institutional') return 'dead_end'
+    // Dentist-owned multi-location: a deal would involve the network, not
+    // this one site — keep it out of the single-site candidate set.
+    if (p.ownership_tier === 'dentist_multi') return 'job_target'
+    // T1 true_independent / T2 single_loc_group — the reviewed candidate set
+    if (bucket !== 'unresolved') return 'acquisition_target'
+  }
+  // Not reviewed yet: the older automated classification may still rule a
+  // row OUT (specialist / corporate / non-clinical), but never rules one IN.
   const ec = p.entity_classification ?? ''
   if (ec === 'specialist') return 'specialist'
-  if (isCorporateClassification(ec)) return 'dead_end'
-  if (ec === 'non_clinical') return 'dead_end'
-  // Independent practices
-  if (isIndependentClassification(ec) || !ec) {
-    // High buyability = acquisition target
-    if (p.buyability_score != null && p.buyability_score >= 50) return 'acquisition_target'
-    // Large employer or group = good job target
-    if (
-      (p.employee_count != null && p.employee_count >= 5) ||
-      ec === 'large_group' ||
-      ec === 'small_group'
-    )
-      return 'job_target'
-    // Default: acquisition target (still independent, just lower score)
-    return 'acquisition_target'
-  }
-  return 'acquisition_target'
+  if (isCorporateClassification(ec) || ec === 'non_clinical') return 'dead_end'
+  return 'unreviewed'
 }
 
 interface AnalyzedPractice extends Practice {
@@ -92,10 +94,11 @@ const PAGE_SIZE = 25
 
 const CATEGORIES: { label: string; value: BuyabilityCategory | 'all' }[] = [
   { label: 'All Categories', value: 'all' },
-  { label: 'Acquisition Leads (broad)', value: 'acquisition_target' },
+  { label: 'Acquisition Leads (reviewed dentist-owned)', value: 'acquisition_target' },
   { label: 'Dead Ends', value: 'dead_end' },
   { label: 'Job Targets', value: 'job_target' },
   { label: 'Specialists', value: 'specialist' },
+  { label: 'Not Reviewed Yet', value: 'unreviewed' },
 ]
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -121,7 +124,8 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
     const dead = analyzed.filter((p) => p.category === 'dead_end').length
     const job = analyzed.filter((p) => p.category === 'job_target').length
     const spec = analyzed.filter((p) => p.category === 'specialist').length
-    return { acq, dead, job, spec }
+    const unrev = analyzed.filter((p) => p.category === 'unreviewed').length
+    return { acq, dead, job, spec, unrev }
   }, [analyzed])
 
   // Unique ZIPs for filter
@@ -220,6 +224,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
       Address: p.address ?? '',
       City: p.city ?? '',
       ZIP: p.zip ?? '',
+      'Reviewed Ownership': p.ownership_tier ? BUCKET_META[tierToBucket(p.ownership_tier)].label : '',
       Classification: getEntityClassificationLabel(p.entity_classification),
       Category: p.category,
       'Buyability Score': p.buyability_score ?? '',
@@ -255,6 +260,8 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
         return 'text-[#B8860B]'
       case 'specialist':
         return 'text-[#7C3AED]'
+      case 'unreviewed':
+        return 'text-[#6B7280]'
     }
   }
 
@@ -268,6 +275,8 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
         return 'Job Target'
       case 'specialist':
         return 'Specialist'
+      case 'unreviewed':
+        return 'Not Reviewed'
     }
   }
 
@@ -293,16 +302,18 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
         <div>
           <h1 className="font-sans font-bold text-2xl text-[#1A1A1A]">Acquisition Scout</h1>
           <p className="text-[#6B6B60] text-sm mt-1 max-w-3xl">
-            {analyzed.length} practices scored for succession, partnership, and acquisition
-            research. Treat this as a scout queue: legacy buyability signals become actionable
-            only after reviewed census ownership, operating status, and evidence checks.
+            {analyzed.length} practices in the scout queue. Candidate lanes come from
+            hand-reviewed ownership: solo owner-operated and dentist-owned single-location
+            offices qualify, reviewed DSO/PE and institutional rows are dead ends, and
+            not-reviewed rows stay quarantined until the census reaches them. The older
+            automated score is a sort hint, not a verdict.
           </p>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Canonical broad-leads headline (lib/census/headline-stats) — its
-              tooltip names Home's strict cut by definition, never by count. */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {/* Canonical reviewed-leads headline (lib/census/headline-stats) — its
+              tooltip names Home's high-score card by definition, never by count. */}
           <HeadlineKpiCard
             stat={acquisitionLeadsBroadStat(kpis.acq)}
             icon={<Target className="h-4 w-4" />}
@@ -324,6 +335,12 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
             label="Specialists"
             value={kpis.spec.toLocaleString()}
             accentColor="#7C3AED"
+          />
+          <KpiCard
+            icon={<ShieldOff className="h-4 w-4" />}
+            label="Not Reviewed Yet"
+            value={kpis.unrev.toLocaleString()}
+            accentColor="#6B7280"
           />
         </div>
 
@@ -401,7 +418,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                     </span>
                   </th>
                   <th className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider">
-                    Status
+                    Reviewed Ownership
                   </th>
                   <th className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider">
                     Classification
@@ -464,7 +481,7 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                         {p.zip ?? '--'}
                       </td>
                       <td className="px-4 py-2.5">
-                        <StatusBadge status={p.entity_classification ?? p.ownership_status} />
+                        <CensusBadge tier={p.ownership_tier} peBacked={p.pe_backed} compact />
                       </td>
                       <td className="px-4 py-2.5 text-xs text-[#6B6B60]">
                         {getEntityClassificationLabel(p.entity_classification)}
@@ -490,7 +507,9 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                                   ? 'rgba(194,59,59,0.1)'
                                   : p.category === 'job_target'
                                     ? 'rgba(184,134,11,0.1)'
-                                    : 'rgba(124,58,237,0.1)',
+                                    : p.category === 'unreviewed'
+                                      ? 'rgba(107,114,128,0.1)'
+                                      : 'rgba(124,58,237,0.1)',
                           }}
                         >
                           {categoryLabel(p.category)}
