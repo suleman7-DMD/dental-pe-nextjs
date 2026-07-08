@@ -335,7 +335,7 @@ export function PracticeDensityMap({
         city_zip: `${p.city ?? ''}, ${p.state ?? ''} ${(p.zip ?? '').toString().slice(0, 5)}`,
         ownership_label:
           bucket === 'unresolved'
-            ? 'Unresolved — not yet reviewed'
+            ? 'Not reviewed yet — no ownership answer'
             : BUCKET_META[bucket].label,
         network: p.network_id ? formatNetworkId(p.network_id) : '--',
         employees: emp ? emp.toString() : '--',
@@ -366,7 +366,7 @@ export function PracticeDensityMap({
     <div>
       <SectionHeader
         title="Ownership Map"
-        helpText="Each dot is a general-dentistry office. Color shows the reviewed ownership answer. Gray means not reviewed or still unresolved. Faded dots use the ZIP center because exact coordinates are missing. Click a dot to open the full practice page."
+        helpText="Each dot is a general-dentistry office. Color shows the reviewed ownership answer. Gray means not reviewed yet. Faded dots use the ZIP center because exact coordinates are missing. Click a dot to open the full practice page."
       />
 
       {geocoded.length === 0 ? (
@@ -384,7 +384,7 @@ export function PracticeDensityMap({
                 onChange={(e) => setHideUnresolved(e.target.checked)}
                 className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
               />
-              Hide unresolved offices
+              Hide not-reviewed offices
             </label>
           </div>
 
@@ -420,7 +420,7 @@ export function PracticeDensityMap({
           {/* Summary counts */}
           <p className="text-xs text-[#6B6B60] mt-1">
             Showing {geocoded.length.toLocaleString()} offices
-            {hideUnresolved ? ' (unresolved hidden)' : ''}
+            {hideUnresolved ? ' (not-reviewed offices hidden)' : ''}
             {' '}&middot;{' '}
             {geocoded.filter(d => !d.is_approximate).length.toLocaleString()} precise locations,{' '}
             {geocoded.filter(d => d.is_approximate).length.toLocaleString()} approximate (ZIP centroid)

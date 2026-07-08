@@ -38,12 +38,17 @@ export function DataFreshnessBar({
 
       <div className="h-3 w-px bg-[var(--border)]" />
 
-      <div className="flex items-center gap-1.5 text-[var(--text-secondary)]">
+      <div
+        className="flex items-center gap-1.5 text-[var(--text-secondary)]"
+        title="Offices matched to a commercial business database that adds staff size and revenue estimates. This is a different measurement from ownership review — an office can have this extra data and still be Not Reviewed Yet, or be reviewed with no extra data."
+      >
         <BarChart3 className="h-3.5 w-3.5 text-[var(--accent-cyan)]" />
         <span className="font-medium text-[var(--text-primary)]">
           {formatNumber(resolvedEnriched)}
         </span>
-        <span>with business details ({enrichmentPct}%)</span>
+        <span>
+          have extra staff/revenue data ({enrichmentPct}%) — separate from ownership review
+        </span>
       </div>
 
       {lastUpdated && (

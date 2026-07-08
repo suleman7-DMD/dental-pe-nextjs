@@ -209,7 +209,7 @@ function MarketIntelShellInner({
           </div>
 
           <p className="text-[#707064] text-xs">
-            Within Unresolved ({bucketSummary.counts.unresolved.toLocaleString()}):{' '}
+            Within Not Reviewed Yet ({bucketSummary.counts.unresolved.toLocaleString()}):{' '}
             {sourceClasses.held.toLocaleString()} held for adjudication &middot;{' '}
             {sourceClasses.undetermined.toLocaleString()} undetermined after research &middot;{' '}
             {sourceClasses.notYetReviewed.toLocaleString()} not yet reviewed.
@@ -275,7 +275,7 @@ function MarketIntelShellInner({
             <div>
               <SectionHeader
                 title="Census Ownership Tiers"
-                helpText="ownership_tier is the only ownership truth layer — assigned by hand review with cited evidence, one location at a time. Tiers roll up to the five headline buckets; anything without a reviewed tier stays Unresolved."
+                helpText="ownership_tier is the only ownership truth layer — assigned by hand review with cited evidence, one location at a time. Tiers roll up to the five headline groups; anything without a reviewed tier stays marked Not Reviewed Yet."
               />
 
               <div className="mt-4 space-y-4">

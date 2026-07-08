@@ -149,7 +149,7 @@ export function ZipScoreTable({ zipScores, tallies }: ZipScoreTableProps) {
     <div>
       <SectionHeader
         title="ZIP Census Detail"
-        helpText="Each row = one watched ZIP. Ownership columns count hand-reviewed conclusions only: True Independent (solo owner-operated), Dentist-Owned Group, DSO / PE, and Institutional. Unresolved = GP clinics without a reviewed conclusion, shown explicitly and never filled with estimates. Older Opp. Score and Market Type come from the older automated pipeline, kept for triage convenience; they are not ownership claims."
+        helpText="Each row = one watched ZIP. Ownership columns count hand-reviewed conclusions only: True Independent (solo owner-operated), Dentist-Owned Group, DSO / PE, and Institutional. Not Reviewed Yet = GP clinics without a reviewed conclusion, shown explicitly and never filled with estimates. Older Opp. Score and Market Type come from the older automated pipeline, kept for triage convenience; they are not ownership claims."
       />
       <div className="mt-4">
         <DataTable

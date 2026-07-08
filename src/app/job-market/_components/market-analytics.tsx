@@ -169,7 +169,7 @@ export function MarketAnalytics({ practices, zipStats }: MarketAnalyticsProps) {
             Ownership Breakdown by ZIP -- Top 25
           </h3>
           <p className="text-xs text-[#6B6B60] mb-3">
-            Five ownership groups per ZIP. Unresolved = offices without a reviewed answer.
+            Five ownership groups per ZIP. &ldquo;Not Reviewed Yet&rdquo; = offices without a reviewed answer.
           </p>
           <StackedBarChart
             data={censusBreakdownData}

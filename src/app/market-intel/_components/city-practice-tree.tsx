@@ -256,7 +256,7 @@ export function CityPracticeTree({ watchedZips, zipScores, zipList, tallies }: C
                             >
                               {cg.unresolved}
                             </div>
-                            <div className="text-[0.7rem] text-[#6B6B60]">Unresolved</div>
+                            <div className="text-[0.7rem] text-[#6B6B60]">Not Reviewed Yet</div>
                           </div>
                         </div>
                       )}

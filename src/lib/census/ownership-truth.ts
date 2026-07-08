@@ -108,11 +108,11 @@ export const BUCKET_META: Record<HeadlineBucket, BucketMeta> = {
     color: "#6B7280",
   },
   unresolved: {
-    label: "Unresolved",
-    shortLabel: "Unresolved",
+    label: "Not Reviewed Yet",
+    shortLabel: "Not Reviewed Yet",
     tiers: [],
     description:
-      "Not yet a census conclusion: undetermined after research, held for adjudication, or not yet reviewed. Always shown — never rolled into another bucket.",
+      "Offices without a hand-reviewed ownership answer yet (including a few researched-but-undetermined or held rows). Always shown — never rolled into another bucket, never filled with guesses.",
     color: "#B8860B",
   },
 }

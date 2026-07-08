@@ -89,7 +89,7 @@ export function handReviewedStat(summary: BucketSummary): HeadlineStat {
     value: formatCount(summary.reviewed),
     sublabel: `${formatShare(summary.coveragePct)} of ${formatCount(summary.universe)} GP locations`,
     tooltip:
-      "Locations with a hand-reviewed ownership conclusion backed by cited evidence. Everything else stays Unresolved — shown honestly, never filled with estimates.",
+      "Locations with a hand-reviewed ownership conclusion backed by cited evidence. Everything else is marked Not Reviewed Yet — shown honestly, never filled with estimates.",
     accentColor: "#2D8B4E",
   }
 }

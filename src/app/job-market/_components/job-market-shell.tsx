@@ -516,7 +516,7 @@ function JobMarketShellInner({
               label="Retirement Risk"
               value={kpiDisplay.retirement_risk.toLocaleString()}
               accentColor="#C23B3B"
-              tooltip="Census dentist-owned clinics (T1–T3) established 30+ years ago. Unreviewed clinics are never counted here — they stay in the Unresolved bucket."
+              tooltip="Census dentist-owned clinics (T1–T3) established 30+ years ago. Offices we have not reviewed are never counted here — they stay in the Not Reviewed Yet group."
             />
           </div>
 

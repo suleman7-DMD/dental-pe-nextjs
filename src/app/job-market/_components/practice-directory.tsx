@@ -600,7 +600,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <div className="text-sm text-[#B8860B]">
           Showing <strong>{filtered.length.toLocaleString()}</strong> of{' '}
           <strong>{totalPractices.toLocaleString()}</strong> GP offices |{' '}
-          <strong>{filteredEnriched.toLocaleString()}</strong> with business details
+          <strong>{filteredEnriched.toLocaleString()}</strong> have extra staff/revenue data
         </div>
       </div>
 
@@ -609,7 +609,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
           <TabsTrigger value="employment">Hiring leads</TabsTrigger>
           <TabsTrigger value="ownership">Acquisition Leads</TabsTrigger>
-          <TabsTrigger value="enriched">Business details</TabsTrigger>
+          <TabsTrigger value="enriched">Staff/revenue data</TabsTrigger>
           <TabsTrigger value="all">All practices</TabsTrigger>
         </TabsList>
 
@@ -682,14 +682,14 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <TabsContent value="enriched">
           {enrichedPractices.length === 0 ? (
             <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-              No offices with added business details match the current filters.
+              No offices with extra staff/revenue data match the current filters.
             </div>
           ) : (
             <>
               {enrichedPractices.length > 500 && (
                 <p className="text-xs text-[#B8860B] mb-2">
                   Showing page {page} of {Math.ceil(enrichedPractices.length / PAGE_SIZE)} for{' '}
-                  {enrichedPractices.length.toLocaleString()} offices with business details. Download CSV for full list.
+                  {enrichedPractices.length.toLocaleString()} offices with extra staff/revenue data. Download CSV for full list.
                 </p>
               )}
               <DataTable

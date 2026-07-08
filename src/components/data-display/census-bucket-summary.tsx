@@ -49,8 +49,8 @@ export function CensusBucketSummaryCard({
           Ownership review — {scopeLabel}
         </h2>
         <span className="text-xs text-[#6B6B60] font-mono">
-          {reviewed.toLocaleString()} of {universe.toLocaleString()} general-dentistry offices reviewed
-          {' '}({coveragePct.toFixed(1)}%)
+          {reviewed.toLocaleString()} reviewed + {counts.unresolved.toLocaleString()} not reviewed yet
+          {' '}= {universe.toLocaleString()} offices ({coveragePct.toFixed(1)}% done)
         </span>
       </div>
 
@@ -101,9 +101,10 @@ export function CensusBucketSummaryCard({
       </div>
 
       <p className="text-[11px] text-[#8A8A7E] mt-2.5">
-        These are human-reviewed ownership answers. Percentages use every general-dentistry
-        office in this area. Unresolved means the office is still not classified; the app does
-        not fill those rows with guesses.
+        Every office in this area is in exactly one group, so the five counts add up to the
+        total. The first four groups are human-reviewed ownership answers; &ldquo;Not Reviewed
+        Yet&rdquo; means no one has classified that office, and the app never fills those in
+        with guesses.
       </p>
     </div>
   )

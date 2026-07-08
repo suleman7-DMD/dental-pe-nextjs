@@ -26,7 +26,7 @@ function jobHuntContext(row: PracticeLocationRecord): string {
     case "dentist_multi":
       return "Dentist-owned group — plausible associate hiring without corporate employment terms."
     default:
-      return "Ownership unresolved — treat the employment context as unknown until this location is reviewed."
+      return "Ownership not reviewed yet — treat the employment context as unknown until this location is reviewed."
   }
 }
 
