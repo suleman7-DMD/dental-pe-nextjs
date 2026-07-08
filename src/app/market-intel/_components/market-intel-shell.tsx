@@ -367,8 +367,8 @@ function MarketIntelShellInner({
                       Every tier is a hand-reviewed conclusion: a reviewer researches the location,
                       records an evidence basis (state business registrations, practice websites,
                       NPI cross-references, DSO location pages), cites source URLs, and assigns a
-                      confidence level. Multi-location ownership is linked through a shared{' '}
-                      <code className="bg-[#F7F7F4] px-1 rounded">network_id</code>.
+                      confidence level. Locations that share an owner or group are linked to the
+                      same named network, so related offices show up together.
                     </p>
                     <p>
                       Locations the census could not settle stay visible as open items: held for
@@ -376,7 +376,7 @@ function MarketIntelShellInner({
                       evidence was too thin. Nothing is backfilled with estimates.
                     </p>
                     <p>
-                      The pre-census automated detector (entity_classification) is no longer an
+                      The older automated detector is no longer an
                       ownership answer anywhere on this page. Its methodology, the confirmed-floor
                       story, and the ADA anchor comparison live in{' '}
                       <Link href="/data-breakdown" className="text-[#8B6508] underline underline-offset-2 hover:text-[#B8860B]">

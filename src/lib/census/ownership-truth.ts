@@ -224,9 +224,11 @@ export const LEGACY_DETECTOR_CONTEXT_LABEL = SOURCE_CLASS_META.legacy_detector.l
  * ("Heartland Dental"). The ONLY network formatter — every surface imports
  * this one. Free-text ids (spaces, slashes, parens, commas — reviewer notes
  * rather than slugs) pass through verbatim after the ao:/brand: prefix.
+ * ao: assignments are owner *candidates* until the verifier pass confirms
+ * them, and the label says so (§7.1).
  */
 export function formatNetworkId(id: string): string {
-  const prefix = /^ao:/i.test(id) ? "Owner: " : /^brand:/i.test(id) ? "Group: " : ""
+  const prefix = /^ao:/i.test(id) ? "Owner (candidate): " : /^brand:/i.test(id) ? "Group: " : ""
   const body = id.replace(/^ao:/i, "").replace(/^brand:/i, "")
   if (/[^a-z0-9_\-.]/i.test(body)) return `${prefix}${body.trim()}`
   const cleaned = body

@@ -94,31 +94,31 @@ export function ZipScoreTable({ zipScores, tallies }: ZipScoreTableProps) {
     },
     {
       key: 'solo_owner',
-      header: 'Solo Owner-Op (T1)',
+      header: BUCKET_META.true_solo_owner_operated.label,
       align: 'right' as const,
       render: bucketCell(BUCKET_META.true_solo_owner_operated.color),
     },
     {
       key: 'dentist_owned',
-      header: 'Dentist-Owned (T2–T3)',
+      header: BUCKET_META.dentist_owned_not_solo.label,
       align: 'right' as const,
       render: bucketCell(BUCKET_META.dentist_owned_not_solo.color),
     },
     {
       key: 'dso_pe',
-      header: 'DSO/PE (T4–T5)',
+      header: BUCKET_META.dso_pe_corporate.label,
       align: 'right' as const,
       render: bucketCell(BUCKET_META.dso_pe_corporate.color),
     },
     {
       key: 'institutional',
-      header: 'Institutional (T6)',
+      header: BUCKET_META.institutional.label,
       align: 'right' as const,
       render: bucketCell(BUCKET_META.institutional.color),
     },
     {
       key: 'unresolved',
-      header: 'Unresolved',
+      header: BUCKET_META.unresolved.label,
       align: 'right' as const,
       render: (v: unknown) =>
         typeof v === 'number' ? (
@@ -129,7 +129,7 @@ export function ZipScoreTable({ zipScores, tallies }: ZipScoreTableProps) {
     },
     {
       key: 'opportunity_score',
-      header: 'Opp. Score (legacy)',
+      header: 'Older Opp. Score',
       align: 'right' as const,
       render: (v: unknown) =>
         typeof v === 'number' ? <span style={{ color: '#9C9C90' }}>{String(v)}</span> : '—',
@@ -149,7 +149,7 @@ export function ZipScoreTable({ zipScores, tallies }: ZipScoreTableProps) {
     <div>
       <SectionHeader
         title="ZIP Census Detail"
-        helpText="Each row = one watched ZIP. Bucket columns count hand-reviewed census conclusions only: T1 solo owner-operated, T2-T3 dentist-owned groups, T4-T5 DSO/PE, T6 institutional. Unresolved = GP clinics without a census conclusion, shown explicitly and never filled with estimates. Opp. Score and Market Type are legacy pipeline heuristics kept for triage convenience; they are not ownership claims."
+        helpText="Each row = one watched ZIP. Ownership columns count hand-reviewed conclusions only: True Independent (solo owner-operated), Dentist-Owned Group, DSO / PE, and Institutional. Unresolved = GP clinics without a reviewed conclusion, shown explicitly and never filled with estimates. Older Opp. Score and Market Type come from the older automated pipeline, kept for triage convenience; they are not ownership claims."
       />
       <div className="mt-4">
         <DataTable
