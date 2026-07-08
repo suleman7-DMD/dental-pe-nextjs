@@ -4,16 +4,15 @@ import { useState, useMemo, Suspense } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import { KpiCard } from '@/components/data-display/kpi-card'
+import { HeadlineKpiCard } from '@/components/data-display/headline-kpi-card'
 import { SectionHeader } from '@/components/data-display/section-header'
-import { formatPct, formatNumber } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils/formatting'
+import { censusHeadlineStats } from '@/lib/census/headline-stats'
 import {
   ADA_ANCHOR_UNIT_CAVEAT,
   ADA_IL_PER_DENTIST_DSO_PCT,
   BUCKET_META,
   HEADLINE_BUCKETS,
-  NOT_SOLO_HEADLINE_LABEL,
   SOURCE_CLASS_META,
   TIER_CODE,
   TIER_META,
@@ -201,45 +200,12 @@ function MarketIntelShellInner({
               buckets always render, Unresolved included. */}
           <CensusBucketSummaryCard summary={bucketSummary} scopeLabel={selectedMetro} />
 
+          {/* Canonical headline cards — same labels/formulas as Home and the
+              Directory, all defined once in lib/census/headline-stats. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <KpiCard
-              label="GP Clinic Locations"
-              value={formatNumber(bucketSummary.universe)}
-              subtitle={
-                <span className="text-xs text-[#6B6B60]">Census scope denominator</span>
-              }
-              tooltip="Address-deduped GP clinic locations (zip_scores.total_gp_locations) for the selected scope. Specialists, non-clinical records, unverified Data Axle rows, and duplicate shells are excluded."
-            />
-            <KpiCard
-              label="Census-Reviewed"
-              value={formatNumber(bucketSummary.reviewed)}
-              subtitle={
-                <span className="text-xs text-[#6B6B60]">
-                  {bucketSummary.coveragePct.toFixed(1)}% of scope reviewed
-                </span>
-              }
-              tooltip="Locations with a hand-reviewed ownership conclusion (ownership_tier) backed by cited evidence. Everything else stays Unresolved in the strip above — shown honestly, never filled with estimates."
-              accentColor="#2D8B4E"
-            />
-            <KpiCard
-              label={NOT_SOLO_HEADLINE_LABEL}
-              value={formatPct(bucketSummary.notSoloOwnerOperatedPctOfReviewed)}
-              subtitle={
-                <span className="text-xs text-[#6B6B60]">of reviewed clinics</span>
-              }
-              tooltip="Share of census-reviewed clinics that are NOT one dentist owning and operating one location (T1). Includes dentist-owned groups and networks — this is NOT a DSO share. The conventional DSO/PE number is the next card."
-            />
-            <KpiCard
-              label="DSO / PE / Corporate"
-              value={formatPct(bucketSummary.dsoPePctOfReviewed)}
-              subtitle={
-                <span className="text-xs text-[#6B6B60]">
-                  of reviewed &middot; ADA anchor {ADA_IL_PER_DENTIST_DSO_PCT}% (IL dentists)
-                </span>
-              }
-              tooltip={`Census-reviewed stealth-DSO (T4) + branded-DSO (T5) share of reviewed clinics: ${bucketSummary.counts.dso_pe_corporate.toLocaleString()} locations, ${bucketSummary.peBacked.toLocaleString()} with census-confirmed PE backing. External anchor: ADA HPI 2024 = ${ADA_IL_PER_DENTIST_DSO_PCT}% of IL dentists DSO-affiliated. ${ADA_ANCHOR_UNIT_CAVEAT}`}
-              accentColor="#C23B3B"
-            />
+            {censusHeadlineStats(bucketSummary).map((stat) => (
+              <HeadlineKpiCard key={stat.key} stat={stat} />
+            ))}
           </div>
 
           <p className="text-[#707064] text-xs">

@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'rea
 import dynamic from 'next/dynamic'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { KpiCard } from '@/components/data-display/kpi-card'
+import { HeadlineKpiCard } from '@/components/data-display/headline-kpi-card'
+import { gpLocationsStat, handReviewedStat } from '@/lib/census/headline-stats'
 import { DataFreshnessBar } from '@/components/data-display/data-freshness-bar'
 import { LivingLocationSelector } from './living-location-selector'
 import { SaturationTable } from './saturation-table'
@@ -436,20 +438,12 @@ function JobMarketShellInner({
       ? daEnrichVals.reduce((a, b) => a + b, 0) / daEnrichVals.length
       : 0
     const bprConfidence = avgDaEnrich > 50 ? 3 : avgDaEnrich > 20 ? 2 : 1
-    // Location-deduped clinic count (sum of total_gp_locations across active ZIPs).
-    // Collapses NPI-1 + NPI-2 + suite-variant rows at the same physical building
-    // to one clinic — the honest "how many clinics" denominator.
-    const gpLocations = filteredZs
-      .map((z) => z.total_gp_locations)
-      .filter((v): v is number => v != null && !isNaN(v))
-      .reduce((a, b) => a + b, 0)
 
     return {
       ...k,
       avgDldVal,
       avgBpr,
       bprConfidence,
-      gpLocations,
     }
   }, [activeKpis, zipScores, loc.commutable_zips])
 
@@ -501,35 +495,16 @@ function JobMarketShellInner({
             scopeLabel={currentLocation}
           />
 
+          {/* First two cards are canonical headline stats (lib/census/headline-stats)
+              — same labels/formulas as Home and Ownership. */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard
+            <HeadlineKpiCard
+              stat={gpLocationsStat(activeKpis.bucketSummary, { gpRowCount: activeKpis.total_p })}
               icon={<Hospital className="h-5 w-5" />}
-              label="Tracked Clinics"
-              value={
-                kpiDisplay.gpLocations > 0
-                  ? kpiDisplay.gpLocations.toLocaleString()
-                  : kpiDisplay.total_p.toLocaleString()
-              }
-              subtitle={
-                kpiDisplay.gpLocations > 0 ? (
-                  <span className="text-xs text-[#6B6B60]">
-                    {kpiDisplay.total_p.toLocaleString()} GP location records
-                  </span>
-                ) : undefined
-              }
-              tooltip="Headline = GP clinic locations in this living location (zip_scores.total_gp_locations — address-deduped, residential- and unverified-record-filtered). Subtitle = raw GP-class rows in practice_locations for the same scope; the small delta is residential-flagged addresses that the scored denominator drops."
             />
-            <KpiCard
+            <HeadlineKpiCard
+              stat={handReviewedStat(activeKpis.bucketSummary)}
               icon={<ClipboardCheck className="h-5 w-5" />}
-              label="Ownership Reviewed"
-              value={`${activeKpis.bucketSummary.coveragePct.toFixed(1)}%`}
-              subtitle={
-                <span className="text-xs text-[#6B6B60]">
-                  {activeKpis.bucketSummary.reviewed.toLocaleString()} of{' '}
-                  {activeKpis.bucketSummary.universe.toLocaleString()} offices
-                </span>
-              }
-              tooltip="Share of offices where the ownership has been reviewed. The rest are still unresolved and are not filled with guesses."
             />
             <KpiCard
               icon={<Users className="h-5 w-5" />}

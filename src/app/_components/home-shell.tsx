@@ -21,7 +21,12 @@ import {
   ShieldCheck,
   Search,
 } from 'lucide-react'
-import { KpiCard } from '@/components/data-display/kpi-card'
+import { HeadlineKpiCard } from '@/components/data-display/headline-kpi-card'
+import {
+  acquisitionLeadsStrictStat,
+  censusHeadlineStats,
+  multiLocationReviewedStat,
+} from '@/lib/census/headline-stats'
 import type { HomeSummary, PracticeChange } from '@/lib/types'
 import type { CensusSummary } from '@/lib/supabase/queries/census'
 
@@ -418,6 +423,13 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges, censusSu
   const daysSinceLastNewDeal = daysBetween(summary.lastNewDealDate)
   const dealFlowStale = daysSinceLastNewDeal !== null && daysSinceLastNewDeal > 30
 
+  // Canonical headline stats — labels, formulas, and formatting come from the
+  // headline module so Home can never disagree with Directory/Ownership/Scout.
+  const [gpLocationsCard, handReviewedCard, notSoloCard, dsoPeCard] =
+    censusHeadlineStats(censusSummary.buckets)
+  const multiLocationCard = multiLocationReviewedStat(censusSummary.multiLocationReviewed)
+  const acquisitionLeadsCard = acquisitionLeadsStrictStat(acquisitionTargets)
+
   return (
     <div className="min-h-screen bg-[#FAFAF7]">
       <div className="px-6 py-8 space-y-8 max-w-7xl mx-auto">
@@ -474,54 +486,16 @@ export function HomeShell({ summary, acquisitionTargets, recentChanges, censusSu
           </div>
         )}
 
-        {/* Census KPI Strip */}
+        {/* Census KPI Strip — canonical headline stats. The old "Legacy Floor"
+            detector KPI is gone from headlines; detector methodology lives in
+            /data-breakdown only. */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KpiCard
-            icon={<Database className="h-4 w-4" />}
-            label="GP Universe"
-            value={censusSummary.universe.toLocaleString()}
-            subtitle={<span className="text-xs text-[#6B6B60]">IL watched-ZIP locations</span>}
-            tooltip="The Chicagoland general-practice location universe. This is a location count, not the federal NPI-row count."
-          />
-          <KpiCard
-            icon={<FileCheck2 className="h-4 w-4" />}
-            label="Reviewed"
-            value={censusSummary.reviewed.toLocaleString()}
-            subtitle={<span className="text-xs text-[#6B6B60]">{formatPct(censusSummary.coveragePct)} coverage</span>}
-            accentColor="#B8860B"
-          />
-          <KpiCard
-            icon={<GitBranch className="h-4 w-4" />}
-            label="DSO/PE"
-            value={censusSummary.dsoPeReviewed.toLocaleString()}
-            subtitle={<span className="text-xs text-[#6B6B60]">{formatPct(censusSummary.dsoPeWholeFloorPct)} whole-universe floor</span>}
-            tooltip="T4 stealth DSO + T5 branded DSO rows that have earned a census tier. Whole-universe floor holds unreviewed rows out as unknown."
-            accentColor="#C23B3B"
-          />
-          <KpiCard
-            icon={<Layers3 className="h-4 w-4" />}
-            label="Multi-Location"
-            value={censusSummary.multiLocationReviewed.toLocaleString()}
-            subtitle={<span className="text-xs text-[#6B6B60]">T3-T5 among reviewed</span>}
-            tooltip="T3 dentist-owned multi-location groups, T4 stealth DSOs, and T5 branded DSOs. T2 single-location groups stay independent."
-            accentColor="#6366F1"
-          />
-          <KpiCard
-            icon={<Zap className="h-4 w-4" />}
-            label="Scout Queue"
-            value={acquisitionTargets.toLocaleString()}
-            subtitle={<span className="text-xs text-[#6B6B60]">legacy heuristic</span>}
-            tooltip="Existing buyability/acquisition heuristic. It remains useful as a signal, but should be filtered through reviewed census ownership before final action."
-            accentColor="#2D8B4E"
-          />
-          <KpiCard
-            icon={<BarChart3 className="h-4 w-4" />}
-            label="Legacy Floor"
-            value={formatPct(censusSummary.legacyCorporatePct)}
-            subtitle={<span className="text-xs text-[#6B6B60]">{censusSummary.legacyCorporateLocations.toLocaleString()} detector corp rows</span>}
-            tooltip="Old entity_classification / zip_scores corporate floor. It is retained for comparison and should not be presented as the true consolidation rate."
-            accentColor="#8F8E82"
-          />
+          <HeadlineKpiCard stat={gpLocationsCard} icon={<Database className="h-4 w-4" />} />
+          <HeadlineKpiCard stat={handReviewedCard} icon={<FileCheck2 className="h-4 w-4" />} />
+          <HeadlineKpiCard stat={notSoloCard} icon={<Building2 className="h-4 w-4" />} />
+          <HeadlineKpiCard stat={dsoPeCard} icon={<GitBranch className="h-4 w-4" />} />
+          <HeadlineKpiCard stat={multiLocationCard} icon={<Layers3 className="h-4 w-4" />} />
+          <HeadlineKpiCard stat={acquisitionLeadsCard} icon={<Zap className="h-4 w-4" />} />
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1fr]">

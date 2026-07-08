@@ -14,6 +14,8 @@ import {
   Microscope,
 } from 'lucide-react'
 import { KpiCard } from '@/components/data-display/kpi-card'
+import { HeadlineKpiCard } from '@/components/data-display/headline-kpi-card'
+import { acquisitionLeadsBroadStat } from '@/lib/census/headline-stats'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { StatusBadge } from '@/components/data-display/status-badge'
 import {
@@ -90,7 +92,7 @@ const PAGE_SIZE = 25
 
 const CATEGORIES: { label: string; value: BuyabilityCategory | 'all' }[] = [
   { label: 'All Categories', value: 'all' },
-  { label: 'Acquisition Targets (broad)', value: 'acquisition_target' },
+  { label: 'Acquisition Leads (broad)', value: 'acquisition_target' },
   { label: 'Dead Ends', value: 'dead_end' },
   { label: 'Job Targets', value: 'job_target' },
   { label: 'Specialists', value: 'specialist' },
@@ -299,12 +301,11 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
 
         {/* KPI Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiCard
+          {/* Canonical broad-leads headline (lib/census/headline-stats) — its
+              tooltip names Home's strict cut by definition, never by count. */}
+          <HeadlineKpiCard
+            stat={acquisitionLeadsBroadStat(kpis.acq)}
             icon={<Target className="h-4 w-4" />}
-            label="Acquisition Targets"
-            value={kpis.acq.toLocaleString()}
-            tooltip="Broad definition: any independent practice (entity_classification ∈ solo/family/group). Includes lower-buyability targets. Home page uses strict definition (independents with buyability_score ≥ 50, ~34 practices)."
-            accentColor="#2D8B4E"
           />
           <KpiCard
             icon={<ShieldOff className="h-4 w-4" />}
