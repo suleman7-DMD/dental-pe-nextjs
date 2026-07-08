@@ -386,5 +386,8 @@ export function practiceLocationToWarroomRecord(
     location_type: null,
     iusa_number: null,
     taxonomy_description: null,
+    ownership_tier: row.ownership_tier,
+    pe_backed: row.pe_backed,
+    census_review_status: row.census_review_status,
   }
 }

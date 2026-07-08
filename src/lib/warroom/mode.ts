@@ -8,7 +8,9 @@ export type WarroomMode = (typeof WARROOM_MODES)[number]["id"]
 export const DEFAULT_WARROOM_MODE: WarroomMode = "hunt"
 
 export const WARROOM_LENSES = [
-  { id: "consolidation", label: "Consolidation" },
+  // id kept as "consolidation" for saved state/briefing links; the lens now
+  // reads hand-reviewed census tallies, not the legacy detector share.
+  { id: "consolidation", label: "Reviewed DSO/PE" },
   { id: "density", label: "Density" },
   { id: "buyability", label: "Buyability" },
   { id: "retirement", label: "Retirement" },

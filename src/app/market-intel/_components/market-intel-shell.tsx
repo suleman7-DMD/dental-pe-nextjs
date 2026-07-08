@@ -23,7 +23,7 @@ import {
   summarizeTallies,
   sumTierCounts,
   type ZipCensusTally,
-} from '../_lib/zip-census'
+} from '@/lib/census/zip-census'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 import { WarroomCrossLink } from '@/components/layout/warroom-cross-link'

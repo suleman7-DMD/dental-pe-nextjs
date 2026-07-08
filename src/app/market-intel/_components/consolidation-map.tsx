@@ -5,7 +5,7 @@ import type mapboxgl from 'mapbox-gl'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { ZIP_CENTROIDS, METRO_CENTERS } from '@/lib/constants/zip-centroids'
 import { BUCKET_META } from '@/lib/census/ownership-truth'
-import { tallyBucketCount, type ZipCensusTally } from '../_lib/zip-census'
+import { tallyBucketCount, type ZipCensusTally } from '@/lib/census/zip-census'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import { escapeHtml } from '@/lib/utils/escape-html'
 

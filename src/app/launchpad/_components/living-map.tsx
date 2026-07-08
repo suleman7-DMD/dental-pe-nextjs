@@ -17,6 +17,7 @@ import {
 } from "@/lib/launchpad/signals"
 import { getLaunchpadScopeOption, type LaunchpadScope } from "@/lib/launchpad/scope"
 import { getPracticeDisplayName } from "@/lib/launchpad/display"
+import { tierToBucket } from "@/lib/census/ownership-truth"
 
 const HAS_MAPBOX_TOKEN = Boolean(process.env.NEXT_PUBLIC_MAPBOX_TOKEN)
 
@@ -29,7 +30,7 @@ export type LaunchpadMapView = "practices" | "zips"
 export type LaunchpadMapLens =
   | "tier"
   | "mentor_density"
-  | "dso_avoid"
+  | "dso_pe"
 
 interface LensOption {
   id: LaunchpadMapLens
@@ -49,9 +50,9 @@ const LENS_OPTIONS: LensOption[] = [
     description: "ZIPs with more mentor-rich practices shine brighter",
   },
   {
-    id: "dso_avoid",
-    label: "DSO Avoid",
-    description: "ZIPs with more avoid-tier DSO practices highlighted",
+    id: "dso_pe",
+    label: "DSO/PE (Reviewed)",
+    description: "ZIPs with more hand-reviewed DSO/PE locations highlighted",
   },
 ]
 
@@ -96,8 +97,8 @@ const TIER_PRIORITY: Record<LaunchpadTier, number> = {
 // Mentor density color ramp (green tones, brighter = more mentors)
 const MENTOR_COLORS = ["#D1FAE5", "#6EE7B7", "#34D399", "#10B981", "#059669", "#047857"]
 
-// DSO avoid color ramp (red-orange tones, brighter = more avoid-tier)
-const AVOID_COLORS = ["#FEE2E2", "#FCA5A5", "#F87171", "#EF4444", "#DC2626", "#B91C1C"]
+// Reviewed DSO/PE color ramp (red-orange tones, brighter = more reviewed DSO/PE)
+const DSO_PE_COLORS = ["#FEE2E2", "#FCA5A5", "#F87171", "#EF4444", "#DC2626", "#B91C1C"]
 
 function mentorColor(count: number, maxCount: number): string {
   if (maxCount === 0 || count === 0) return "#E8E5DE"
@@ -108,13 +109,13 @@ function mentorColor(count: number, maxCount: number): string {
   return MENTOR_COLORS[idx]
 }
 
-function avoidColor(count: number, maxCount: number): string {
+function dsoPeColor(count: number, maxCount: number): string {
   if (maxCount === 0 || count === 0) return "#E8E5DE"
   const idx = Math.min(
-    Math.floor((count / maxCount) * AVOID_COLORS.length),
-    AVOID_COLORS.length - 1
+    Math.floor((count / maxCount) * DSO_PE_COLORS.length),
+    DSO_PE_COLORS.length - 1
   )
-  return AVOID_COLORS[idx]
+  return DSO_PE_COLORS[idx]
 }
 
 const PRACTICE_DOT_LIMIT = 5000
@@ -143,7 +144,8 @@ interface ZipAggregate {
   low: number
   avoid: number
   mentorCount: number
-  dsoAvoidCount: number
+  /** Hand-reviewed DSO/PE locations (census tiers, never a brand list). */
+  dsoPeCount: number
   dominantTier: LaunchpadTier
   bestScore: number
   topTargets: LaunchpadRankedTarget[]
@@ -233,7 +235,7 @@ export function LaunchpadLivingMap({
           low: 0,
           avoid: 0,
           mentorCount: 0,
-          dsoAvoidCount: 0,
+          dsoPeCount: 0,
           dominantTier: "low",
           bestScore: 0,
           topTargets: [],
@@ -254,8 +256,9 @@ export function LaunchpadLivingMap({
       const isMultiProvider = (target.practice.num_providers ?? 0) >= 3
       if (hasMentorSignal || isMultiProvider) agg.mentorCount += 1
 
-      // DSO avoid — count dso_avoid_warning signal
-      if (target.warningSignalIds.includes("dso_avoid_warning")) agg.dsoAvoidCount += 1
+      // Reviewed DSO/PE — census ownership tiers only (tierToBucket returns
+      // "unresolved" for unreviewed rows, so they never count here)
+      if (tierToBucket(target.practice.ownership_tier) === "dso_pe_corporate") agg.dsoPeCount += 1
     }
 
     for (const agg of map.values()) {
@@ -334,8 +337,8 @@ export function LaunchpadLivingMap({
     [zipAggregates]
   )
 
-  const maxAvoidCount = useMemo(
-    () => zipAggregates.reduce((m, z) => Math.max(m, z.dsoAvoidCount), 0) || 1,
+  const maxDsoPeCount = useMemo(
+    () => zipAggregates.reduce((m, z) => Math.max(m, z.dsoPeCount), 0) || 1,
     [zipAggregates]
   )
 
@@ -369,7 +372,7 @@ export function LaunchpadLivingMap({
   // ---------------------------------------------------------------------------
   function getZipColor(agg: ZipAggregate): string {
     if (activeLens === "mentor_density") return mentorColor(agg.mentorCount, maxMentorCount)
-    if (activeLens === "dso_avoid") return avoidColor(agg.dsoAvoidCount, maxAvoidCount)
+    if (activeLens === "dso_pe") return dsoPeColor(agg.dsoPeCount, maxDsoPeCount)
     return TIER_COLORS[agg.dominantTier]
   }
 
@@ -407,7 +410,7 @@ export function LaunchpadLivingMap({
                 ? `${zipAggregates.length.toLocaleString()} ZIPs colored by dominant tier · sized by practice count`
                 : activeLens === "mentor_density"
                   ? `${zipAggregates.length.toLocaleString()} ZIPs colored by mentor-rich practice density`
-                  : `${zipAggregates.length.toLocaleString()} ZIPs colored by avoid-tier DSO presence`}
+                  : `${zipAggregates.length.toLocaleString()} ZIPs colored by hand-reviewed DSO/PE presence`}
           </p>
         </div>
 
@@ -434,7 +437,7 @@ export function LaunchpadLivingMap({
                     "h-7 px-2.5 text-[11px] font-medium transition-colors",
                     lens.id !== "tier" && "border-l border-[#E8E5DE]",
                     activeLens === lens.id
-                      ? lens.id === "dso_avoid"
+                      ? lens.id === "dso_pe"
                         ? "bg-[#C23B3B]/10 text-[#C23B3B]"
                         : lens.id === "mentor_density"
                           ? "bg-[#2D8B4E]/10 text-[#2D8B4E]"
@@ -493,7 +496,7 @@ export function LaunchpadLivingMap({
             >
               ZIP view
             </button>{" "}
-            to see market-level patterns and use the mentor density / DSO avoid lenses.
+            to see market-level patterns and use the mentor density / reviewed DSO-PE lenses.
           </p>
         </div>
       )}
@@ -534,8 +537,8 @@ export function LaunchpadLivingMap({
                       borderColor: "#FFFFFF",
                       opacity: 0.85,
                     }}
-                    aria-label={`ZIP ${agg.zip} — ${agg.total} practices${activeLens === "mentor_density" ? `, ${agg.mentorCount} mentor-rich` : activeLens === "dso_avoid" ? `, ${agg.dsoAvoidCount} avoid-tier DSO` : `, dominant tier ${LAUNCHPAD_TIER_LABELS[agg.dominantTier]}`}`}
-                    title={`${agg.zip} · ${agg.total} practices · ${activeLens === "mentor_density" ? `${agg.mentorCount} mentor-rich` : activeLens === "dso_avoid" ? `${agg.dsoAvoidCount} avoid-tier DSO` : LAUNCHPAD_TIER_LABELS[agg.dominantTier]}`}
+                    aria-label={`ZIP ${agg.zip} — ${agg.total} practices${activeLens === "mentor_density" ? `, ${agg.mentorCount} mentor-rich` : activeLens === "dso_pe" ? `, ${agg.dsoPeCount} reviewed DSO/PE` : `, dominant tier ${LAUNCHPAD_TIER_LABELS[agg.dominantTier]}`}`}
+                    title={`${agg.zip} · ${agg.total} practices · ${activeLens === "mentor_density" ? `${agg.mentorCount} mentor-rich` : activeLens === "dso_pe" ? `${agg.dsoPeCount} reviewed DSO/PE` : LAUNCHPAD_TIER_LABELS[agg.dominantTier]}`}
                   />
                 </Marker>
               )
@@ -569,9 +572,9 @@ export function LaunchpadLivingMap({
                       <span className="font-semibold">{hovered.mentorCount}</span> mentor-rich
                     </p>
                   )}
-                  {activeLens === "dso_avoid" && (
+                  {activeLens === "dso_pe" && (
                     <p className="text-[#C23B3B]">
-                      <span className="font-semibold">{hovered.dsoAvoidCount}</span> avoid-tier DSO
+                      <span className="font-semibold">{hovered.dsoPeCount}</span> reviewed DSO/PE
                     </p>
                   )}
                   {hovered.metricsConfidence === "low" && (
@@ -772,10 +775,10 @@ export function LaunchpadLivingMap({
           ) : (
             <>
               <p className="font-semibold uppercase tracking-wider text-[#707064]">
-                DSO avoid presence
+                Reviewed DSO/PE presence
               </p>
               <div className="flex items-center gap-1">
-                {AVOID_COLORS.map((c, i) => (
+                {DSO_PE_COLORS.map((c, i) => (
                   <span
                     key={i}
                     className="h-3 flex-1 rounded-sm"
@@ -785,11 +788,11 @@ export function LaunchpadLivingMap({
                 ))}
               </div>
               <div className="flex justify-between text-[10px] text-[#9C9C90]">
-                <span>None</span>
+                <span>None reviewed</span>
                 <span>High</span>
               </div>
               <p className="text-[10px] text-[#707064]">
-                Aspen, Sage, Western, Smile Brands, Risas
+                Hand-reviewed DSO/PE ownership (stealth + branded DSOs) — unreviewed rows never count
               </p>
             </>
           )}
@@ -861,11 +864,11 @@ export function LaunchpadLivingMap({
                   </span>
                 </div>
               )}
-              {activeLens === "dso_avoid" && (
+              {activeLens === "dso_pe" && (
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-[#6B6B60]">Avoid-tier DSO</span>
+                  <span className="text-[#6B6B60]">Reviewed DSO/PE</span>
                   <span className="font-mono font-semibold text-[#C23B3B]">
-                    {selectedZipAgg.dsoAvoidCount}
+                    {selectedZipAgg.dsoPeCount}
                   </span>
                 </div>
               )}

@@ -565,6 +565,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
   const summary = effectiveBundle?.summary ?? null
   const zipScores = effectiveBundle?.zipScores ?? []
   const zipSignals = effectiveBundle?.zipSignals ?? []
+  const zipCensusTallies = effectiveBundle?.zipCensusTallies ?? []
   const briefingItems = effectiveBundle?.briefing ?? []
   const dataHealth = effectiveBundle?.dataHealth
   const rawErrorMessage =
@@ -765,6 +766,7 @@ function WarroomShellInner({ initialBundle, initialBundleError }: WarroomShellPr
               onLensChange={setLens}
               zipScores={zipScores}
               zipSignals={zipSignals}
+              zipCensusTallies={zipCensusTallies}
               rankedTargets={visibleTargets}
               selectedZip={selectedZip}
               onZipSelect={setSelectedZip}

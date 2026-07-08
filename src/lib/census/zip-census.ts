@@ -1,8 +1,8 @@
 /**
- * zip-census.ts — per-ZIP census ownership tallies for /market-intel.
+ * zip-census.ts — per-ZIP census ownership tallies.
  *
- * The page aggregates census truth by ZIP on the server and ships ONLY these
- * compact tallies to the client (never detector fields, never full rows).
+ * Pages (/market-intel, /warroom) aggregate census truth by ZIP and ship ONLY
+ * these compact tallies to the client (never detector fields, never full rows).
  * Bucket/tier semantics come exclusively from the ownership-truth contract —
  * this module counts; it never re-interprets `ownership_tier`.
  */

@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { SectionHeader } from '@/components/data-display/section-header'
 import { DataTable } from '@/components/data-display/data-table'
-import { tallyBucketCount, type ZipCensusTally } from '../_lib/zip-census'
+import { tallyBucketCount, type ZipCensusTally } from '@/lib/census/zip-census'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 

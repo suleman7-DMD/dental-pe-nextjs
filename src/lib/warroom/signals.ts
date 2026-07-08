@@ -1,3 +1,4 @@
+import type { ZipCensusTally } from "../census/zip-census";
 import type { WarroomScopeKind } from "./scope";
 
 export type OwnershipGroup =
@@ -55,6 +56,10 @@ export interface WarroomPracticeRecord {
   taxonomy_code: string | null;
   taxonomy_description: string | null;
   updated_at: string | null;
+  /** Census truth (hand review) — populated from practice_locations. */
+  ownership_tier: string | null;
+  pe_backed: boolean | null;
+  census_review_status: string | null;
 }
 
 export interface WarroomDealRecord {
@@ -346,6 +351,8 @@ export interface WarroomSitrepBundle {
   summary: WarroomSummary;
   zipScores: WarroomZipScoreRecord[];
   zipSignals: WarroomZipSignalRecord[];
+  /** Per-ZIP hand-reviewed ownership tallies for the scope's GP locations. */
+  zipCensusTallies: ZipCensusTally[];
   recentDeals: WarroomDealRecord[];
   recentChanges: WarroomChangeRecord[];
   topSignals: {

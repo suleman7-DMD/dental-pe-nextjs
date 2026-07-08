@@ -4,6 +4,7 @@ import { useMemo, useState } from "react"
 import { Layer, Source, Marker, Popup } from "react-map-gl/mapbox"
 import type { FeatureCollection, Feature, Point } from "geojson"
 import { MapContainer } from "@/components/maps/map-container"
+import { tallyBucketCount, type ZipCensusTally } from "@/lib/census/zip-census"
 import { ZIP_CENTROIDS } from "@/lib/constants/zip-centroids"
 import { cn } from "@/lib/utils"
 import { formatNumber, formatPercent } from "@/lib/utils/formatting"
@@ -23,6 +24,7 @@ interface LivingMapProps {
   onLensChange: (lens: WarroomLens) => void
   zipScores: WarroomZipScoreRecord[]
   zipSignals: WarroomZipSignalRecord[]
+  zipCensusTallies: ZipCensusTally[]
   rankedTargets: RankedTarget[]
   selectedZip: string | null
   onZipSelect: (zip: string | null) => void
@@ -39,6 +41,7 @@ interface LensComputation {
   get: (args: {
     zipScore: WarroomZipScoreRecord | null
     zipSignal: WarroomZipSignalRecord | null
+    census: ZipCensusTally | null
   }) => number | null
   invertScale?: boolean
   format: (value: number | null) => string
@@ -46,12 +49,15 @@ interface LensComputation {
 
 const LENS_COMPUTATIONS: Record<WarroomLens, LensComputation> = {
   consolidation: {
-    label: "Corporate share",
+    label: "Reviewed DSO/PE floor",
     unit: "%",
-    description: "dso_regional + dso_national share of GP locations.",
-    get: ({ zipScore }) => zipScore?.corporate_share_pct ?? null,
-    // corporate_share_pct is stored as a decimal fraction (e.g. 0.0682 = 6.82%).
-    // Multiply by 100 before passing to formatPercent so tooltip shows "6.8%" not "0.1%".
+    description:
+      "Hand-reviewed DSO/PE clinics as a share of tracked GP locations — a floor that only rises with review coverage. Gray ZIPs have no reviewed rows yet.",
+    get: ({ census }) => {
+      if (!census || census.reviewed === 0 || census.rows === 0) return null
+      return tallyBucketCount(census, "dso_pe_corporate") / census.rows
+    },
+    // Fraction (e.g. 0.068 = 6.8%) — multiply by 100 before formatPercent.
     format: (value) => (value == null ? "--" : formatPercent(value * 100)),
   },
   density: {
@@ -86,6 +92,7 @@ interface ZipMarker {
   value: number | null
   zipScore: WarroomZipScoreRecord | null
   zipSignal: WarroomZipSignalRecord | null
+  census: ZipCensusTally | null
 }
 
 const LENS_COLOR_STOPS: [string, string, string] = ["#2D8B4E", "#D4920B", "#C23B3B"]
@@ -130,6 +137,7 @@ export function LivingMap({
   onLensChange,
   zipScores,
   zipSignals,
+  zipCensusTallies,
   rankedTargets,
   selectedZip,
   onZipSelect,
@@ -144,6 +152,7 @@ export function LivingMap({
   const { markers, minValue, maxValue } = useMemo(() => {
     const zipScoreByZip = new Map(zipScores.map((row) => [row.zip_code, row] as const))
     const zipSignalByZip = new Map(zipSignals.map((row) => [row.zip_code, row] as const))
+    const censusByZip = new Map(zipCensusTallies.map((tally) => [tally.zip, tally] as const))
     const allZips = new Set<string>([...zipScoreByZip.keys(), ...zipSignalByZip.keys()])
 
     const entries: ZipMarker[] = []
@@ -156,12 +165,13 @@ export function LivingMap({
       const [lat, lng] = coords
       const zipScore = zipScoreByZip.get(zip) ?? null
       const zipSignal = zipSignalByZip.get(zip) ?? null
-      const value = computation.get({ zipScore, zipSignal })
+      const census = censusByZip.get(zip) ?? null
+      const value = computation.get({ zipScore, zipSignal, census })
       if (value != null && Number.isFinite(value)) {
         min = Math.min(min, value)
         max = Math.max(max, value)
       }
-      entries.push({ zip, lat, lng, value, zipScore, zipSignal })
+      entries.push({ zip, lat, lng, value, zipScore, zipSignal, census })
     })
 
     return {
@@ -169,7 +179,7 @@ export function LivingMap({
       minValue: Number.isFinite(min) ? min : 0,
       maxValue: Number.isFinite(max) ? max : 1,
     }
-  }, [computation, zipScores, zipSignals])
+  }, [computation, zipScores, zipSignals, zipCensusTallies])
 
   const normalize = (value: number | null): number => {
     if (value == null || !Number.isFinite(value)) return 0
@@ -316,6 +326,11 @@ export function LivingMap({
                       {formatNumber(hovered.zipScore.total_gp_locations)} GP locations
                     </p>
                   )}
+                  {hovered.census && (
+                    <p className="text-[#707064]">
+                      {formatNumber(hovered.census.reviewed)} of {formatNumber(hovered.census.rows)} rows hand-reviewed
+                    </p>
+                  )}
                 </div>
               </Popup>
             )
@@ -413,6 +428,11 @@ export function LivingMap({
                     {computation.format(selected.value)}
                   </span>
                 </p>
+                {selected.census && (
+                  <p className="text-[#707064]">
+                    {formatNumber(selected.census.reviewed)} of {formatNumber(selected.census.rows)} rows hand-reviewed
+                  </p>
+                )}
               </div>
               {selected.zipScore?.opportunity_score != null && (
                 <p className="text-[#6B6B60]">

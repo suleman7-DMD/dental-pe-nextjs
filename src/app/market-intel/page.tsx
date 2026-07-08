@@ -2,7 +2,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { getZipScores } from '@/lib/supabase/queries/zip-scores'
 import { getWatchedZips, getDistinctMetroAreas } from '@/lib/supabase/queries/watched-zips'
 import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
-import { buildZipCensusTallies } from './_lib/zip-census'
+import { buildZipCensusTallies } from '@/lib/census/zip-census'
 import { MarketIntelShell } from './_components/market-intel-shell'
 
 export const dynamic = "force-dynamic"

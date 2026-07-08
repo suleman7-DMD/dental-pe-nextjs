@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildZipCensusTallies } from "../census/zip-census";
 import { getSupabaseBrowserClient } from "../supabase/client";
 import {
   computeSignalCounts,
@@ -216,6 +217,9 @@ export async function getSitrepBundle(
   }
 
   const topSignals = extractTopPracticeSignals(practiceSignals, topSignalLimit);
+  // Census truth for the map: practices here are the scope's GP location rows,
+  // so tallying them mirrors /market-intel's server-side tally exactly.
+  const zipCensusTallies = buildZipCensusTallies(practices);
   const candidates = buildCandidates(practices, practiceSignals, zipScores, zipSignals);
   const rankedTargets: RankedTarget[] = rankTargets(candidates, {
     lens,
@@ -265,6 +269,7 @@ export async function getSitrepBundle(
     summary,
     zipScores,
     zipSignals,
+    zipCensusTallies,
     recentDeals,
     recentChanges,
     topSignals,

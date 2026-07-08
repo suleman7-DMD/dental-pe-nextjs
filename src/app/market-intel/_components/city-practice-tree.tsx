@@ -12,7 +12,7 @@ import {
   deriveSourceClass,
   tierToBucket,
 } from '@/lib/census/ownership-truth'
-import { tallyBucketCount, type ZipCensusTally } from '../_lib/zip-census'
+import { tallyBucketCount, type ZipCensusTally } from '@/lib/census/zip-census'
 import type { WatchedZip } from '@/lib/supabase/queries/watched-zips'
 import type { ZipScore } from '@/lib/supabase/queries/zip-scores'
 
