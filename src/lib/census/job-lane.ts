@@ -46,6 +46,9 @@ export interface JobLaneVerificationInput {
   verification_status: string | null
   website_url?: string | null
   doctors?: unknown[] | null
+  provider_count_website?: number | null
+  owner_operator_stated?: string | null
+  ownership_evidence_status?: string | null
   has_hiring_page?: boolean | null
   openings?: unknown[] | null
   last_checked_at?: string | null
@@ -170,6 +173,12 @@ export function isVerifiedJobLane(lane: JobLane): boolean {
 
 const DOCTORS_GAP = 'Current doctors (not website-verified)'
 
+// Verified-layer gaps: these offices HAVE been website-checked, so the wording
+// states what the check actually found. "Nothing missing" may only appear when
+// current doctors are verified on the site AND the owner/operator is stated.
+const VERIFIED_DOCTORS_GAP = 'Current doctors not published/verified on website'
+const OWNER_GAP = 'Owner/operator not stated on website'
+
 const VERIFICATION_STATUSES = new Set([
   'roster_verified',
   'hiring_page_found',
@@ -230,7 +239,6 @@ export function deriveJobLane(
       why =
         'The website check found ownership evidence that conflicts with the census answer — resolve the conflict before acting on this office.'
       missing.unshift('Ownership conflict resolution')
-      if (doctorCount === 0) missing.unshift(DOCTORS_GAP)
     } else if (stale) {
       lane = 'stale_recheck'
       why = `This office was website-checked, but the check is over ${STALE_AFTER_DAYS} days old — recheck before acting on it.`
@@ -249,13 +257,23 @@ export function deriveJobLane(
       lane = 'no_usable_website'
       why =
         'Checked — no usable practice website exists (dead, parked, or social-only). Verifying doctors or openings means a phone call or a visit.'
-      missing.unshift(DOCTORS_GAP)
     } else {
       lane = 'call_required'
       why =
         'The website was checked but it does not publish a usable doctor roster — confirming current doctors requires a phone call.'
-      missing.unshift(DOCTORS_GAP)
     }
+
+    // Honesty gaps apply to EVERY verified lane. A record can carry hiring
+    // evidence and still not tell you who works there or who owns it — the
+    // missing list must say so, or the page contradicts itself.
+    const ownerStated = (v.owner_operator_stated ?? '').trim() !== ''
+    if (!ownerStated || v.ownership_evidence_status === 'no_statement') {
+      missing.unshift(OWNER_GAP)
+    }
+    if (doctorCount === 0 || v.provider_count_website === 0) {
+      missing.unshift(VERIFIED_DOCTORS_GAP)
+    }
+
     return { lane, why, missing, ...JOB_LANE_META[lane] }
   }
 

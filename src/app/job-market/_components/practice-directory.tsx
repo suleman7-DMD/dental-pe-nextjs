@@ -22,7 +22,10 @@ import {
   tierToBucket,
   type OwnershipTier,
 } from '@/lib/census/ownership-truth'
-import { displayName as practiceDisplayName } from '@/lib/census/display-name'
+import {
+  displayName as practiceDisplayName,
+  verifiedDisplayName,
+} from '@/lib/census/display-name'
 import {
   JOB_LANE_META,
   JOB_LANE_ORDER,
@@ -436,13 +439,19 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     setPage(1)
   }, [activeView, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
 
+  // Headline name: the website-verified public name outranks the census/legal
+  // name everywhere downstream — the name sort, the row link renderer, and the
+  // CSV export all read this materialized display_name.
   const withDisplayName = useMemo(
     () =>
       practices.map((p) => ({
         ...p,
-        display_name: practiceDisplayName(p),
+        display_name: verifiedDisplayName(
+          p,
+          p.location_id ? verificationMap[p.location_id]?.public_practice_name : null
+        ),
       })),
-    [practices]
+    [practices, verificationMap]
   )
 
   const totalPractices = withDisplayName.length

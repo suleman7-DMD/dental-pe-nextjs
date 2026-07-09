@@ -18,6 +18,7 @@ import {
   deriveSourceClass,
 } from "@/lib/census/ownership-truth"
 import { deriveJobLane } from "@/lib/census/job-lane"
+import { verifiedDisplayName } from "@/lib/census/display-name"
 import { ManualCorrectionPanel } from "@/components/data-display/manual-correction-panel"
 import {
   displayName,
@@ -61,7 +62,16 @@ export default async function PracticePage({
       )
     : []
 
-  const name = displayName(row)
+  // Website-verified public name outranks the census/registry name; the
+  // legal entity stays visible as a secondary "Legal/census name" line.
+  const censusName = displayName(row)
+  const name = verifiedDisplayName(row, verification?.public_practice_name)
+  const legalLine =
+    row.practice_name && row.practice_name !== name
+      ? row.practice_name
+      : censusName !== name
+        ? censusName
+        : null
   const addressLine = [row.normalized_address, row.city, row.state, row.zip]
     .filter(Boolean)
     .join(", ")
@@ -94,8 +104,10 @@ export default async function PracticePage({
               <h1 className="mt-4 font-sans text-3xl font-bold leading-tight text-[#1A1A1A]">
                 {name}
               </h1>
-              {row.practice_name && row.practice_name !== name ? (
-                <p className="mt-1 text-sm text-[#6B6B60]">{row.practice_name}</p>
+              {legalLine ? (
+                <p className="mt-1 text-sm text-[#6B6B60]">
+                  Legal/census name: {legalLine}
+                </p>
               ) : null}
               <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#6B6B60]">
                 <span className="inline-flex items-center gap-1.5">

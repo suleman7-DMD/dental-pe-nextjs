@@ -110,12 +110,46 @@ describe('deriveJobLane — verified layer (job_hunt_verification record)', () =
       verification_status: 'roster_verified',
       website_url: 'https://smiles.example.com',
       doctors: [{ name: 'Dr. A' }, { name: 'Dr. B' }],
+      provider_count_website: 2,
+      owner_operator_stated: 'Site names Dr. A as owner',
+      ownership_evidence_status: 'consistent',
       has_hiring_page: true,
       last_checked_at: FRESH,
     })
     expect(r.lane).toBe('roster_verified')
     expect(r.missing).toEqual([])
     expect(r.why).toContain('2 doctors')
+  })
+
+  it('Mynt regression: hiring page + openings + no doctors + no owner statement is NOT "nothing missing"', () => {
+    const r = deriveJobLane(FULL_FACTS, {
+      verification_status: 'hiring_page_found',
+      website_url: 'https://mynt.example.com',
+      doctors: [],
+      provider_count_website: 0,
+      owner_operator_stated: null,
+      ownership_evidence_status: 'no_statement',
+      has_hiring_page: true,
+      openings: [{ title: 'Associate Dentist' }, { title: 'General Dentist' }],
+      last_checked_at: FRESH,
+    })
+    expect(r.lane).toBe('hiring_page_found')
+    expect(r.missing.length).toBeGreaterThan(0)
+    expect(r.missing.join(' ')).toContain('Current doctors not published')
+    expect(r.missing.join(' ')).toContain('Owner/operator not stated')
+  })
+
+  it('roster_verified with doctors but no owner statement still reports the owner gap', () => {
+    const r = deriveJobLane(FULL_FACTS, {
+      verification_status: 'roster_verified',
+      doctors: [{ name: 'Dr. A' }],
+      owner_operator_stated: null,
+      ownership_evidence_status: 'no_statement',
+      last_checked_at: FRESH,
+    })
+    expect(r.lane).toBe('roster_verified')
+    expect(r.missing.join(' ')).toContain('Owner/operator not stated')
+    expect(r.missing.join(' ')).not.toContain('Current doctors not published')
   })
 
   it('a check older than the staleness window overrides the stored status', () => {
@@ -173,7 +207,7 @@ describe('deriveJobLane — verified layer (job_hunt_verification record)', () =
         verification_status: status,
         last_checked_at: FRESH,
       })
-      expect(r.missing.join(' ')).toContain('not website-verified')
+      expect(r.missing.join(' ')).toContain('Current doctors not published')
     }
   })
 })

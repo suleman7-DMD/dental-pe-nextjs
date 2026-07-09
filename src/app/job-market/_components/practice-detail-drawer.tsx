@@ -13,7 +13,7 @@ import {
 } from '@/components/data-display/census-badge'
 import { ManualCorrectionPanel } from '@/components/data-display/manual-correction-panel'
 import { LEGACY_DETECTOR_CONTEXT_LABEL } from '@/lib/census/ownership-truth'
-import { displayName } from '@/lib/census/display-name'
+import { displayName, verifiedDisplayName } from '@/lib/census/display-name'
 import { deriveJobLane } from '@/lib/census/job-lane'
 import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
 import { JobHuntVerificationCard } from '@/components/data-display/job-hunt-verification-card'
@@ -128,8 +128,11 @@ function displayValue(v: string | number | null | undefined): string {
   return String(v)
 }
 
-function drawerPracticeName(p: Practice): string {
-  return displayName(p)
+function drawerPracticeName(
+  p: Practice,
+  publicPracticeName?: string | null
+): string {
+  return verifiedDisplayName(p, publicPracticeName)
 }
 
 function formatReliableRevenue(value: number | null | undefined): string | null {
@@ -242,6 +245,11 @@ export function PracticeDetailDrawer({
     ? verificationMap[p.location_id] ?? null
     : null
   const lane = deriveJobLane(p, verification)
+  // Website-verified public name outranks the census/registry name; the
+  // census name stays visible as a secondary line when it differs.
+  const headlineName = drawerPracticeName(p, verification?.public_practice_name)
+  const censusName = displayName(p)
+  const legalLine = censusName !== headlineName ? censusName : null
 
   return (
     <Sheet open={isOpen} onOpenChange={() => onClose()}>
@@ -252,8 +260,13 @@ export function PracticeDetailDrawer({
         {/* ── Header ─────────────────────────────────────────────── */}
         <SheetHeader className="relative pr-12">
           <SheetTitle className="text-[#1A1A1A] font-bold text-lg leading-tight">
-            {drawerPracticeName(p)}
+            {headlineName}
           </SheetTitle>
+          {legalLine ? (
+            <p className="text-[11px] text-[#8F8E82] mt-0.5">
+              Legal/census name: {legalLine}
+            </p>
+          ) : null}
           <p className="text-[13px] text-[#6B6B60] mt-0.5">
             {[p.address, p.city, p.state ? `${p.state} ${(p.zip ?? '').toString().slice(0, 5)}` : null]
               .filter(Boolean)
@@ -419,12 +432,12 @@ export function PracticeDetailDrawer({
               compact
               locationId={p.location_id}
               npi={p.npi}
-              practiceName={drawerPracticeName(p)}
+              practiceName={headlineName}
               fields={[
                 {
                   key: 'practice_name',
                   label: 'Current practice name',
-                  currentValue: drawerPracticeName(p),
+                  currentValue: headlineName,
                   placeholder: 'Name shown on the practice website',
                 },
                 {

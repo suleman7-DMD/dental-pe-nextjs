@@ -103,3 +103,20 @@ export function legalEntityName(row: DisplayNameSource): string | null {
   if (formatEntityName(legal).toLowerCase() === headline.toLowerCase()) return null
   return legal
 }
+
+/**
+ * Headline with the job-hunt verification layer applied: the name the
+ * practice's own website uses (job_hunt_verification.public_practice_name)
+ * outranks every census/registry-derived name — "Eagle Falls Dentistry", not
+ * "MY DENTIST FAMILY, LTD". Falls back to the shared displayName rules when
+ * no website-verified name is on file. The legal/census name stays available
+ * as a secondary line via legalEntityName / displayName.
+ */
+export function verifiedDisplayName(
+  row: DisplayNameSource,
+  publicPracticeName?: string | null
+): string {
+  const verified = cleanNamePart(publicPracticeName)
+  if (verified) return verified
+  return displayName(row)
+}
