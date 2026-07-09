@@ -332,7 +332,7 @@ function SnapshotTab({
         <SectionHeading>Quick facts</SectionHeading>
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <QuickFact
-            label="Ownership (census)"
+            label="Ownership (reviewed)"
             value={
               <CensusBadge
                 tier={target.ownershipTier ?? practice.census_review_status}
@@ -567,7 +567,7 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
           <EvidenceUrlList urls={intelAudit?.verification_urls ?? []} />
         </div>
         <div className="rounded-md border border-[#E8E5DE] bg-[#F5F5F0] px-3 py-2 text-xs text-[#6B6B60]">
-          This drawer is using census ownership plus structural NPPES/Data Axle fields only.
+          This drawer is using the reviewed ownership answer plus structural NPPES/Data Axle fields only.
           Rejected or archived raw research is visible as an audit record, but it is not used
           for scoring, thesis, or evidence claims.
         </div>

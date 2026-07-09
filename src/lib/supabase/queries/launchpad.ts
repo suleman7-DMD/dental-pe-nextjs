@@ -3,6 +3,7 @@ import {
   fetchPracticeLocations,
   practiceLocationToLaunchpadRecord,
 } from "@/lib/supabase/queries/practice-locations"
+import { fetchJobHuntVerificationMap } from "@/lib/supabase/queries/job-hunt-verification"
 import {
   getLaunchpadScopeOption,
   resolveLaunchpadZipCodes,
@@ -498,13 +499,17 @@ export async function getLaunchpadBundle(options: {
   const zipCodes = resolveLaunchpadZipCodes(scope)
   const scopeOption = getLaunchpadScopeOption(scope)
 
-  // 2. Parallel fetches (practices, watched_zips, zip_scores, recent_deals)
-  const [rawPractices, watchedZipRows, rawZipScores, recentDeals] = await Promise.all([
-    fetchAllPracticesByZips(supabase, zipCodes),
-    fetchWatchedZips(supabase, zipCodes),
-    fetchZipScores(supabase, zipCodes),
-    fetchRecentDeals(supabase, zipCodes, cutoffIso),
-  ])
+  // 2. Parallel fetches (practices, watched_zips, zip_scores, recent_deals,
+  //    job-hunt verification layer). Verification failure degrades to null
+  //    (the KPI shows "--"), never kills the bundle.
+  const [rawPractices, watchedZipRows, rawZipScores, recentDeals, verificationMap] =
+    await Promise.all([
+      fetchAllPracticesByZips(supabase, zipCodes),
+      fetchWatchedZips(supabase, zipCodes),
+      fetchZipScores(supabase, zipCodes),
+      fetchRecentDeals(supabase, zipCodes, cutoffIso),
+      fetchJobHuntVerificationMap(supabase).catch(() => null),
+    ])
 
   const practices: LaunchpadPracticeRecord[] = rawPractices
 
@@ -654,6 +659,12 @@ export async function getLaunchpadBundle(options: {
   const censusReviewedPct =
     totalPractices > 0 ? Math.round((allSummary.censusReviewed / totalPractices) * 100) : 0
 
+  // Axis 2 — job-hunt verification: scope locations with a job_hunt_verification
+  // row (website / current doctors / hiring / contact facts checked).
+  const jobHuntVerifiedCount = verificationMap
+    ? practices.filter((p) => p.location_id && verificationMap[p.location_id]).length
+    : null
+
   const summary: LaunchpadSummary = {
     scopeId: scope,
     scopeLabel: scopeOption.label,
@@ -693,6 +704,8 @@ export async function getLaunchpadBundle(options: {
       needs_research: allSummary.needsResearch,
     },
     censusReviewedPct,
+    censusReviewedCount: allSummary.censusReviewed,
+    jobHuntVerifiedCount,
   }
 
   // 10. Build dataHealth

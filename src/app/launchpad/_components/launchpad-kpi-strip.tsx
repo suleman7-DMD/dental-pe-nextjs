@@ -23,22 +23,18 @@ interface LaunchpadKpiStripProps {
 export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps) {
   const summary = bundle?.summary ?? null
 
-  const intelCoveragePct = bundle?.dataHealth?.intelCoveragePct ?? null
-
-  // Intel coverage count
-  const withIntelCount = bundle?.rankedTargets
-    ? bundle.rankedTargets.filter((t) => t.intel != null).length
+  // The clinic-location denominator: one row per physical office.
+  // zip_scores sum when available, else the fetched location-row count.
+  const clinicLocations = summary
+    ? summary.totalGpLocations ?? summary.totalPracticesInScope
     : null
-  const totalCount = bundle?.rankedTargets ? bundle.rankedTargets.length : null
 
-  const intelValue =
-    withIntelCount != null && totalCount != null
-      ? `${withIntelCount} / ${totalCount}`
-      : "--"
+  const ownershipReviewed = summary?.censusReviewedCount ?? null
+  const jobHuntVerified = summary?.jobHuntVerifiedCount ?? null
 
-  const intelPct =
-    withIntelCount != null && totalCount != null && totalCount > 0
-      ? ((withIntelCount / totalCount) * 100).toFixed(0)
+  const ownershipPct =
+    ownershipReviewed != null && clinicLocations != null && clinicLocations > 0
+      ? ((ownershipReviewed / clinicLocations) * 100).toFixed(0)
       : null
 
   return (
@@ -50,27 +46,51 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
       >
         <KpiCard
           icon={<Building2 className="h-4 w-4" />}
-          label="GP clinics in scope"
+          label="Clinic locations"
+          value={clinicLocations != null ? clinicLocations.toLocaleString() : "--"}
+          subtitle={
+            <span className="text-[11px] text-[#6B6B60]">
+              one row per physical office
+            </span>
+          }
+          tooltip="Physical clinic locations in this scope — dentist and organization registry rows at the same address are collapsed into one office. This is the denominator every coverage number below is measured against."
+          accentColor="#B8860B"
+        />
+
+        <KpiCard
+          icon={<ListChecks className="h-4 w-4" />}
+          label="Ownership reviewed"
           value={
-            summary && summary.totalGpLocations != null
-              ? summary.totalGpLocations.toLocaleString()
-              : summary
-                ? summary.totalPracticesInScope.toLocaleString()
-                : "--"
+            summary && clinicLocations != null
+              ? `${summary.censusReviewedCount.toLocaleString()} / ${clinicLocations.toLocaleString()}`
+              : "--"
           }
           subtitle={
-            summary && summary.totalGpLocations != null ? (
-              <span className="text-[11px] text-[#6B6B60]">
-                {summary.totalPracticesInScope.toLocaleString()} NPI rows
-              </span>
-            ) : (
-              <span className="text-[11px] text-[#9C9C90]">
-                Location dedup unavailable
-              </span>
-            )
+            <span className="text-[11px] text-[#6B6B60]">
+              {ownershipPct != null
+                ? `${ownershipPct}% have an ownership answer`
+                : "who controls the office"}
+            </span>
           }
-          tooltip="Location-deduped GP clinic count (sum of zip_scores.total_gp_locations across the scope's ZIPs). Subtitle shows the raw NPPES NPI row count, which is ~2.7× larger because NPPES emits one row per provider AND one per organization at the same address."
-          accentColor="#B8860B"
+          tooltip="Offices where a human reviewed evidence and concluded who likely controls the practice (independent dentist, dentist-owned group, DSO/PE, etc.). The rest are still waiting for an answer — never assumed."
+          accentColor="#2563EB"
+        />
+
+        <KpiCard
+          icon={<Brain className="h-4 w-4" />}
+          label="Job-hunt verified"
+          value={
+            jobHuntVerified != null && clinicLocations != null
+              ? `${jobHuntVerified.toLocaleString()} / ${clinicLocations.toLocaleString()}`
+              : "--"
+          }
+          subtitle={
+            <span className="text-[11px] text-[#6B6B60]">
+              first batch — grows over time
+            </span>
+          }
+          tooltip="Offices where we checked the practice's own website for current doctors, owner/operator statement, hiring, and contact facts. This is an extra verification layer on top of the ownership review — a small count here does NOT mean the other offices aren't real."
+          accentColor="#7C3AED"
         />
 
         <KpiCard
@@ -79,10 +99,10 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           value={summary ? summary.laneCounts.verified_target.toLocaleString() : "--"}
           subtitle={
             <span className="text-[11px] text-[#6B6B60]">
-              Census-reviewed + verified dossier
+              ownership + job details both checked
             </span>
           }
-          tooltip="Practices whose ownership is a census-reviewed conclusion AND that carry a current verified practice dossier. Partial, stale, or conflicted intel cannot enter this lane."
+          tooltip="Offices where we know who controls the practice AND have current, source-backed job details. Partial, stale, or conflicted info cannot enter this lane."
           accentColor={LAUNCHPAD_LANE_COLORS.verified_target}
         />
 
@@ -92,10 +112,10 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           value={summary ? summary.laneCounts.promising_lead.toLocaleString() : "--"}
           subtitle={
             <span className="text-[11px] text-[#6B6B60]">
-              Census-reviewed · scores ≤ 60
+              job details missing · scores ≤ 60
             </span>
           }
-          tooltip="Ownership is census-reviewed but practice-level intel is missing, partial, stale, or conflicted. Scores are capped at 60 until current verified intel is accepted."
+          tooltip="We know who controls the office, but current doctors / website / hiring / contact facts still need checking. Scores are capped at 60 until those job details are verified."
           accentColor={LAUNCHPAD_LANE_COLORS.promising_lead}
         />
 
@@ -105,52 +125,24 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           value={summary ? summary.laneCounts.needs_research.toLocaleString() : "--"}
           subtitle={
             <span className="text-[11px] text-[#6B6B60]">
-              Census pending · scores ≤ 45
+              ownership answer missing · scores ≤ 45
             </span>
           }
-          tooltip="Ownership is not a census conclusion yet — unreviewed, undetermined, or held for evidence. Scores are capped at 45 until the ownership census reviews these locations. This lane is never hidden: it is the honest size of what we don't know yet."
+          tooltip="We don't have a reviewed answer yet for who controls these offices. Scores are capped at 45 until the ownership review answers. This lane is never hidden: it is the honest size of what we don't know yet."
           accentColor={LAUNCHPAD_LANE_COLORS.needs_research}
-        />
-
-        <KpiCard
-          icon={<ListChecks className="h-4 w-4" />}
-          label="Census coverage"
-          value={summary ? `${summary.censusReviewedPct.toFixed(0)}%` : "--"}
-          subtitle={
-            <span className="text-[11px] text-[#6B6B60]">
-              of scope rows ownership-reviewed
-            </span>
-          }
-          tooltip="Share of practice rows in this scope whose ownership_tier is a census-reviewed conclusion (evidence-backed human review). Everything else is unreviewed, undetermined, or held — never assumed."
-          accentColor="#2563EB"
-        />
-
-        <KpiCard
-          icon={<Brain className="h-4 w-4" />}
-          label="Evidence coverage"
-          value={intelValue}
-          subtitle={
-            intelPct != null ? (
-              <span className="text-[11px] text-[#6B6B60]">{intelPct}% of ranked targets</span>
-            ) : (
-              <span className="text-[11px] text-[#9C9C90]">No source-backed intel</span>
-            )
-          }
-          tooltip={
-            withIntelCount === 0
-              ? "0% source-backed evidence coverage — no practice can reach the verified-target lane. Run the weekly research pipeline to populate verified dossiers."
-              : "Practices with source-backed practice_intel attached. Rejected raw rows do not lift scores or populate thesis claims."
-          }
-          accentColor="#7C3AED"
         />
       </div>
 
-      {intelCoveragePct !== null && intelCoveragePct < 10 && (
-        <div className="mt-2 rounded-md border border-[#D4920B]/30 bg-[#D4920B]/5 px-3 py-2 text-xs text-[#6B6B60]">
-          Current verified intel coverage thin ({intelCoveragePct.toFixed(0)}%) — most
-          census-reviewed practices sit in the promising-leads lane (scores ≤ 60)
-        </div>
-      )}
+      {jobHuntVerified != null &&
+        clinicLocations != null &&
+        jobHuntVerified < clinicLocations * 0.1 && (
+          <div className="mt-2 rounded-md border border-[#D4920B]/30 bg-[#D4920B]/5 px-3 py-2 text-xs text-[#6B6B60]">
+            Only {jobHuntVerified.toLocaleString()} of{" "}
+            {clinicLocations.toLocaleString()} offices have job-hunt details
+            verified so far — for everything else, treat doctors, website, and
+            contact fields as unchecked unless they carry a verified label.
+          </div>
+        )}
     </div>
   )
 }

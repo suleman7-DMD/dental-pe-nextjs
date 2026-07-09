@@ -64,7 +64,7 @@ function exportRankedCsv(targets: LaunchpadRankedTarget[], track: LaunchpadTrack
   ]
   const headerMap: Record<string, string> = {
     rank: "Rank", npi: "NPI", practice: "Practice", city: "City", state: "State",
-    zip: "ZIP", lane: "Lane", ownership_tier: "Census Ownership Tier",
+    zip: "ZIP", lane: "Lane", ownership_tier: "Ownership Answer",
     network: "Network", pe_backed: "PE-Backed",
     best_track: "Best Track", score: "Score", tier: "Fit Tier",
     commutable: "Commutable", dso_employment_tier: "DSO Employment Tier",

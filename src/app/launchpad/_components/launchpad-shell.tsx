@@ -188,6 +188,16 @@ function LaunchpadShellInner({ initialBundle, initialBundleError }: LaunchpadShe
         {/* KPI strip */}
         <LaunchpadKpiStrip bundle={effectiveBundle} />
 
+        {/* One-paragraph explainer: the two coverage axes in plain language */}
+        <p className="rounded-md border border-[#E5E1D8] bg-[#FBFAF7] px-3 py-2 text-xs leading-relaxed text-[#6B6B60]">
+          <span className="font-medium text-[#3D3D38]">Ownership review</span>{" "}
+          tells us who likely controls the office.{" "}
+          <span className="font-medium text-[#3D3D38]">Job-hunt verification</span>{" "}
+          tells us whether we have current doctors, website, hiring, and contact
+          facts. Most offices have ownership reviewed; only a small first batch
+          has job-hunt verification.
+        </p>
+
         {/* Pinboard panel (only renders when pins exist) */}
         <PinboardPanel
           bundle={effectiveBundle}

@@ -47,18 +47,18 @@ export const LAUNCHPAD_LANES: LaunchpadLane[] = [
 ]
 
 export const LAUNCHPAD_LANE_LABELS: Record<LaunchpadLane, string> = {
-  verified_target: "Verified job targets",
-  promising_lead: "Promising leads",
-  needs_research: "Needs research",
+  verified_target: "Ready to research/apply",
+  promising_lead: "Ownership known, job details need checking",
+  needs_research: "Ownership answer missing",
 }
 
 export const LAUNCHPAD_LANE_DESCRIPTIONS: Record<LaunchpadLane, string> = {
   verified_target:
-    "Census-reviewed ownership with a current verified practice dossier — useful enough to prepare outreach.",
+    "We know who controls this office AND have current source-backed job details — ready to prepare outreach.",
   promising_lead:
-    "Census-reviewed ownership, but practice-level intel is missing, partial, stale, or conflicted — re-research before outreach.",
+    "We know who controls this office, but job details (current doctors, website, hiring, contact facts) are missing, partial, stale, or conflicted — check before outreach.",
   needs_research:
-    "Ownership is not a census conclusion yet (unreviewed, undetermined, or held) — scores are capped until the census answers.",
+    "We do not yet have a reviewed answer for who controls this office — scores stay capped until the ownership review answers.",
 }
 
 /** Score ceilings by lane. Null = uncapped (0–100). */
@@ -514,6 +514,18 @@ export interface LaunchpadSummary {
   laneCounts: Record<LaunchpadLane, number>
   /** % of scope practice rows with a census-reviewed ownership conclusion. */
   censusReviewedPct: number
+  /**
+   * Axis 1 — ownership: clinic locations in scope with a hand-reviewed
+   * ownership conclusion (ownership_tier set). Numerator for
+   * "Ownership reviewed: X / Y clinic locations".
+   */
+  censusReviewedCount: number
+  /**
+   * Axis 2 — job-hunt: clinic locations in scope with a row in
+   * job_hunt_verification (website/doctors/hiring/contact facts checked).
+   * Null when the verification layer could not be fetched.
+   */
+  jobHuntVerifiedCount: number | null
 }
 
 export interface LaunchpadDataHealth {

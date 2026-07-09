@@ -40,6 +40,7 @@ import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { summarizeBuckets, tierToBucket, type BucketSummary } from '@/lib/census/ownership-truth'
 import { countSourceClassesFromRows, type SourceClassCounts } from '@/lib/census/zip-census'
 import { CensusBucketSummaryCard } from '@/components/data-display/census-bucket-summary'
+import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
 import {
@@ -425,6 +426,18 @@ function JobMarketShellInner({
     [practices]
   )
 
+  // Job-hunt verification is the SECOND coverage axis (ownership review is the
+  // first). Scope intersection when the full practice set is loaded; the raw
+  // verified-table size ("so far") before that — never presented as a share of
+  // an unloaded denominator.
+  const verificationMap = useJobHuntVerificationMap()
+  const jobHuntVerifiedCount = useMemo(() => {
+    if (practices && practices.length > 0) {
+      return practices.filter((p) => p.location_id && verificationMap[p.location_id]).length
+    }
+    return Object.keys(verificationMap).length
+  }, [practices, verificationMap])
+
   // ── KPI display values ─────────────────────────────────────────────
   const kpiDisplay = useMemo(() => {
     const k = activeKpis
@@ -499,6 +512,20 @@ function JobMarketShellInner({
             scopeLabel={currentLocation}
             sourceClasses={activeKpis.sourceClasses}
           />
+
+          {/* The two coverage axes in plain language */}
+          <p className="rounded-md border border-[#E5E1D8] bg-[#FBFAF7] px-3 py-2 text-xs leading-relaxed text-[#6B6B60]">
+            <span className="font-medium text-[#3D3D38]">Ownership review</span>{' '}
+            tells us who likely controls the office.{' '}
+            <span className="font-medium text-[#3D3D38]">Job-hunt verification</span>{' '}
+            tells us whether we have current doctors, website, hiring, and contact
+            facts. Most offices have ownership reviewed; only a small first batch
+            {jobHuntVerifiedCount > 0
+              ? ` (${jobHuntVerifiedCount.toLocaleString()} offices so far)`
+              : ''}{' '}
+            has job-hunt verification — treat doctor, website, and contact fields
+            on the other offices as unchecked unless they carry a verified label.
+          </p>
 
           {/* Extra business data — a separate axis, stated as such */}
           <DataFreshnessBar

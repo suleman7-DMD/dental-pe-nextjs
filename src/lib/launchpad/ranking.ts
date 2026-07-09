@@ -182,20 +182,20 @@ export function resolveLane(
     const status = reviewStatusOf(practice)
     const why =
       status === "held"
-        ? "Census review is held for adjudication"
+        ? "The ownership answer is on hold pending a judgment call"
         : status === "undetermined"
-          ? "Census-researched, but the evidence was too thin to classify"
-          : "Not yet census-reviewed"
+          ? "Ownership was researched, but the evidence was too thin for an answer"
+          : "Ownership answer missing — this office hasn't been reviewed yet"
     return {
       lane: "needs_research",
-      laneReason: `${why} — ownership unknown, so the score is capped at ${LAUNCHPAD_LANE_CAPS.needs_research}.`,
+      laneReason: `${why} — so the score is capped at ${LAUNCHPAD_LANE_CAPS.needs_research}.`,
       cap: LAUNCHPAD_LANE_CAPS.needs_research,
     }
   }
   if (intel == null) {
     return {
       lane: "promising_lead",
-      laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}), but no current verified practice-level dossier yet — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
+      laneReason: `Ownership reviewed (${TIER_META[tier].shortLabel}), but job details (current doctors, website, hiring, contact) are missing — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
       cap: LAUNCHPAD_LANE_CAPS.promising_lead,
     }
   }
@@ -206,13 +206,13 @@ export function resolveLane(
   if (audit.status !== "source_backed") {
     return {
       lane: "promising_lead",
-      laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}), but the intel on file failed the source-backed audit (${audit.reason}) — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
+      laneReason: `Ownership reviewed (${TIER_META[tier].shortLabel}), but the job details on file failed the source-backed check (${audit.reason}) — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
       cap: LAUNCHPAD_LANE_CAPS.promising_lead,
     }
   }
   return {
     lane: "verified_target",
-    laneReason: `Census-reviewed ownership (${TIER_META[tier].shortLabel}) with a current verified practice dossier on file.`,
+    laneReason: `Ownership reviewed (${TIER_META[tier].shortLabel}) and current source-backed job details on file.`,
     cap: null,
   }
 }

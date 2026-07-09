@@ -41,9 +41,10 @@ function censusOwnershipLabel(
       .join(" · ")
     return extras ? `${label} (${extras})` : label
   }
-  if (s.census_review_status === "undetermined") return "Needs evidence (census undetermined)"
-  if (s.census_review_status === "held") return "Held for census review"
-  return "Not census-reviewed yet"
+  if (s.census_review_status === "undetermined")
+    return "Ownership researched — evidence too thin for an answer"
+  if (s.census_review_status === "held") return "Ownership answer on hold"
+  return "Ownership answer missing — not reviewed yet"
 }
 
 interface CompoundThesisProps {
@@ -351,7 +352,7 @@ export function CompoundThesis({ npi, signals, scores, track, practice }: Compou
                 <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2 text-[11px]">
                   <div className="flex flex-col">
                     <dt className="text-[10px] uppercase tracking-wider text-[#9C9C90]">
-                      Census ownership
+                      Ownership answer
                     </dt>
                     <dd className="font-medium text-[#1A1A1A]">
                       {censusOwnershipLabel(data.structural_summary)}
