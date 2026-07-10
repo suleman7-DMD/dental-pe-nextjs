@@ -551,7 +551,7 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
           </Banner>
         ) : (
           <Banner variant="amber">
-            <div className="font-semibold">No current verified practice dossier attached</div>
+            <div className="font-semibold">No source-backed practice dossier attached</div>
             <div className="mt-1 text-xs opacity-90">
               {intelAudit?.reason ??
                 "There is no practice_intel row for this location's provider NPIs."}
@@ -584,7 +584,7 @@ function IntelEvidenceTab({ target }: { target: LaunchpadRankedTarget }) {
         <div className="font-semibold">
           {intelAudit?.status === "legacy"
             ? "Practice dossier (pre-verification batch)"
-            : "Current verified practice dossier"}
+            : "Older source-backed dossier — doesn't count as website-checked"}
         </div>
         <div className="mt-1 text-xs opacity-90">
           {intel.verification_quality ?? "verified"} · {intel.verification_searches ?? 0} searches ·{" "}

@@ -162,9 +162,14 @@ function reviewStatusOf(practice: LaunchpadPracticeRecord): "held" | "undetermin
 }
 
 // ---------------------------------------------------------------------------
-// Lane assignment — census review state + intel presence. Rule §2.9:
-// no fake precision. Unknown ownership means a capped score and an
-// explicit reason, not a confident-looking number.
+// Lane assignment — census review state + the job_hunt_verification
+// website-check layer. Rule §2.9: no fake precision. Unknown ownership
+// means a capped score and an explicit reason, not a confident number.
+//
+// "Ready to research/apply" requires a job_hunt_verification row — the
+// hand-checked record of what the practice's own website says right now.
+// Older practice_intel AI dossiers are NOT verification: they may inform
+// signals and scores, but they can never buy the verified lane.
 // ---------------------------------------------------------------------------
 
 export interface LaneAssignment {
@@ -175,7 +180,8 @@ export interface LaneAssignment {
 
 export function resolveLane(
   practice: LaunchpadPracticeRecord,
-  intel: LaunchpadPracticeIntelRecord | null
+  intel: LaunchpadPracticeIntelRecord | null,
+  hasJobHuntVerification: boolean
 ): LaneAssignment {
   const tier = censusTier(practice)
   if (!tier) {
@@ -192,28 +198,24 @@ export function resolveLane(
       cap: LAUNCHPAD_LANE_CAPS.needs_research,
     }
   }
-  if (intel == null) {
+  if (hasJobHuntVerification) {
     return {
-      lane: "promising_lead",
-      laneReason: `Ownership reviewed (${TIER_META[tier].shortLabel}), but job details (current doctors, website, hiring, contact) are missing — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
-      cap: LAUNCHPAD_LANE_CAPS.promising_lead,
+      lane: "verified_target",
+      laneReason: `Ownership reviewed (${TIER_META[tier].shortLabel}) and this office's own website was checked for current doctors, hiring, and contact facts.`,
+      cap: null,
     }
   }
-  // Defense in depth: the pipeline pre-filters intelByNpi to source-backed
-  // rows, but verified_target must never depend on a caller remembering to.
-  // Re-audit here so a raw intel row can't buy the verified lane.
-  const audit = auditIntel(intel)
-  if (audit.status !== "source_backed") {
-    return {
-      lane: "promising_lead",
-      laneReason: `Ownership reviewed (${TIER_META[tier].shortLabel}), but the job details on file failed the source-backed check (${audit.reason}) — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.`,
-      cap: LAUNCHPAD_LANE_CAPS.promising_lead,
-    }
-  }
+  // Ownership is reviewed but the website-check layer hasn't covered this
+  // office. An older AI dossier (even a source-backed one) may exist — say
+  // so, but it does not count as checked job details.
+  const dossierNote =
+    intel != null && auditIntel(intel).status === "source_backed"
+      ? " An older source-backed AI dossier exists, but current doctors/website/contact facts haven't been re-checked."
+      : ""
   return {
-    lane: "verified_target",
-    laneReason: `Ownership reviewed (${TIER_META[tier].shortLabel}) and current source-backed job details on file.`,
-    cap: null,
+    lane: "promising_lead",
+    laneReason: `Ownership reviewed (${TIER_META[tier].shortLabel}), but this office's website hasn't been checked for current doctors, hiring, and contact facts — score capped at ${LAUNCHPAD_LANE_CAPS.promising_lead}.${dossierNote}`,
+    cap: LAUNCHPAD_LANE_CAPS.promising_lead,
   }
 }
 
@@ -463,13 +465,14 @@ export function scoreForTrack(
   active: ActiveSignal[],
   track: ConcreteLaunchpadTrack,
   practice: LaunchpadPracticeRecord,
-  intel: LaunchpadPracticeIntelRecord | null
+  intel: LaunchpadPracticeIntelRecord | null,
+  hasJobHuntVerification: boolean
 ): LaunchpadTrackScore {
   const contributions = applyTrackMultipliers(active, track)
   const totalContribution = contributions.reduce((sum, c) => sum + c.contribution, 0)
   const raw = BASE_SCORE + totalContribution
   let final = clamp(raw, 0, 100)
-  const laneInfo = resolveLane(practice, intel)
+  const laneInfo = resolveLane(practice, intel, hasJobHuntVerification)
   let capped = false
   let capReason: string | null = null
   if (laneInfo.cap != null && final > laneInfo.cap) {
@@ -498,6 +501,13 @@ export interface RankContext {
   scope: LaunchpadScope
   track: LaunchpadTrack
   nowYear?: number
+  /**
+   * location_ids with a job_hunt_verification row — the hand-checked
+   * website layer. This is the ONLY key to the verified_target lane.
+   * Absent/empty ⇒ nothing verifies (lanes degrade to promising_lead,
+   * never falsely verified).
+   */
+  verifiedLocationIds?: Set<string>
 }
 
 function buildHeadline(
@@ -551,6 +561,9 @@ export function rankTargets(ctx: RankContext): LaunchpadRankedTarget[] {
   const ranked: LaunchpadRankedTarget[] = ctx.practices.map((practice) => {
     const intel = ctx.intelByNpi.get(practice.npi) ?? null
     const zipScore = practice.zip ? ctx.zipScoreByZip.get(practice.zip) ?? null : null
+    const hasVerification =
+      practice.location_id != null &&
+      ctx.verifiedLocationIds?.has(practice.location_id) === true
 
     const evalCtx: SignalEvaluationContext = {
       practice,
@@ -566,9 +579,9 @@ export function rankTargets(ctx: RankContext): LaunchpadRankedTarget[] {
     const active = evaluateSignals(evalCtx)
 
     const trackScores: Record<ConcreteLaunchpadTrack, LaunchpadTrackScore> = {
-      succession: scoreForTrack(active, "succession", practice, intel),
-      high_volume: scoreForTrack(active, "high_volume", practice, intel),
-      dso: scoreForTrack(active, "dso", practice, intel),
+      succession: scoreForTrack(active, "succession", practice, intel, hasVerification),
+      high_volume: scoreForTrack(active, "high_volume", practice, intel, hasVerification),
+      dso: scoreForTrack(active, "dso", practice, intel, hasVerification),
     }
 
     let bestTrack: ConcreteLaunchpadTrack = "succession"
@@ -592,7 +605,7 @@ export function rankTargets(ctx: RankContext): LaunchpadRankedTarget[] {
       (id) => LAUNCHPAD_SIGNALS[id].category === "warning"
     )
 
-    const laneInfo = resolveLane(practice, intel)
+    const laneInfo = resolveLane(practice, intel, hasVerification)
     const networkLabel = censusNetworkLabel(practice)
     const dsoEntry = networkLabel ? resolveDsoTierEntry(networkLabel) : null
 

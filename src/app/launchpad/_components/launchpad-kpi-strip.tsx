@@ -86,7 +86,7 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           }
           subtitle={
             <span className="text-[11px] text-[#6B6B60]">
-              first batch — grows over time
+              website-checked GP offices
             </span>
           }
           tooltip="Offices where we checked the practice's own website for current doctors, owner/operator statement, hiring, and contact facts. This is an extra verification layer on top of the ownership review — a small count here does NOT mean the other offices aren't real."
@@ -99,10 +99,10 @@ export function LaunchpadKpiStrip({ bundle, className }: LaunchpadKpiStripProps)
           value={summary ? summary.laneCounts.verified_target.toLocaleString() : "--"}
           subtitle={
             <span className="text-[11px] text-[#6B6B60]">
-              ownership + job details both checked
+              ownership reviewed + website checked
             </span>
           }
-          tooltip="Offices where we know who controls the practice AND have current, source-backed job details. Partial, stale, or conflicted info cannot enter this lane."
+          tooltip="Offices where we know who controls the practice AND the practice's own website was checked for current doctors, hiring, and contact facts. Older AI dossiers do not count — only the website-check layer opens this lane."
           accentColor={LAUNCHPAD_LANE_COLORS.verified_target}
         />
 

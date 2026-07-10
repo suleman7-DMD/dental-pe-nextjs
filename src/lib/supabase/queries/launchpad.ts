@@ -230,6 +230,7 @@ async function fetchWatchedZips(
       .from("watched_zips")
       .select("zip_code,median_household_income,population,city,state,metro_area")
       .in("zip_code", zipCodes)
+      .order("zip_code", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)
 
     if (error) throw error
@@ -275,6 +276,7 @@ async function fetchZipScores(
         ].join(",")
       )
       .in("zip_code", zipCodes)
+      .order("id", { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1)
 
     if (error) throw error
@@ -399,6 +401,7 @@ async function fetchRecentDeals(
       .in("target_zip", zipCodes)
       .gte("deal_date", cutoffDate)
       .order("deal_date", { ascending: false })
+      .order("id", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1)
 
     if (error) throw error
@@ -518,6 +521,12 @@ export async function getLaunchpadBundle(options: {
     warnings.push("No practices in scope")
   }
 
+  // location_ids with a job_hunt_verification row — the ONLY key to the
+  // verified_target lane. If the verification fetch failed (null map), the
+  // set is empty and every lane degrades to promising_lead: we never show
+  // "verified" without the row that proves it.
+  const verifiedLocationIds = new Set(Object.keys(verificationMap ?? {}))
+
   // 3. Merge watched_zips demographic data into zip_scores
   // population + median_household_income live on watched_zips, not zip_scores.
   const watchedZipByZip = new Map<string, WatchedZipRow>()
@@ -557,6 +566,7 @@ export async function getLaunchpadBundle(options: {
     recentDeals,
     scope,
     track,
+    verifiedLocationIds,
   })
 
   // Collect NPIs for the top-N structurally-ranked practices.
@@ -620,6 +630,7 @@ export async function getLaunchpadBundle(options: {
     intelAuditByNpi,
     scope,
     track,
+    verifiedLocationIds,
   })
 
   // 8. Trim to rankLimit (fullRanking is already sorted + numbered 1..N)

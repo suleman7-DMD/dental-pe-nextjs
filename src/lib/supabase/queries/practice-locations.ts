@@ -6,6 +6,7 @@ import {
   classifyPractice,
   isGpLocationClassification,
 } from "@/lib/constants/entity-classifications"
+import { fetchAllRowsStable } from "@/lib/supabase/queries/stable-pagination"
 
 const PAGE_SIZE = 1000
 const PRIMARY_MARKET_STATE = "IL"
@@ -185,48 +186,48 @@ export async function fetchPracticeLocations(
   supabase: SupabaseClient,
   options: PracticeLocationFetchOptions = {}
 ): Promise<PracticeLocationRecord[]> {
-  const rows: PracticeLocationRecord[] = []
   const zips = options.zips?.filter(Boolean) ?? null
-  let page = 0
 
-  while (options.maxRows == null || rows.length < options.maxRows) {
-    const remaining = options.maxRows == null ? PAGE_SIZE : options.maxRows - rows.length
-    const size = Math.min(PAGE_SIZE, remaining)
-    const from = page * PAGE_SIZE
-    const to = from + size - 1
+  return fetchAllRowsStable<PracticeLocationRecord>({
+    label: "practice_locations",
+    pageSize: PAGE_SIZE,
+    maxRows: options.maxRows,
+    keyOf: (row) => row.location_id,
+    fetchPage: (from, to) => {
+      let query = supabase
+        .from("practice_locations")
+        .select(PRACTICE_LOCATION_SELECT)
 
-    let query = supabase
-      .from("practice_locations")
-      .select(PRACTICE_LOCATION_SELECT)
-
-    if (zips && zips.length > 0) {
-      query = query.in("zip", zips)
-      if (!options.includeLegacyMarkets) {
+      if (zips && zips.length > 0) {
+        query = query.in("zip", zips)
+        if (!options.includeLegacyMarkets) {
+          query = query.eq("state", PRIMARY_MARKET_STATE)
+        }
+      } else if (!options.includeLegacyMarkets) {
         query = query.eq("state", PRIMARY_MARKET_STATE)
       }
-    } else if (!options.includeLegacyMarkets) {
-      query = query.eq("state", PRIMARY_MARKET_STATE)
-    }
-    if (!options.includeResidential) query = query.or("is_likely_residential.eq.false,is_likely_residential.is.null")
-    if (options.gpOnly) {
-      query = query.in("entity_classification", [...GP_LOCATION_CLASSIFICATIONS])
-    }
+      if (!options.includeResidential) query = query.or("is_likely_residential.eq.false,is_likely_residential.is.null")
+      if (options.gpOnly) {
+        query = query.in("entity_classification", [...GP_LOCATION_CLASSIFICATIONS])
+      }
 
-    query = query.order(options.orderBy ?? "practice_name", {
-      ascending: options.ascending ?? true,
-      nullsFirst: false,
-    })
-
-    const { data, error } = await query.range(from, to)
-    if (error) throw error
-
-    const batch = (data as unknown as PracticeLocationRecord[]) ?? []
-    rows.push(...batch)
-    if (batch.length < size) break
-    page += 1
-  }
-
-  return options.maxRows == null ? rows : rows.slice(0, options.maxRows)
+      // Paginated reads MUST have a unique total order. The caller-chosen sort
+      // columns (buyability_score, practice_name, ...) are non-unique, and
+      // Postgres gives no stable ordering within ties — so consecutive
+      // .range() pages can repeat some rows and skip others. location_id is
+      // the primary key; adding it as the final sort makes pagination exact.
+      return query
+        .order(options.orderBy ?? "practice_name", {
+          ascending: options.ascending ?? true,
+          nullsFirst: false,
+        })
+        .order("location_id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{
+        data: PracticeLocationRecord[] | null
+        error: unknown
+      }>
+    },
+  })
 }
 
 export async function fetchGpPracticeLocations(

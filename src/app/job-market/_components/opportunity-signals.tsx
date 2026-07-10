@@ -189,6 +189,7 @@ export function OpportunitySignals({ practices, zipList }: OpportunitySignalsPro
             .select('change_date, field_changed, old_value, new_value, change_type, npi')
             .gte('change_date', cutoff)
             .order('change_date', { ascending: false })
+            .order('id', { ascending: false })
             .range(offset, offset + pageSize - 1)
 
           if (data && data.length > 0) {

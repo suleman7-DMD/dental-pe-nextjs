@@ -264,9 +264,13 @@ function applyPracticeBoundingBoxQuery(
     .gte("longitude", bounds.minLon)
     .lte("longitude", bounds.maxLon);
 
-  query = query.order(options.orderBy ?? "practice_name", {
-    ascending: options.ascending ?? true,
-  });
+  // npi tie-breaker: the caller-chosen sort is non-unique, and paginated
+  // .range() reads need a unique total order or pages repeat/skip rows.
+  query = query
+    .order(options.orderBy ?? "practice_name", {
+      ascending: options.ascending ?? true,
+    })
+    .order("npi", { ascending: true });
 
   return query as unknown as RangeableQuery<PracticeRow>;
 }
@@ -396,7 +400,9 @@ export async function getScopedDeals(
       let query = supabase.from("deals").select(DEAL_SELECT);
       if (zipChunk) query = query.in("target_zip", zipChunk);
       if (options.sinceDate) query = query.gte("deal_date", options.sinceDate);
-      query = query.order("deal_date", { ascending: false });
+      query = query
+        .order("deal_date", { ascending: false })
+        .order("id", { ascending: false });
       return query as unknown as RangeableQuery<DealRow>;
     },
     { pageSize: options.pageSize, maxRows: zipCodes ? undefined : options.maxRows }
@@ -430,7 +436,9 @@ export async function getScopedZipScores(
             : ["low", "medium", "high"];
         query = query.in("metrics_confidence", allowed);
       }
-      query = query.order("zip_code", { ascending: true });
+      query = query
+        .order("zip_code", { ascending: true })
+        .order("id", { ascending: true });
       return query as unknown as RangeableQuery<ZipScoreRow>;
     },
     { pageSize: options.pageSize, maxRows: options.maxRows }
@@ -513,7 +521,11 @@ export async function getScopedChanges(
     () => {
       let query = supabase.from("practice_changes").select(CHANGE_SELECT);
       if (options.sinceDate) query = query.gte("change_date", options.sinceDate);
-      query = query.order("change_date", { ascending: false });
+      // id tie-breaker: change_date is non-unique; paginated reads need a
+      // unique total order or pages repeat/skip rows.
+      query = query
+        .order("change_date", { ascending: false })
+        .order("id", { ascending: false });
       return query as unknown as RangeableQuery<ChangeRow>;
     },
     { pageSize: options.pageSize, maxRows: options.maxRows ?? 500 }
@@ -803,6 +815,9 @@ export async function getScopedPracticeSignals(
       } else {
         query = query.order("zip_code", { ascending: true });
       }
+      // npi tie-breaker: zip_code / caller sorts are non-unique; paginated
+      // reads need a unique total order or pages repeat/skip rows.
+      query = query.order("npi", { ascending: true });
 
       query = query.abortSignal(timeoutSignal(1500));
       return query as unknown as RangeableQuery<PracticeSignalRow>;

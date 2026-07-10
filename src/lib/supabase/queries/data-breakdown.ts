@@ -383,6 +383,7 @@ export async function getDealsByType(
       .from("deals")
       .select("deal_type")
       .eq("target_state", "IL")
+      .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) throw error;
     const batch = (data ?? []) as Array<{ deal_type: string | null }>;
@@ -437,6 +438,7 @@ export async function getDealsByYear(
       .select("deal_date")
       .eq("target_state", "IL")
       .not("deal_date", "is", null)
+      .order("id", { ascending: true })
       .range(from, to);
     if (error) throw error;
     const rows = (data ?? []) as { deal_date: string }[];

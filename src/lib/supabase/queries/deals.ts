@@ -40,7 +40,10 @@ export async function getDealsByFilters(
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  query = query.order("deal_date", { ascending: false }).range(from, to);
+  query = query
+    .order("deal_date", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, to);
 
   const { data, count, error } = await query;
   if (error) throw error;
@@ -64,6 +67,7 @@ export async function getDealStats(
       .from("deals")
       .select("id, deal_date, platform_company, pe_sponsor, target_name, target_city, target_state, target_zip, deal_type, deal_size_mm, ebitda_multiple, specialty, num_locations, source, source_url, notes, created_at, updated_at")
       .order("deal_date", { ascending: false })
+      .order("id", { ascending: false })
       .range(from, to);
 
     if (error) throw error;
@@ -179,6 +183,7 @@ export async function getTopSponsors(
       .from("deals")
       .select("pe_sponsor")
       .not("pe_sponsor", "is", null)
+      .order("id", { ascending: true })
       .range(from, to);
 
     if (error) throw error;
@@ -214,6 +219,7 @@ export async function getTopPlatforms(
     const { data, error } = await supabase
       .from("deals")
       .select("platform_company")
+      .order("id", { ascending: true })
       .range(from, to);
 
     if (error) throw error;
@@ -367,7 +373,7 @@ async function fetchAllDealColumn<T extends Record<string, unknown>>(
     const to = from + pageSize - 1;
     let q = supabase.from("deals").select(column);
     if (notNull) q = q.not(column, "is", null);
-    q = q.range(from, to);
+    q = q.order("id", { ascending: true }).range(from, to);
     const { data, error } = await q;
     if (error) throw error;
     const batch = (data ?? []) as unknown as T[];

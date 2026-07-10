@@ -298,12 +298,13 @@ export function TrackListCard({
             </p>
           )}
 
-          {/* Intel trust chip — driven ONLY by the audit verdict (§7.2):
-              source_backed is the sole status allowed to say "verified". */}
+          {/* Intel trust chip — driven ONLY by the audit verdict (§7.2).
+              source_backed dossiers are OLDER AI research: they never open the
+              verified lane and must not read as "verified". */}
           {target.intelAudit?.status === "source_backed" ? (
-            <p className="mt-1 text-[10px] text-[#2D8B4E]">
-              Current verified dossier · {target.intelAudit.verification_quality ?? "verified"} ·{" "}
-              {target.intelAudit.verification_urls.length} URLs
+            <p className="mt-1 text-[10px] text-[#6B6B60]">
+              Older source-backed dossier available ·{" "}
+              {target.intelAudit.verification_urls.length} URLs · doesn&apos;t count as website-checked
             </p>
           ) : target.intelAudit?.status === "legacy" ? (
             <p className="mt-1 text-[10px] text-[#6B6B60]">

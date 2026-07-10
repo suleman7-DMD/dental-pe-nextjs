@@ -19,7 +19,7 @@ export async function getADABenchmarks(supabase: SupabaseClient): Promise<ADABen
       .from('ada_hpi_benchmarks')
       .select('*')
       .eq('state', 'IL')
-      .order('state', { ascending: true })
+      .order('id', { ascending: true })
       .range(offset, offset + pageSize - 1)
 
     if (error) {

@@ -44,6 +44,7 @@ export async function getRecentChanges(
           .from("practices")
           .select("npi")
           .in("zip", zipChunk)
+          .order("npi", { ascending: true })
           .range(offset, offset + pageSize - 1);
         if (batch && batch.length > 0) {
           allNpis.push(...batch.map((r: { npi: string }) => r.npi));

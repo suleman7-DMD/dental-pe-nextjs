@@ -157,9 +157,9 @@ export function TrackList({
           </h2>
           {rankedTargets.length > 0 && (
             <p className="text-xs text-[#707064]">
-              {(totalGrouped.get("verified_target") ?? []).length.toLocaleString()} verified ·{" "}
-              {(totalGrouped.get("promising_lead") ?? []).length.toLocaleString()} promising ·{" "}
-              {(totalGrouped.get("needs_research") ?? []).length.toLocaleString()} need research
+              {(totalGrouped.get("verified_target") ?? []).length.toLocaleString()} website-checked GP offices ·{" "}
+              {(totalGrouped.get("promising_lead") ?? []).length.toLocaleString()} ownership known, job details unchecked ·{" "}
+              {(totalGrouped.get("needs_research") ?? []).length.toLocaleString()} ownership answer missing
             </p>
           )}
         </div>

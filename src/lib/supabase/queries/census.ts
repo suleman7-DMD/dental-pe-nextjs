@@ -4,6 +4,7 @@ import {
   summarizeBuckets,
   type BucketSummary,
 } from "@/lib/census/ownership-truth"
+import { fetchAllRowsStable } from "@/lib/supabase/queries/stable-pagination"
 
 const PAGE_SIZE = 1000
 const PRIMARY_MARKET_STATE = "IL"
@@ -35,6 +36,7 @@ export interface CensusSummary {
 }
 
 interface CensusLocationRow {
+  location_id: string
   ownership_tier: string | null
   pe_backed: boolean | null
 }
@@ -52,28 +54,25 @@ function pct(numerator: number, denominator: number): number {
 async function fetchTieredLocationRows(
   supabase: SupabaseClient
 ): Promise<CensusLocationRow[]> {
-  const rows: CensusLocationRow[] = []
-  let page = 0
-
-  while (true) {
-    const from = page * PAGE_SIZE
-    const to = from + PAGE_SIZE - 1
-    const { data, error } = await supabase
-      .from("practice_locations")
-      .select("ownership_tier,pe_backed")
-      .eq("state", PRIMARY_MARKET_STATE)
-      .not("ownership_tier", "is", null)
-      .range(from, to)
-
-    if (error) throw error
-
-    const batch = (data as unknown as CensusLocationRow[]) ?? []
-    rows.push(...batch)
-    if (batch.length < PAGE_SIZE) break
-    page += 1
-  }
-
-  return rows
+  // This query previously paginated with NO ORDER BY at all, so page
+  // boundaries were arbitrary and tier counts could double- or under-count.
+  // location_id (primary key) gives an exact total order + dedupe.
+  return fetchAllRowsStable<CensusLocationRow>({
+    label: "census tiered locations",
+    pageSize: PAGE_SIZE,
+    keyOf: (row) => row.location_id,
+    fetchPage: (from, to) =>
+      supabase
+        .from("practice_locations")
+        .select("location_id,ownership_tier,pe_backed")
+        .eq("state", PRIMARY_MARKET_STATE)
+        .not("ownership_tier", "is", null)
+        .order("location_id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{
+        data: CensusLocationRow[] | null
+        error: unknown
+      }>,
+  })
 }
 
 async function fetchIlZipScores(

@@ -27,6 +27,7 @@ export async function getPracticesByZips(
     .select("*", { count: "exact" })
     .in("zip", zips)
     .order("practice_name", { ascending: true })
+    .order("npi", { ascending: true })
     .range(from, to);
 
   if (error) throw error;

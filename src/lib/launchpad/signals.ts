@@ -48,15 +48,15 @@ export const LAUNCHPAD_LANES: LaunchpadLane[] = [
 
 export const LAUNCHPAD_LANE_LABELS: Record<LaunchpadLane, string> = {
   verified_target: "Ready to research/apply",
-  promising_lead: "Ownership known, job details need checking",
+  promising_lead: "Ownership known, job details unchecked",
   needs_research: "Ownership answer missing",
 }
 
 export const LAUNCHPAD_LANE_DESCRIPTIONS: Record<LaunchpadLane, string> = {
   verified_target:
-    "We know who controls this office AND have current source-backed job details — ready to prepare outreach.",
+    "We know who controls this office AND we checked the practice's own website for current doctors, hiring, and contact facts — ready to prepare outreach.",
   promising_lead:
-    "We know who controls this office, but job details (current doctors, website, hiring, contact facts) are missing, partial, stale, or conflicted — check before outreach.",
+    "We know who controls this office, but its website hasn't been checked for current doctors, hiring, and contact facts. An older AI dossier may exist for some offices — it doesn't count as checked.",
   needs_research:
     "We do not yet have a reviewed answer for who controls this office — scores stay capped until the ownership review answers.",
 }
