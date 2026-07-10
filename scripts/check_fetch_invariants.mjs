@@ -20,7 +20,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const EXPECTED_GP_TOTAL = 4439;
-const EXPECTED_OWNERSHIP_REVIEWED = 3180;
+const EXPECTED_OWNERSHIP_REVIEWED = 3692; // 2026-07-09 P5 recovery close-out (was 3180)
 const EXPECTED_JHV_TOTAL = 48;
 const EXPECTED_JHV_GP = 47; // Wirtz Orthodontics is a specialist — outside GP scope
 const LIVE_URL = process.env.LAUNCHPAD_URL ?? "https://dental-pe-nextjs.vercel.app/launchpad";
