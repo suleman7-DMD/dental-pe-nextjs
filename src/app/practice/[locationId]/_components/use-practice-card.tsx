@@ -1,6 +1,10 @@
 import Link from "next/link"
 import { ArrowUpRight, Compass, Briefcase, Target } from "lucide-react"
 import type { PracticeLocationRecord } from "@/lib/supabase/queries/practice-locations"
+import {
+  TrustSourceTag,
+  type TrustSource,
+} from "@/components/data-display/trust-source-tag"
 import { acquisitionVerdict, formatCurrency } from "./format"
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -54,14 +58,24 @@ function hiringSignal(row: PracticeLocationRecord): string {
   return row.ownership_tier ? "Moderate — review in Job Hunt" : "Unknown — awaiting review"
 }
 
-function Stat({ label, value }: { label: string; value: string | number | null }) {
+function Stat({
+  label,
+  value,
+  source,
+}: {
+  label: string
+  value: string | number | null
+  source: TrustSource
+}) {
+  const empty = value == null || value === "" || value === "Not available"
   return (
     <div>
       <dt className="text-[11px] font-medium uppercase tracking-wider text-[#8F8E82]">
         {label}
       </dt>
-      <dd className="mt-0.5 text-sm font-medium text-[#1A1A1A]">
-        {value == null || value === "" ? "Not available" : String(value)}
+      <dd className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm font-medium text-[#1A1A1A]">
+        {empty ? "Not available" : String(value)}
+        <TrustSourceTag source={empty ? "missing" : source} />
       </dd>
     </div>
   )
@@ -103,8 +117,8 @@ export function UsePracticeCard({ row }: { row: PracticeLocationRecord }) {
           </div>
           <p className="mt-1 text-sm leading-6 text-[#3D3D35]">{jobHuntContext(row)}</p>
           <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
-            <Stat label="Providers" value={row.provider_count} />
-            <Stat label="Employees" value={row.employee_count} />
+            <Stat label="Providers" value={row.provider_count} source="registry_only" />
+            <Stat label="Employees" value={row.employee_count} source="commercial_estimate" />
           </dl>
           <div className="mt-4">
             <CtaLink
@@ -133,8 +147,13 @@ export function UsePracticeCard({ row }: { row: PracticeLocationRecord }) {
                     : row.year_established
                   : null
               }
+              source="commercial_estimate"
             />
-            <Stat label="Est. revenue" value={formatCurrency(row.estimated_revenue)} />
+            <Stat
+              label="Est. revenue"
+              value={formatCurrency(row.estimated_revenue)}
+              source="commercial_estimate"
+            />
           </dl>
           <div className="mt-4">
             <CtaLink
@@ -146,9 +165,9 @@ export function UsePracticeCard({ row }: { row: PracticeLocationRecord }) {
       </div>
 
       <p className="mt-4 text-xs leading-5 text-[#8F8E82]">
-        Verdicts come from the reviewed ownership record; staffing and revenue are registry
-        estimates, and a real acquisition target still needs current ownership and succession
-        review.{" "}
+        Verdicts come from the reviewed ownership record. Provider counts are federal-registry
+        filings; staffing, revenue, and year established are unchecked commercial-feed estimates.
+        A real acquisition target still needs current ownership and succession review.{" "}
         <Link
           href={`/market-intel?zip=${encodeURIComponent(row.zip ?? "")}`}
           className="font-medium text-[#8B6508] underline hover:text-[#1A1A1A]"

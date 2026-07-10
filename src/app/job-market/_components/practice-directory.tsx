@@ -34,6 +34,7 @@ import {
 } from '@/lib/census/job-lane'
 import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
 import type { JobHuntVerificationRecord } from '@/lib/supabase/queries/job-hunt-verification'
+import { TRUST_SOURCE_META, websiteTrust } from '@/components/data-display/trust-source-tag'
 import type { Practice } from '@/lib/types'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -197,11 +198,12 @@ function renderTrustCell(valueOrPractice: unknown): React.ReactElement {
       ? `Current doctors: website-verified \u2014 ${verifiedDoctors.map((d) => d.name).join(', ')}`
       : 'Current doctors: website checked \u2014 none published on the site (confirming needs a call)'
     : 'Current doctors: not website-verified yet \u2014 the website check has not reached this office'
+  const websiteRuling = websiteTrust(website, verification)
   const title = [
     ownerLine,
     doctorsLine,
-    website
-      ? `Website: on file (${website})`
+    websiteRuling.url
+      ? `Website: ${websiteRuling.url} (${TRUST_SOURCE_META[websiteRuling.source].label})`
       : 'Website: none on file \u2014 this office may genuinely lack a researchable web presence',
     hasStaff
       ? `Staff: ~${p.employee_count} employees (commercial estimate, not verified)`
@@ -369,7 +371,7 @@ const ENRICHED_COLUMNS = [
     render: (v: number | null) => (v != null ? Number(v).toFixed(0) : '--'),
   },
   { key: 'job_opp_score', header: 'Hiring Signal', render: (v: number | null) => v ?? '--' },
-  { key: 'website', header: 'Website', render: (v: string | null) => v || '--' },
+  { key: 'website_display', header: 'Website', render: (v: string | null) => v || '--' },
   { key: 'trust', header: 'What We Know', render: renderTrustCell },
 ]
 
@@ -557,10 +559,16 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     return result.map(p => {
       const verification = p.location_id ? verificationMap[p.location_id] ?? null : null
       const lane = deriveJobLane(p, verification ?? undefined)
+      // Website column stays a primitive string (DataTable contract), so the
+      // trust ruling is baked into the cell text itself
+      const website = websiteTrust(p.website, verification)
       return {
         ...p,
         job_lane: lane.label,
         trust: countTrustFacts(p),
+        website_display: website.url
+          ? `${website.url} · ${TRUST_SOURCE_META[website.source].label.toLowerCase()}`
+          : null,
         __lane: lane,
         __verification: verification,
       }

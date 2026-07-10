@@ -56,6 +56,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import {
+  TrustSourceTag,
+  type TrustSource,
+} from "@/components/data-display/trust-source-tag"
+import {
   formatCurrency,
   formatDate,
   formatNumber,
@@ -396,10 +400,13 @@ function DossierField({
   label,
   value,
   icon: Icon,
+  source,
 }: {
   label: string
   value: string | null | undefined
   icon?: typeof Sparkles
+  /** Trust-source tag; shown as "missing" automatically when the value is empty. */
+  source?: TrustSource
 }) {
   const empty = value == null || value === ""
   return (
@@ -417,6 +424,7 @@ function DossierField({
         >
           {empty ? "—" : value}
         </p>
+        {source && <TrustSourceTag source={empty ? "missing" : source} />}
       </div>
     </div>
   )
@@ -917,8 +925,8 @@ function SnapshotTab({
         <div className="mt-2 grid grid-cols-2 gap-3">
           <DossierField label="NPI" value={practice.npi} />
           <DossierField label="Doing Business As" value={practice.doing_business_as} />
-          <DossierField label="Phone" value={practice.phone} icon={Phone} />
-          <DossierField label="Website" value={practice.website} icon={Globe} />
+          <DossierField label="Phone" value={practice.phone} icon={Phone} source="registry_only" />
+          <DossierField label="Website" value={practice.website} icon={Globe} source="commercial_estimate" />
           <DossierField label="Taxonomy" value={practice.taxonomy_description ?? practice.taxonomy_code} />
           <DossierField label="Location Type" value={practice.location_type} />
           <DossierField

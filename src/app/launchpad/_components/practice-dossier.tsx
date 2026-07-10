@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/utils/formatting"
 import { safeExternalUrl } from "@/lib/utils/safe-url"
 import { CensusBadge, getOwnershipTierMeta } from "@/components/data-display/census-badge"
+import { TrustSourceTag } from "@/components/data-display/trust-source-tag"
 import { ManualCorrectionPanel } from "@/components/data-display/manual-correction-panel"
 import {
   resolveDsoTierEntry,
@@ -204,6 +205,7 @@ function SnapshotTab({
           <div className="flex items-center gap-1.5 text-sm text-[#6B6B60]">
             <Phone className="h-3.5 w-3.5 shrink-0 text-[#9C9C90]" />
             <span>{practice.phone}</span>
+            <TrustSourceTag source="registry_only" />
           </div>
         )}
         {practice.website && (
@@ -218,6 +220,7 @@ function SnapshotTab({
               {practice.website.replace(/^https?:\/\//, "").split("/")[0]}
               <ExternalLink className="ml-1 inline h-3 w-3" />
             </a>
+            <TrustSourceTag source="commercial_estimate" />
           </div>
         )}
       </div>

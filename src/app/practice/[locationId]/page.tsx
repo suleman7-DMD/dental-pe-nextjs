@@ -21,6 +21,10 @@ import { deriveJobLane } from "@/lib/census/job-lane"
 import { verifiedDisplayName } from "@/lib/census/display-name"
 import { ManualCorrectionPanel } from "@/components/data-display/manual-correction-panel"
 import {
+  TrustSourceTag,
+  websiteTrust,
+} from "@/components/data-display/trust-source-tag"
+import {
   displayName,
   formatTitle,
   narrowReviewStatus,
@@ -75,7 +79,8 @@ export default async function PracticePage({
   const addressLine = [row.normalized_address, row.city, row.state, row.zip]
     .filter(Boolean)
     .join(", ")
-  const practiceWebsite = websiteHref(row.website)
+  const website = websiteTrust(row.website, verification)
+  const practiceWebsite = website.url ? websiteHref(website.url) : null
   const sourceClass = deriveSourceClass(
     row.ownership_tier,
     narrowReviewStatus(row.census_review_status)
@@ -109,28 +114,38 @@ export default async function PracticePage({
                   Legal/census name: {legalLine}
                 </p>
               ) : null}
-              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-[#6B6B60]">
+              {/* Contact facts — each labeled by trust source, none hidden */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[#6B6B60]">
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-4 w-4 text-[#B8860B]" />
-                  {addressLine || "Address not available"}
+                  {addressLine || "Address not on file"}
+                  <TrustSourceTag source={addressLine ? "registry_only" : "missing"} />
                 </span>
-                {row.phone ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Phone className="h-4 w-4 text-[#B8860B]" />
-                    {row.phone}
-                  </span>
-                ) : null}
+                <span className="inline-flex items-center gap-1.5">
+                  <Phone className="h-4 w-4 text-[#B8860B]" />
+                  {row.phone || "Phone not on file"}
+                  <TrustSourceTag source={row.phone ? "registry_only" : "missing"} />
+                </span>
                 {practiceWebsite ? (
-                  <a
-                    href={practiceWebsite}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-[#8B6508] hover:text-[#1A1A1A]"
-                  >
-                    <Globe2 className="h-4 w-4" />
-                    Website
-                  </a>
-                ) : null}
+                  <span className="inline-flex items-center gap-1.5">
+                    <a
+                      href={practiceWebsite}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[#8B6508] hover:text-[#1A1A1A]"
+                    >
+                      <Globe2 className="h-4 w-4" />
+                      Website
+                    </a>
+                    <TrustSourceTag source={website.source} />
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Globe2 className="h-4 w-4 text-[#B8860B]" />
+                    Website not on file
+                    <TrustSourceTag source="missing" />
+                  </span>
+                )}
               </div>
             </div>
 
@@ -177,8 +192,9 @@ export default async function PracticePage({
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[#6B6B60]">Current doctors</span>
                 {verifiedDoctors.length > 0 ? (
-                  <span className="text-right font-medium text-[#1A1A1A]">
+                  <span className="inline-flex flex-wrap items-center justify-end gap-1.5 text-right font-medium text-[#1A1A1A]">
                     {verifiedDoctors.map((d) => d.name).join(", ")}
+                    <TrustSourceTag source="website_verified" />
                   </span>
                 ) : (
                   <span className="text-right text-[#8F8E82]">
