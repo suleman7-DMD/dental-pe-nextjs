@@ -29,15 +29,15 @@ function buyableColor(val: number | null): { bg: string; text: string } | null {
   return { bg: '#B71C1C', text: '#ffffff' }
 }
 
-function confidenceStars(val: string | null): string {
+function confidenceLabel(val: string | null): string {
   if (!val) return '\u2014'
   switch (val) {
     case 'high':
-      return '\u2605\u2605\u2605'
+      return 'High'
     case 'medium':
-      return '\u2605\u2605'
+      return 'Medium'
     case 'low':
-      return '\u2605'
+      return 'Low'
     default:
       return '\u2014'
   }
@@ -89,7 +89,7 @@ export function SaturationTable({ zipScores, watchedZips }: SaturationTableProps
         buyable: zs.buyable_practice_ratio != null ? `${(zs.buyable_practice_ratio * 100).toFixed(0)}%` : '\u2014',
         buyableRaw: zs.buyable_practice_ratio,
         type: formatMarketType(zs.market_type),
-        confidence: confidenceStars(zs.metrics_confidence),
+        confidence: confidenceLabel(zs.metrics_confidence),
         confidenceRaw: zs.metrics_confidence,
       }
     })

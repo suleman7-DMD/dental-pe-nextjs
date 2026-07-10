@@ -508,7 +508,6 @@ export interface LaunchpadSummary {
   successionCandidates: { bestFit: number; strong: number }
   highVolumeCandidates: { bestFit: number; strong: number }
   dsoCandidates: { bestFit: number; strong: number; avoidCount: number }
-  medianCompRange: { low: number; high: number; source: string }
   intelCoverage: { total: number; withIntel: number; pct: number }
   /** Honest lane split across the whole scope (all-tracks view). */
   laneCounts: Record<LaunchpadLane, number>

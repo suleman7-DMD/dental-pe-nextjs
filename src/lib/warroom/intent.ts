@@ -383,7 +383,7 @@ function detectBuyability(context: ParseContext) {
   if (/\bacquisition targets?\b|\btargets?\b/.test(context.normalized)) {
     context.filter.acquisitionTargetsOnly = true;
     context.recognized.add("acquisition targets");
-    addChip(context, "acqTarget", "Acquisition Targets", "acquisitionTargetsOnly");
+    addChip(context, "acqTarget", "High-Score Leads (older score)", "acquisitionTargetsOnly");
   }
 }
 
@@ -726,7 +726,7 @@ export function buildIntentFromFilter(filter: WarroomIntentFilter): WarroomInten
     parts.push("retirement risk");
   }
   if (filter.acquisitionTargetsOnly) {
-    pushChip(chips, { id: "acqTarget", label: "Acquisition Targets", key: "acquisitionTargetsOnly" });
+    pushChip(chips, { id: "acqTarget", label: "High-Score Leads (older score)", key: "acquisitionTargetsOnly" });
     parts.push("acquisition targets");
   }
 

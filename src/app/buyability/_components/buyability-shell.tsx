@@ -62,19 +62,27 @@ function categorize(p: Practice): BuyabilityCategory {
 
 interface AnalyzedPractice extends Practice {
   category: BuyabilityCategory
-  confidenceStars: string
+  censusConfidence: string
+}
+
+// Hand-review confidence from the census (`ownership_confidence`), shown only
+// for reviewed rows. Replaces the old star rating, which mixed two unrelated
+// automated scores (classification_confidence, buyability_score) into a fake
+// confidence signal.
+function censusConfidenceLabel(p: Practice): string {
+  if (!p.ownership_tier) return '\u2014'
+  const c = p.ownership_confidence?.toLowerCase()
+  if (c === 'high') return 'High'
+  if (c === 'medium') return 'Medium'
+  if (c === 'low') return 'Low'
+  return 'Reviewed'
 }
 
 function analyzePractices(practices: Practice[]): AnalyzedPractice[] {
   return practices.map((p) => ({
     ...p,
     category: categorize(p),
-    confidenceStars:
-      p.classification_confidence != null && p.classification_confidence > 0
-        ? '\u2605'.repeat(Math.min(Math.round(p.classification_confidence / 20), 5))
-        : p.buyability_score != null
-          ? '\u2605'.repeat(Math.min(Math.ceil(p.buyability_score / 25), 5))
-          : '\u2014',
+    censusConfidence: censusConfidenceLabel(p),
   }))
 }
 
@@ -225,9 +233,10 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
       City: p.city ?? '',
       ZIP: p.zip ?? '',
       'Reviewed Ownership': p.ownership_tier ? BUCKET_META[tierToBucket(p.ownership_tier)].label : '',
-      Classification: getEntityClassificationLabel(p.entity_classification),
+      'Census Confidence': p.censusConfidence === '—' ? '' : p.censusConfidence,
+      'Older Automated Classification': getEntityClassificationLabel(p.entity_classification),
       Category: p.category,
-      'Buyability Score': p.buyability_score ?? '',
+      'Legacy Buyability Score': p.buyability_score ?? '',
       'Year Established': p.year_established ?? '',
       Employees: p.employee_count ?? '',
     }))
@@ -420,19 +429,26 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                   <th className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider">
                     Reviewed Ownership
                   </th>
-                  <th className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider">
-                    Classification
+                  <th
+                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider"
+                    title="Classification from the older automated importer — not the hand-reviewed census"
+                  >
+                    Older Auto Class
                   </th>
                   <th
                     className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#1A1A1A]"
                     onClick={() => handleSort('buyability_score')}
+                    title="Older automated buyability score — a sort hint, not a verdict"
                   >
                     <span className="flex items-center gap-1">
-                      Score <SortIcon field="buyability_score" />
+                      Legacy Score <SortIcon field="buyability_score" />
                     </span>
                   </th>
-                  <th className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider">
-                    Confidence
+                  <th
+                    className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider"
+                    title="Hand-review confidence from the ownership census (blank until a row is reviewed)"
+                  >
+                    Census Confidence
                   </th>
                   <th
                     className="text-left px-4 py-2.5 font-semibold text-[11px] uppercase tracking-wider cursor-pointer hover:text-[#1A1A1A]"
@@ -489,7 +505,17 @@ export function BuyabilityShell({ initialPractices }: BuyabilityShellProps) {
                       <td className="px-4 py-2.5 text-[#1A1A1A] font-mono font-bold tabular-nums">
                         {p.buyability_score ?? '--'}
                       </td>
-                      <td className="px-4 py-2.5 text-[#D4920B] text-xs">{p.confidenceStars}</td>
+                      <td
+                        className={`px-4 py-2.5 text-xs font-medium ${
+                          p.censusConfidence === 'High'
+                            ? 'text-[#2D8B4E]'
+                            : p.censusConfidence === '—'
+                              ? 'text-[#9C9C90]'
+                              : 'text-[#D4920B]'
+                        }`}
+                      >
+                        {p.censusConfidence}
+                      </td>
                       <td className="px-4 py-2.5 text-[#6B6B60] font-mono text-xs">
                         {p.year_established ?? '--'}
                       </td>

@@ -114,15 +114,6 @@ function entityTypeLabel(et: string | null | undefined): string {
   return '\u2014'
 }
 
-function confidenceStarsInline(confidence: number | null | undefined): string {
-  if (confidence == null) return ''
-  const n = Number(confidence)
-  if (n >= 80) return '\u2605\u2605\u2605'
-  if (n >= 50) return '\u2605\u2605'
-  if (n > 0) return '\u2605'
-  return ''
-}
-
 function displayValue(v: string | number | null | undefined): string {
   if (v == null || v === '') return '\u2014'
   return String(v)
@@ -279,9 +270,6 @@ export function PracticeDetailDrawer({
               <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(45,139,78,0.1)] text-[#2D8B4E] border border-[rgba(45,139,78,0.2)]">
                 <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#2D8B4E]" />
                 Business data available
-                {p.classification_confidence != null && (
-                  <span className="ml-0.5 text-[10px]">{confidenceStarsInline(p.classification_confidence)}</span>
-                )}
               </span>
             ) : hasDa ? (
               <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium bg-[rgba(45,139,78,0.1)] text-[#2D8B4E] border border-[rgba(45,139,78,0.2)]">

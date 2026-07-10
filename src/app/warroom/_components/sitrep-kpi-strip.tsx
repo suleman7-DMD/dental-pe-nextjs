@@ -93,14 +93,14 @@ export function SitrepKpiStrip({ summary, className }: SitrepKpiStripProps) {
 
       <KpiCard
         icon={<Target className="h-4 w-4" />}
-        label="Acquisition Ready"
+        label="High-Score Leads"
         value={formatNumber(acquisitionTargets)}
         subtitle={
           <span className="text-[11px] text-[#6B6B60]">
-            Buyability ≥ 50 · {countsToPct(acquisitionTargets, ownership.total)} of scope
+            Older automated score ≥ 50 · {countsToPct(acquisitionTargets, ownership.total)} of scope
           </span>
         }
-        tooltip="Independent practices with buyability_score ≥ 50 in the selected scope."
+        tooltip="Practices with buyability_score ≥ 50 from the older automated importer — a sort hint, not an ownership verdict. Check each lead's hand-reviewed ownership before acting."
         accentColor="#2D8B4E"
       />
 

@@ -699,11 +699,6 @@ export async function getLaunchpadBundle(options: {
       strong: dsoCandidateSummary.strong,
       avoidCount: dsoCandidateSummary.avoidList,
     },
-    medianCompRange: {
-      low: 135000,
-      high: 175000,
-      source: "MGMA Early-Career Dentist 2024 (IL)",
-    },
     intelCoverage: {
       total: totalPractices,
       withIntel,

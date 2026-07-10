@@ -92,14 +92,14 @@ function addAcquisitionTargetItem(items: WarroomBriefingItem[], summary: Warroom
   items.push({
     id: "acquisition-targets",
     severity: summary.acquisitionTargets >= 20 ? "high" : "medium",
-    title: `${summary.acquisitionTargets} acquisition-ready practices`,
-    detail: `Buyability score ≥ 50 in ${summary.scopeLabel}. Use "top 25 buyability ≥ 60" in the command bar to rank them.`,
+    title: `${summary.acquisitionTargets} high-score leads (older automated score)`,
+    detail: `Buyability score ≥ 50 in ${summary.scopeLabel} — an older automated sort hint, not an ownership verdict. Check each lead's hand-reviewed ownership before acting. Use "top 25 buyability ≥ 60" in the command bar to rank them.`,
     lens: "buyability",
     action: {
       label: "Show ranked list",
       intentHint: "top 25 acquisition targets",
     },
-    metric: { label: "Acquisition ready", value: summary.acquisitionTargets, unit: "practices" },
+    metric: { label: "High-score leads", value: summary.acquisitionTargets, unit: "practices" },
   });
 }
 
