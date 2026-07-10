@@ -179,7 +179,9 @@ const DOCTORS_GAP = 'Current doctors (not website-verified)'
 const VERIFIED_DOCTORS_GAP = 'Current doctors not published/verified on website'
 const OWNER_GAP = 'Owner/operator not stated on website'
 
-const VERIFICATION_STATUSES = new Set([
+/** Recognized job_hunt_verification statuses — a record with any other
+ *  status is treated as absent. Shared with funnel.ts (single definition). */
+export const VERIFICATION_STATUSES = new Set([
   'roster_verified',
   'hiring_page_found',
   'call_required',

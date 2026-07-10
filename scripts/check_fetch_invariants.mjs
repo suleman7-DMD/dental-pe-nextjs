@@ -93,7 +93,7 @@ async function fetchGpScope() {
     const from = page * pageSize;
     const { data, error } = await supabase
       .from("practice_locations")
-      .select("location_id,ownership_tier")
+      .select("location_id,ownership_tier,provider_count,website,primary_npi")
       .eq("state", "IL")
       .or("is_likely_residential.eq.false,is_likely_residential.is.null")
       .in("entity_classification", GP_CLASSIFICATIONS)
@@ -105,6 +105,25 @@ async function fetchGpScope() {
     page += 1;
   }
   return rows;
+}
+
+async function fetchIntelByNpi() {
+  const pageSize = 1000;
+  const map = new Map();
+  let page = 0;
+  for (;;) {
+    const from = page * pageSize;
+    const { data, error } = await supabase
+      .from("practice_intel")
+      .select("npi,hiring_active,google_review_count,google_rating")
+      .order("npi", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`practice_intel page ${page}: ${error.message}`);
+    for (const r of data ?? []) map.set(r.npi, r);
+    if ((data ?? []).length < pageSize) break;
+    page += 1;
+  }
+  return map;
 }
 
 async function fetchVerificationIds() {
@@ -159,6 +178,60 @@ async function main() {
     gpVerified === EXPECTED_JHV_GP,
     `GP-scope website-checked == ${EXPECTED_JHV_GP}`,
     `got ${gpVerified}`
+  );
+
+  // --- 3b: funnel structure audit -------------------------------------------
+  // Mirrors the stage predicates in src/lib/census/funnel.ts (the canonical
+  // module — if the rules there change, change this block in the same commit;
+  // the funnel.test.ts source-walk keeps app pages from diverging). Counts are
+  // live-derived; the checks are STRUCTURAL: monotone nesting, partition sum,
+  // and website_checked == the pinned JHV GP count. Stage counts print as
+  // informational lines so drift is visible in CI logs without pinning
+  // never-reproduced snapshot integers.
+  const intelByNpi = await fetchIntelByNpi();
+  const jhvGpIds = new Set(verificationIds.filter((id) => uniqueIds.has(id)));
+  const PROFILE_TIERS = new Set(["single_loc_group", "dentist_multi"]);
+  const MIN_SIGNAL_PROVIDERS = 2;
+  const MIN_HOT_REVIEW_COUNT = 50;
+  const MIN_HOT_REVIEW_RATING = 4.0;
+  const stage = { profile: 0, signal_pool: 0, hot_lead: 0, website_checked: 0, dso_lane: 0 };
+  for (const r of gpRows) {
+    const tier = OWNERSHIP_TIERS.has(r.ownership_tier) ? r.ownership_tier : null;
+    const intel = r.primary_npi ? intelByNpi.get(r.primary_npi) : undefined;
+    const profile = tier ? PROFILE_TIERS.has(tier) : intel != null;
+    const hasWebsite = (r.website ?? "").trim() !== "";
+    const signalPool = profile && (r.provider_count ?? 0) >= MIN_SIGNAL_PROVIDERS && hasWebsite;
+    const hot =
+      intel != null &&
+      (intel.hiring_active === true ||
+        intel.hiring_active === 1 ||
+        ((intel.google_review_count ?? 0) >= MIN_HOT_REVIEW_COUNT &&
+          (intel.google_rating ?? 0) >= MIN_HOT_REVIEW_RATING));
+    if (profile) stage.profile += 1;
+    if (signalPool) stage.signal_pool += 1;
+    if (signalPool && hot) stage.hot_lead += 1;
+    if (jhvGpIds.has(r.location_id)) stage.website_checked += 1;
+    if (tier === "stealth_dso" || tier === "branded_dso") stage.dso_lane += 1;
+  }
+  console.log(
+    `INFO funnel stages (live): universe=${gpRows.length} profile=${stage.profile} ` +
+      `signal_pool=${stage.signal_pool} hot_lead=${stage.hot_lead} ` +
+      `website_checked=${stage.website_checked} dso_lane=${stage.dso_lane}`
+  );
+  check(
+    gpRows.length >= stage.profile &&
+      stage.profile >= stage.signal_pool &&
+      stage.signal_pool >= stage.hot_lead,
+    "funnel base stages nest monotonically (S0 ≥ S1 ≥ S2 ≥ S3)"
+  );
+  check(
+    stage.website_checked === gpVerified,
+    "funnel website_checked == GP-scope JHV count",
+    `${stage.website_checked} vs ${gpVerified}`
+  );
+  check(
+    stage.profile + stage.dso_lane <= gpRows.length,
+    "profile pool and DSO lane are disjoint subsets of the universe"
   );
 
   // --- 4: live /launchpad must not resurrect the stale numbers -------------
