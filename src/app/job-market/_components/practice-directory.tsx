@@ -36,6 +36,7 @@ import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification
 import type { JobHuntVerificationRecord } from '@/lib/supabase/queries/job-hunt-verification'
 import { TRUST_SOURCE_META, websiteTrust } from '@/components/data-display/trust-source-tag'
 import type { Practice } from '@/lib/types'
+import { DEFAULT_DIRECTORY_VIEW, filterDirectoryRows, getOfficeCoordinates } from '@/lib/utils/directory-visibility'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -90,20 +91,6 @@ function hasOwnershipEvidence(p: Practice): boolean {
   const basis = (p.ownership_evidence_basis ?? '').trim()
   const urls = (p.ownership_evidence_urls ?? '').trim()
   return basis !== '' || (urls !== '' && urls !== '[]')
-}
-
-function matchesSearch(p: Practice, term: string): boolean {
-  if (!term) return true
-  const t = term.toLowerCase()
-  return (
-    (p.practice_name ?? '').toLowerCase().includes(t) ||
-    (p.doing_business_as ?? '').toLowerCase().includes(t) ||
-    (p.address ?? '').toLowerCase().includes(t) ||
-    (p.city ?? '').toLowerCase().includes(t) ||
-    (p.zip ?? '').toString().startsWith(term.trim()) ||
-    (p.network_id ?? '').toLowerCase().includes(t) ||
-    (p.network_id ? formatNetworkId(p.network_id).toLowerCase().includes(t) : false)
-  )
 }
 
 function sortPractices<T extends Practice>(
@@ -275,10 +262,9 @@ function renderPracticeLink(valueOrPractice: unknown): React.ReactElement {
   }
   const p = valueOrPractice as Practice
   const name = practiceDisplayName(p)
-  if (!p.location_id) {
-    return React.createElement('span', { className: 'font-medium text-[#1A1A1A]' }, name)
-  }
-  return React.createElement(
+  const nameLink = !p.location_id
+    ? React.createElement('span', { className: 'font-medium text-[#1A1A1A]' }, name)
+    : React.createElement(
     Link,
     {
       href: `/practice/${p.location_id}`,
@@ -289,6 +275,11 @@ function renderPracticeLink(valueOrPractice: unknown): React.ReactElement {
     React.createElement('span', { className: 'truncate' }, name),
     React.createElement(ArrowUpRight, { className: 'h-3.5 w-3.5 shrink-0 text-[#B8860B]' })
   )
+  return React.createElement('div', null, nameLink,
+    !getOfficeCoordinates(p) && React.createElement('div', {
+      className: 'text-[11px] text-[#6B6B60] font-normal',
+      title: 'No usable stored coordinates. This office remains searchable, but is not pinned on the map.',
+    }, 'Map location unavailable'))
 }
 
 function renderCensusBadge(valueOrPractice: unknown): React.ReactElement {
@@ -421,7 +412,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   const [sortBy, setSortBy] = useState<SortOption>('lane')
   const [selectedPractice, setSelectedPractice] = useState<Practice | null>(null)
   const [page, setPage] = useState(1)
-  const [activeView, setActiveView] = useState('employment')
+  const [activeView, setActiveView] = useState(DEFAULT_DIRECTORY_VIEW)
 
   // Reset filters when location changes (practices prop changes)
   useEffect(() => {
@@ -474,33 +465,15 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
 
   // Apply filters
   const filtered = useMemo(() => {
-    let result = withDisplayName
-
-    // Search
-    if (searchTerm) {
-      result = result.filter((p) => matchesSearch(p, searchTerm))
-    }
+    let result = filterDirectoryRows(withDisplayName, {
+      search: searchTerm,
+      buckets: selectedBuckets.flatMap(o => { const b = bucketByOption.get(o); return b ? [b] : [] }),
+      tiers: selectedTiers.flatMap(o => { const t = tierByOption.get(o); return t ? [t] : [] }),
+    })
 
     // Job-hunt lane filter (verification-aware — verified lanes are selectable)
     if (selectedLanes.length > 0) {
       result = result.filter((p) => selectedLanes.includes(laneFor(p).label))
-    }
-
-    // Census bucket filter (unresolved = no reviewed conclusion yet)
-    if (selectedBuckets.length > 0) {
-      const buckets = new Set(selectedBuckets.map((o) => bucketByOption.get(o)))
-      result = result.filter((p) => buckets.has(tierToBucket(p.ownership_tier ?? null)))
-    }
-
-    // Census tier filter (T1–T6; unreviewed rows have no tier)
-    if (selectedTiers.length > 0) {
-      const tiers = new Set<string>(
-        selectedTiers.flatMap((o) => {
-          const t = tierByOption.get(o)
-          return t ? [t] : []
-        })
-      )
-      result = result.filter((p) => p.ownership_tier != null && tiers.has(p.ownership_tier))
     }
 
     // Census review confidence
@@ -783,10 +756,10 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       {/* Tabs */}
       <Tabs value={activeView} onValueChange={setActiveView} className="mt-4">
         <TabsList className="bg-[#FFFFFF] border border-[#E8E5DE]">
+          <TabsTrigger value="all">All practices</TabsTrigger>
           <TabsTrigger value="employment">Hiring leads</TabsTrigger>
           <TabsTrigger value="ownership">Acquisition Leads</TabsTrigger>
           <TabsTrigger value="enriched">Staff/revenue data</TabsTrigger>
-          <TabsTrigger value="all">All practices</TabsTrigger>
         </TabsList>
 
         <TabsContent value="employment">

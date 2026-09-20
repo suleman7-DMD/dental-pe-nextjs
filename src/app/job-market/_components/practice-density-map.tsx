@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type mapboxgl from 'mapbox-gl'
 import { SectionHeader } from '@/components/data-display/section-header'
-import { ZIP_CENTROIDS } from '@/lib/constants/zip-centroids'
+import { getOfficeCoordinates } from '@/lib/utils/directory-visibility'
 import { isGpLocationClassification } from '@/lib/constants/entity-classifications'
 import {
   BUCKET_META,
@@ -46,7 +46,6 @@ interface MapPractice {
   employees: string
   year: string
   color: [number, number, number, number]
-  is_approximate: boolean
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -77,26 +76,6 @@ const BUCKET_DOT_COLORS: Record<HeadlineBucket, [number, number, number, number]
   )
 
 const UNRESOLVED_LEGEND_GRAY = '#9CA3AF'
-
-// ────────────────────────────────────────────────────────────────────────────
-// NPI-based jitter (matches Python: hash(npi) % 2^32 → deterministic offset)
-// ────────────────────────────────────────────────────────────────────────────
-
-function hashNpi(npi: string): number {
-  let h = 0
-  for (let i = 0; i < npi.length; i++) {
-    h = ((h << 5) - h + npi.charCodeAt(i)) | 0
-  }
-  return Math.abs(h) % 4294967296 // 2^32
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Helpers — compute approximate alpha (halved) for dot colors
-// ────────────────────────────────────────────────────────────────────────────
-
-function getApproxColor(color: [number, number, number, number]): [number, number, number, number] {
-  return [color[0], color[1], color[2], Math.round(color[3] * 0.5)]
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Inner map — raw mapboxgl dot layer colored by census bucket
@@ -164,7 +143,6 @@ function PracticeMapInner({
               g: d.color[1],
               b: d.color[2],
               a: d.color[3],
-              approx: d.is_approximate ? 1 : 0,
             },
           })),
         }
@@ -191,12 +169,7 @@ function PracticeMapInner({
               ['get', 'g'],
               ['get', 'b'],
             ],
-            'circle-opacity': [
-              'case',
-              ['==', ['get', 'approx'], 1],
-              0.45,    // Approximate — 50% opacity reduction
-              0.9,     // Precise (Data Axle coords)
-            ],
+            'circle-opacity': 0.9,
             'circle-stroke-width': 0.5,
             'circle-stroke-color': 'rgba(0,0,0,0.15)',
           },
@@ -281,9 +254,6 @@ export function PracticeDensityMap({
   const router = useRouter()
   // Website-check layer — {} while loading, so lanes fall back to base states
   const verificationMap = useJobHuntVerificationMap()
-  // Action map: offices without an ownership answer are hidden by DEFAULT so
-  // the first view is only records you can act on. The toggle adds them back.
-  const [showUnanswered, setShowUnanswered] = useState(false)
 
   // Canonical GP-only map layer (scope axis, not an ownership claim). This
   // excludes specialists, non-clinical rows, org-only NPIs, da_unverified
@@ -295,48 +265,19 @@ export function PracticeDensityMap({
     [practices]
   )
 
-  // Geocode all practices: real coords if available, ZIP centroid + NPI jitter otherwise
+  // Render only stored coordinates; unlocated offices remain in the directory.
   const geocoded = useMemo<MapPractice[]>(() => {
     const results: MapPractice[] = []
 
     for (const p of filteredPractices) {
       const bucket = tierToBucket(p.ownership_tier)
-      if (!showUnanswered && bucket === 'unresolved') continue
-
-      let lat: number | null = null
-      let lon: number | null = null
-      let is_approximate = false
-
-      // Use real coordinates if available (Data Axle enriched)
-      if (
-        p.latitude != null &&
-        p.longitude != null &&
-        Number(p.latitude) !== 0 &&
-        Number(p.longitude) !== 0
-      ) {
-        lat = Number(p.latitude)
-        lon = Number(p.longitude)
-      } else {
-        // Fall back to ZIP centroid + NPI-based deterministic jitter
-        const zip5 = (p.zip ?? '').toString().slice(0, 5)
-        const centroid = ZIP_CENTROIDS[zip5]
-        if (centroid) {
-          const npiStr = (p.npi ?? '0').toString()
-          const h = hashNpi(npiStr)
-          const jitterLat = ((h % 10000) / 10000.0 - 0.5) * 0.025
-          const jitterLon = ((Math.floor(h / 10000) % 10000) / 10000.0 - 0.5) * 0.025
-          lat = centroid[0] + jitterLat
-          lon = centroid[1] + jitterLon
-          is_approximate = true
-        }
-      }
-
-      if (lat == null || lon == null || isNaN(lat) || isNaN(lon)) continue
+      const coordinates = getOfficeCoordinates(p)
+      if (!coordinates) continue
+      const { lat, lon } = coordinates
 
       const emp = p.employee_count != null ? Number(p.employee_count) : 0
 
       const baseColor = BUCKET_DOT_COLORS[bucket]
-      const dotColor = is_approximate ? getApproxColor(baseColor) : baseColor
       const lane = deriveJobLane(
         p,
         p.location_id ? verificationMap[p.location_id] : undefined
@@ -346,7 +287,6 @@ export function PracticeDensityMap({
         map_lat: lat,
         map_lon: lon,
         location_id: p.location_id ?? null,
-        is_approximate,
         bucket,
         practice_name: displayName(p),
         address: p.address ?? '--',
@@ -364,19 +304,12 @@ export function PracticeDensityMap({
           p.year_established != null && Number(p.year_established) > 0
             ? Math.floor(Number(p.year_established)).toString()
             : '--',
-        color: dotColor,
+        color: baseColor,
       })
     }
 
     return results
-  }, [filteredPractices, showUnanswered, verificationMap])
-
-  const unansweredTotal = useMemo(
-    () =>
-      filteredPractices.filter((p) => tierToBucket(p.ownership_tier) === 'unresolved')
-        .length,
-    [filteredPractices]
-  )
+  }, [filteredPractices, verificationMap])
 
   const bucketCounts = useMemo(() => {
     const counts: Record<HeadlineBucket, number> = {
@@ -394,28 +327,19 @@ export function PracticeDensityMap({
     <div>
       <SectionHeader
         title="Ownership Map"
-        helpText="Action map: by default only offices WITH a reviewed ownership answer are shown, colored by that answer. Toggle on the gray dots to see offices that still need an ownership answer. Hovering a dot shows the office name, owner/operator, job-hunt lane, and exactly what is still missing. Faded dots use the ZIP center because exact coordinates are missing. Click a dot to open the full practice page."
+        helpText="Offices with stored coordinates are shown regardless of ownership status. Gray dots have unresolved ownership. Offices without usable coordinates remain searchable in the Directory, but receive no approximate map pin. Click a dot to open the practice page."
       />
+      <p className="text-xs text-[#6B6B60] mb-3" role="status">
+        {geocoded.length.toLocaleString()} offices mapped ·{' '}
+        {(filteredPractices.length - geocoded.length).toLocaleString()} without a usable map location — still available in the Directory.
+      </p>
 
       {geocoded.length === 0 ? (
         <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-          No geocodable practices found.
+          No stored office coordinates available. Find these offices in the Directory.
         </div>
       ) : (
         <>
-          {/* Controls */}
-          <div className="flex items-center gap-6 mb-3">
-            <label className="flex items-center gap-2 text-sm text-[#1A1A1A] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showUnanswered}
-                onChange={(e) => setShowUnanswered(e.target.checked)}
-                className="rounded border-[#E8E5DE] bg-[#FFFFFF] text-[#B8860B] focus:ring-[#B8860B]"
-              />
-              Show offices without an ownership answer ({unansweredTotal.toLocaleString()} gray dots)
-            </label>
-          </div>
-
           {/* Map — raw mapboxgl dot layer */}
           <PracticeMapInner
             geocoded={geocoded}
@@ -439,9 +363,7 @@ export function PracticeDensityMap({
                 />
                 {BUCKET_META[b].shortLabel}
                 <span className="text-[#6B6B60]">
-                  {b === 'unresolved' && !showUnanswered
-                    ? `${unansweredTotal.toLocaleString()} hidden`
-                    : bucketCounts[b].toLocaleString()}
+                  {bucketCounts[b].toLocaleString()}
                 </span>
               </span>
             ))}
@@ -449,14 +371,7 @@ export function PracticeDensityMap({
 
           {/* Summary counts */}
           <p className="text-xs text-[#6B6B60] mt-1">
-            Showing {geocoded.length.toLocaleString()} offices
-            {showUnanswered
-              ? ' (including offices without an ownership answer)'
-              : ` (${unansweredTotal.toLocaleString()} offices without an ownership answer hidden — toggle above to show)`}
-            {' '}&middot;{' '}
-            {geocoded.filter(d => !d.is_approximate).length.toLocaleString()} precise locations,{' '}
-            {geocoded.filter(d => d.is_approximate).length.toLocaleString()} approximate (ZIP centroid)
-            {' '}&middot; Ownership colors use reviewed ownership data only.
+            Stored coordinates only; no ZIP-center approximations. Gray dots indicate unresolved ownership.
           </p>
         </>
       )}
