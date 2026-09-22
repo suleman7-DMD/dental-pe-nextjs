@@ -1,7 +1,7 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { directoryContacts, DIRECTORY_CONTACT_EXPORT_HEADERS } from '@/lib/utils/directory-contacts'
+import { directoryContacts, DIRECTORY_CONTACT_EXPORT_HEADERS, matchesDirectoryResearch } from '@/lib/utils/directory-contacts'
 import { filterDirectoryRows } from '@/lib/utils/directory-visibility'
 import { DirectoryContactsCell } from '@/components/data-display/directory-contacts-cell'
 import { PracticeDirectory } from '@/app/job-market/_components/practice-directory'
@@ -38,6 +38,26 @@ afterEach(() => {
 })
 
 describe('existing research reaches directory outreach', () => {
+  it('filters on recent source-backed contacts, not ownership confidence or raw website presence', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-22'))
+    expect(matchesDirectoryResearch(undefined, 'all')).toBe(true)
+    expect(matchesDirectoryResearch(undefined, 'recent_evidence')).toBe(false)
+    expect(matchesDirectoryResearch(verification, 'recent_evidence')).toBe(true)
+    expect(matchesDirectoryResearch({ ...verification, ownership_evidence_status: 'conflict' }, 'recent_evidence')).toBe(true)
+    expect(matchesDirectoryResearch({ ...verification, doctors: [] }, 'recent_evidence')).toBe(true)
+    expect(matchesDirectoryResearch({ ...verification, website_status: 'none_found' }, 'recent_evidence')).toBe(true)
+    const negative = { ...verification, website_status: 'dead' as const, doctors: [] }
+    expect(matchesDirectoryResearch(negative, 'recent_evidence')).toBe(false)
+    expect(matchesDirectoryResearch(negative, 'any_research')).toBe(true)
+    expect(matchesDirectoryResearch({ ...negative, doctors: [{ name: 'No source' }] }, 'recent_evidence')).toBe(false)
+    for (const last_checked_at of ['', 'invalid', '2026-01-01', '2027-01-01']) {
+      expect(matchesDirectoryResearch({ ...verification, last_checked_at }, 'recent_evidence')).toBe(false)
+    }
+    expect(matchesDirectoryResearch({ ...verification, verification_status: 'stale_recheck' }, 'recent_evidence')).toBe(false)
+    expect(matchesDirectoryResearch({ ...negative, website_status: 'live', website_url: 'javascript:alert(1)' }, 'recent_evidence')).toBe(false)
+  })
+
   it('uses the existing live-site ruling while preserving the original source for export', () => {
     const row = { ...practice, ...directoryContacts(practice, verification) }
     expect(row.contact_website).toBe('https://researched.example')

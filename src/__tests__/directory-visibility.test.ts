@@ -25,6 +25,19 @@ const unresolvedLocated = { ...located, npi: 'unknown', location_id: 'unknown', 
 const rows = [unlocated, located, unresolvedLocated]
 
 describe('directory inclusion is independent of map coordinates and ownership resolution', () => {
+  it('renders a full 100-office page with only the outer paginator, not five nested 20-row pages', () => {
+    const offices = Array.from({ length: 4439 }, (_, i) => ({
+      ...unlocated, npi: `office-${i}`, location_id: `office-${i}`, practice_name: `Office ${i}`,
+    }))
+    const html = renderToStaticMarkup(React.createElement(PracticeDirectory, { practices: offices, allPractices: offices }))
+    const text = html.replace(/<[^>]*>/g, '')
+    expect(html.match(/href="\/practice\/office-/g)).toHaveLength(100)
+    expect(text).toContain('Page 1 of 45 (4,439 total)')
+    expect(text).not.toContain('Page 1 of 5')
+    expect(html.match(/>Next<\/button>/g)).toHaveLength(1)
+    expect(html).toContain('Tracked does not mean validated')
+  })
+
   it('renders the default All practices list including an unresolved, unlocated office', () => {
     const html = renderToStaticMarkup(React.createElement(PracticeDirectory, { practices: rows, allPractices: rows }))
     expect(html).toContain('href="/practice/unlocated"')

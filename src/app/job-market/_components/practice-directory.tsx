@@ -37,7 +37,8 @@ import type { JobHuntVerificationRecord } from '@/lib/supabase/queries/job-hunt-
 import { TRUST_SOURCE_META, websiteTrust } from '@/components/data-display/trust-source-tag'
 import type { Practice } from '@/lib/types'
 import { DEFAULT_DIRECTORY_VIEW, filterDirectoryRows, getOfficeCoordinates } from '@/lib/utils/directory-visibility'
-import { directoryContacts, DIRECTORY_CONTACT_EXPORT_HEADERS } from '@/lib/utils/directory-contacts'
+import { directoryContacts, DIRECTORY_CONTACT_EXPORT_HEADERS, matchesDirectoryResearch, type DirectoryResearchFilter } from '@/lib/utils/directory-contacts'
+import { STALE_AFTER_DAYS } from '@/lib/census/job-lane'
 import { DirectoryContactsCell } from '@/components/data-display/directory-contacts-cell'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -422,6 +423,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   const [selectedNetworks, setSelectedNetworks] = useState<string[]>([])
   const [selectedSponsor, setSelectedSponsor] = useState<string[]>([])
   const [selectedSources, setSelectedSources] = useState<string[]>(['All'])
+  const [researchFilter, setResearchFilter] = useState<DirectoryResearchFilter>('all')
   const [sortBy, setSortBy] = useState<SortOption>('lane')
   const [selectedPractice, setSelectedPractice] = useState<Practice | null>(null)
   const [page, setPage] = useState(1)
@@ -439,11 +441,12 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     setSelectedNetworks([])
     setSelectedSponsor([])
     setSelectedSources(['All'])
+    setResearchFilter('all')
   }, [practices.length])
 
   useEffect(() => {
     setPage(1)
-  }, [activeView, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy])
+  }, [activeView, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, researchFilter, sortBy])
 
   // Headline name: the website-verified public name outranks the census/legal
   // name everywhere downstream — the name sort, the row link renderer, and the
@@ -462,6 +465,10 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   )
 
   const totalPractices = withDisplayName.length
+  const researchCounts = useMemo(() => ({
+    checked: practices.filter(p => matchesDirectoryResearch(p.location_id ? verificationMap[p.location_id] : null, 'any_research')).length,
+    evidence: practices.filter(p => matchesDirectoryResearch(p.location_id ? verificationMap[p.location_id] : null, 'recent_evidence')).length,
+  }), [practices, verificationMap])
   const enrichedCount = useMemo(
     () => withDisplayName.filter(isDataAxle).length,
     [withDisplayName]
@@ -484,6 +491,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       buckets: selectedBuckets.flatMap(o => { const b = bucketByOption.get(o); return b ? [b] : [] }),
       tiers: selectedTiers.flatMap(o => { const t = tierByOption.get(o); return t ? [t] : [] }),
     })
+    result = result.filter(p => matchesDirectoryResearch(p.location_id ? verificationMap[p.location_id] : null, researchFilter))
 
     // Job-hunt lane filter (verification-aware — verified lanes are selectable)
     if (selectedLanes.length > 0) {
@@ -560,7 +568,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         __verification: verification,
       }
     })
-  }, [withDisplayName, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, sortBy, laneFor, verificationMap])
+  }, [withDisplayName, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, researchFilter, sortBy, laneFor, verificationMap])
 
   const filteredEnriched = useMemo(
     () => filtered.filter(isDataAxle).length,
@@ -700,7 +708,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
               placeholder="All types"
             />
           </FilterGroup>
-          <FilterGroup label="Confidence">
+          <FilterGroup label="Ownership confidence">
             <MultiSelect
               options={CONFIDENCE_OPTIONS}
               selected={selectedConfidence}
@@ -708,7 +716,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
               placeholder="All Confidence"
             />
           </FilterGroup>
-          <FilterGroup label="Evidence">
+          <FilterGroup label="Ownership evidence">
             <MultiSelect
               options={EVIDENCE_OPTIONS}
               selected={selectedEvidence}
@@ -759,10 +767,27 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
           </div>
         </div>
 
+        <div className="rounded-md border border-[#E8E5DE] bg-white p-3 space-y-2">
+          <label htmlFor="directory-research" className="text-xs font-medium text-[#6B6B60] block">Contact research</label>
+          <select id="directory-research" value={researchFilter}
+            onChange={event => setResearchFilter(event.target.value as DirectoryResearchFilter)}
+            className="w-full sm:w-auto rounded-md border border-[#E8E5DE] px-3 py-2 text-sm">
+            <option value="all">All tracked offices ({totalPractices.toLocaleString()})</option>
+            <option value="recent_evidence">Website/doctor evidence — last {STALE_AFTER_DAYS} days ({researchCounts.evidence.toLocaleString()})</option>
+            <option value="any_research">Any research check — includes stale/negative results ({researchCounts.checked.toLocaleString()})</option>
+          </select>
+          <p className="text-xs text-[#6B6B60]">
+            Tracked does not mean validated. Website/doctor evidence requires a dated check within {STALE_AFTER_DAYS} days
+            {' '}with a live-site URL or a named doctor and source link. It does not confirm current operations,
+            staffing, or job openings. Ownership confidence and imported business data alone do not qualify.
+            Ownership conflicts remain visible with warnings.
+          </p>
+        </div>
+
         {/* Results count */}
         <div className="text-sm text-[#B8860B]">
           Showing <strong>{filtered.length.toLocaleString()}</strong> of{' '}
-          <strong>{totalPractices.toLocaleString()}</strong> GP offices |{' '}
+          <strong>{totalPractices.toLocaleString()}</strong> tracked GP offices |{' '}
           <strong>{filteredEnriched.toLocaleString()}</strong> have extra staff/revenue data
         </div>
       </div>
@@ -792,6 +817,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
             <>
               <DataTable
                 data={paginatedData(employmentPractices)}
+                pagination={false}
                 columns={EMPLOYMENT_COLUMNS}
                 onRowClick={handleRowClick}
                 rowKey="npi"
@@ -825,6 +851,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
             <>
               <DataTable
                 data={paginatedData(ownershipPractices)}
+                pagination={false}
                 columns={OWNERSHIP_COLUMNS}
                 onRowClick={handleRowClick}
                 rowKey="npi"
@@ -857,6 +884,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
               )}
               <DataTable
                 data={paginatedData(enrichedPractices)}
+                pagination={false}
                 columns={ENRICHED_COLUMNS}
                 onRowClick={handleRowClick}
                 rowKey="npi"
@@ -886,6 +914,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
               )}
               <DataTable
                 data={paginatedData(filtered)}
+                pagination={false}
                 columns={ALL_COLUMNS}
                 onRowClick={handleRowClick}
                 rowKey="npi"

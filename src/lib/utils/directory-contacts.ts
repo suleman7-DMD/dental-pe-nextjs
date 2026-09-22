@@ -3,6 +3,25 @@ import { isVerificationStale } from '@/lib/census/job-lane'
 import type { JobHuntVerificationRecord } from '@/lib/supabase/queries/job-hunt-verification'
 import type { Practice } from '@/lib/types'
 
+export type DirectoryResearchFilter = 'all' | 'recent_evidence' | 'any_research'
+
+/** Contact evidence is separate from ownership confidence and imported business data. */
+export function matchesDirectoryResearch(
+  verification: JobHuntVerificationRecord | null | undefined,
+  filter: DirectoryResearchFilter,
+): boolean {
+  if (filter === 'all') return true
+  if (!verification) return false
+  if (filter === 'any_research') return true
+  const checked = Date.parse(verification.last_checked_at)
+  if (!Number.isFinite(checked) || checked > Date.now() || isVerificationStale(verification)) return false
+  const webUrl = (value?: string | null) => {
+    try { return ['http:', 'https:'].includes(new URL(value ?? '').protocol) } catch { return false }
+  }
+  return (verification.website_status === 'live' && webUrl(verification.website_url)) ||
+    (verification.doctors ?? []).some(d => Boolean(d.name?.trim()) && webUrl(d.source_url))
+}
+
 /** Read-only projection: retain imported values alongside the existing website ruling. */
 export function directoryContacts(
   practice: Pick<Practice, 'website'>,
