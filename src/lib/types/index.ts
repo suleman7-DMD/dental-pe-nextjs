@@ -64,6 +64,7 @@ export interface Practice {
   updated_at: string | null
   provider_last_name: string | null
   location_id?: string | null
+  provider_npis?: string[]
   ownership_tier?: string | null
   pe_backed?: boolean | null
   ownership_evidence_basis?: string | null

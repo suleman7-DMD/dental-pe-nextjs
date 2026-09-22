@@ -8,17 +8,17 @@ import { getOfficeCoordinates } from '@/lib/utils/directory-visibility'
 import { isGpLocationClassification } from '@/lib/constants/entity-classifications'
 import {
   BUCKET_META,
-  HEADLINE_BUCKETS,
   formatNetworkId,
   tierToBucket,
-  type HeadlineBucket,
 } from '@/lib/census/ownership-truth'
-import { displayName } from '@/lib/census/display-name'
+import { verifiedDisplayName } from '@/lib/census/display-name'
 import { deriveJobLane } from '@/lib/census/job-lane'
 import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
 import { escapeHtml } from '@/lib/utils/escape-html'
 
 import type { Practice } from '@/lib/types'
+import { getDirectoryEvidence, officeMapDisposition, type ProviderResearchMap } from '@/lib/utils/directory-evidence'
+import { matchesDirectoryResearch, type DirectoryResearchFilter } from '@/lib/utils/directory-contacts'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -28,13 +28,15 @@ interface PracticeDensityMapProps {
   practices: Practice[]
   centerLat: number
   centerLon: number
+  providerResearch?: ProviderResearchMap
+  researchFilter?: DirectoryResearchFilter
+  onResearchFilterChange?: (value: DirectoryResearchFilter) => void
 }
 
 interface MapPractice {
   map_lat: number
   map_lon: number
   location_id: string | null
-  bucket: HeadlineBucket
   practice_name: string
   address: string
   city_zip: string
@@ -46,39 +48,19 @@ interface MapPractice {
   employees: string
   year: string
   color: [number, number, number, number]
+  evidence_label: string
+  contact_checked: string
+  doctors: string
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Colors — census bucket colors from the ownership contract. Per the truth
-// charter, unresolved renders as NEUTRAL GRAY on maps (not the amber chip
-// color) so unreviewed clinics never read as a finding.
+// Colors describe the evidence supporting a dot, not ownership type.
 // ────────────────────────────────────────────────────────────────────────────
 
-const UNRESOLVED_MAP_GRAY: [number, number, number] = [156, 163, 175]
-
-function hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace('#', '')
-  return [
-    parseInt(h.slice(0, 2), 16),
-    parseInt(h.slice(2, 4), 16),
-    parseInt(h.slice(4, 6), 16),
-  ]
-}
-
-const BUCKET_DOT_COLORS: Record<HeadlineBucket, [number, number, number, number]> =
-  HEADLINE_BUCKETS.reduce(
-    (acc, b) => {
-      const rgb = b === 'unresolved' ? UNRESOLVED_MAP_GRAY : hexToRgb(BUCKET_META[b].color)
-      acc[b] = [rgb[0], rgb[1], rgb[2], b === 'unresolved' ? 110 : 200]
-      return acc
-    },
-    {} as Record<HeadlineBucket, [number, number, number, number]>
-  )
-
-const UNRESOLVED_LEGEND_GRAY = '#9CA3AF'
+const EMPTY_PROVIDER_RESEARCH: ProviderResearchMap = {}
 
 // ────────────────────────────────────────────────────────────────────────────
-// Inner map — raw mapboxgl dot layer colored by census bucket
+// Inner map — raw mapboxgl dot layer colored by evidence basis
 // ────────────────────────────────────────────────────────────────────────────
 
 function PracticeMapInner({
@@ -102,10 +84,12 @@ function PracticeMapInner({
     if (!mapRef.current || geocoded.length === 0) return
 
     let map: mapboxgl.Map | null = null
+    let cancelled = false
 
     const initMap = async () => {
       const mapboxgl = (await import('mapbox-gl')).default
       await import('mapbox-gl/dist/mapbox-gl.css')
+      if (cancelled || !mapRef.current) return
       mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? ''
 
       map = new mapboxgl.Map({
@@ -139,6 +123,9 @@ function PracticeMapInner({
               network: d.network,
               employees: d.employees,
               year: d.year,
+              evidence_label: d.evidence_label,
+              contact_checked: d.contact_checked,
+              doctors: d.doctors,
               r: d.color[0],
               g: d.color[1],
               b: d.color[2],
@@ -149,7 +136,7 @@ function PracticeMapInner({
 
         map.addSource('practices', { type: 'geojson', data: geojson })
 
-        // Circle layer — all practices as census-colored dots
+        // Circle layer — office-evidence-backed stored coordinates only
         // Scale radius with zoom: tiny at zoom 9, bigger when zoomed in
         map.addLayer({
           id: 'practice-dots',
@@ -195,11 +182,15 @@ function PracticeMapInner({
                 <strong style="color:#1A1A1A">${escapeHtml(props.name)}</strong><br/>
                 <span style="color:#6B6B60">${escapeHtml(props.address)}</span><br/>
                 <span style="color:#6B6B60">${escapeHtml(props.city_zip)}</span><br/>
+                <strong>${escapeHtml(props.evidence_label)}</strong><br/>
+                <span>Contact check: ${escapeHtml(props.contact_checked)}</span><br/>
+                <span>Researched doctors: ${escapeHtml(props.doctors)}</span><br/>
+                <span>Stored coordinates; address accuracy not independently verified.</span><br/>
                 <span style="color:#6B6B60">Owner / operator:</span> <strong style="color:#1A1A1A">${escapeHtml(props.network !== '--' ? props.network : props.ownership_label)}</strong><br/>
                 <span style="color:#6B6B60">Census ownership:</span> <span style="color:#1A1A1A">${escapeHtml(props.ownership_label)}</span><br/>
                 <span style="color:#6B6B60">Job-hunt lane:</span> <strong style="color:${escapeHtml(props.lane_color)}">${escapeHtml(props.lane_label)}</strong><br/>
-                <span style="color:#6B6B60">Still missing:</span> <span style="color:#1A1A1A">${escapeHtml(props.gaps || 'Nothing — verified record on file')}</span><br/>
-                <span style="color:#6B6B60">Employees:</span> <span style="color:#1A1A1A">${escapeHtml(props.employees)}</span> <span style="color:#6B6B60">| Est:</span> <span style="color:#1A1A1A">${escapeHtml(props.year)}</span><br/>
+                <span style="color:#6B6B60">Still missing:</span> <span style="color:#1A1A1A">${escapeHtml(props.gaps || 'Confirm current details before outreach')}</span><br/>
+                <span style="color:#6B6B60">Employees (estimate):</span> <span style="color:#1A1A1A">${escapeHtml(props.employees)}</span> <span style="color:#6B6B60">| Est:</span> <span style="color:#1A1A1A">${escapeHtml(props.year)}</span><br/>
                 <span style="color:#8B6508">Click the dot to open the practice page</span>
               </div>`
             )
@@ -225,6 +216,7 @@ function PracticeMapInner({
 
     initMap()
     return () => {
+      cancelled = true
       if (map) map.remove()
       mapObjRef.current = null
     }
@@ -240,16 +232,17 @@ function PracticeMapInner({
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Main component — census truth layer only. The detector green/red
-// independent-vs-consolidated coloring (and its never-rendered deck.gl hex
-// layers) were removed, not relabeled: every dot color now states a
-// hand-reviewed census conclusion, and unreviewed clinics are neutral gray.
+// Office evidence and coordinates are independent gates. Provider-only
+// research stays in the directory without pretending to validate an address.
 // ────────────────────────────────────────────────────────────────────────────
 
 export function PracticeDensityMap({
   practices,
   centerLat,
   centerLon,
+  providerResearch = EMPTY_PROVIDER_RESEARCH,
+  researchFilter = 'all',
+  onResearchFilterChange,
 }: PracticeDensityMapProps) {
   const router = useRouter()
   // Website-check layer — {} while loading, so lanes fall back to base states
@@ -265,11 +258,39 @@ export function PracticeDensityMap({
     [practices]
   )
 
+  const assessed = useMemo(() => filteredPractices.map(p => {
+    const verification = p.location_id ? verificationMap[p.location_id] : undefined
+    const evidence = getDirectoryEvidence(p, verification, providerResearch)
+    return { p, verification, evidence,
+      disposition: officeMapDisposition(p, evidence),
+      selected: matchesDirectoryResearch(verification, researchFilter, evidence.hasAnyEvidence) }
+  }), [filteredPractices, verificationMap, providerResearch, researchFilter])
+
+  const counts = useMemo(() => {
+    const result = { mapped: 0, missing_coordinates: 0, missing_office_evidence: 0, missing_both: 0, outside_filter: 0,
+      contact: 0, ownershipOnly: 0, ownership: 0, checked: 0, provider: 0, commercial: 0, any: 0 }
+    for (const a of assessed) {
+      if (a.p.ownership_tier) result.ownership++
+      if (a.verification) result.checked++
+      if (a.evidence.providerResearch.length) result.provider++
+      if (a.p.data_axle_import_date) result.commercial++
+      if (a.evidence.hasAnyEvidence) result.any++
+      if (!a.selected) { result.outside_filter++; continue }
+      result[a.disposition]++
+      if (a.disposition === 'mapped') {
+        if (a.evidence.contact) result.contact++
+        else result.ownershipOnly++
+      }
+    }
+    return result
+  }, [assessed])
+
   // Render only stored coordinates; unlocated offices remain in the directory.
   const geocoded = useMemo<MapPractice[]>(() => {
     const results: MapPractice[] = []
 
-    for (const p of filteredPractices) {
+    for (const { p, verification, evidence, disposition, selected } of assessed) {
+      if (!selected || disposition !== 'mapped') continue
       const bucket = tierToBucket(p.ownership_tier)
       const coordinates = getOfficeCoordinates(p)
       if (!coordinates) continue
@@ -277,7 +298,7 @@ export function PracticeDensityMap({
 
       const emp = p.employee_count != null ? Number(p.employee_count) : 0
 
-      const baseColor = BUCKET_DOT_COLORS[bucket]
+      const baseColor: MapPractice['color'] = evidence.contact ? [13, 148, 136, 200] : [37, 99, 235, 200]
       const lane = deriveJobLane(
         p,
         p.location_id ? verificationMap[p.location_id] : undefined
@@ -287,8 +308,10 @@ export function PracticeDensityMap({
         map_lat: lat,
         map_lon: lon,
         location_id: p.location_id ?? null,
-        bucket,
-        practice_name: displayName(p),
+        practice_name: verifiedDisplayName(p, verification?.public_practice_name),
+        evidence_label: evidence.contact ? 'Office website/doctor evidence on file' : 'Ownership source evidence only — contacts not checked',
+        contact_checked: verification?.last_checked_at?.slice(0, 10) ?? 'Not checked',
+        doctors: verification?.doctors?.map(d => d.name).join(', ') || 'Not on file',
         address: p.address ?? '--',
         city_zip: `${p.city ?? ''}, ${p.state ?? ''} ${(p.zip ?? '').toString().slice(0, 5)}`,
         ownership_label:
@@ -309,34 +332,47 @@ export function PracticeDensityMap({
     }
 
     return results
-  }, [filteredPractices, verificationMap])
-
-  const bucketCounts = useMemo(() => {
-    const counts: Record<HeadlineBucket, number> = {
-      true_solo_owner_operated: 0,
-      dentist_owned_not_solo: 0,
-      dso_pe_corporate: 0,
-      institutional: 0,
-      unresolved: 0,
-    }
-    for (const d of geocoded) counts[d.bucket]++
-    return counts
-  }, [geocoded])
+  }, [assessed, verificationMap])
 
   return (
     <div>
       <SectionHeader
-        title="Ownership Map"
-        helpText="Offices with stored coordinates are shown regardless of ownership status. Gray dots have unresolved ownership. Offices without usable coordinates remain searchable in the Directory, but receive no approximate map pin. Click a dot to open the practice page."
+        title="Practice Evidence Map"
+        helpText="A dot requires stored coordinates plus office-level ownership source evidence or a positive website/doctor check. Older evidence is included and is not proof of current operations. Provider-only research and commercial estimates do not verify an office address. No ZIP-center pins."
       />
       <p className="text-xs text-[#6B6B60] mb-3" role="status">
         {geocoded.length.toLocaleString()} offices mapped ·{' '}
-        {(filteredPractices.length - geocoded.length).toLocaleString()} without a usable map location — still available in the Directory.
+        {(filteredPractices.length - geocoded.length).toLocaleString()} not pinned of {filteredPractices.length.toLocaleString()} tracked offices — all remain available in the Directory.
       </p>
+
+      <p className="text-xs text-[#6B6B60] mb-3">
+        Overlapping research coverage (do not add): {counts.ownership.toLocaleString()} ownership-classified ·{' '}
+        {counts.checked.toLocaleString()} contact checks · {counts.provider.toLocaleString()} with source-linked provider dossiers ·{' '}
+        {counts.commercial.toLocaleString()} commercially enriched (estimates, not verification).{' '}
+        {counts.any.toLocaleString()} distinct offices have source-backed ownership, contact, or linked-provider research.
+      </p>
+      {onResearchFilterChange && <label className="block text-xs mb-3">Research filter (shared with Directory){' '}
+        <select value={researchFilter} onChange={e => onResearchFilterChange(e.target.value as DirectoryResearchFilter)} className="border rounded p-2">
+          <option value="all">All tracked offices</option>
+          <option value="any_evidence">Any source-backed research</option>
+          <option value="recent_evidence">Website/doctor evidence — last 90 days</option>
+          <option value="any_research">Any contact research check</option>
+        </select>
+      </label>}
+      <div aria-label="Map evidence legend" className="rounded border border-[#E8E5DE] bg-white p-3 mb-3 text-xs space-y-1">
+        <div><span className="text-[#0D9488]">●</span> Website/doctor evidence + coordinates: {counts.contact.toLocaleString()}</div>
+        <div><span className="text-[#2563EB]">●</span> Ownership source evidence + coordinates (no positive contact check): {counts.ownershipOnly.toLocaleString()}</div>
+        <div>Not pinned — office evidence, but no usable coordinates: {counts.missing_coordinates.toLocaleString()}</div>
+        <div>Not pinned — coordinates, but insufficient office evidence: {counts.missing_office_evidence.toLocaleString()}</div>
+        <div>Not pinned — missing both coordinates and office evidence: {counts.missing_both.toLocaleString()}</div>
+        {counts.outside_filter > 0 && <div>Outside selected research filter: {counts.outside_filter.toLocaleString()}</div>}
+        <p className="text-[#6B6B60]">Missing coordinates does not mean dirty research. Provider-only evidence may concern another office.
+          {' '}Dots use stored coordinates, not independently verified address accuracy; no approximations or new geocoding.</p>
+      </div>
 
       {geocoded.length === 0 ? (
         <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
-          No stored office coordinates available. Find these offices in the Directory.
+          No offices with both office-level evidence and usable coordinates in this selection. Find these offices in the Directory.
         </div>
       ) : (
         <>
@@ -350,29 +386,6 @@ export function PracticeDensityMap({
             }
           />
 
-          {/* Legend — all five ownership groups, always */}
-          <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-2 mb-1">
-            {HEADLINE_BUCKETS.map((b) => (
-              <span key={b} className="flex items-center gap-1.5 text-[13px] text-[#1A1A1A]">
-                <span
-                  className="inline-block w-2.5 h-2.5 rounded-full"
-                  style={{
-                    backgroundColor:
-                      b === 'unresolved' ? UNRESOLVED_LEGEND_GRAY : BUCKET_META[b].color,
-                  }}
-                />
-                {BUCKET_META[b].shortLabel}
-                <span className="text-[#6B6B60]">
-                  {bucketCounts[b].toLocaleString()}
-                </span>
-              </span>
-            ))}
-          </div>
-
-          {/* Summary counts */}
-          <p className="text-xs text-[#6B6B60] mt-1">
-            Stored coordinates only; no ZIP-center approximations. Gray dots indicate unresolved ownership.
-          </p>
         </>
       )}
     </div>

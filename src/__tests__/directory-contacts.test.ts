@@ -86,6 +86,16 @@ describe('existing research reaches directory outreach', () => {
       'On-file phone: 312-555-0100', 'Map location unavailable']) expect(html).toContain(value)
   })
 
+  it('includes ownership-source offices in the broader filter without claiming a contact check', () => {
+    const owned = { ...practice, ownership_tier: 'true_independent', ownership_evidence_urls: '["https://example.org/owner"]' }
+    const html = renderToStaticMarkup(React.createElement(PracticeDirectory, {
+      practices: [owned], allPractices: [owned], researchFilter: 'any_evidence',
+    }))
+    expect(html).toContain('href="/practice/office"')
+    expect(html).toContain('Ownership research sources')
+    expect(html).toContain('Doctor research not on file')
+  })
+
   it('keeps dated research usable while clearly marking stale checks and ownership conflicts', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-11-01'))

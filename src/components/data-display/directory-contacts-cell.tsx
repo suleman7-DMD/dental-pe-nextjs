@@ -2,6 +2,7 @@ import type { Practice } from '@/lib/types'
 import type { JobHuntVerificationRecord } from '@/lib/supabase/queries/job-hunt-verification'
 import { directoryContacts } from '@/lib/utils/directory-contacts'
 import { safeExternalUrl } from '@/lib/utils/safe-url'
+import { researchUrls, type DirectoryEvidence } from '@/lib/utils/directory-evidence'
 
 function ResearchLink({ url, children }: { url: string; children: React.ReactNode }) {
   const href = safeExternalUrl(url)
@@ -12,9 +13,10 @@ function ResearchLink({ url, children }: { url: string; children: React.ReactNod
   )
 }
 
-export function DirectoryContactsCell({ practice, verification }: {
+export function DirectoryContactsCell({ practice, verification, evidence }: {
   practice: Pick<Practice, 'website' | 'phone'>
   verification?: JobHuntVerificationRecord | null
+  evidence?: DirectoryEvidence
 }) {
   const contact = directoryContacts(practice, verification)
   const doctors = verification?.doctors ?? []
@@ -52,6 +54,22 @@ export function DirectoryContactsCell({ practice, verification }: {
         {verification.ownership_evidence_status === 'conflict' &&
           <div className="text-[11px] text-[#C23B3B]">Ownership evidence conflicts — see dossier</div>}
       </> : <div className="text-[11px] text-[#6B6B60]">Doctor research not on file · contacts unverified</div>}
+      {!!evidence?.ownershipUrls.length && <details>
+        <summary className="cursor-pointer text-[#8B6508]">Ownership research sources ({evidence.ownershipUrls.length})</summary>
+        <div className="text-[#6B6B60]">Ownership evidence, not a current contact or address check.</div>
+        {evidence.ownershipUrls.map((url, i) => <div key={url}><ResearchLink url={url}>Source {i + 1}</ResearchLink></div>)}
+      </details>}
+      {!!evidence?.providerResearch.length && <details>
+        <summary className="cursor-pointer text-[#8B6508]">Older provider research ({evidence.providerResearch.length})</summary>
+        <div className="text-[#6B6B60]">Linked by provider NPI; may describe another office. Confirm address and current details.</div>
+        {evidence.providerResearch.map(r => <div key={r.npi} className="mt-2 border-t pt-1">
+          <div>NPI {r.npi} · {r.research_date.slice(0, 10)} · {r.verification_quality} findings</div>
+          {r.website_url && <div><ResearchLink url={r.website_url}>Historical research website (not rechecked)</ResearchLink></div>}
+          {r.services_listed && <div>Reported services: {r.services_listed}</div>}
+          {r.provider_notes && <div className="max-h-40 overflow-auto">Provider notes: {r.provider_notes}</div>}
+          {researchUrls(r.verification_urls).map((url, i) => <div key={url}><ResearchLink url={url}>Evidence {i + 1}</ResearchLink></div>)}
+        </div>)}
+      </details>}
     </div>
   )
 }

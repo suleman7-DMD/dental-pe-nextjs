@@ -40,14 +40,20 @@ import { DEFAULT_DIRECTORY_VIEW, filterDirectoryRows, getOfficeCoordinates } fro
 import { directoryContacts, DIRECTORY_CONTACT_EXPORT_HEADERS, matchesDirectoryResearch, type DirectoryResearchFilter } from '@/lib/utils/directory-contacts'
 import { STALE_AFTER_DAYS } from '@/lib/census/job-lane'
 import { DirectoryContactsCell } from '@/components/data-display/directory-contacts-cell'
+import { getDirectoryEvidence, type DirectoryEvidence, type ProviderResearchMap } from '@/lib/utils/directory-evidence'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────────────────────
 
+const EMPTY_PROVIDER_RESEARCH: ProviderResearchMap = {}
+
 interface PracticeDirectoryProps {
   practices: Practice[]  // Already has job_opp_score computed
   allPractices: Practice[]  // For cross-reference (same-address lookup etc.)
+  providerResearch?: ProviderResearchMap
+  researchFilter?: DirectoryResearchFilter
+  onResearchFilterChange?: (value: DirectoryResearchFilter) => void
 }
 
 type SortOption = 'lane' | 'job_score' | 'buyability' | 'employees' | 'year_est' | 'name' | 'trust'
@@ -57,6 +63,7 @@ type PracticeWithJobScore = Practice & { job_opp_score?: number | null }
 type PracticeWithLane = Practice & {
   __lane?: JobLaneResult
   __verification?: JobHuntVerificationRecord | null
+  __evidence?: DirectoryEvidence
 }
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
@@ -310,7 +317,7 @@ const CONTACTS_COLUMN = {
   render: (valueOrPractice: unknown) => {
     if (!valueOrPractice || typeof valueOrPractice !== 'object') throw new Error('Practice row expected')
     const p = valueOrPractice as PracticeWithLane
-    return <DirectoryContactsCell practice={p} verification={p.__verification} />
+    return <DirectoryContactsCell practice={p} verification={p.__verification} evidence={p.__evidence} />
   },
 }
 
@@ -406,7 +413,8 @@ const ALL_COLUMNS = [
 // Component
 // ────────────────────────────────────────────────────────────────────────────
 
-export function PracticeDirectory({ practices, allPractices }: PracticeDirectoryProps) {
+export function PracticeDirectory({ practices, allPractices, providerResearch = EMPTY_PROVIDER_RESEARCH,
+  researchFilter: controlledResearchFilter, onResearchFilterChange }: PracticeDirectoryProps) {
   // Website-check layer — {} while loading, so lanes fall back to base states
   const verificationMap = useJobHuntVerificationMap()
   const laneFor = useCallback(
@@ -423,7 +431,9 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
   const [selectedNetworks, setSelectedNetworks] = useState<string[]>([])
   const [selectedSponsor, setSelectedSponsor] = useState<string[]>([])
   const [selectedSources, setSelectedSources] = useState<string[]>(['All'])
-  const [researchFilter, setResearchFilter] = useState<DirectoryResearchFilter>('all')
+  const [localResearchFilter, setLocalResearchFilter] = useState<DirectoryResearchFilter>('all')
+  const researchFilter = controlledResearchFilter ?? localResearchFilter
+  const setResearchFilter = onResearchFilterChange ?? setLocalResearchFilter
   const [sortBy, setSortBy] = useState<SortOption>('lane')
   const [selectedPractice, setSelectedPractice] = useState<Practice | null>(null)
   const [page, setPage] = useState(1)
@@ -441,7 +451,6 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     setSelectedNetworks([])
     setSelectedSponsor([])
     setSelectedSources(['All'])
-    setResearchFilter('all')
   }, [practices.length])
 
   useEffect(() => {
@@ -456,19 +465,21 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       practices.map((p) => ({
         ...p,
         ...directoryContacts(p, p.location_id ? verificationMap[p.location_id] : null),
+        __evidence: getDirectoryEvidence(p, p.location_id ? verificationMap[p.location_id] : null, providerResearch),
         display_name: verifiedDisplayName(
           p,
           p.location_id ? verificationMap[p.location_id]?.public_practice_name : null
         ),
       })),
-    [practices, verificationMap]
+    [practices, verificationMap, providerResearch]
   )
 
   const totalPractices = withDisplayName.length
   const researchCounts = useMemo(() => ({
+    any: withDisplayName.filter(p => p.__evidence.hasAnyEvidence).length,
     checked: practices.filter(p => matchesDirectoryResearch(p.location_id ? verificationMap[p.location_id] : null, 'any_research')).length,
     evidence: practices.filter(p => matchesDirectoryResearch(p.location_id ? verificationMap[p.location_id] : null, 'recent_evidence')).length,
-  }), [practices, verificationMap])
+  }), [practices, verificationMap, withDisplayName])
   const enrichedCount = useMemo(
     () => withDisplayName.filter(isDataAxle).length,
     [withDisplayName]
@@ -491,7 +502,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       buckets: selectedBuckets.flatMap(o => { const b = bucketByOption.get(o); return b ? [b] : [] }),
       tiers: selectedTiers.flatMap(o => { const t = tierByOption.get(o); return t ? [t] : [] }),
     })
-    result = result.filter(p => matchesDirectoryResearch(p.location_id ? verificationMap[p.location_id] : null, researchFilter))
+    result = result.filter(p => matchesDirectoryResearch(p.location_id ? verificationMap[p.location_id] : null, researchFilter, p.__evidence.hasAnyEvidence))
 
     // Job-hunt lane filter (verification-aware — verified lanes are selectable)
     if (selectedLanes.length > 0) {
@@ -566,9 +577,11 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
           : null,
         __lane: lane,
         __verification: verification,
+        ownership_research_sources: p.__evidence.ownershipUrls.join('; '),
+        provider_research: JSON.stringify(p.__evidence.providerResearch),
       }
     })
-  }, [withDisplayName, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, researchFilter, sortBy, laneFor, verificationMap])
+  }, [withDisplayName, searchTerm, selectedLanes, selectedBuckets, selectedTiers, selectedConfidence, selectedEvidence, selectedNetworks, selectedSponsor, selectedSources, researchFilter, sortBy, laneFor, verificationMap, providerResearch])
 
   const filteredEnriched = useMemo(
     () => filtered.filter(isDataAxle).length,
@@ -635,6 +648,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       'job_opp_score',
       'parent_company',
       ...Object.keys(DIRECTORY_CONTACT_EXPORT_HEADERS),
+      'ownership_research_sources',
+      'provider_research',
       'data_source',
     ]
     const headerMap: Record<string, string> = {
@@ -656,6 +671,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       job_opp_score: 'Hiring Signal',
       parent_company: 'Imported Parent Company',
       ...DIRECTORY_CONTACT_EXPORT_HEADERS,
+      ownership_research_sources: 'Ownership Research Sources (not address verification)',
+      provider_research: 'Historical Linked Provider Research (JSON; may concern another office)',
       data_source: 'Data Source',
     }
 
@@ -773,6 +790,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
             onChange={event => setResearchFilter(event.target.value as DirectoryResearchFilter)}
             className="w-full sm:w-auto rounded-md border border-[#E8E5DE] px-3 py-2 text-sm">
             <option value="all">All tracked offices ({totalPractices.toLocaleString()})</option>
+            <option value="any_evidence">Any source-backed research — ownership, contacts, or providers ({researchCounts.any.toLocaleString()})</option>
             <option value="recent_evidence">Website/doctor evidence — last {STALE_AFTER_DAYS} days ({researchCounts.evidence.toLocaleString()})</option>
             <option value="any_research">Any research check — includes stale/negative results ({researchCounts.checked.toLocaleString()})</option>
           </select>
@@ -780,7 +798,8 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
             Tracked does not mean validated. Website/doctor evidence requires a dated check within {STALE_AFTER_DAYS} days
             {' '}with a live-site URL or a named doctor and source link. It does not confirm current operations,
             staffing, or job openings. Ownership confidence and imported business data alone do not qualify.
-            Ownership conflicts remain visible with warnings.
+            Ownership conflicts remain visible with warnings. The broader source-backed option also includes ownership sources
+            {' '}and older linked provider dossiers; it does not mean all their contact details are verified. This selection also applies to the Map tab.
           </p>
         </div>
 

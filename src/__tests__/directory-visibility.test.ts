@@ -8,7 +8,9 @@ import type { Practice } from '@/lib/types'
 
 vi.stubGlobal('React', React)
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('@/lib/hooks/use-job-hunt-verification', () => ({ useJobHuntVerificationMap: () => ({}) }))
+vi.mock('@/lib/hooks/use-job-hunt-verification', () => ({ useJobHuntVerificationMap: () => ({
+  unknown: { website_status: 'live', website_url: 'https://example.org', doctors: [], last_checked_at: '2026-07-10', verification_status: 'call_required' },
+}) }))
 vi.mock('@/app/job-market/_components/practice-detail-drawer', () => ({ PracticeDetailDrawer: () => null }))
 
 const unlocated = {
@@ -20,6 +22,7 @@ const unlocated = {
 const located = {
   ...unlocated, npi: 'located', location_id: 'located', practice_name: 'Located Office',
   latitude: 41.882, longitude: -87.624, ownership_tier: 'true_independent',
+  ownership_evidence_urls: '["https://example.org/ownership"]',
 } as Practice
 const unresolvedLocated = { ...located, npi: 'unknown', location_id: 'unknown', ownership_tier: null }
 const rows = [unlocated, located, unresolvedLocated]
@@ -66,7 +69,7 @@ describe('directory inclusion is independent of map coordinates and ownership re
       practices: [unlocated], centerLat: 41.88, centerLon: -87.62,
     }))
     expect(html).toContain('0 offices mapped')
-    expect(html).toContain('1 without a usable map location')
+    expect(html).toContain('1 not pinned of 1 tracked offices')
     expect(html).toContain('Find these offices in the Directory')
   })
 
@@ -77,10 +80,24 @@ describe('directory inclusion is independent of map coordinates and ownership re
       practices: rows, centerLat: 41.88, centerLon: -87.62,
     }))
     expect(html).toContain('2 offices mapped')
-    expect(html).toContain('1 without a usable map location')
+    expect(html).toContain('1 not pinned of 3 tracked offices')
     const visibleText = html.replace(/<[^>]*>/g, '')
-    expect(visibleText).toContain('Needs Answer1')
+    expect(visibleText).toContain('Website/doctor evidence + coordinates: 1')
     expect(visibleText).not.toContain('hidden')
+  })
+
+  it('reconciles each office into one map disposition and accounts for selected filters', () => {
+    const offices = [located, { ...located, location_id: 'missing-coords', latitude: null },
+      { ...unlocated, location_id: 'no-evidence', latitude: 41.8, longitude: -87.7 }, unlocated]
+    const render = (researchFilter: 'all' | 'recent_evidence') => renderToStaticMarkup(React.createElement(PracticeDensityMap, {
+      practices: offices, centerLat: 41.88, centerLon: -87.62, researchFilter,
+    })).replace(/<[^>]*>/g, '')
+    const text = render('all')
+    expect(text).toContain('1 offices mapped · 3 not pinned of 4 tracked offices')
+    expect(text).toContain('office evidence, but no usable coordinates: 1')
+    expect(text).toContain('coordinates, but insufficient office evidence: 1')
+    expect(text).toContain('missing both coordinates and office evidence: 1')
+    expect(render('recent_evidence')).toContain('Outside selected research filter: 4')
   })
 
   it.each([

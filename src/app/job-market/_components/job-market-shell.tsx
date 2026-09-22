@@ -41,6 +41,8 @@ import { summarizeBuckets, tierToBucket, type BucketSummary } from '@/lib/census
 import { countSourceClassesFromRows, type SourceClassCounts } from '@/lib/census/zip-census'
 import { CensusBucketSummaryCard } from '@/components/data-display/census-bucket-summary'
 import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
+import { useDirectoryProviderResearch } from '@/lib/hooks/use-directory-provider-research'
+import type { DirectoryResearchFilter } from '@/lib/utils/directory-contacts'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
 import { createBrowserClient } from '@/lib/supabase/client'
 import {
@@ -293,6 +295,8 @@ function JobMarketShellInner({
   // ── State ──────────────────────────────────────────────────────────────
   // Full practice data — loaded lazily only when a data-heavy tab is active
   const [practices, setPractices] = useState<Practice[] | null>(null)
+  const [researchFilter, setResearchFilter] = useState<DirectoryResearchFilter>('all')
+  const providerResearch = useDirectoryProviderResearch(practices !== null)
   const defaultLoc = LIVING_LOCATIONS[defaultLocationKey]
   const [zipScores, setZipScores] = useState<ZipScore[]>(
     initialZipScores.filter(zs => defaultLoc.commutable_zips.includes(zs.zip_code))
@@ -657,10 +661,17 @@ function JobMarketShellInner({
         )}
 
         {/* Map Tab */}
+        {(activeTab === 'map' || activeTab === 'directory') && providerResearch.isFetching &&
+          <p className="text-xs text-[#6B6B60]">Loading older provider research; coverage counts will update.</p>}
+        {(activeTab === 'map' || activeTab === 'directory') && providerResearch.isError &&
+          <p role="alert" className="text-xs text-[#C23B3B]">Older provider research could not be loaded. Its coverage counts are incomplete.</p>}
         {activeTab === 'map' && (
           <div key="map">
             {practices ? (
               <PracticeDensityMap
+                providerResearch={providerResearch.data}
+                researchFilter={researchFilter}
+                onResearchFilterChange={setResearchFilter}
                 practices={practices}
                 centerLat={loc.center_lat}
                 centerLon={loc.center_lon}
@@ -678,6 +689,9 @@ function JobMarketShellInner({
           <div key="directory">
             {practices ? (
               <PracticeDirectory
+                providerResearch={providerResearch.data}
+                researchFilter={researchFilter}
+                onResearchFilterChange={setResearchFilter}
                 practices={practicesWithScore}
                 allPractices={practicesWithScore}
               />
