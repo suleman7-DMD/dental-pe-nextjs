@@ -37,6 +37,8 @@ import type { JobHuntVerificationRecord } from '@/lib/supabase/queries/job-hunt-
 import { TRUST_SOURCE_META, websiteTrust } from '@/components/data-display/trust-source-tag'
 import type { Practice } from '@/lib/types'
 import { DEFAULT_DIRECTORY_VIEW, filterDirectoryRows, getOfficeCoordinates } from '@/lib/utils/directory-visibility'
+import { directoryContacts, DIRECTORY_CONTACT_EXPORT_HEADERS } from '@/lib/utils/directory-contacts'
+import { DirectoryContactsCell } from '@/components/data-display/directory-contacts-cell'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -182,7 +184,7 @@ function renderTrustCell(valueOrPractice: unknown): React.ReactElement {
     : []
   const doctorsLine = verification
     ? verifiedDoctors.length > 0
-      ? `Current doctors: website-verified \u2014 ${verifiedDoctors.map((d) => d.name).join(', ')}`
+      ? `Researched doctors (not current staffing): ${verifiedDoctors.map((d) => d.name).join(', ')}; checked ${verification.last_checked_at}`
       : 'Current doctors: website checked \u2014 none published on the site (confirming needs a call)'
     : 'Current doctors: not website-verified yet \u2014 the website check has not reached this office'
   const websiteRuling = websiteTrust(website, verification)
@@ -302,8 +304,18 @@ function renderCensusBadge(valueOrPractice: unknown): React.ReactElement {
 // confidence). Buyability is a legacy heuristic and is labeled as such.
 // ────────────────────────────────────────────────────────────────────────────
 
+const CONTACTS_COLUMN = {
+  key: 'researched_doctors', header: 'Contacts & Research',
+  render: (valueOrPractice: unknown) => {
+    if (!valueOrPractice || typeof valueOrPractice !== 'object') throw new Error('Practice row expected')
+    const p = valueOrPractice as PracticeWithLane
+    return <DirectoryContactsCell practice={p} verification={p.__verification} />
+  },
+}
+
 const EMPLOYMENT_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  CONTACTS_COLUMN,
   { key: 'job_lane', header: 'Job-Hunt Lane', render: renderLaneBadge },
   { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'address', header: 'Address' },
@@ -368,6 +380,7 @@ const ENRICHED_COLUMNS = [
 
 const ALL_COLUMNS = [
   { key: 'display_name', header: 'Practice Name', render: renderPracticeLink },
+  CONTACTS_COLUMN,
   { key: 'job_lane', header: 'Job-Hunt Lane', render: renderLaneBadge },
   { key: 'ownership_tier', header: 'Ownership', render: renderCensusBadge },
   { key: 'city', header: 'City' },
@@ -439,6 +452,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
     () =>
       practices.map((p) => ({
         ...p,
+        ...directoryContacts(p, p.location_id ? verificationMap[p.location_id] : null),
         display_name: verifiedDisplayName(
           p,
           p.location_id ? verificationMap[p.location_id]?.public_practice_name : null
@@ -612,7 +626,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       'buyability_score',
       'job_opp_score',
       'parent_company',
-      'website',
+      ...Object.keys(DIRECTORY_CONTACT_EXPORT_HEADERS),
       'data_source',
     ]
     const headerMap: Record<string, string> = {
@@ -633,7 +647,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
       buyability_score: 'Acquisition Lead Score',
       job_opp_score: 'Hiring Signal',
       parent_company: 'Imported Parent Company',
-      website: 'Website',
+      ...DIRECTORY_CONTACT_EXPORT_HEADERS,
       data_source: 'Data Source',
     }
 
@@ -657,7 +671,7 @@ export function PracticeDirectory({ practices, allPractices }: PracticeDirectory
         <SearchInput
           value={searchTerm}
           onChange={setSearchTerm}
-          placeholder="Search by name, address, city, ZIP, or network..."
+          placeholder="Search by practice or doctor name, address, city, ZIP, or network..."
           debounceMs={300}
         />
 

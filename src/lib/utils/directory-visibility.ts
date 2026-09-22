@@ -14,7 +14,7 @@ export function getOfficeCoordinates(p: { latitude?: number | string | null; lon
 }
 
 /** Map eligibility never affects directory/search eligibility. */
-export function filterDirectoryRows<T extends Practice & { display_name?: string }>(rows: T[], options: {
+export function filterDirectoryRows<T extends Practice & { display_name?: string; researched_doctors?: string }>(rows: T[], options: {
   search?: string
   buckets?: HeadlineBucket[]
   tiers?: string[]
@@ -24,7 +24,7 @@ export function filterDirectoryRows<T extends Practice & { display_name?: string
     if (options.buckets?.length && !options.buckets.includes(tierToBucket(p.ownership_tier))) return false
     if (options.tiers?.length && (!p.ownership_tier || !options.tiers.includes(p.ownership_tier))) return false
     if (!term) return true
-    return [p.practice_name, p.display_name, p.doing_business_as, p.address, p.city,
+    return [p.practice_name, p.display_name, p.doing_business_as, p.researched_doctors, p.address, p.city,
       p.network_id, p.network_id ? formatNetworkId(p.network_id) : null]
       .some(value => (value ?? '').toLowerCase().includes(term)) || (p.zip ?? '').toString().startsWith(term)
   })
