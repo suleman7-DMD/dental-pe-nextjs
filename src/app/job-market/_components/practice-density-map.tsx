@@ -21,6 +21,9 @@ import { getDirectoryEvidence, officeMapDisposition, type ProviderResearchMap } 
 import { matchesDirectoryResearch, type DirectoryResearchFilter } from '@/lib/utils/directory-contacts'
 import { POPULATION_BOUNDS, POPULATION_GRADIENT, POPULATION_LAYER_ID, POPULATION_LEGEND,
   POPULATION_MAX_ZOOM, POPULATION_MIN_ZOOM, POPULATION_SOURCE_ID } from '@/lib/maps/population-density'
+import { acsNumber, formatSocioeconomicValue, socioeconomicColor, socioeconomicValue,
+  SOCIOECONOMIC_DATA, SOCIOECONOMIC_LAYER, SOCIOECONOMIC_METRICS, SOCIOECONOMIC_SOURCE,
+  type SocioeconomicMetric } from '@/lib/maps/socioeconomic'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -78,12 +81,16 @@ function PracticeMapInner({
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapObjRef = useRef<mapboxgl.Map | null>(null)
-  const [populationEnabled, setPopulationEnabled] = useState(true)
+  const [contextLayer, setContextLayer] = useState<'none' | 'population' | SocioeconomicMetric>('population')
+  const populationEnabled = contextLayer === 'population'
+  const socioeconomicMetric = contextLayer === 'income' || contextLayer === 'education' ? contextLayer : null
   const [populationOpacity, setPopulationOpacity] = useState(0.65)
   const [showPractices, setShowPractices] = useState(true)
   const [populationStatus, setPopulationStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const presentation = useRef({ populationEnabled, populationOpacity, showPractices })
-  presentation.current = { populationEnabled, populationOpacity, showPractices }
+  const [acsStatus, setAcsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const tractPopupRef = useRef<mapboxgl.Popup | null>(null)
+  const presentation = useRef({ populationEnabled, populationOpacity, showPractices, socioeconomicMetric })
+  presentation.current = { populationEnabled, populationOpacity, showPractices, socioeconomicMetric }
   // Ref so a changing callback identity never tears down and re-creates the map
   const onOpenPracticeRef = useRef(onOpenPractice)
   onOpenPracticeRef.current = onOpenPractice
@@ -94,7 +101,9 @@ function PracticeMapInner({
     let map: mapboxgl.Map | null = null
     let cancelled = false
     let populationFailed = false
+    let acsFailed = false
     setPopulationStatus('loading')
+    setAcsStatus('loading')
 
     const initMap = async () => {
       const mapboxgl = (await import('mapbox-gl')).default
@@ -121,9 +130,14 @@ function PracticeMapInner({
           populationFailed = true
           if (!cancelled) setPopulationStatus('error')
         }
+        if (sourceId === SOCIOECONOMIC_SOURCE || e.error?.message?.includes(SOCIOECONOMIC_DATA)) {
+          acsFailed = true
+          if (!cancelled) setAcsStatus('error')
+        }
       })
       map.on('sourcedata', e => {
         if (e.sourceId === POPULATION_SOURCE_ID && e.isSourceLoaded && !populationFailed && !cancelled) setPopulationStatus('ready')
+        if (e.sourceId === SOCIOECONOMIC_SOURCE && e.isSourceLoaded && !acsFailed && !cancelled) setAcsStatus('ready')
       })
 
       map.on('load', () => {
@@ -139,6 +153,39 @@ function PracticeMapInner({
           layout: { visibility: presentation.current.populationEnabled ? 'visible' : 'none' },
           paint: { 'raster-opacity': presentation.current.populationOpacity, 'raster-resampling': 'linear' },
         }, firstLabel)
+
+        map.addSource(SOCIOECONOMIC_SOURCE, { type: 'geojson', data: SOCIOECONOMIC_DATA,
+          attribution: '<a href="https://www.census.gov/programs-surveys/acs">U.S. Census ACS 2020–2024</a> · <a href="https://www.arcgis.com/home/item.html?id=c9faa265b82848498bc0a8390c0afa65">Esri</a>',
+        })
+        map.addLayer({ id: SOCIOECONOMIC_LAYER, type: 'fill', source: SOCIOECONOMIC_SOURCE,
+          layout: { visibility: presentation.current.socioeconomicMetric ? 'visible' : 'none' },
+          paint: { 'fill-color': socioeconomicColor(presentation.current.socioeconomicMetric ?? 'income'),
+            'fill-opacity': presentation.current.populationOpacity, 'fill-outline-color': 'rgba(80,80,80,0.25)' },
+        }, firstLabel)
+
+        const tractPopup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '300px' })
+        tractPopupRef.current = tractPopup
+        map.on('mousemove', SOCIOECONOMIC_LAYER, e => {
+          const metric = presentation.current.socioeconomicMetric
+          if (!map || !metric || !e.features?.[0] || map.queryRenderedFeatures(e.point, { layers: ['practice-dots'] }).length) {
+            tractPopup.remove()
+            return
+          }
+          const props = e.features[0].properties ?? {}
+          const config = SOCIOECONOMIC_METRICS[metric]
+          const value = socioeconomicValue(props, metric)
+          const moe = value === null ? null : acsNumber(props[config.moe])
+          const margin = moe === null ? 'Margin of error unavailable' : metric === 'income'
+            ? `90% margin of error: ±$${Math.round(moe).toLocaleString('en-US')}`
+            : `90% margin of error: ±${moe.toFixed(1)} percentage points`
+          tractPopup.setLngLat(e.lngLat).setHTML(`<div style="font:12px/1.5 system-ui;color:#1A1A1A">
+            <strong>${escapeHtml(props.NAME)} · ${escapeHtml(props.County)}</strong><br/>
+            ${escapeHtml(config.label)}<br/><strong>${escapeHtml(formatSocioeconomicValue(value, metric))}</strong><br/>
+            ${escapeHtml(margin)}<br/>ACS 2020–2024 · ${escapeHtml(config.unit)}<br/>
+            Tract estimate, not an individual patient characteristic.</div>`).addTo(map)
+        })
+        map.on('mouseleave', SOCIOECONOMIC_LAYER, () => tractPopup.remove())
+        map.on('movestart', () => tractPopup.remove())
 
         // Build GeoJSON from geocoded practices
         const geojson: GeoJSON.FeatureCollection = {
@@ -207,6 +254,7 @@ function PracticeMapInner({
 
         map.on('mouseenter', 'practice-dots', (e) => {
           if (!map || !e.features?.[0]) return
+          tractPopup.remove()
           map.getCanvas().style.cursor = 'pointer'
           const props = e.features[0].properties!
           const coords = (e.features[0].geometry as GeoJSON.Point).coordinates.slice() as [number, number]
@@ -255,6 +303,7 @@ function PracticeMapInner({
       cancelled = true
       if (map) map.remove()
       mapObjRef.current = null
+      tractPopupRef.current = null
     }
   }, [geocoded, centerLat, centerLon])
 
@@ -265,16 +314,29 @@ function PracticeMapInner({
       map.setPaintProperty(POPULATION_LAYER_ID, 'raster-opacity', populationOpacity)
     }
     if (map?.getLayer('practice-dots')) map.setLayoutProperty('practice-dots', 'visibility', showPractices ? 'visible' : 'none')
-  }, [populationEnabled, populationOpacity, showPractices])
+    if (map?.getLayer(SOCIOECONOMIC_LAYER)) {
+      map.setLayoutProperty(SOCIOECONOMIC_LAYER, 'visibility', socioeconomicMetric ? 'visible' : 'none')
+      map.setPaintProperty(SOCIOECONOMIC_LAYER, 'fill-opacity', populationOpacity)
+      if (socioeconomicMetric) map.setPaintProperty(SOCIOECONOMIC_LAYER, 'fill-color', socioeconomicColor(socioeconomicMetric))
+    }
+    tractPopupRef.current?.remove()
+  }, [populationEnabled, populationOpacity, showPractices, socioeconomicMetric])
 
   return (
     <div>
       <div className="rounded border border-[#E8E5DE] bg-white p-3 mb-3 space-y-3">
         <div className="flex flex-wrap items-center gap-5 text-sm">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={populationEnabled} onChange={e => setPopulationEnabled(e.target.checked)} />Population density</label>
+          <label className="flex items-center gap-2">Map layer
+            <select className="rounded border border-[#D4D0C8] bg-white p-1.5" value={contextLayer} onChange={e => setContextLayer(e.target.value as typeof contextLayer)}>
+              <option value="none">None — practices only</option>
+              <option value="population">Population density</option>
+              <option value="income">Median household income</option>
+              <option value="education">Education: bachelor’s degree or higher</option>
+            </select>
+          </label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={showPractices} onChange={e => setShowPractices(e.target.checked)} />Show practice dots</label>
-          <label className="flex items-center gap-2">Population opacity
-            <input type="range" min="0" max="100" step="5" value={Math.round(populationOpacity * 100)} disabled={!populationEnabled}
+          <label className="flex items-center gap-2">Layer opacity
+            <input type="range" min="0" max="100" step="5" value={Math.round(populationOpacity * 100)} disabled={contextLayer === 'none'}
               onChange={e => setPopulationOpacity(Number(e.target.value) / 100)} />
             <span>{Math.round(populationOpacity * 100)}%</span>
           </label>
@@ -294,12 +356,26 @@ function PracticeMapInner({
           {populationStatus === 'loading' && <p className="text-xs text-[#6B6B60]">Loading population tiles…</p>}
           {populationStatus === 'error' && <p role="alert" className="text-xs text-[#C23B3B]">Population tiles are unavailable or incomplete. Blank areas are not zero population. Practice dots remain available; reload to retry.</p>}
         </>}
-        <p className="text-xs text-[#6B6B60]">Compare residential population with white-outlined practice dots. This is not a saturation score:
+        {socioeconomicMetric && <>
+          <div className="text-xs font-medium">{SOCIOECONOMIC_METRICS[socioeconomicMetric].unit} · Census ACS 2020–2024</div>
+          <div className="w-[360px] max-w-full">
+            <div className="h-3 rounded" style={{ background: `linear-gradient(to right, ${SOCIOECONOMIC_METRICS[socioeconomicMetric].colors.join(',')})` }} />
+            <div className="flex justify-between text-[10px] text-[#6B6B60]">{SOCIOECONOMIC_METRICS[socioeconomicMetric].labels.map(label => <span key={label}>{label}</span>)}</div>
+          </div>
+          <p className="text-xs text-[#6B6B60]"><span className="inline-block h-2.5 w-2.5 bg-[#b8bec5] mr-1" />Gray = no estimate. Hover a tract for its estimate and 90% margin of error.</p>
+          <p className="text-xs text-[#6B6B60]">Illinois census-tract estimates across the map region, not ZIP boundaries or a people-density heatmap. Outside coverage is blank. Five-year estimates, not live 2026 conditions.
+            {' '}Income and education provide neighborhood context; they do not establish dental insurance coverage, patient demand, or practice profitability.</p>
+          {acsStatus === 'loading' && <p className="text-xs text-[#6B6B60]">Loading Census tract estimates…</p>}
+          {acsStatus === 'error' && <p role="alert" className="text-xs text-[#C23B3B]">Census layer is unavailable. Blank areas are not zero income or education. Practice dots remain available; reload to retry.</p>}
+          <p className="text-xs text-[#6B6B60]"><a className="underline" href={SOCIOECONOMIC_METRICS[socioeconomicMetric].source} target="_blank" rel="noopener noreferrer">Census ACS via Esri · source and methodology</a>
+            {' · '}<a className="underline" href="/data/chicagoland-acs-2024.metadata.json" target="_blank" rel="noopener noreferrer">Snapshot provenance</a></p>
+        </>}
+        <p className="text-xs text-[#6B6B60]">Compare neighborhood context with white-outlined practice dots. This is not a saturation score:
           {' '}unmapped offices, missing practices, commuters, and travel across ZIPs can change the picture.</p>
-        <p className="text-xs text-[#6B6B60]">
+        {populationEnabled && <p className="text-xs text-[#6B6B60]">
           <a className="underline" href="https://citydensity.com/city/chicago-united-states" target="_blank" rel="noopener noreferrer">CityDensity population layer</a>
           {' · '}<a className="underline" href="https://www.worldpop.org/faq/" target="_blank" rel="noopener noreferrer">WorldPop · CC BY 4.0</a>
-        </p>
+        </p>}
       </div>
     <div
       ref={mapRef}

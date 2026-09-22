@@ -1,0 +1,48 @@
+{
+  "vintage": "2020-2024",
+  "retrievedAt": "2026-09-22T13:29:27.168Z",
+  "bounds": [
+    -89.5,
+    40.6,
+    -87.2,
+    42.7
+  ],
+  "scope": "Illinois tracts intersecting the Chicagoland map region; not clipped to watched ZIPs",
+  "tractCount": 2339,
+  "simplificationDegrees": 0.0002,
+  "source": "U.S. Census Bureau ACS 5-year estimates, hosted by Esri; TIGER boundaries with major water areas removed",
+  "terms": "https://goto.arcgis.com/termsofuse/viewtermsofuse",
+  "sources": [
+    {
+      "topic": "income",
+      "item": "c9faa265b82848498bc0a8390c0afa65",
+      "service": "Median_Household_Income",
+      "fields": [
+        "B19049_001E",
+        "B19049_001M"
+      ],
+      "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/ACS_Median_Household_Income_View_Boundaries/FeatureServer/2",
+      "count": 2339,
+      "modified": 1779803700000
+    },
+    {
+      "topic": "education",
+      "item": "5906be82cfc349948cecbed2f7297e9f",
+      "service": "Educational_Attainment",
+      "fields": [
+        "B15002_001E",
+        "B15002_calc_pctGEBAE",
+        "B15002_calc_pctGEBAM"
+      ],
+      "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/ACS_Educational_Attainment_View_Boundaries/FeatureServer/2",
+      "count": 2339,
+      "modified": 1779803610000
+    }
+  ],
+  "notes": [
+    "Raw selected source fields retained, including nulls and margins of error (90% confidence).",
+    "Income B19049_001E is in 2024 inflation-adjusted dollars. Education is bachelor or higher, adults 25+; Esri-calculated percent and MOE.",
+    "Esri normalizes negative Census sentinels to null (controlled-estimate MOE sentinel to zero). No interpolation or office-level demographic inference.",
+    "Education item accessInformation is stale (2019-2023/B16007); Current Vintage and live B15002 schema identify 2020-2024."
+  ]
+}
