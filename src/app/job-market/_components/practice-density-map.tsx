@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type mapboxgl from 'mapbox-gl'
 import { SectionHeader } from '@/components/data-display/section-header'
@@ -19,6 +19,8 @@ import { escapeHtml } from '@/lib/utils/escape-html'
 import type { Practice } from '@/lib/types'
 import { getDirectoryEvidence, officeMapDisposition, type ProviderResearchMap } from '@/lib/utils/directory-evidence'
 import { matchesDirectoryResearch, type DirectoryResearchFilter } from '@/lib/utils/directory-contacts'
+import { POPULATION_BOUNDS, POPULATION_GRADIENT, POPULATION_LAYER_ID, POPULATION_LEGEND,
+  POPULATION_MAX_ZOOM, POPULATION_MIN_ZOOM, POPULATION_SOURCE_ID } from '@/lib/maps/population-density'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -76,15 +78,23 @@ function PracticeMapInner({
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapObjRef = useRef<mapboxgl.Map | null>(null)
+  const [populationEnabled, setPopulationEnabled] = useState(true)
+  const [populationOpacity, setPopulationOpacity] = useState(0.65)
+  const [showPractices, setShowPractices] = useState(true)
+  const [populationStatus, setPopulationStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const presentation = useRef({ populationEnabled, populationOpacity, showPractices })
+  presentation.current = { populationEnabled, populationOpacity, showPractices }
   // Ref so a changing callback identity never tears down and re-creates the map
   const onOpenPracticeRef = useRef(onOpenPractice)
   onOpenPracticeRef.current = onOpenPractice
 
   useEffect(() => {
-    if (!mapRef.current || geocoded.length === 0) return
+    if (!mapRef.current) return
 
     let map: mapboxgl.Map | null = null
     let cancelled = false
+    let populationFailed = false
+    setPopulationStatus('loading')
 
     const initMap = async () => {
       const mapboxgl = (await import('mapbox-gl')).default
@@ -101,9 +111,34 @@ function PracticeMapInner({
       })
       mapObjRef.current = map
       map.addControl(new mapboxgl.NavigationControl(), 'top-right')
+      map.addControl(new mapboxgl.FullscreenControl(), 'top-right')
+      map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-left')
+      map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
+
+      map.on('error', e => {
+        const sourceId = (e as unknown as { sourceId?: string }).sourceId
+        if (sourceId === POPULATION_SOURCE_ID || e.error?.message?.includes('/api/population-tiles/')) {
+          populationFailed = true
+          if (!cancelled) setPopulationStatus('error')
+        }
+      })
+      map.on('sourcedata', e => {
+        if (e.sourceId === POPULATION_SOURCE_ID && e.isSourceLoaded && !populationFailed && !cancelled) setPopulationStatus('ready')
+      })
 
       map.on('load', () => {
         if (!map) return
+        map.addSource(POPULATION_SOURCE_ID, {
+          type: 'raster', tiles: [`${window.location.origin}/api/population-tiles/{z}/{x}/{y}`],
+          tileSize: 256, bounds: POPULATION_BOUNDS, minzoom: POPULATION_MIN_ZOOM, maxzoom: POPULATION_MAX_ZOOM,
+          attribution: '<a href="https://www.worldpop.org/">WorldPop 2026</a> · <a href="https://citydensity.com/city/chicago-united-states">CityDensity tiles</a> · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>',
+        })
+        // Below labels and practice dots; the population layer never changes office eligibility.
+        const firstLabel = map.getStyle().layers.find(layer => layer.type === 'symbol')?.id
+        map.addLayer({ id: POPULATION_LAYER_ID, type: 'raster', source: POPULATION_SOURCE_ID,
+          layout: { visibility: presentation.current.populationEnabled ? 'visible' : 'none' },
+          paint: { 'raster-opacity': presentation.current.populationOpacity, 'raster-resampling': 'linear' },
+        }, firstLabel)
 
         // Build GeoJSON from geocoded practices
         const geojson: GeoJSON.FeatureCollection = {
@@ -142,11 +177,12 @@ function PracticeMapInner({
           id: 'practice-dots',
           type: 'circle',
           source: 'practices',
+          layout: { visibility: presentation.current.showPractices ? 'visible' : 'none' },
           paint: {
             'circle-radius': [
               'interpolate', ['linear'], ['zoom'],
-              8, 1.5,
-              10, 3,
+              8, 2.5,
+              10, 4,
               12, 5,
               14, 8,
             ],
@@ -157,8 +193,8 @@ function PracticeMapInner({
               ['get', 'b'],
             ],
             'circle-opacity': 0.9,
-            'circle-stroke-width': 0.5,
-            'circle-stroke-color': 'rgba(0,0,0,0.15)',
+            'circle-stroke-width': 1.2,
+            'circle-stroke-color': '#FFFFFF',
           },
         })
 
@@ -222,12 +258,55 @@ function PracticeMapInner({
     }
   }, [geocoded, centerLat, centerLon])
 
+  useEffect(() => {
+    const map = mapObjRef.current
+    if (map?.getLayer(POPULATION_LAYER_ID)) {
+      map.setLayoutProperty(POPULATION_LAYER_ID, 'visibility', populationEnabled ? 'visible' : 'none')
+      map.setPaintProperty(POPULATION_LAYER_ID, 'raster-opacity', populationOpacity)
+    }
+    if (map?.getLayer('practice-dots')) map.setLayoutProperty('practice-dots', 'visibility', showPractices ? 'visible' : 'none')
+  }, [populationEnabled, populationOpacity, showPractices])
+
   return (
+    <div>
+      <div className="rounded border border-[#E8E5DE] bg-white p-3 mb-3 space-y-3">
+        <div className="flex flex-wrap items-center gap-5 text-sm">
+          <label className="flex items-center gap-2"><input type="checkbox" checked={populationEnabled} onChange={e => setPopulationEnabled(e.target.checked)} />Population density</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={showPractices} onChange={e => setShowPractices(e.target.checked)} />Show practice dots</label>
+          <label className="flex items-center gap-2">Population opacity
+            <input type="range" min="0" max="100" step="5" value={Math.round(populationOpacity * 100)} disabled={!populationEnabled}
+              onChange={e => setPopulationOpacity(Number(e.target.value) / 100)} />
+            <span>{Math.round(populationOpacity * 100)}%</span>
+          </label>
+        </div>
+        {populationEnabled && <>
+          <div className="text-xs font-medium">People per square mile · WorldPop 2026 modeled population</div>
+          <div className="w-[320px] max-w-full">
+            <div className="h-3 rounded" style={{ background: POPULATION_GRADIENT }} />
+            <div className="relative h-5 text-[10px] text-[#6B6B60]">
+              {POPULATION_LEGEND.map((stop, i) => <span key={stop.position} className="absolute" style={{ left: `${stop.position}%`, transform: i === 0 ? undefined : i === 4 ? 'translateX(-100%)' : 'translateX(-50%)' }}>
+                {stop.perSquareMile === 0 ? '0' : `${(stop.perSquareMile / 1000).toFixed(1)}k`}{i === 4 ? '+' : ''}
+              </span>)}
+            </div>
+          </div>
+          <p className="text-xs text-[#6B6B60]">100-metre source grid (about 328 ft), rendered by CityDensity. Regional context, not clipped to the tracked ZIP boundaries.
+            {' '}Transparent/light areas are not proof of zero residents.</p>
+          {populationStatus === 'loading' && <p className="text-xs text-[#6B6B60]">Loading population tiles…</p>}
+          {populationStatus === 'error' && <p role="alert" className="text-xs text-[#C23B3B]">Population tiles are unavailable or incomplete. Blank areas are not zero population. Practice dots remain available; reload to retry.</p>}
+        </>}
+        <p className="text-xs text-[#6B6B60]">Compare residential population with white-outlined practice dots. This is not a saturation score:
+          {' '}unmapped offices, missing practices, commuters, and travel across ZIPs can change the picture.</p>
+        <p className="text-xs text-[#6B6B60]">
+          <a className="underline" href="https://citydensity.com/city/chicago-united-states" target="_blank" rel="noopener noreferrer">CityDensity population layer</a>
+          {' · '}<a className="underline" href="https://www.worldpop.org/faq/" target="_blank" rel="noopener noreferrer">WorldPop · CC BY 4.0</a>
+        </p>
+      </div>
     <div
       ref={mapRef}
       className="w-full rounded-lg border border-[#E8E5DE] overflow-hidden"
       style={{ height: 620, boxShadow: '0 0 40px rgba(184, 134, 11, 0.06), 0 4px 24px rgba(0, 0, 0, 0.08)' }}
     />
+    </div>
   )
 }
 
@@ -289,8 +368,13 @@ export function PracticeDensityMap({
   const geocoded = useMemo<MapPractice[]>(() => {
     const results: MapPractice[] = []
 
-    for (const { p, verification, evidence, disposition, selected } of assessed) {
-      if (!selected || disposition !== 'mapped') continue
+    // Provider dossiers affect coverage counts, not marker eligibility. Loading
+    // those dossiers must not tear down a map the user is already inspecting.
+    for (const p of filteredPractices) {
+      const verification = p.location_id ? verificationMap[p.location_id] : undefined
+      const evidence = getDirectoryEvidence(p, verification)
+      if (officeMapDisposition(p, evidence) !== 'mapped' ||
+          !matchesDirectoryResearch(verification, researchFilter, evidence.hasAnyEvidence)) continue
       const bucket = tierToBucket(p.ownership_tier)
       const coordinates = getOfficeCoordinates(p)
       if (!coordinates) continue
@@ -332,7 +416,7 @@ export function PracticeDensityMap({
     }
 
     return results
-  }, [assessed, verificationMap])
+  }, [filteredPractices, verificationMap, researchFilter])
 
   return (
     <div>
@@ -370,24 +454,17 @@ export function PracticeDensityMap({
           {' '}Dots use stored coordinates, not independently verified address accuracy; no approximations or new geocoding.</p>
       </div>
 
-      {geocoded.length === 0 ? (
+      {geocoded.length === 0 && (
         <div className="rounded-lg border border-[#E8E5DE] bg-[#FFFFFF] p-6 text-center text-[#6B6B60]">
           No offices with both office-level evidence and usable coordinates in this selection. Find these offices in the Directory.
         </div>
-      ) : (
-        <>
-          {/* Map — raw mapboxgl dot layer */}
-          <PracticeMapInner
-            geocoded={geocoded}
-            centerLat={centerLat}
-            centerLon={centerLon}
-            onOpenPractice={(locationId) =>
-              router.push(`/practice/${encodeURIComponent(locationId)}`)
-            }
-          />
-
-        </>
       )}
+      <PracticeMapInner
+        geocoded={geocoded}
+        centerLat={centerLat}
+        centerLon={centerLon}
+        onOpenPractice={(locationId) => router.push(`/practice/${encodeURIComponent(locationId)}`)}
+      />
     </div>
   )
 }

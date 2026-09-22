@@ -71,6 +71,9 @@ describe('directory inclusion is independent of map coordinates and ownership re
     expect(html).toContain('0 offices mapped')
     expect(html).toContain('1 not pinned of 1 tracked offices')
     expect(html).toContain('Find these offices in the Directory')
+    expect(html).toContain('Population density')
+    expect(html).toContain('People per square mile')
+    expect(html).toContain('This is not a saturation score')
   })
 
   it('maps valid stored coordinates unchanged, including unresolved ownership', () => {
