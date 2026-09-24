@@ -35,6 +35,7 @@ const HEADING = { fontFamily: "var(--font-heading), DM Sans, sans-serif" } as co
 const STATE_META: Record<OfficeCensusQueueState, { label: string; color: string }> = {
   CONFIRMED_OPERATING_GP: { label: "Confirmed operating GP", color: "#2D8B4E" },
   NEEDS_CURRENT_VERIFICATION: { label: "Likely — needs verification", color: "#2563EB" },
+  EXISTING_EVIDENCE_NO_CURRENT_CONTRADICTION: { label: "P4 Deferred existing row", color: "#2563EB" },
   IDENTITY_REVIEW: { label: "Identity / split-merge review", color: "#7C3AED" },
   OPERATING_STATUS_UNRESOLVED: { label: "Operating status unresolved", color: "#C23B3B" },
   GP_SCOPE_UNRESOLVED: { label: "GP scope unresolved", color: "#0D9488" },
@@ -50,6 +51,7 @@ const STATE_META: Record<OfficeCensusQueueState, { label: string; color: string 
 const STATE_ORDER = Object.keys(STATE_META) as OfficeCensusQueueState[];
 
 const FLAG_LABELS: Record<string, string> = {
+  source_name_missing: "no public name in source",
   multi_org_multi_phone: "several orgs + phones at street",
   multi_suite_multi_phone: "several suites + phones",
   phone_shared_with_other_address: "phone shared with another address",
@@ -110,6 +112,7 @@ const COORD_LABELS: Record<string, string> = {
 };
 
 const EVIDENCE_LABELS: Record<string, string> = {
+  registry_only: "Registry only",
   none: "No prior research",
   ownership_review_only: "Ownership review only",
   researched: "Prior web research",
@@ -120,11 +123,15 @@ const STAGE_LABELS: Record<string, string> = {
   not_started: "Not started",
   in_progress: "In progress",
   rows_validated: "Rows validated",
-  discovery_done: "Discovery done",
+  discovery_done: "Discovery pass recorded",
   recall_audited: "Recall audited",
 };
 
 type SortKey =
+  | "p1_items"
+  | "p2_items"
+  | "p4_deferred"
+  | "candidate_decisions"
   | "batch_rank"
   | "zip"
   | "directory_rows"
@@ -142,6 +149,10 @@ const COLUMNS: Array<{ key: SortKey; label: string; title: string }> = [
   { key: "zip", label: "ZIP", title: "ZIP code" },
   { key: "directory_rows", label: "Dir. rows", title: "Rows currently in the practice directory for this ZIP" },
   { key: "confirmed", label: "Confirmed", title: "Candidates confirmed operating GP by a research-ledger decision" },
+  { key: "p1_items", label: "P1 leads", title: "Possible absent offices, not confirmed missing offices" },
+  { key: "p2_items", label: "P2 review", title: "Suspicious current or excluded rows" },
+  { key: "p4_deferred", label: "P4 deferred", title: "Ordinary rows retained provisionally without mandatory individual research" },
+  { key: "candidate_decisions", label: "Adjudicated", title: "Candidate decisions, including researched unresolved" },
   { key: "open_items", label: "Open", title: "Candidates still needing work (excludes probable non-office / likely specialist-only)" },
   { key: "review_items", label: "Review", title: "Identity + status + GP-scope + unrepresented source + external items" },
   { key: "identity_review", label: "Identity", title: "Rows that may merge several offices or duplicate another row" },
@@ -178,7 +189,9 @@ export function OfficeCensusShell({
       zips: coverage.length,
       directory: sum("directory_rows"),
       confirmed: sum("confirmed"),
-      needs: sum("needs_verification"),
+      needs: sum("p4_deferred"),
+      p1: sum("p1_items"),
+      p2: sum("p2_items"),
       identity: sum("identity_review"),
       status: sum("status_unresolved"),
       scope: sum("gp_scope_unresolved"),
@@ -189,7 +202,7 @@ export function OfficeCensusShell({
       missingCoords: sum("dir_missing_coords"),
       recoverableCoords: sum("dir_coords_recoverable"),
       noResearch: sum("dir_no_prior_research"),
-      started: coverage.filter((r) => r.stage !== "not_started").length,
+      started: coverage.filter((r) => r.discovery_status === "pass_recorded").length,
     };
   }, [coverage]);
 
@@ -233,11 +246,8 @@ export function OfficeCensusShell({
             </h1>
           </div>
           <p className="mt-2 max-w-3xl text-[13px] text-[#6B6B60]">
-            Which general dental offices exist and operate today, ZIP by ZIP. Every row below is a{" "}
-            <strong>research candidate</strong>, not a verified office. A candidate becomes a confirmed
-            office only when a dated research-ledger decision cites a phone call, a DSO locator, or two
-            independent sources seen within the last year. A website alone, an NPI alone, or absence
-            from a directory never settles it.
+            Currently operating general dental offices across Chicagoland. Candidate records,
+            provisional directory rows and evidence-backed confirmations are counted separately.
           </p>
         </div>
         {build && (
@@ -263,42 +273,41 @@ export function OfficeCensusShell({
 
       {coverage.length > 0 && (
         <>
-          <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 [&_p]:text-[12px]">
             <KpiCard
               icon={<CheckCircle2 className="h-4 w-4" />}
               label="Confirmed operating GP"
               value={formatNumber(totals.confirmed)}
-              suffix={`/ ${formatNumber(totals.directory)}`}
-              subtitle="directory rows confirmed by a ledger decision"
+              subtitle="evidence-backed decisions"
               accentColor="#2D8B4E"
               tooltip="Only research-ledger decisions move a candidate here. The directory row count is the denominator, not a claim that all of those offices exist."
             />
             <KpiCard
               icon={<HelpCircle className="h-4 w-4" />}
-              label="Likely, unverified"
+              label="P4 Deferred existing"
               value={formatNumber(totals.needs)}
-              subtitle="no contradiction on file, no current confirmation"
+              subtitle="provisional; no detected contradiction"
               accentColor="#2563EB"
             />
             <KpiCard
               icon={<GitMerge className="h-4 w-4" />}
-              label="Identity review"
-              value={formatNumber(totals.identity)}
-              subtitle="row may merge several offices or duplicate another"
+              label="P2 High-risk rows"
+              value={formatNumber(totals.p2)}
+              subtitle="identity, status and GP scope"
               accentColor="#7C3AED"
             />
             <KpiCard
               icon={<AlertTriangle className="h-4 w-4" />}
-              label="Status unresolved"
-              value={formatNumber(totals.status)}
-              subtitle="closure / move / dead-site signals on file"
+              label="All candidates"
+              value={formatNumber(manifest?.totals?.candidates ?? 0)}
+              subtitle={`${formatNumber(totals.directory)} current directory rows`}
               accentColor="#C23B3B"
             />
             <KpiCard
               icon={<SearchX className="h-4 w-4" />}
-              label="Source gaps"
-              value={formatNumber(totals.source)}
-              subtitle="raw records at addresses the directory lacks"
+              label="P1 Discovery candidates"
+              value={formatNumber(totals.p1)}
+              subtitle="not confirmed missing offices"
               accentColor="#B8860B"
               tooltip="Data Axle, NPPES and DSO-locator records at a street address with no directory row. Candidates only: many are stale or duplicates of a row under a different spelling."
             />
@@ -313,10 +322,19 @@ export function OfficeCensusShell({
           </div>
 
           <p className="mt-3 text-[12px] text-[#9C9C90]">
-            {formatNumber(totals.zips)} watched Chicagoland ZIPs · {formatNumber(totals.started)} started ·{" "}
-            {formatNumber(totals.open)} open candidates · {formatNumber(totals.noResearch)} directory rows never
-            researched in any prior pass · {formatNumber(manifest?.totals?.ledger_decisions ?? 0)} ledger decisions
+            {formatNumber(totals.zips)} tracked ZIPs · {formatNumber(totals.started)} with discovery passes ·{" "}
+            {formatNumber(totals.open)} P1/P2 open items · {formatNumber(manifest?.totals?.historical_evidence_rows ?? 0)} candidates with historical evidence ·{" "}
+            {formatNumber(manifest?.totals?.ledger_decisions ?? 0)} new census decisions
           </p>
+
+          {manifest?.source_candidate_breakdown && (
+            <details className="mt-4 border-y border-[#E8E5DE] py-3 text-[12px] text-[#6B6B60]">
+              <summary className="cursor-pointer font-medium text-[#1A1A1A]">Discovery candidate provenance</summary>
+              <p className="mt-2">{manifest.source_candidate_breakdown.definition}</p>
+              <p className="mt-2">{manifest.source_candidate_breakdown.discovery_candidates} plausible discovery candidates among {manifest.source_candidate_breakdown.raw_groups} source groups; {manifest.source_candidate_breakdown.alternate_match} have alternate matches; {manifest.source_candidate_breakdown.clean_leads} have no listed weak-data or alternate-match flag.</p>
+              <p className="mt-2">{Object.entries(manifest.source_candidate_breakdown.by_source_family).map(([s, n]) => `${s}: ${n}`).join("; ")}</p>
+            </details>
+          )}
 
           {selectedZip && (
             <ZipDrilldown
@@ -364,7 +382,7 @@ export function OfficeCensusShell({
                     </th>
                   ))}
                   <th className="px-3 py-2 text-left text-[11px] font-medium uppercase tracking-wider text-[#6B6B60]">
-                    Stage
+                    Review / discovery
                   </th>
                 </tr>
               </thead>
@@ -399,7 +417,7 @@ export function OfficeCensusShell({
                         {formatNumber(r[c.key] as number)}
                       </td>
                     ))}
-                    <td className="px-3 py-1.5 whitespace-nowrap text-[#6B6B60]">{STAGE_LABELS[r.stage] ?? r.stage}</td>
+                    <td className="px-3 py-1.5 whitespace-nowrap text-[#6B6B60]">{STAGE_LABELS[r.stage] ?? r.stage}<br />{r.discovery_status === "pass_recorded" ? `Discovery: ${r.last_discovery_at}` : "Discovery: not searched"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -410,7 +428,7 @@ export function OfficeCensusShell({
             title="Queue states"
             description="Every candidate sits in exactly one state. Counts are live from the published build."
           />
-          <div className="mt-3 overflow-hidden rounded-lg border border-[#E8E5DE] bg-white">
+          <div className="mt-3 overflow-auto border-y border-[#E8E5DE]">
             <table className="w-full text-[12px]">
               <thead className="bg-[#F7F7F4]">
                 <tr className="text-left text-[11px] font-medium uppercase tracking-wider text-[#6B6B60]">
@@ -463,24 +481,26 @@ function ZipDrilldown({
   candidates: OfficeCensusCandidate[];
   definitions: Record<string, string>;
 }) {
-  const [showExcluded, setShowExcluded] = useState(false);
+  const [showExcluded, setShowExcluded] = useState(true);
+  const [priority, setPriority] = useState("all");
   const groups = useMemo(() => {
     const m = new Map<OfficeCensusQueueState, OfficeCensusCandidate[]>();
     for (const c of candidates) {
+      if (priority !== "all" && c.priority !== Number(priority)) continue;
       if (!showExcluded && (c.queue_state === "LIKELY_SPECIALIST_ONLY" || c.queue_state === "PROBABLE_NON_OFFICE"))
         continue;
       const list = m.get(c.queue_state) ?? [];
       list.push(c);
       m.set(c.queue_state, list);
     }
-    return STATE_ORDER.filter((s) => m.has(s)).map((s) => [s, m.get(s)!] as const);
-  }, [candidates, showExcluded]);
+    return STATE_ORDER.filter((s) => m.has(s)).sort((a, b) => Math.min(...m.get(a)!.map(c => c.priority)) - Math.min(...m.get(b)!.map(c => c.priority))).map((s) => [s, m.get(s)!] as const);
+  }, [candidates, showExcluded, priority]);
   const hidden = candidates.filter(
     (c) => c.queue_state === "LIKELY_SPECIALIST_ONLY" || c.queue_state === "PROBABLE_NON_OFFICE"
   ).length;
 
   return (
-    <div className="mt-6 rounded-lg border border-[#B8860B]/40 bg-white p-4">
+    <div className="mt-6 border-y border-[#B8860B]/40 py-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-[18px] font-bold text-[#1A1A1A]" style={HEADING}>
@@ -496,11 +516,12 @@ function ZipDrilldown({
           ) : (
             <p className="mt-1 text-[12px] text-[#C23B3B]">ZIP {zip} is not in the watched Chicagoland set.</p>
           )}
-          <p className="mt-1 text-[11px] text-[#9C9C90]" style={MONO}>
-            python3 scrapers/office_census.py next-batch --zip {zip}
-          </p>
+          <p className="mt-2 text-[12px] text-[#6B6B60]">P1 {coverage?.p1_items ?? 0} ({coverage?.p1_clean ?? 0} clean leads) · P2 {coverage?.p2_items ?? 0} · P4 deferred {coverage?.p4_deferred ?? 0} · Adjudicated {coverage?.candidate_decisions ?? 0}</p>
         </div>
         <div className="flex items-center gap-3">
+          <select aria-label="Research priority" value={priority} onChange={e => setPriority(e.target.value)} className="h-8 rounded border border-[#E8E5DE] bg-white text-[12px]">
+            <option value="all">All priorities</option><option value="1">P1 Missing leads</option><option value="2">P2 High-risk</option><option value="4">P4 Deferred</option>
+          </select>
           {hidden > 0 && (
             <label className="flex items-center gap-2 text-[12px] text-[#6B6B60]">
               <input type="checkbox" checked={showExcluded} onChange={(e) => setShowExcluded(e.target.checked)} />
@@ -515,6 +536,12 @@ function ZipDrilldown({
             <X className="h-3 w-3" /> Close
           </Link>
         </div>
+      </div>
+
+      <div className="mt-4 border-y border-[#E8E5DE] py-3 text-[12px] text-[#6B6B60]">
+        <strong className="text-[#1A1A1A]">P3 Independent discovery</strong>
+        <p>Offices absent from both the directory and existing source data. {coverage?.last_discovery_at ? `Last pass: ${coverage.last_discovery_at}.` : "No discovery pass recorded."}</p>
+        {coverage?.discovery_passes?.map(pass => <div key={pass.entry_id} className="mt-2"><strong>{pass.completed_at}</strong> · {pass.sources_searched.join(", ")}<p>{pass.notes}</p><p>{pass.findings.length} recorded findings</p></div>)}
       </div>
 
       {groups.length === 0 && (
@@ -544,12 +571,16 @@ function CandidateRow({ c }: { c: OfficeCensusCandidate }) {
   const links: Array<{ label: string; url: string }> = [];
   const addLink = (label: string, url: string | null | undefined) => {
     if (!url) return;
-    const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
-    if (!links.some((l) => l.url === href)) links.push({ label, url: href });
+    const token = url.match(/https?:\/\/[^\s<>]+/i)?.[0] ?? url.trim();
+    try {
+      const parsed = new URL(/^https?:\/\//i.test(token) ? token : `https://${token}`);
+      if (!parsed.hostname.includes(".") || /\s/.test(token)) return;
+      const href = parsed.href;
+      if (!links.some((l) => l.url === href)) links.push({ label, url: href });
+    } catch { return; }
   };
   addLink("website on file", c.website);
   pe.job_hunt_check?.evidence_urls?.forEach((u) => addLink("site check", u));
-  pe.ownership_census?.evidence_urls?.forEach((u) => addLink("ownership review", u));
   pe.ai_dossier?.urls?.forEach((u) => addLink("dossier", u));
 
   const suites = c.suites_seen ?? [];
@@ -558,7 +589,7 @@ function CandidateRow({ c }: { c: OfficeCensusCandidate }) {
   const variants = c.source_refs?.address_variant_rows ?? [];
 
   return (
-    <div className="px-3 py-2.5">
+    <div className="break-words px-3 py-2.5 [overflow-wrap:anywhere]">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <div className="text-[13px] font-semibold text-[#1A1A1A]">{c.name ?? "(no name)"}</div>
@@ -617,13 +648,12 @@ function CandidateRow({ c }: { c: OfficeCensusCandidate }) {
             {pe.ai_dossier.google_recent_review ? `, last review ${pe.ai_dossier.google_recent_review}` : ""})
           </span>
         )}
-        {pe.ownership_census && <span>ownership review {pe.ownership_census.reviewed_at ?? ""}</span>}
         {c.observations > 0 && <span>{c.observations} ledger observations</span>}
         <span className="text-[#9C9C90]" style={MONO}>{c.candidate_id}</span>
       </div>
       {links.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-          {links.slice(0, 6).map((l) => (
+          {links.map((l) => (
             <a
               key={l.url}
               href={l.url}
@@ -636,9 +666,16 @@ function CandidateRow({ c }: { c: OfficeCensusCandidate }) {
               {l.label}: {l.url.replace(/^https?:\/\/(www\.)?/i, "").slice(0, 40)}
             </a>
           ))}
-          {links.length > 6 && <span className="text-[#9C9C90]">+{links.length - 6} more</span>}
         </div>
       )}
+      {(pe.historical_observations?.length ?? 0) > 0 && (
+        <details className="mt-2 text-[11px] text-[#6B6B60]">
+          <summary className="cursor-pointer">Historical evidence ({pe.historical_observations!.length})</summary>
+          {pe.historical_observations!.map((o) => <div key={o.observation_id} className="mt-2 border-t border-[#E8E5DE] pt-2"><strong>{o.source}</strong> · {o.observed_at ?? "date unavailable"} · {o.claim_scope.join(", ")}<pre className="mt-1 whitespace-pre-wrap break-words font-sans">{JSON.stringify(o.evidence, null, 2)}</pre></div>)}
+        </details>
+      )}
+      {(c.source_refs.records?.length ?? 0) > 0 && <details className="mt-2 text-[11px] text-[#6B6B60]"><summary className="cursor-pointer">Source addresses and suites ({c.source_refs.records!.length})</summary><pre className="whitespace-pre-wrap break-words font-sans">{JSON.stringify(c.source_refs.records, null, 2)}</pre></details>}
+      {c.decision && <details className="mt-2 text-[11px]"><summary className="cursor-pointer">Census decision</summary><pre className="whitespace-pre-wrap break-words font-sans">{JSON.stringify(c.decision, null, 2)}</pre></details>}
     </div>
   );
 }

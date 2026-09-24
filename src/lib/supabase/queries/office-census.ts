@@ -10,6 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 export type OfficeCensusQueueState =
   | "CONFIRMED_OPERATING_GP"
   | "NEEDS_CURRENT_VERIFICATION"
+  | "EXISTING_EVIDENCE_NO_CURRENT_CONTRADICTION"
   | "IDENTITY_REVIEW"
   | "OPERATING_STATUS_UNRESOLVED"
   | "GP_SCOPE_UNRESOLVED"
@@ -35,6 +36,15 @@ export interface OfficeCensusZipCoverage {
   city: string | null
   pilot: boolean
   stage: "not_started" | "in_progress" | "rows_validated" | "discovery_done" | "recall_audited"
+  p1_items: number
+  p1_clean: number
+  p2_items: number
+  p4_deferred: number
+  candidate_decisions: number
+  historical_evidence_rows: number
+  discovery_status: string
+  last_discovery_at: string | null
+  discovery_passes: Array<{ entry_id: string; stage: string; completed_at: string; sources_searched: string[]; notes: string; findings: unknown[] }>
   batch_rank: number
   directory_rows: number
   excluded_rows: number
@@ -69,6 +79,7 @@ export interface OfficeCensusZipCoverage {
 }
 
 export interface OfficeCensusPriorEvidence {
+  historical_observations?: Array<{ observation_id: string; source: string; observed_at: string | null; claim_scope: string[]; evidence: Record<string, unknown> }>
   ownership_census?: { status: string; reviewed_at: string | null; evidence_urls: string[] }
   ai_dossier?: {
     npi: string
@@ -107,6 +118,8 @@ export interface OfficeCensusCandidate {
   entity_classification: string | null
   queue_state: OfficeCensusQueueState
   priority: number
+  research_priority: string
+  lead_quality: string | null
   effort: string
   flags: string[]
   gp_scope_taxonomy: string | null
@@ -118,6 +131,7 @@ export interface OfficeCensusCandidate {
   prior_evidence_level: string
   prior_evidence: OfficeCensusPriorEvidence
   source_refs: {
+    records?: Array<Record<string, unknown>>
     npis?: string[]
     iusa?: string[]
     data_sources?: string
@@ -142,10 +156,13 @@ export interface OfficeCensusBuild {
   built_at: string
   published_at: string
   manifest: {
+    source_candidate_breakdown?: { definition: string; raw_groups: number; discovery_candidates: number; by_source_family: Record<string, number>; alternate_match: number; clean_leads: number }
     scope?: string
     watched_zips?: number
     totals?: {
       candidates: number
+      by_priority?: Record<string, number>
+      historical_evidence_rows?: number
       directory_rows: number
       by_origin: Record<string, number>
       by_state: Record<string, number>
@@ -158,7 +175,7 @@ export interface OfficeCensusBuild {
       ledger_observations?: number
     }
     state_definitions?: Record<string, string>
-    ledger_orphans?: number
+    ledger_orphans?: unknown[]
   }
 }
 
