@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Menu,
   BarChart3,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSidebarContext } from "@/providers/sidebar-provider";
@@ -46,6 +47,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: "Home", href: "/", icon: LayoutDashboard },
       { label: "Directory", href: "/directory", icon: Briefcase },
+      { label: "Office Census", href: "/office-census", icon: ClipboardCheck },
       { label: "Ownership", href: "/market-intel", icon: MapPin },
     ],
   },
