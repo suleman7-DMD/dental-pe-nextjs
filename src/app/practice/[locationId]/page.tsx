@@ -8,6 +8,8 @@ import {
 } from "@/lib/supabase/queries/practice-locations"
 import { fetchJobHuntVerification } from "@/lib/supabase/queries/job-hunt-verification"
 import { JobHuntVerificationCard } from "@/components/data-display/job-hunt-verification-card"
+import { fetchDirectoryWebCheck } from "@/lib/supabase/queries/directory-web-checks"
+import { DirectoryWebCheckCard } from "@/components/data-display/directory-web-check-card"
 import {
   CensusBadge,
   ReviewStatusBadge,
@@ -46,9 +48,10 @@ export default async function PracticePage({
 }) {
   const { locationId } = await params
   const supabase = await createServerClient()
-  const [row, verification] = await Promise.all([
+  const [row, verification, webCheck] = await Promise.all([
     fetchPracticeLocationById(supabase, locationId),
     fetchJobHuntVerification(supabase, locationId),
+    fetchDirectoryWebCheck(supabase, locationId),
   ])
 
   if (!row) notFound()
@@ -210,6 +213,12 @@ export default async function PracticePage({
             </div>
           </div>
         </section>
+
+        {webCheck ? (
+          <section className="mt-6">
+            <DirectoryWebCheckCard check={webCheck} />
+          </section>
+        ) : null}
 
         {verification ? (
           <section className="mt-6">

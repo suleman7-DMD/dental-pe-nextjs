@@ -3,6 +3,8 @@ import { getZipScores } from '@/lib/supabase/queries/zip-scores'
 import { getWatchedZips } from '@/lib/supabase/queries/watched-zips'
 import { getADABenchmarks } from '@/lib/supabase/queries/ada-benchmarks'
 import { fetchPracticeLocations } from '@/lib/supabase/queries/practice-locations'
+import { fetchDirectoryWebCheckMapSafe } from '@/lib/supabase/queries/directory-web-checks'
+import { isRemovedByWebCheck } from '@/lib/directory/web-checks'
 import { LIVING_LOCATIONS } from '@/lib/constants/living-locations'
 import { summarizeBuckets, tierToBucket } from '@/lib/census/ownership-truth'
 import { countSourceClassesFromRows } from '@/lib/census/zip-census'
@@ -31,7 +33,7 @@ export default async function JobMarketPage() {
 
   try {
     // ── Batch 1: Lightweight full-table reads (parallel) ──────────────────
-    const [zipScores, watchedZips, adaBenchmarks] = await Promise.all([
+    const [zipScores, watchedZips, adaBenchmarks, webChecks] = await Promise.all([
       getZipScores(supabase).catch((e) => {
         console.error('getZipScores failed:', e)
         return []
@@ -44,6 +46,7 @@ export default async function JobMarketPage() {
         console.error('getADABenchmarks failed:', e)
         return []
       }),
+      fetchDirectoryWebCheckMapSafe(supabase),
     ])
 
     const locations = await fetchPracticeLocations(supabase, { zips: defaultZips, gpOnly: true })
@@ -56,7 +59,10 @@ export default async function JobMarketPage() {
     // Canonical GP-only Chicagoland directory feed. The query layer excludes
     // specialists, non-clinical rows, org-only NPIs, da_unverified records, and
     // duplicate shells before the page computes KPIs or renders maps/lists.
-    const gpLocations = locations
+    // Rows a web check removed (closed, moved, duplicate… — directory_web_checks)
+    // leave the directory counts; ownership summaries below still use every
+    // row, because their denominator is the zip_scores GP universe.
+    const gpLocations = locations.filter((p) => !isRemovedByWebCheck(p, webChecks))
 
     // Enriched count: scoped to the GP location set (data_axle_enriched=true).
     // This makes the freshness bar scope-aware: "21.7% in Chicagoland" instead of
@@ -64,7 +70,7 @@ export default async function JobMarketPage() {
     const locDaEnrichedCount = gpLocations.filter((p) => p.data_axle_enriched === true).length
 
     const freshness = {
-      totalPractices: locations.length,
+      totalPractices: gpLocations.length,
       daEnriched: locDaEnrichedCount,
       lastUpdated: latestUpdate,
     }
@@ -109,11 +115,11 @@ export default async function JobMarketPage() {
       retirement_risk,
       highVolCount,
       bucketSummary: summarizeBuckets(
-        gpLocations.map((p) => ({ ownership_tier: p.ownership_tier, pe_backed: p.pe_backed })),
+        locations.map((p) => ({ ownership_tier: p.ownership_tier, pe_backed: p.pe_backed })),
         universe
       ),
       sourceClasses: countSourceClassesFromRows(
-        gpLocations.map((p) => ({
+        locations.map((p) => ({
           ownership_tier: p.ownership_tier,
           census_review_status: p.census_review_status ?? null,
         })),

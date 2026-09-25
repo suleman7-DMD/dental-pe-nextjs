@@ -34,6 +34,7 @@ import {
 } from '@/lib/census/job-lane'
 import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
 import type { JobHuntVerificationRecord } from '@/lib/supabase/queries/job-hunt-verification'
+import { WEB_CHECK_EFFECT_META } from '@/lib/directory/web-checks'
 import { TRUST_SOURCE_META, websiteTrust } from '@/components/data-display/trust-source-tag'
 import type { Practice } from '@/lib/types'
 import { DEFAULT_DIRECTORY_VIEW, filterDirectoryRows, getOfficeCoordinates } from '@/lib/utils/directory-visibility'
@@ -285,7 +286,13 @@ function renderPracticeLink(valueOrPractice: unknown): React.ReactElement {
     React.createElement('span', { className: 'truncate' }, name),
     React.createElement(ArrowUpRight, { className: 'h-3.5 w-3.5 shrink-0 text-[#B8860B]' })
   )
+  const webCheck = p.web_check ? WEB_CHECK_EFFECT_META[p.web_check.effect] : null
   return React.createElement('div', null, nameLink,
+    webCheck && React.createElement('div', {
+      className: 'text-[11px] font-normal',
+      style: { color: webCheck.color },
+      title: webCheck.why,
+    }, webCheck.short),
     !getOfficeCoordinates(p) && React.createElement('div', {
       className: 'text-[11px] text-[#6B6B60] font-normal',
       title: 'No usable stored coordinates. This office remains searchable, but is not pinned on the map.',
