@@ -19,11 +19,12 @@ export interface WebCheckedRow {
   phone?: string | null
   website?: string | null
   address?: string | null
+  zip?: string | null
   web_check?: DirectoryWebCheck | null
 }
 
 /** Attach the check and, for corrected rows, show the web-seen fields. */
-export function applyWebCheck<T extends WebCheckedRow>(row: T, check?: DirectoryWebCheck | null): T {
+export function applyWebCheck<T extends WebCheckedRow>(row: T, check?: DirectoryWebCheck | null): T & WebCheckedRow {
   if (!check) return row
   const out: T = { ...row, web_check: check }
   if (check.effect !== "open_corrected") return out
@@ -33,9 +34,11 @@ export function applyWebCheck<T extends WebCheckedRow>(row: T, check?: Directory
   if (o.name?.trim()) out.doing_business_as = o.name.trim()
   if (o.phone?.trim()) out.phone = o.phone.trim()
   if (o.website?.trim()) out.website = o.website.trim()
-  if (o.address?.trim()) {
-    out.address = o.suite?.trim() ? `${o.address.trim()}, Ste ${o.suite.trim()}` : o.address.trim()
+  if (o.address?.trim() || o.suite?.trim()) {
+    const address = (o.address?.trim() || out.address || '').replace(/(?:,?\s*(?:#|\b(?:suite|ste|unit)\b)\s*[a-z0-9-]+)\s*$/i, '').trim()
+    out.address = o.suite?.trim() ? `${address}, Ste ${o.suite.trim()}` : o.address!.trim()
   }
+  if (o.zip?.trim()) out.zip = o.zip.trim()
   return out
 }
 

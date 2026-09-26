@@ -227,7 +227,7 @@ function SidebarContent({
           </span>
           {!collapsed && (
             <span className="text-[11px] font-medium text-[#F5F5F0]/60">
-              System Online
+              Chicagoland workspace
             </span>
           )}
         </div>
