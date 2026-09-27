@@ -4,6 +4,9 @@ import { applyWebChecks } from './web-checks'
 import { getOfficeCoordinates } from '@/lib/utils/directory-visibility'
 
 export type LiveOffice = Pick<Practice, 'location_id' | 'npi' | 'practice_name' | 'doing_business_as' | 'provider_last_name' | 'address' | 'city' | 'state' | 'zip' | 'phone' | 'website' | 'latitude' | 'longitude' | 'network_id' | 'web_check'> & {
+  ownership_tier?: string | null
+  provider_npis?: string[]
+  year_established?: number | null
   /** Set when coordinates come from the address geocode snapshot, not the stored record. */
   coord_source?: 'census_geocoder'
   /** The exact directory address those geocoded coordinates were matched from. */

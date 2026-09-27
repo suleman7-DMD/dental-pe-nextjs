@@ -1,0 +1,107 @@
+{
+  "source": "Mapbox Geocoding v6, permanent=true",
+  "retrievedAt": "2026-09-27T21:42:39.694Z",
+  "notes": "Exploratory corridor anchors, not verified sites, vacancies, or market recommendations. Street-only matches are labeled as corridors.",
+  "nodes": [
+    {
+      "id": "lockport",
+      "name": "159th & Farrell",
+      "area": "Lockport / I-355 corridor",
+      "lens": "Growth corridor",
+      "question": "Test the shared residential catchment across the village lines.",
+      "lon": -88.026295,
+      "lat": 41.597782,
+      "sourceAddress": "West 159th Street and South Farrell Road, Lockport, Illinois 60441, United States"
+    },
+    {
+      "id": "homer",
+      "name": "143rd Street",
+      "area": "Homer Glen",
+      "lens": "Corridor study",
+      "question": "Compare the western catchment with the pull toward Orland Park.",
+      "lon": -87.964114,
+      "lat": 41.628382,
+      "sourceAddress": "West 143rd Street, Homer Glen, Illinois 60491, United States"
+    },
+    {
+      "id": "lemont",
+      "name": "State & 127th",
+      "area": "Lemont",
+      "lens": "Corridor study",
+      "question": "Test how the road network connects this compact market to its neighbors.",
+      "lon": -87.999837,
+      "lat": 41.656618,
+      "sourceAddress": "State Street and East 127th Street, Lemont, Illinois 60439, United States"
+    },
+    {
+      "id": "bartlett",
+      "name": "Stearns Road",
+      "area": "Bartlett",
+      "lens": "Mature-market comparison",
+      "question": "Include neighboring supply before interpreting the apparent gap.",
+      "lon": -88.16372,
+      "lat": 41.972353,
+      "sourceAddress": "East Stearns Road, Bartlett, Illinois 60103, United States"
+    },
+    {
+      "id": "carol",
+      "name": "North & Gary",
+      "area": "Carol Stream",
+      "lens": "Volume-market comparison",
+      "question": "Compare household demand with every tracked office across town lines.",
+      "lon": -88.120664,
+      "lat": 41.904115,
+      "sourceAddress": "North Avenue and South Gary Avenue, Carol Stream, Illinois 60188, United States"
+    },
+    {
+      "id": "romeoville",
+      "name": "Weber & Airport",
+      "area": "Romeoville",
+      "lens": "Land-use comparison",
+      "question": "Use the homes layer to separate residential demand from industrial acreage.",
+      "lon": -88.123118,
+      "lat": 41.609738,
+      "sourceAddress": "Weber Road and W Airport Rd, Romeoville, Illinois 60446, United States"
+    },
+    {
+      "id": "newlenox",
+      "name": "Lincoln & Cedar",
+      "area": "New Lenox",
+      "lens": "Acquisition comparison",
+      "question": "Study the existing commercial corridor as well as surrounding households.",
+      "lon": -87.966439,
+      "lat": 41.514006,
+      "sourceAddress": "West Lincoln Highway and North Cedar Road, New Lenox, Illinois 60451, United States"
+    },
+    {
+      "id": "frankfort",
+      "name": "La Grange & Lincoln",
+      "area": "Frankfort",
+      "lens": "Acquisition comparison",
+      "question": "Test the commercial core; open acreage is not a patient pool.",
+      "lon": -87.849293,
+      "lat": 41.506593,
+      "sourceAddress": "South La Grange Road and West Lincoln Highway, Frankfort, Illinois 60423, United States"
+    },
+    {
+      "id": "elmhurst",
+      "name": "York & St Charles",
+      "area": "Elmhurst",
+      "lens": "Mature-market comparison",
+      "question": "High supply can coexist with valuable demand. Inspect established dentist-owned offices.",
+      "lon": -87.940064,
+      "lat": 41.890296,
+      "sourceAddress": "South York Street and East Saint Charles Road, Elmhurst, Illinois 60126, United States"
+    },
+    {
+      "id": "wheaton",
+      "name": "Roosevelt & Naperville",
+      "area": "Wheaton",
+      "lens": "Mature-market comparison",
+      "question": "Use a mature corridor to challenge a low-competition thesis.",
+      "lon": -88.102516,
+      "lat": 41.858862,
+      "sourceAddress": "East Roosevelt Road and South Naperville Road, Wheaton, Illinois 60187, United States"
+    }
+  ]
+}

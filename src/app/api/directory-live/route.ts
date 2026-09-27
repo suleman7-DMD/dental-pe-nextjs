@@ -25,7 +25,8 @@ export async function GET() {
         return { location_id: r.location_id, npi: r.npi, practice_name: r.practice_name,
           doing_business_as: r.doing_business_as, provider_last_name: r.provider_last_name,
           address: r.address, city: r.city, state: r.state, zip: r.zip, phone: r.phone,
-          website: r.website, latitude: r.latitude, longitude: r.longitude, network_id: r.network_id } as LiveOffice
+          website: r.website, latitude: r.latitude, longitude: r.longitude, network_id: r.network_id,
+          ownership_tier: r.ownership_tier, provider_npis: r.provider_npis, year_established: r.year_established } as LiveOffice
       }), checks,
       watched.map(z => ({ zip: z.zip_code, city: z.city ?? '' })), new Date().toISOString(),
       officeGeocodes.offices as OfficeGeocodes,

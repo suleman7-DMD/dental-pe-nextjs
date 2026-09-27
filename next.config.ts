@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/land-use-tiles/*': ['./data/land-use/chicagoland-2023.pmtiles'],
+    '/api/commute': ['./public/data/land-use/scope.geojson'],
   },
   // Friendly aliases matching the sidebar vocabulary. `/directory` is a real
   // route (re-exports the job-market page); the rest redirect so a typed or

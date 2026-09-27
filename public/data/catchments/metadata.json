@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "vintage": "2020\u20132024",
+  "retrievedAt": "2026-09-27T22:03:19.420753+00:00",
+  "tractCount": 2133,
+  "blockCount": 124453,
+  "counties": [
+    "031",
+    "037",
+    "043",
+    "063",
+    "089",
+    "091",
+    "093",
+    "097",
+    "111",
+    "197"
+  ],
+  "sources": [
+    {
+      "topic": "population",
+      "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/ACS_Population_View_Boundaries/FeatureServer/2",
+      "item": "60c98f20a162416ea1725b94d7297f83",
+      "fields": [
+        "B01001_001E",
+        "B01001_001M",
+        "B01001_calc_numLT18E",
+        "B01001_calc_numGE65E"
+      ],
+      "modified": 1779803715000
+    },
+    {
+      "topic": "income",
+      "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/ACS_Household_Income_Distribution_View_Boundaries/FeatureServer/2",
+      "item": "0f43160beaaa4026a8a2f2db01ba1972",
+      "fields": [
+        "B19001_001E",
+        "B19001_002E",
+        "B19001_003E",
+        "B19001_004E",
+        "B19001_005E",
+        "B19001_006E",
+        "B19001_007E",
+        "B19001_008E",
+        "B19001_009E",
+        "B19001_010E",
+        "B19001_011E",
+        "B19001_012E",
+        "B19001_013E",
+        "B19001_014E",
+        "B19001_015E",
+        "B19001_016E",
+        "B19001_017E"
+      ],
+      "modified": 1779803629000
+    },
+    {
+      "topic": "housing",
+      "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/ACS_Housing_Units_by_Year_Built_View_Boundaries/FeatureServer/2",
+      "item": "204f0ea4315640fca8c2e0fbefe11a96",
+      "fields": [
+        "B25034_001E",
+        "B25034_002E"
+      ],
+      "modified": 1779803751000
+    },
+    {
+      "topic": "tenure",
+      "url": "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/ACS_Housing_Units_Occupancy_View_Boundaries/FeatureServer/2",
+      "item": "4e3f28aff6bf4119baa286f2e389296e",
+      "fields": [
+        "B25003_001E",
+        "B25003_002E"
+      ],
+      "modified": 1779803660000
+    }
+  ],
+  "blockSource": "https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/10",
+  "sha256": "3ff965f521426a1068baf34fe07e9af9359fc9d1615dc7ebfe51ad888878143a",
+  "missingPopulationAnchors": [],
+  "coverageBoundary": "Tract union with interior water holes filled and 0.001-degree tolerance for removed-water slivers. Used only for coverage warnings, never population weights.",
+  "method": "ACS tract counts allocated using 2020 Census block population weights; households/income/housing use housing-unit weights. Block internal points determine polygon membership. Income median interpolated from pooled B19001 bins, never averaged tract medians.",
+  "limitations": [
+    "Spatial allocation is modeled. 2020 blocks can miss or misplace subsequent development.",
+    "ACS sampling error and block-boundary allocation error remain. Demographics within each tract are assumed spatially uniform after weighting.",
+    "Housing built 2020 or later is a stock estimate, not annual permits or a growth forecast.",
+    "Population is residential; commuters, dental utilization, patient flows and financials are not estimated."
+  ]
+}

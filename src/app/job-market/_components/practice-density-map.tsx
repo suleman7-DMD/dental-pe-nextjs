@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type mapboxgl from 'mapbox-gl'
 import type { ExpressionSpecification } from 'mapbox-gl'
-import { ArrowUpRight, ChevronRight, CircleHelp, Layers, List, LocateFixed, Maximize2, Minimize2, Phone, X } from 'lucide-react'
+import { ArrowUpRight, Car, ChevronRight, CircleHelp, Layers, List, LocateFixed, Maximize2, Minimize2, Phone, X } from 'lucide-react'
 import { getOfficeCoordinates } from '@/lib/utils/directory-visibility'
 import { displayName } from '@/lib/census/display-name'
 import { escapeHtml } from '@/lib/utils/escape-html'
@@ -19,6 +19,9 @@ import { acsNumber, formatSocioeconomicValue, socioeconomicColor, socioeconomicV
 import { attachLandUse, type LandUseStatus } from '@/lib/maps/land-use-layer'
 import type { LandUseMode } from '@/lib/maps/land-use'
 import { LandUseLegend } from '@/components/maps/land-use-legend'
+import { CatchmentWorkbench } from '@/components/maps/catchment-workbench'
+import type { CatchmentNode } from '@/lib/maps/catchment'
+import { CommutePlanner } from '@/components/maps/commute-planner'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -26,6 +29,8 @@ import { LandUseLegend } from '@/components/maps/land-use-legend'
 
 interface PracticeDensityMapProps {
   practices: Practice[]
+  /** Catchment counts always use the complete live feed, before search/area filters. */
+  allPractices?: Practice[]
   centerLat: number
   centerLon: number
   /** Live feed metadata, shown on the map so the dots' freshness is visible. */
@@ -97,8 +102,9 @@ function isTouchOnly() {
 // ────────────────────────────────────────────────────────────────────────────
 
 function OfficeMap({
-  offices, counts, centerLat, centerLon, fresh, onOpenPractice, syncedAt, refreshing, stale, newsCount, onDismissNews,
+  offices, counts, centerLat, centerLon, fresh, onOpenPractice, syncedAt, refreshing, stale, newsCount, onDismissNews, studyRows,
 }: {
+  studyRows: Practice[]
   offices: MapOffice[]
   counts: Record<MapState, number>
   centerLat: number
@@ -136,6 +142,10 @@ function OfficeMap({
   const [acsStatus, setAcsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [visibleIds, setVisibleIds] = useState<string[]>([])
   const [listOpen, setListOpen] = useState(false)
+  const pickingRef = useRef(false)
+  const [catchmentRequest, setCatchmentRequest] = useState<CatchmentNode | null>(null)
+  const [commuteOpen, setCommuteOpen] = useState(false)
+  const [commuteWork, setCommuteWork] = useState<CatchmentNode | null>(null)
 
   const populationOn = contextLayer === 'population'
   const metric: SocioeconomicMetric | null = contextLayer === 'income' || contextLayer === 'education' ? contextLayer : null
@@ -321,6 +331,7 @@ function OfficeMap({
         map.on('click', e => {
           if (!map) return
           hoverPopup.remove(); tractPopup.remove()
+          if (pickingRef.current) return
           const hits = map.getLayoutProperty(L.hit, 'visibility') === 'none' ? [] : map.queryRenderedFeatures(e.point, { layers: [L.hit] })
           const ids = [...new Set(hits
             .map(f => { const [x, y] = (f.geometry as GeoJSON.Point).coordinates; const q = map!.project([x, y]); return { id: f.properties?.id, d: (q.x - e.point.x) ** 2 + (q.y - e.point.y) ** 2 } })
@@ -471,6 +482,14 @@ function OfficeMap({
         {mapError && <div role="alert" className="absolute inset-0 z-10 flex items-center justify-center bg-[#EEF1EB] p-8 text-center text-sm text-[#7A4B12]">
           Interactive map unavailable in this browser. Try a browser with WebGL enabled, or use the List view.</div>}
 
+        {ready && <CatchmentWorkbench map={mapRef.current} rows={studyRows} requestedNode={catchmentRequest}
+          syncedAt={syncedAt} stale={stale} onPickingChange={value => { pickingRef.current = value }}
+          suspended={commuteOpen} onCommute={node => { setCommuteWork(node); setCommuteOpen(true) }}
+          onOpen={() => { setSelection([]); setListOpen(false); setLayerPanel(false); setCommuteOpen(false) }}
+          onHomes={() => { chooseContext('landuse', 'homes'); setLayerPanel(false) }} />}
+        {ready && <CommutePlanner map={mapRef.current} active={commuteOpen} initialWork={commuteWork}
+          onClose={() => setCommuteOpen(false)} onPickingChange={value => { pickingRef.current = value }} />}
+
         {/* Status filter — multi-select, the only three groups on the map */}
         <div className="pointer-events-none absolute inset-x-2 top-2 z-20 flex flex-col items-end gap-2 sm:inset-x-3 sm:top-3 sm:flex-row sm:items-start">
           <div role="group" aria-label="Map status filters" className={`${overlayCard} pointer-events-auto grid w-full min-w-0 grid-cols-3 gap-0.5 rounded-xl p-0.5 sm:flex sm:w-auto sm:flex-none`}>
@@ -487,6 +506,7 @@ function OfficeMap({
             })}
           </div>
           <div className={`${overlayCard} pointer-events-auto flex shrink-0 flex-col overflow-hidden sm:ml-auto`}>
+            <button type="button" aria-label="Commute planner" title="Home ↔ work · 6:45 AM / 4 PM" aria-pressed={commuteOpen} onClick={() => { setCommuteOpen(v => !v); setSelection([]); setListOpen(false); setLayerPanel(false) }} className={`${iconButton} ${commuteOpen ? 'bg-[#253C34] text-white hover:bg-[#1D302A]' : ''}`}><Car className="h-[18px] w-[18px]" /></button>
             <button type="button" aria-label="Practices in view" aria-expanded={listOpen} onClick={() => { setListOpen(v => !v); setLayerPanel(false); setSelection([]) }} className={`${iconButton} ${listOpen ? 'bg-[#253C34] text-white hover:bg-[#1D302A]' : ''}`}><List className="h-[18px] w-[18px]" /></button>
             <button type="button" aria-label="Map layers" aria-expanded={layerPanel} onClick={() => { setLayerPanel(v => !v); setListOpen(false) }} className={`${iconButton} border-t border-black/5 ${layerOn || layerPanel ? 'bg-[#253C34] text-white hover:bg-[#1D302A]' : ''}`}><Layers className="h-[18px] w-[18px]" /></button>
             <button type="button" aria-label="Fit all dots" disabled={!ready || !offices.length} onClick={() => fitTo(offices.filter(o => activeSet.has(o.status)))} className={`${iconButton} border-t border-black/5`}><LocateFixed className="h-[18px] w-[18px]" /></button>
@@ -547,6 +567,7 @@ function OfficeMap({
             <p className="text-xs text-[#5F665F]">{o.address} · {o.cityZip}</p>
             <p className="text-[11px] text-[#7A8079]">{formatChecked(o.checkedAt)}{o.approx && ' · Dot placed from the street address (U.S. Census geocode)'}</p>
             <div className="flex flex-wrap gap-2 pt-1">
+              <button type="button" onClick={() => { setCatchmentRequest({ name: o.name, lon: o.lon, lat: o.lat }); setSelection([]) }} className="flex min-h-11 items-center gap-1.5 rounded-xl border border-[#DCE1D9] px-3 text-xs font-medium text-[#253C34]">Study 10 / 15 min catchment</button>
               <button type="button" onClick={() => onOpenPractice(o.id)} className="flex min-h-11 items-center gap-1.5 rounded-xl bg-[#253C34] px-4 text-sm font-medium text-white hover:bg-[#1D302A]">Open practice <ArrowUpRight className="h-4 w-4" /></button>
               {o.phone && <a href={`tel:${o.phone.replace(/[^\d+]/g, '')}`} className="flex min-h-11 items-center gap-1.5 rounded-xl border border-[#DCE1D9] px-4 text-sm font-medium text-[#253C34]"><Phone className="h-4 w-4" />Call</a>}
             </div>
@@ -601,7 +622,7 @@ function OfficeMap({
 // non-removed office with usable coordinates gets exactly one dot.
 // ────────────────────────────────────────────────────────────────────────────
 
-export function PracticeDensityMap({ practices, centerLat, centerLon, syncedAt, refreshing, stale, removedCount = 0, onShowRemoved }: PracticeDensityMapProps) {
+export function PracticeDensityMap({ practices, allPractices, centerLat, centerLon, syncedAt, refreshing, stale, removedCount = 0, onShowRemoved }: PracticeDensityMapProps) {
   const router = useRouter()
   const roster = useMemo(() => mapRoster(practices), [practices])
   const built = useMemo<MapOffice[]>(() => roster.mapped.flatMap(p => {
@@ -645,6 +666,7 @@ export function PracticeDensityMap({ practices, centerLat, centerLon, syncedAt, 
 
   return <section aria-label="Live directory map" data-mapped-count={offices.length} className="space-y-2">
     <OfficeMap offices={offices} counts={roster.counts} centerLat={centerLat} centerLon={centerLon} fresh={freshIds}
+      studyRows={allPractices ?? practices}
       syncedAt={syncedAt} refreshing={refreshing} stale={stale} newsCount={newsCount} onDismissNews={() => setNewsCount(0)}
       onOpenPractice={id => router.push(`/practice/${encodeURIComponent(id)}`)} />
     <div className="flex flex-wrap items-start gap-x-4 gap-y-1 px-1 text-xs text-[#747970]">
