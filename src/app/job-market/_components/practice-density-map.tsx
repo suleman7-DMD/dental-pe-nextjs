@@ -6,8 +6,8 @@ import type mapboxgl from 'mapbox-gl'
 import { getOfficeCoordinates } from '@/lib/utils/directory-visibility'
 import { displayName } from '@/lib/census/display-name'
 import { escapeHtml } from '@/lib/utils/escape-html'
-import { mapIssue, researchState, RESEARCH_META, RESEARCH_STATES } from '@/lib/directory/live-directory'
-import { ResearchBadge } from '@/components/directory/live-summary'
+import { MAP_META, MAP_STATES, mapState, mapRoster, type MapState } from '@/lib/maps/directory-map'
+import { Check, CircleHelp, LocateFixed, X, ArrowUpRight, Maximize2, Minimize2 } from 'lucide-react'
 import type { LiveOffice as Practice } from '@/lib/directory/live-directory'
 
 import { POPULATION_BOUNDS, POPULATION_GRADIENT, POPULATION_LAYER_ID, POPULATION_LEGEND,
@@ -36,6 +36,7 @@ interface MapPractice {
   address: string
   city_zip: string
   color: [number, number, number, number]
+  status: MapState
   evidence_label: string
   checked_at: string
 }
@@ -44,7 +45,7 @@ function mapFeatures(rows: MapPractice[]): GeoJSON.FeatureCollection {
     type: 'Feature', geometry: { type: 'Point', coordinates: [d.map_lon, d.map_lat] },
     properties: { location_id: d.location_id, name: d.practice_name, address: d.address,
       city_zip: d.city_zip, evidence_label: d.evidence_label, checked_at: d.checked_at,
-      r: d.color[0], g: d.color[1], b: d.color[2] },
+      r: d.color[0], g: d.color[1], b: d.color[2], status: d.status },
   })) }
 }
 
@@ -63,10 +64,13 @@ function PracticeMapInner({
   centerLat,
   centerLon,
   onOpenPractice,
+  status, onStatusChange,
 }: {
   geocoded: MapPractice[]
   centerLat: number
   centerLon: number
+  status: MapState | 'all'
+  onStatusChange: (value: MapState | 'all') => void
   onOpenPractice: (locationId: string) => void
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -75,19 +79,35 @@ function PracticeMapInner({
   geoRef.current = geocoded
   const popupRef = useRef<mapboxgl.Popup | null>(null)
   const [mapError, setMapError] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [selection, setSelection] = useState<string[]>([])
+  const [expanded, setExpanded] = useState(false)
+  const [visibleIds, setVisibleIds] = useState<string[]>([])
+  const [showVisible, setShowVisible] = useState(false)
+  const selectedOffices = geocoded.filter(p => p.location_id && selection.includes(p.location_id))
+  const visibleOffices = geocoded.filter(p => p.location_id && visibleIds.includes(p.location_id))
+  const updateViewport = () => {
+    const map = mapObjRef.current
+    if (!map) return
+    const bounds = map.getBounds()
+    setVisibleIds(geoRef.current.filter(p => bounds?.contains([p.map_lon, p.map_lat])).map(p => p.location_id ?? ''))
+  }
+  const fitPractices = () => {
+    const rows = geoRef.current
+    if (!rows.length || !mapObjRef.current) return
+    const lons = rows.map(p => p.map_lon), lats = rows.map(p => p.map_lat)
+    mapObjRef.current.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 55, maxZoom: 15, duration: 600 })
+  }
   const [contextLayer, setContextLayer] = useState<'none' | 'population' | SocioeconomicMetric>('none')
   const populationEnabled = contextLayer === 'population'
   const socioeconomicMetric = contextLayer === 'income' || contextLayer === 'education' ? contextLayer : null
-  const [populationOpacity, setPopulationOpacity] = useState(0.65)
+  const [populationOpacity, setPopulationOpacity] = useState(0.45)
   const [showPractices, setShowPractices] = useState(true)
   const [populationStatus, setPopulationStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [acsStatus, setAcsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const tractPopupRef = useRef<mapboxgl.Popup | null>(null)
   const presentation = useRef({ populationEnabled, populationOpacity, showPractices, socioeconomicMetric })
   presentation.current = { populationEnabled, populationOpacity, showPractices, socioeconomicMetric }
-  // Ref so a changing callback identity never tears down and re-creates the map
-  const onOpenPracticeRef = useRef(onOpenPractice)
-  onOpenPracticeRef.current = onOpenPractice
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -96,6 +116,8 @@ function PracticeMapInner({
     let cancelled = false
     let populationFailed = false
     let acsFailed = false
+    setReady(false)
+    setMapError(false)
     setPopulationStatus('loading')
     setAcsStatus('loading')
 
@@ -114,7 +136,7 @@ function PracticeMapInner({
       })
       mapObjRef.current = map
       map.addControl(new mapboxgl.NavigationControl(), 'top-right')
-      map.addControl(new mapboxgl.FullscreenControl(), 'top-right')
+      // The CSS expand control also works on iPhone, without Fullscreen API support.
       map.addControl(new mapboxgl.ScaleControl({ unit: 'imperial' }), 'bottom-left')
       map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right')
 
@@ -124,6 +146,7 @@ function PracticeMapInner({
           populationFailed = true
           if (!cancelled) setPopulationStatus('error')
         }
+        if (!sourceId && /token|unauthorized|forbidden|style/i.test(e.error?.message ?? '')) setMapError(true)
         if (sourceId === SOCIOECONOMIC_SOURCE || e.error?.message?.includes(SOCIOECONOMIC_DATA)) {
           acsFailed = true
           if (!cancelled) setAcsStatus('error')
@@ -161,7 +184,7 @@ function PracticeMapInner({
         tractPopupRef.current = tractPopup
         map.on('mousemove', SOCIOECONOMIC_LAYER, e => {
           const metric = presentation.current.socioeconomicMetric
-          if (!map || !metric || !e.features?.[0] || map.queryRenderedFeatures(e.point, { layers: ['practice-dots'] }).length) {
+          if (!map || !metric || !e.features?.[0] || (map.getLayer('practice-hit') && map.queryRenderedFeatures(e.point, { layers: ['practice-hit'] }).length)) {
             tractPopup.remove()
             return
           }
@@ -184,7 +207,10 @@ function PracticeMapInner({
         // Build GeoJSON from geocoded practices
         map.addSource('practices', { type: 'geojson', data: mapFeatures(geoRef.current) })
 
-        // Circle layer — office-evidence-backed stored coordinates only
+        map.addLayer({ id: 'practice-halo', type: 'circle', source: 'practices',
+          paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 7, 12, 9, 16, 12],
+            'circle-color': '#142C36', 'circle-opacity': 0.75, 'circle-blur': 0.25 } })
+        // Solid status colors sit above every demographic layer.
         // Scale radius with zoom: tiny at zoom 9, bigger when zoomed in
         map.addLayer({
           id: 'practice-dots',
@@ -194,9 +220,9 @@ function PracticeMapInner({
           paint: {
             'circle-radius': [
               'interpolate', ['linear'], ['zoom'],
-              8, 2.5,
-              10, 4,
-              12, 5,
+              8, 4.5,
+              10, 5.5,
+              12, 6.5,
               14, 8,
             ],
             'circle-color': [
@@ -205,11 +231,19 @@ function PracticeMapInner({
               ['get', 'g'],
               ['get', 'b'],
             ],
-            'circle-opacity': 0.9,
-            'circle-stroke-width': 1.2,
+            'circle-opacity': 1,
+            'circle-stroke-width': 2.2,
             'circle-stroke-color': '#FFFFFF',
           },
         })
+
+        // A generous invisible hit target makes isolated dots easier to tap.
+        map.addLayer({ id: 'practice-hit', type: 'circle', source: 'practices',
+          paint: { 'circle-radius': 14, 'circle-opacity': 0 } })
+        setReady(true)
+        updateViewport()
+        map.on('moveend', updateViewport)
+        map.on('resize', updateViewport)
 
         // Popup on hover — light panel styling
         const popup = new mapboxgl.Popup({
@@ -219,7 +253,7 @@ function PracticeMapInner({
         })
 
         popupRef.current = popup
-        map.on('mouseenter', 'practice-dots', (e) => {
+        map.on('mouseenter', 'practice-hit', (e) => {
           if (!map || !e.features?.[0]) return
           tractPopup.remove()
           map.getCanvas().style.cursor = 'pointer'
@@ -236,25 +270,24 @@ function PracticeMapInner({
                 <strong>${escapeHtml(props.evidence_label)}</strong><br/>
                 <span>${escapeHtml(props.checked_at)}</span><br/>
                 <span style="color:#747970">Stored location; dot color describes the office check, not coordinate accuracy.</span><br/>
-                <span style="color:#8B6508">Click the dot to open the practice page</span>
+                <span style="color:#8B6508">Tap or click to preview this location</span>
               </div>`
             )
             .addTo(map)
         })
 
-        map.on('mouseleave', 'practice-dots', () => {
+        map.on('mouseleave', 'practice-hit', () => {
           if (!map) return
           map.getCanvas().style.cursor = ''
           popup.remove()
         })
 
-        // Click-through to the practice page — location_id rides in the
-        // feature properties, so every dot deep-links to /practice/[locationId]
-        map.on('click', 'practice-dots', (e) => {
-          const locationId = e.features?.[0]?.properties?.location_id
-          if (typeof locationId === 'string' && locationId) {
-            onOpenPracticeRef.current(locationId)
-          }
+        // Select every overlapping office rather than silently opening the first.
+        map.on('click', 'practice-hit', e => {
+          if (!map) return
+          popup.remove(); tractPopup.remove()
+          const hits = map.queryRenderedFeatures(e.point, { layers: ['practice-hit'] })
+          setSelection([...new Set(hits.map(f => f.properties?.location_id).filter((id): id is string => typeof id === 'string' && !!id))])
         })
       })
     }
@@ -272,6 +305,7 @@ function PracticeMapInner({
     const source = mapObjRef.current?.getSource('practices') as mapboxgl.GeoJSONSource | undefined
     source?.setData(mapFeatures(geocoded))
     popupRef.current?.remove()
+    updateViewport()
   }, [geocoded])
 
   useEffect(() => {
@@ -280,34 +314,48 @@ function PracticeMapInner({
       map.setLayoutProperty(POPULATION_LAYER_ID, 'visibility', populationEnabled ? 'visible' : 'none')
       map.setPaintProperty(POPULATION_LAYER_ID, 'raster-opacity', populationOpacity)
     }
-    if (map?.getLayer('practice-dots')) map.setLayoutProperty('practice-dots', 'visibility', showPractices ? 'visible' : 'none')
+    for (const id of ['practice-dots', 'practice-halo', 'practice-hit']) {
+      if (map?.getLayer(id)) map.setLayoutProperty(id, 'visibility', showPractices ? 'visible' : 'none')
+    }
+    if (map?.getLayer('practice-dots')) {
+      const boost = populationEnabled || socioeconomicMetric ? 1.6 : 0
+      map.setPaintProperty('practice-dots', 'circle-radius', ['interpolate', ['linear'], ['zoom'], 8, 4.5 + boost, 12, 6.5 + boost, 16, 9 + boost])
+      map.setPaintProperty('practice-halo', 'circle-radius', ['interpolate', ['linear'], ['zoom'], 8, 7 + boost, 12, 9 + boost, 16, 12 + boost])
+    }
     if (map?.getLayer(SOCIOECONOMIC_LAYER)) {
       map.setLayoutProperty(SOCIOECONOMIC_LAYER, 'visibility', socioeconomicMetric ? 'visible' : 'none')
       map.setPaintProperty(SOCIOECONOMIC_LAYER, 'fill-opacity', populationOpacity)
       if (socioeconomicMetric) map.setPaintProperty(SOCIOECONOMIC_LAYER, 'fill-color', socioeconomicColor(socioeconomicMetric))
     }
     tractPopupRef.current?.remove()
-  }, [populationEnabled, populationOpacity, showPractices, socioeconomicMetric])
+  }, [populationEnabled, populationOpacity, showPractices, socioeconomicMetric, ready])
+
+  useEffect(() => {
+    mapObjRef.current?.resize()
+    if (!expanded) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false) }
+    window.addEventListener('keydown', escape)
+    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', escape) }
+  }, [expanded])
 
   return (
-    <div>
-      <details className="rounded-xl border border-[#E8E5DE] bg-white p-3 mb-3 space-y-3"><summary className="cursor-pointer text-xs font-medium text-[#747970]">Map layers & display</summary>
-        <div className="flex flex-wrap items-center gap-5 text-sm">
-          <label className="flex items-center gap-2">Map layer
-            <select className="rounded border border-[#D4D0C8] bg-white p-1.5" value={contextLayer} onChange={e => setContextLayer(e.target.value as typeof contextLayer)}>
-              <option value="none">None — practices only</option>
-              <option value="population">Population density</option>
-              <option value="income">Median household income</option>
-              <option value="education">Education: bachelor’s degree or higher</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={showPractices} onChange={e => setShowPractices(e.target.checked)} />Show practice dots</label>
-          <label className="flex items-center gap-2">Layer opacity
-            <input type="range" min="0" max="100" step="5" value={Math.round(populationOpacity * 100)} disabled={contextLayer === 'none'}
-              onChange={e => setPopulationOpacity(Number(e.target.value) / 100)} />
-            <span>{Math.round(populationOpacity * 100)}%</span>
-          </label>
-        </div>
+    <div className={expanded ? 'fixed inset-0 z-50 flex flex-col overflow-auto bg-[#F6F8F5] p-3 pb-[env(safe-area-inset-bottom)] sm:p-5' : 'space-y-3'}>
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#DFE5DE] bg-white p-2.5 shadow-sm">
+        {expanded && <label className="flex w-full items-center gap-2 text-xs text-[#52625A]">Office checks<select aria-label="Expanded map status" value={status} onChange={e => onStatusChange(e.target.value as MapState | 'all')} className="min-h-11 flex-1 rounded-xl bg-[#F1F5EF] px-3 text-base sm:text-sm"><option value="all">All statuses</option>{MAP_STATES.map(s => <option key={s} value={s}>{MAP_META[s].label}</option>)}</select></label>}
+        <label className="flex min-w-0 flex-1 items-center gap-2 text-xs font-medium text-[#52625A]">Layer
+          <select aria-label="Map layer" className="min-h-11 min-w-0 flex-1 rounded-xl bg-[#F1F5EF] px-3 text-base text-[#253C34] sm:flex-none sm:text-sm" value={contextLayer} onChange={e => setContextLayer(e.target.value as typeof contextLayer)}>
+            <option value="none">Practices only</option><option value="population">Population density</option>
+            <option value="income">Median household income</option><option value="education">Education: bachelor’s degree or higher</option>
+          </select>
+        </label>
+        <button disabled={!ready || !geocoded.length} onClick={fitPractices} className="flex min-h-11 items-center gap-1.5 rounded-xl border border-[#DFE5DE] px-3 text-xs font-medium disabled:opacity-40"><LocateFixed className="h-4 w-4" />Fit dots</button>
+        <button aria-label={expanded ? 'Exit expanded map' : 'Expand map'} aria-pressed={expanded} onClick={() => setExpanded(v => !v)} className="min-h-11 min-w-11 rounded-xl border border-[#DFE5DE] p-3">{expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+        {contextLayer !== 'none' && <div className="flex w-full items-center gap-3 border-t border-[#EDF0E9] pt-2 text-xs text-[#52625A]"><label className="flex min-h-11 flex-1 items-center gap-3">Layer strength<input aria-label="Layer strength" className="min-w-16 flex-1 accent-[#253C34]" type="range" min="10" max="85" step="5" value={Math.round(populationOpacity * 100)} onChange={e => setPopulationOpacity(Number(e.target.value) / 100)} /><span className="w-8 tabular-nums">{Math.round(populationOpacity * 100)}%</span></label></div>}
+      </div>
+      <details className="rounded-xl border border-[#E8E5DE] bg-white p-3 text-xs text-[#626F66]"><summary className="min-h-7 cursor-pointer font-medium">Layer legend & display options</summary>
+        <label className="my-2 flex min-h-11 items-center gap-2"><input className="h-5 w-5 accent-[#253C34]" type="checkbox" checked={showPractices} onChange={e => setShowPractices(e.target.checked)} />Show practice dots</label>
         {populationEnabled && <>
           <div className="text-xs font-medium">People per square mile · WorldPop 2026 modeled population</div>
           <div className="w-[320px] max-w-full">
@@ -344,12 +392,19 @@ function PracticeMapInner({
           {' · '}<a className="underline" href="https://www.worldpop.org/faq/" target="_blank" rel="noopener noreferrer">WorldPop · CC BY 4.0</a>
         </p>}
       </details>
-      {mapError && <p role="alert" className="mb-3 text-sm text-amber-700">Map tiles are unavailable. All practices remain in the List view.</p>}
-    <div
-      ref={mapRef}
-      className="w-full rounded-lg border border-[#E8E5DE] overflow-hidden"
-      style={{ height: 'min(66vh, 680px)', minHeight: 360 }}
-    />
+      {mapError && <p role="alert" className="text-sm text-amber-700">Interactive map unavailable in this browser. Try a browser with WebGL support, or use the directory List view.</p>}
+      <div className={`relative overflow-hidden rounded-2xl border border-[#DCE3DA] bg-[#EAF0E7] shadow-sm ${expanded ? 'min-h-[55dvh] flex-1' : 'h-[60svh] min-h-[350px] sm:h-[68vh] sm:min-h-[480px]'}`}>
+        <div ref={mapRef} className="absolute inset-0" aria-label="Interactive practice map" />
+        {!ready && !mapError && <div role="status" className="pointer-events-none absolute inset-0 flex items-center justify-center bg-[#F1F5EF]/90 text-sm text-[#52625A]">Loading map…</div>}
+        {ready && <div className="pointer-events-none absolute left-3 top-3 max-w-[70%] rounded-xl bg-white/95 px-3 py-2 text-xs text-[#253C34] shadow-md backdrop-blur"><strong>{showPractices ? visibleOffices.length.toLocaleString() : 'Dots hidden'}</strong>{showPractices && ' practices in this area'}<p className="mt-0.5 text-[10px] text-[#747970]">{showPractices ? 'Tap a dot to preview · pinch to zoom' : 'Enable dots in display options'}</p></div>}
+        {showPractices && !!selectedOffices.length && <section aria-label="Selected map practices" className="absolute inset-x-3 bottom-8 max-h-[48%] overflow-auto overscroll-contain rounded-2xl border border-[#DCE3DA] bg-white p-4 shadow-xl sm:left-3 sm:right-auto sm:w-80">
+          <div className="sticky -top-4 flex items-center justify-between bg-white pb-2"><h3 className="text-xs font-medium text-[#747970]">{selectedOffices.length > 1 ? `${selectedOffices.length} nearby / overlapping offices` : 'Practice preview'}</h3><button aria-label="Close practice preview" onClick={() => setSelection([])} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-[#F1F5EF]"><X className="h-4 w-4" /></button></div>
+          {selectedOffices.map(p => <div key={p.location_id} className="space-y-1 border-t border-[#EDF0E9] py-3"><p className="text-xs font-medium" style={{color:MAP_META[p.status].color}}>{p.evidence_label}</p><h4 className="text-base font-semibold text-[#253C34]">{p.practice_name}</h4><p className="text-xs text-[#626F66]">{p.address} · {p.city_zip}</p><p className="text-[11px] text-[#747970]">{p.checked_at}</p><button onClick={() => p.location_id && onOpenPractice(p.location_id)} className="mt-2 flex min-h-11 items-center gap-2 text-sm font-medium text-[#007F73]">Open practice <ArrowUpRight className="h-4 w-4" /></button></div>)}
+        </section>}
+        {ready && !geocoded.length && <p className="pointer-events-none absolute inset-x-8 top-24 rounded-xl bg-white p-4 text-center text-sm text-[#52625A]">No mappable practices in this selection. Try another check status or clear your search.</p>}
+      </div>
+      <details open={showVisible} onToggle={e => setShowVisible(e.currentTarget.open)} className="rounded-xl border border-[#E8E5DE] bg-white p-3 text-xs text-[#626F66]"><summary className="min-h-7 cursor-pointer">Browse practices in this map area · {visibleOffices.length.toLocaleString()}</summary><div className="mt-2 max-h-64 divide-y divide-[#EDF0E9] overflow-auto">{showVisible && visibleOffices.map(p => <button key={p.location_id} onClick={() => { setSelection([p.location_id!]); mapObjRef.current?.easeTo({center:[p.map_lon,p.map_lat],duration:400}) }} className="flex min-h-12 w-full items-center gap-3 py-2 text-left"><span className="h-3 w-3 shrink-0 rounded-full" style={{background:MAP_META[p.status].color}}/><span><strong className="font-medium text-[#253C34]">{p.practice_name}</strong><span className="block text-[11px]">{p.address} · {p.evidence_label}</span></span></button>)}</div></details>
+
     </div>
   )
 }
@@ -361,29 +416,30 @@ function PracticeMapInner({
 
 export function PracticeDensityMap({ practices, centerLat, centerLon }: PracticeDensityMapProps) {
   const router = useRouter()
-  const counts = { missing_coordinates: 0, address_changed: 0, removed: 0 }
-  for (const p of practices) { const issue = mapIssue(p); if (issue) counts[issue]++ }
-  const geocoded = useMemo<MapPractice[]>(() => practices.filter(p => !mapIssue(p)).map(p => {
+  const [status, setStatus] = useState<MapState | 'all'>('all')
+  const roster = useMemo(() => mapRoster(practices, status), [practices, status])
+  const geocoded = useMemo<MapPractice[]>(() => roster.mapped.map(p => {
     const coordinates = getOfficeCoordinates(p)!
-    const meta = RESEARCH_META[researchState(p)]
+    const state = mapState(p), meta = MAP_META[state]
     const rgb = meta.color.slice(1).match(/.{2}/g)!.map(v => parseInt(v, 16))
     return { map_lat: coordinates.lat, map_lon: coordinates.lon, location_id: p.location_id ?? null,
       practice_name: displayName(p), address: p.address ?? 'Address not on file', city_zip: `${p.city ?? ''} ${p.zip ?? ''}`,
-      evidence_label: meta.label, checked_at: p.web_check?.checked_at ? `Checked ${new Date(p.web_check.checked_at).toLocaleDateString()}` : 'Not yet checked by the office validator',
-      color: [rgb[0], rgb[1], rgb[2], 230],
+      status: state, evidence_label: meta.label, checked_at: p.web_check?.checked_at ? `Checked ${new Date(p.web_check.checked_at).toLocaleDateString()}` : 'Not yet checked by the office validator',
+      color: [rgb[0], rgb[1], rgb[2], 255],
     }
-  }), [practices])
-  const listed = practices.length - counts.removed
+  }), [roster])
   return <section aria-label="Live directory map" data-mapped-count={geocoded.length} className="space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#747970]">
-      <p role="status"><strong className="text-[#253C34]">{geocoded.length.toLocaleString()} mapped</strong> of {listed.toLocaleString()} listed in this view</p>
-      <div className="flex flex-wrap gap-4" aria-label="Map dot colors">{RESEARCH_STATES.map(s => <ResearchBadge key={s} state={s} />)}</div>
+    <div className="rounded-2xl border border-[#DFE5DE] bg-white p-3 shadow-sm">
+      <div className="mb-2 flex items-center justify-between"><p className="text-[11px] font-medium uppercase tracking-wider text-[#747970]">Show practices by office check</p><button onClick={() => setStatus('all')} aria-pressed={status === 'all'} className={`min-h-11 rounded-xl px-3 text-xs font-medium ${status === 'all' ? 'bg-[#253C34] text-white' : 'text-[#52625A] hover:bg-[#F1F5EF]'}`}>Show all</button></div>
+      <div className="grid grid-cols-3 gap-2" aria-label="Map status filters">{MAP_STATES.map(s => <button key={s} onClick={() => setStatus(status === s ? 'all' : s)} aria-pressed={status === s} title={MAP_META[s].description} className={`flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border px-2 py-2 text-center text-[11px] sm:min-h-12 sm:flex-row sm:gap-2 sm:px-3 sm:text-left sm:text-xs transition-colors ${status === s ? 'border-[#253C34] bg-[#F0F5ED] ring-1 ring-[#253C34]' : 'border-[#E5EAE1] hover:bg-[#F6F8F3]'}`}><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white" style={{background:MAP_META[s].color}}>{status === s && <Check className="h-3.5 w-3.5" />}</span><span className="flex-1 font-medium text-[#253C34]">{MAP_META[s].label}</span><strong className="tabular-nums text-[#52625A]">{roster.counts[s].toLocaleString()}</strong></button>)}</div>
+      <p className="mt-2 text-[11px] text-[#747970]">Confirmed includes corrected offices. Counts reflect your directory search and area; some records lack map coordinates.</p>
     </div>
-    <details className="text-xs text-[#747970]"><summary className="cursor-pointer">Why some practices have no dot</summary><div className="space-y-1.5 py-2 leading-5">
-      <p>{counts.missing_coordinates.toLocaleString()} have no usable stored coordinates. {counts.address_changed.toLocaleString()} have a corrected street address awaiting matching coordinates.</p>
+    <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-[#747970]"><p role="status"><strong className="text-[#253C34]">{geocoded.length.toLocaleString()} mapped</strong> of {roster.listed.length.toLocaleString()} listed in this selection</p><span>Colors follow the latest validator result</span></div>
+    <PracticeMapInner status={status} onStatusChange={setStatus} geocoded={geocoded} centerLat={centerLat} centerLon={centerLon} onOpenPractice={id => router.push(`/practice/${encodeURIComponent(id)}`)} />
+    <details className="rounded-xl border border-[#E8E5DE] bg-white p-3 text-xs text-[#747970]"><summary className="flex min-h-7 cursor-pointer items-center gap-2"><CircleHelp className="h-4 w-4" />Why some practices have no dot</summary><div className="space-y-1.5 py-2 leading-5">
+      <p>{roster.missing.toLocaleString()} have no usable stored coordinates. {roster.moved.toLocaleString()} have a corrected street address awaiting matching coordinates.</p>
       <p>All other listed practices get a dot, including records not yet checked. Removed records never appear. No ZIP-center placeholders are added.</p>
-      <p>The count is for the whole selected dataset, not just this viewport. Zoom and pan to see other locations. Offices at the same coordinates can overlap. Stored coordinates are not independently verified by an office check.</p>
+      <p>Mapped counts cover the full selection; the in-area count follows your viewport. Overlapping offices stay separate records: tap their dot to choose an office. Stored coordinates are not independently verified by an office check.</p>
     </div></details>
-    <PracticeMapInner geocoded={geocoded} centerLat={centerLat} centerLon={centerLon} onOpenPractice={id => router.push(`/practice/${encodeURIComponent(id)}`)} />
   </section>
 }

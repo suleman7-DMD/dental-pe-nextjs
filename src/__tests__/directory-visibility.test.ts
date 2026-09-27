@@ -74,7 +74,7 @@ describe('directory inclusion is independent of map coordinates and ownership re
     expect(html).toContain('Population density')
     expect(html).toContain('Median household income')
     expect(html).toContain('Education: bachelor’s degree or higher')
-    expect(html).toContain('None — practices only')
+    expect(html).toContain('Practices only')
     expect(html).toContain('Why some practices have no dot')
     expect(html).toContain('This is not a saturation score')
   })

@@ -39,7 +39,7 @@ function Workspace() {
   const removed = (live.data?.removed ?? []).filter(inScope)
   const term = search.toLowerCase().trim()
   const matches = (p: Practice) => [displayName(p), p.practice_name, p.address, p.city, p.zip, p.network_id, p.phone].some(s => s?.toLowerCase().includes(term))
-  const filtered = scopeRows.filter(p => matches(p) && (status === 'all' || researchState(p) === status)).sort((a, b) => displayName(a).localeCompare(displayName(b)))
+  const filtered = scopeRows.filter(p => matches(p) && (view === 'map' || status === 'all' || researchState(p) === status)).sort((a, b) => displayName(a).localeCompare(displayName(b)))
   const changeParam = (key: string, value: string) => { const next = new URLSearchParams(params); next.set(key, value); router.replace(`${pathname}?${next}`, { scroll: false }) }
   const zips = (live.data?.zips ?? []).filter(z => (location === 'All Chicagoland' || area.commutable_zips.includes(z.zip)) && (!term || z.zip.includes(term) || z.city.toLowerCase().includes(term) || filtered.some(p => p.zip === z.zip)))
   const groups = new Map<string, Practice[]>()
@@ -51,11 +51,11 @@ function Workspace() {
   }
   return <main className="mx-auto max-w-[1440px] space-y-5 px-4 py-6 sm:px-7">
     <header className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[11px] uppercase tracking-[.18em] text-[#8A9189]">Find a practice</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-[#202824]">Directory</h1></div><select aria-label="Directory area" value={location in LIVING_LOCATIONS ? location : 'All Chicagoland'} onChange={e => changeParam('location', e.target.value)} className="rounded-xl border border-[#E0E4DD] bg-white px-3 py-2 text-sm">{Object.keys(LIVING_LOCATIONS).map(k => <option key={k}>{k}</option>)}</select></header>
-    <LiveSummary data={live.data} rows={scopeRows} removed={removed} scope={location} stale={live.stale} refreshing={live.isFetching} onRefresh={() => void live.refetch()} />
+    <LiveSummary combineConfirmed={view === 'map'} data={live.data} rows={scopeRows} removed={removed} scope={location} stale={live.stale} refreshing={live.isFetching} onRefresh={() => void live.refetch()} />
     <div className="flex flex-wrap items-center gap-3"><div className="flex rounded-xl border border-[#E0E4DD] bg-white p-1" aria-label="Directory views">{VIEWS.map(v => <button key={v.id} aria-pressed={view === v.id} onClick={() => changeParam('tab', v.id)} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium ${view === v.id ? 'bg-[#253C34] text-white' : 'text-[#747970] hover:bg-[#F3F5F0]'}`}><v.icon className="h-3.5 w-3.5" />{v.label}</button>)}</div>
       <label className="flex min-w-48 flex-1 items-center gap-2 rounded-xl border border-[#E0E4DD] bg-white px-3 py-2"><Search className="h-4 w-4 text-[#939BA8]" /><input aria-label="Search directory" placeholder="Name, address, city or ZIP" value={search} onChange={e => setSearch(e.target.value)} className="w-full bg-transparent text-sm outline-none" /></label>
-      <select aria-label="Validator status" value={status} onChange={e => setStatus(e.target.value as typeof status)} className="rounded-xl border border-[#E0E4DD] bg-white px-3 py-2.5 text-xs"><option value="all">All check statuses</option>{RESEARCH_STATES.map(s => <option key={s} value={s}>{RESEARCH_META[s].label}</option>)}</select>
-      <button onClick={download} disabled={!live.data} aria-label="Download filtered directory" title="Download this view" className="rounded-xl border border-[#E0E4DD] bg-white p-2.5"><Download className="h-4 w-4" /></button>
+      {view !== 'map' && <select aria-label="Validator status" value={status} onChange={e => setStatus(e.target.value as typeof status)} className="rounded-xl border border-[#E0E4DD] bg-white px-3 py-2.5 text-xs"><option value="all">All check statuses</option>{RESEARCH_STATES.map(s => <option key={s} value={s}>{RESEARCH_META[s].label}</option>)}</select>}
+      {view !== 'map' && <button onClick={download} disabled={!live.data} aria-label="Download filtered directory" title="Download this view" className="rounded-xl border border-[#E0E4DD] bg-white p-2.5"><Download className="h-4 w-4" /></button>}
     </div>
     {live.data ? <>
       {view === 'directory' && <OfficeList key={`${search}-${status}-${location}`} rows={filtered} />}
