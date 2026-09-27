@@ -25,6 +25,10 @@ import { acsNumber, formatSocioeconomicValue, socioeconomicColor, socioeconomicV
   SOCIOECONOMIC_DATA, SOCIOECONOMIC_LAYER, SOCIOECONOMIC_METRICS, SOCIOECONOMIC_SOURCE,
   type SocioeconomicMetric } from '@/lib/maps/socioeconomic'
 
+import { attachLandUse, type LandUseStatus } from '@/lib/maps/land-use-layer'
+import type { LandUseMode } from '@/lib/maps/land-use'
+import { LandUseLegend } from '@/components/maps/land-use-legend'
+
 // ────────────────────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────────────────────
@@ -81,7 +85,11 @@ function PracticeMapInner({
 }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapObjRef = useRef<mapboxgl.Map | null>(null)
-  const [contextLayer, setContextLayer] = useState<'none' | 'population' | SocioeconomicMetric>('population')
+  const [contextLayer, setContextLayer] = useState<'none' | 'population' | 'landuse' | SocioeconomicMetric>('population')
+  const [landUseMode, setLandUseMode] = useState<LandUseMode>('full')
+  const [landUseStatus, setLandUseStatus] = useState<LandUseStatus>('idle')
+  const landUseRef = useRef<ReturnType<typeof attachLandUse> | null>(null)
+  const landUseEnabled = contextLayer === 'landuse'
   const populationEnabled = contextLayer === 'population'
   const socioeconomicMetric = contextLayer === 'income' || contextLayer === 'education' ? contextLayer : null
   const [populationOpacity, setPopulationOpacity] = useState(0.65)
@@ -89,11 +97,35 @@ function PracticeMapInner({
   const [populationStatus, setPopulationStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [acsStatus, setAcsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const tractPopupRef = useRef<mapboxgl.Popup | null>(null)
-  const presentation = useRef({ populationEnabled, populationOpacity, showPractices, socioeconomicMetric })
-  presentation.current = { populationEnabled, populationOpacity, showPractices, socioeconomicMetric }
+  const presentation = useRef({ populationEnabled, populationOpacity, showPractices, socioeconomicMetric, landUseEnabled, landUseMode })
+  presentation.current = { populationEnabled, populationOpacity, showPractices, socioeconomicMetric, landUseEnabled, landUseMode }
   // Ref so a changing callback identity never tears down and re-creates the map
   const onOpenPracticeRef = useRef(onOpenPractice)
   onOpenPracticeRef.current = onOpenPractice
+
+  // Preserve shareable map context without replacing directory filters or refetching the page.
+  useEffect(() => {
+    const restore = () => {
+      const params = new URLSearchParams(window.location.search)
+      const layer = params.get('mapLayer')
+      if (layer && ['none', 'population', 'income', 'education', 'landuse'].includes(layer)) setContextLayer(layer as typeof contextLayer)
+      const mode = params.get('landUse')
+      if (mode && ['homes', 'full', 'sites'].includes(mode)) setLandUseMode(mode as LandUseMode)
+    }
+    restore()
+    window.addEventListener('popstate', restore)
+    return () => window.removeEventListener('popstate', restore)
+  }, [])
+
+  function chooseContext(layer: typeof contextLayer, mode = landUseMode) {
+    setContextLayer(layer)
+    setLandUseMode(mode)
+    const url = new URL(window.location.href)
+    url.searchParams.set('mapLayer', layer)
+    if (layer === 'landuse') url.searchParams.set('landUse', mode)
+    else url.searchParams.delete('landUse')
+    window.history.replaceState(window.history.state, '', url)
+  }
 
   useEffect(() => {
     if (!mapRef.current) return
@@ -104,6 +136,7 @@ function PracticeMapInner({
     let acsFailed = false
     setPopulationStatus('loading')
     setAcsStatus('loading')
+    setLandUseStatus('idle')
 
     const initMap = async () => {
       const mapboxgl = (await import('mapbox-gl')).default
@@ -186,6 +219,9 @@ function PracticeMapInner({
         })
         map.on('mouseleave', SOCIOECONOMIC_LAYER, () => tractPopup.remove())
         map.on('movestart', () => tractPopup.remove())
+
+        landUseRef.current = attachLandUse(map, mapboxgl, value => { if (!cancelled) setLandUseStatus(value) })
+        landUseRef.current.set({ mode: presentation.current.landUseEnabled ? presentation.current.landUseMode : null, opacity: presentation.current.populationOpacity })
 
         // Build GeoJSON from geocoded practices
         const geojson: GeoJSON.FeatureCollection = {
@@ -301,6 +337,8 @@ function PracticeMapInner({
     initMap()
     return () => {
       cancelled = true
+      landUseRef.current?.destroy()
+      landUseRef.current = null
       if (map) map.remove()
       mapObjRef.current = null
       tractPopupRef.current = null
@@ -319,17 +357,19 @@ function PracticeMapInner({
       map.setPaintProperty(SOCIOECONOMIC_LAYER, 'fill-opacity', populationOpacity)
       if (socioeconomicMetric) map.setPaintProperty(SOCIOECONOMIC_LAYER, 'fill-color', socioeconomicColor(socioeconomicMetric))
     }
+    landUseRef.current?.set({ mode: landUseEnabled ? landUseMode : null, opacity: populationOpacity })
     tractPopupRef.current?.remove()
-  }, [populationEnabled, populationOpacity, showPractices, socioeconomicMetric])
+  }, [populationEnabled, populationOpacity, showPractices, socioeconomicMetric, landUseEnabled, landUseMode])
 
   return (
     <div>
       <div className="rounded border border-[#E8E5DE] bg-white p-3 mb-3 space-y-3">
         <div className="flex flex-wrap items-center gap-5 text-sm">
           <label className="flex items-center gap-2">Map layer
-            <select className="rounded border border-[#D4D0C8] bg-white p-1.5" value={contextLayer} onChange={e => setContextLayer(e.target.value as typeof contextLayer)}>
+            <select className="rounded border border-[#D4D0C8] bg-white p-1.5" value={contextLayer} onChange={e => chooseContext(e.target.value as typeof contextLayer)}>
               <option value="none">None — practices only</option>
               <option value="population">Population density</option>
+              <option value="landuse">Land use · homes & landscape</option>
               <option value="income">Median household income</option>
               <option value="education">Education: bachelor’s degree or higher</option>
             </select>
@@ -341,6 +381,7 @@ function PracticeMapInner({
             <span>{Math.round(populationOpacity * 100)}%</span>
           </label>
         </div>
+        {landUseEnabled && <LandUseLegend mode={landUseMode} onModeChange={mode => chooseContext('landuse', mode)} status={landUseStatus} onRetry={() => landUseRef.current?.retry()} />}
         {populationEnabled && <>
           <div className="text-xs font-medium">People per square mile · WorldPop 2026 modeled population</div>
           <div className="w-[320px] max-w-full">

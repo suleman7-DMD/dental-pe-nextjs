@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    '/api/land-use-tiles/*': ['./data/land-use/chicagoland-2023.pmtiles'],
+  },
   // Friendly aliases matching the sidebar vocabulary. `/directory` is a real
   // route (re-exports the job-market page); the rest redirect so a typed or
   // shared "plain English" URL lands on the canonical route.
