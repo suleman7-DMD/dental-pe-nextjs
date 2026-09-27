@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mapRoster, mapState } from '@/lib/maps/directory-map'
-import type { LiveOffice } from '@/lib/directory/live-directory'
+import { applyOfficeGeocodes, mapIssue, type LiveOffice } from '@/lib/directory/live-directory'
 import type { DirectoryWebCheck } from '@/lib/supabase/queries/directory-web-checks'
 const row = (id:string, effect?:DirectoryWebCheck['effect']) => ({ location_id:id, npi:id, address:'100 Main St', latitude:41.8, longitude:-87.6,
   web_check:effect ? {effect, observed:{}, as_seen:{address:'100 Main St'}} as DirectoryWebCheck : undefined,
@@ -35,5 +35,27 @@ describe('three map statuses use the live directory universe', () => {
     expect(mapRoster([row('a','open_corrected')],'unchecked').mapped).toHaveLength(0)
     expect(mapRoster([row('a','open_corrected')],'confirmed').mapped).toHaveLength(1)
     expect(mapRoster([row('a','removed')],'confirmed').mapped).toHaveLength(0)
+  })
+})
+
+describe('address geocode snapshot fills missing and moved dots', () => {
+  const geo = { a: { address: '100 Main St', lat: 41.9, lon: -87.7, precision: 'exact' }, b: { address: '200 Main St', lat: 41.95, lon: -87.65, precision: 'exact' }, c: { address: '999 Old Rd', lat: 42, lon: -88, precision: 'exact' } }
+  it('fills missing coordinates, follows a corrected street, and never overrides stored coordinates', () => {
+    const missing = { ...row('a', 'open_verified'), latitude: null, longitude: null }
+    const moved = row('b', 'open_corrected'); moved.address = '200 Main St'; moved.web_check!.observed.address = '200 Main St'
+    const stored = row('d', 'open_verified')
+    const out = applyOfficeGeocodes([missing, moved, stored], { ...geo, d: { address: '100 Main St', lat: 1, lon: 1, precision: 'exact' } })
+    expect(out[0]).toMatchObject({ latitude: 41.9, longitude: -87.7, coord_source: 'census_geocoder' })
+    expect(out[1]).toMatchObject({ latitude: 41.95, coord_source: 'census_geocoder' })
+    expect(out[2]).toBe(stored)
+    const roster = mapRoster(out)
+    expect(roster).toMatchObject({ missing: 0, moved: 0, geocoded: 2 })
+    expect(roster.mapped).toHaveLength(3)
+  })
+  it('drops a geocode once the displayed address no longer matches it', () => {
+    const changed = { ...row('c', 'open_verified'), latitude: null, longitude: null }
+    const [out] = applyOfficeGeocodes([changed], geo)
+    expect(out.coord_source).toBeUndefined()
+    expect(mapIssue(out)).toBe('missing_coordinates')
   })
 })

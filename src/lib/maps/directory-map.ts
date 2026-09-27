@@ -20,5 +20,6 @@ export function mapRoster(rows: LiveOffice[], selected: MapState | 'all' = 'all'
   return { counts, listed, mapped,
     missing: listed.filter(p => mapIssue(p) === 'missing_coordinates').length,
     moved: listed.filter(p => mapIssue(p) === 'address_changed').length,
+    geocoded: mapped.filter(p => p.coord_source === 'census_geocoder').length,
   }
 }

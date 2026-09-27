@@ -3,7 +3,8 @@ import { createServerClient } from '@/lib/supabase/server'
 import { fetchPracticeLocations, practiceLocationToLaunchpadRecord } from '@/lib/supabase/queries/practice-locations'
 import { fetchDirectoryWebCheckMap } from '@/lib/supabase/queries/directory-web-checks'
 import { getWatchedZips } from '@/lib/supabase/queries/watched-zips'
-import { makeDirectorySnapshot, type LiveOffice } from '@/lib/directory/live-directory'
+import { makeDirectorySnapshot, type LiveOffice, type OfficeGeocodes } from '@/lib/directory/live-directory'
+import officeGeocodes from '@/data/office-geocodes.json'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -27,6 +28,7 @@ export async function GET() {
           website: r.website, latitude: r.latitude, longitude: r.longitude, network_id: r.network_id } as LiveOffice
       }), checks,
       watched.map(z => ({ zip: z.zip_code, city: z.city ?? '' })), new Date().toISOString(),
+      officeGeocodes.offices as OfficeGeocodes,
     )
     return new Response(gzipSync(JSON.stringify(snapshot)), { headers: { 'Content-Type': 'application/json', 'Content-Encoding': 'gzip', 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
