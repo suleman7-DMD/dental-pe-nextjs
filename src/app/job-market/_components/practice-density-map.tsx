@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type mapboxgl from 'mapbox-gl'
 import type { ExpressionSpecification } from 'mapbox-gl'
-import { ArrowUpRight, Check, ChevronRight, CircleHelp, Layers, List, LocateFixed, Maximize2, Minimize2, Phone, X } from 'lucide-react'
+import { ArrowUpRight, ChevronRight, CircleHelp, Layers, List, LocateFixed, Maximize2, Minimize2, Phone, X } from 'lucide-react'
 import { getOfficeCoordinates } from '@/lib/utils/directory-visibility'
 import { displayName } from '@/lib/census/display-name'
 import { escapeHtml } from '@/lib/utils/escape-html'
@@ -72,7 +72,7 @@ function toFeatures(rows: MapOffice[]): GeoJSON.FeatureCollection {
 /** Dot radius by zoom. Grows when a context layer is on and when hovered. */
 function dotRadius(boost: number, extra = 0): ExpressionSpecification {
   const hover = ['case', ['boolean', ['feature-state', 'hover'], false], 1.4, 1]
-  const stops: [number, number][] = [[8, 3.4], [10, 4.4], [12, 5.8], [14, 7.6], [17, 11]]
+  const stops: [number, number][] = [[8, 2.1], [10, 2.8], [12, 4.2], [14, 6.2], [17, 9.5]]
   return ['interpolate', ['linear'], ['zoom'], ...stops.flatMap(([z, r]) => [z, ['+', ['*', r + boost, hover], extra]])] as unknown as ExpressionSpecification
 }
 
@@ -347,12 +347,14 @@ function OfficeMap({
     map.setFilter(L.selected, ['all', statusFilter, ['in', ['get', 'id'], ['literal', selection]]])
     map.setFilter(L.pulse, ['all', statusFilter, ['in', ['get', 'id'], ['literal', fresh]]])
     for (const id of Object.values(L)) map.setLayoutProperty(id, 'visibility', showDots ? 'visible' : 'none')
-    const boost = layerOn ? 1.3 : 0
+    // Small, crisp dots. Over a context layer the hairline outline turns dark so
+    // each color separates from the fill underneath without bloating the dot.
+    const boost = layerOn ? 0.5 : 0
     map.setPaintProperty(L.dots, 'circle-radius', dotRadius(boost))
-    map.setPaintProperty(L.dots, 'circle-stroke-width', layerOn ? 2 : 1.5)
-    map.setPaintProperty(L.casing, 'circle-radius', dotRadius(boost, layerOn ? 3.6 : 2.5))
-    map.setPaintProperty(L.casing, 'circle-opacity', layerOn ? 0.92 : 0.45)
-    map.setPaintProperty(L.selected, 'circle-radius', dotRadius(boost, 6.5))
+    map.setPaintProperty(L.dots, 'circle-stroke-width', ['interpolate', ['linear'], ['zoom'], 8, 0.6, 12, 1, 15, 1.5])
+    map.setPaintProperty(L.dots, 'circle-stroke-color', layerOn ? '#15201A' : '#FFFFFF')
+    map.setPaintProperty(L.casing, 'circle-opacity', 0)
+    map.setPaintProperty(L.selected, 'circle-radius', dotRadius(boost, 5))
   }, [active, selection, fresh, showDots, layerOn, ready])
 
   useEffect(() => {
@@ -439,17 +441,15 @@ function OfficeMap({
 
         {/* Status filter — multi-select, the only three groups on the map */}
         <div className="pointer-events-none absolute inset-x-2 top-2 z-20 flex flex-col items-end gap-2 sm:inset-x-3 sm:top-3 sm:flex-row sm:items-start">
-          <div role="group" aria-label="Map status filters" className={`${overlayCard} pointer-events-auto grid w-full min-w-0 grid-cols-3 gap-1 p-1 sm:flex sm:w-auto sm:flex-none`}>
+          <div role="group" aria-label="Map status filters" className={`${overlayCard} pointer-events-auto grid w-full min-w-0 grid-cols-3 gap-0.5 rounded-xl p-0.5 sm:flex sm:w-auto sm:flex-none`}>
             {MAP_STATES.map(s => {
               const on = activeSet.has(s)
               return <button key={s} type="button" onClick={() => toggleState(s)} onDoubleClick={() => soloState(s)} aria-pressed={on} title={`${MAP_META[s].description} Double-click to show only this group.`}
-                className={`flex min-h-11 min-w-0 items-center gap-1.5 rounded-xl px-1.5 py-1 text-left transition-all sm:shrink-0 sm:gap-2 sm:px-3 ${on ? 'bg-white shadow-sm ring-1 ring-black/5' : 'opacity-55 hover:opacity-80'}`}>
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full sm:h-[18px] sm:w-[18px]" style={{ background: on ? MAP_META[s].color : '#FFFFFF', boxShadow: on ? '0 0 0 1.5px #fff, 0 0 0 3px rgba(14,26,21,.3)' : `inset 0 0 0 2px ${MAP_META[s].color}` }}>
-                  {on && <Check className="h-3 w-3 text-white" strokeWidth={3} />}
-                </span>
-                <span className="flex min-w-0 flex-col leading-tight">
-                  <span className="truncate whitespace-nowrap text-[11px] font-semibold text-[#1F2A24] sm:text-[12px]"><span className="sm:hidden">{MAP_META[s].short}</span><span className="hidden sm:inline">{MAP_META[s].label}</span></span>
-                  <span className="text-[11px] tabular-nums text-[#6B706A]">{counts[s].toLocaleString()}</span>
+                className={`flex min-h-9 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-left transition-all sm:min-h-8 sm:shrink-0 ${on ? 'bg-white shadow-sm ring-1 ring-black/5' : 'opacity-50 hover:opacity-80'}`}>
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: on ? MAP_META[s].color : 'transparent', boxShadow: `inset 0 0 0 1.5px ${MAP_META[s].color}` }} />
+                <span className="flex min-w-0 flex-col leading-tight sm:flex-row sm:items-baseline sm:gap-1.5">
+                  <span className="whitespace-nowrap text-[11px] font-semibold text-[#1F2A24]">{MAP_META[s].short}</span>
+                  <span className="text-[10.5px] tabular-nums text-[#6B706A] sm:text-[11px]">{counts[s].toLocaleString()}</span>
                 </span>
               </button>
             })}
@@ -471,6 +471,11 @@ function OfficeMap({
               className={`flex flex-col gap-1.5 rounded-xl border p-2 text-left text-[11.5px] font-medium leading-tight text-[#1F2A24] transition ${contextLayer === o.id ? 'border-[#253C34] ring-1 ring-[#253C34]' : 'border-[#E3E7E0] hover:border-[#C5CDC2]'}`}>
               <span className="h-9 w-full rounded-lg" style={{ background: o.swatch }} />{o.label}</button>)}
           </div>
+          {legend && <div className="mt-3"><p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#6B706A]">{legend.title}</p>
+            <div className="h-2 rounded-full" style={{ background: legend.gradient }} />
+            <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-[#6B706A]">{legend.labels.map(l => <span key={l}>{l}</span>)}</div>
+            {layerLoading && <p className="mt-1 text-[10px] text-[#6B706A]">Loading layer…</p>}
+            {layerFailed && <p role="alert" className="mt-1 text-[10px] text-[#B42318]">Layer unavailable — blank is not zero. Reload to retry.</p>}</div>}
           {layerOn && <label className="mt-3 flex items-center gap-3 text-xs text-[#52625A]">Layer strength
             <input aria-label="Layer strength" className="min-w-0 flex-1 accent-[#253C34]" type="range" min="15" max="85" step="5" value={Math.round(strength * 100)} onChange={e => setStrength(Number(e.target.value) / 100)} />
             <span className="w-8 text-right tabular-nums">{Math.round(strength * 100)}%</span></label>}
@@ -534,27 +539,14 @@ function OfficeMap({
         </section>}
 
         {/* Live status + in-view count */}
-        {ready && !selectedOffices.length && !listOpen && <div className={`${overlayCard} pointer-events-none absolute bottom-9 left-2 z-20 max-w-[calc(100%-70px)] px-3 py-2 sm:left-3`}>
-          <p className="flex items-center gap-2 text-[12px] text-[#1F2A24]">
-            <span className={`h-2 w-2 shrink-0 rounded-full ${stale ? 'bg-amber-500' : 'bg-[#12A150]'}`} style={stale ? undefined : { animation: 'omp-live 2s infinite' }} />
-            {showDots ? <span><strong className="tabular-nums">{visibleOffices.length.toLocaleString()}</strong> in view</span> : <span>Dots off</span>}
-            <span className="text-[#8A8F88]">·</span>
-            <span className="text-[#6B706A]">{stale ? 'Reconnecting' : refreshing ? 'Updating…' : synced ? `Live · ${synced.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Live'}</span>
-          </p>
-          {showDots && <p className="mt-1 flex gap-2.5 text-[10.5px] tabular-nums text-[#6B706A]">{MAP_STATES.filter(s => activeSet.has(s)).map(s => <span key={s} className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full" style={{ background: MAP_META[s].color }} />{visibleCounts[s].toLocaleString()}</span>)}</p>}
-        </div>}
-
-        {/* Layer legend */}
-        {ready && legend && !layerPanel && <div className={`${overlayCard} pointer-events-none absolute bottom-[118px] right-2 z-20 w-40 px-2.5 py-2 sm:right-3`}>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#6B706A]">{legend.title}</p>
-          <div className="h-2 rounded-full" style={{ background: legend.gradient }} />
-          <div className="mt-0.5 flex justify-between text-[10px] tabular-nums text-[#6B706A]">{legend.labels.map(l => <span key={l}>{l}</span>)}</div>
-          {layerLoading && <p className="mt-1 text-[10px] text-[#6B706A]">Loading layer…</p>}
-          {layerFailed && <p role="alert" className="mt-1 text-[10px] text-[#B42318]">Layer unavailable — blank is not zero. Reload to retry.</p>}
+        {ready && !selectedOffices.length && !listOpen && <div className={`${overlayCard} pointer-events-none absolute bottom-9 left-2 z-20 flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] text-[#1F2A24] sm:left-3`} title={synced ? `Synced ${synced.toLocaleTimeString()}` : undefined}>
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stale ? 'bg-amber-500' : 'bg-[#12A150]'}`} style={stale ? undefined : { animation: 'omp-live 2s infinite' }} />
+          {showDots ? <span><strong className="tabular-nums">{visibleOffices.length.toLocaleString()}</strong> in view</span> : <span>Dots off</span>}
+          <span className="text-[#6B706A]">· {stale ? 'reconnecting' : refreshing ? 'updating' : 'live'}</span>
         </div>}
 
         {/* Live change toast */}
-        {newsCount > 0 && <div role="status" className="pointer-events-none absolute inset-x-0 top-[66px] z-30 flex justify-start px-2 sm:top-[76px] sm:justify-center sm:px-3">
+        {newsCount > 0 && <div role="status" className="pointer-events-none absolute inset-x-0 top-[50px] z-30 flex justify-start px-2 sm:top-[76px] sm:justify-center sm:px-3">
           <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-[#1F2A24] py-1.5 pl-3.5 pr-1.5 text-xs text-white shadow-lg">
             <span className="h-2 w-2 rounded-full bg-[#12A150]" style={{ animation: 'omp-live 2s infinite' }} />
             {newsCount.toLocaleString()} {newsCount === 1 ? 'office' : 'offices'} just updated
