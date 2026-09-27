@@ -1,0 +1,799 @@
+{
+  "currentVersion": 12,
+  "id": 1,
+  "name": "Dissolved (External)",
+  "type": "Feature Layer",
+  "serviceItemId": "1022fd982a5b4b51a9cecb20ea6c2a29",
+  "cacheMaxAge": 30,
+  "isView": true,
+  "isUpdatableView": true,
+  "sourceSchemaChangesAllowed": true,
+  "displayField": "",
+  "description": "&lt;div style=\"background-color:rgb(255, 255, 255); border:0px solid currentcolor; box-sizing:border-box; color:rgb(74, 74, 74); font-family:&amp;quot;Avenir Next&amp;quot;, Avenir, &amp;quot;Helvetica Neue&amp;quot;, sans-serif; font-size:16px; font-style:normal; font-variant-caps:normal; font-variant-ligatures:normal; font-weight:400; letter-spacing:normal; line-height:1.5; text-align:start; text-decoration-color:initial; text-decoration-style:initial; text-indent:0px; text-transform:none; word-spacing:0px;\"&gt;&lt;span style=\"font-family:inherit; font-size:large;\"&gt;&lt;font style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"border:0px solid currentcolor; box-sizing:border-box; line-height:1.5;\"&gt;&lt;strong&gt;What is this data?&lt;/strong&gt;&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=\"background-color:rgb(255, 255, 255); border:0px solid currentcolor; box-sizing:border-box; color:rgb(74, 74, 74); font-family:&amp;quot;Avenir Next&amp;quot;, Avenir, &amp;quot;Helvetica Neue&amp;quot;, sans-serif; font-size:16px; font-style:normal; font-variant-caps:normal; font-variant-ligatures:normal; font-weight:400; letter-spacing:normal; line-height:1.5; text-align:start; text-decoration-color:initial; text-decoration-style:initial; text-indent:0px; text-transform:none; word-spacing:0px;\"&gt;&amp;nbsp;&lt;/div&gt;&lt;p style=\"background-color:rgb(255, 255, 255); border:0px solid currentcolor; box-sizing:border-box; color:rgb(74, 74, 74); font-family:&amp;quot;Avenir Next&amp;quot;, Avenir, &amp;quot;Helvetica Neue&amp;quot;, sans-serif; font-size:16px; font-style:normal; font-variant-caps:normal; font-variant-ligatures:normal; font-weight:400; letter-spacing:normal; margin:0px 0px 1rem 0in; text-align:start; text-decoration-color:initial; text-decoration-style:initial; text-indent:0px; text-transform:none; word-spacing:0px;\"&gt;&lt;span style=\"font-family:inherit;\"&gt;&lt;span style=\"border:0px solid currentcolor; box-sizing:border-box; line-height:1.5;\"&gt;This feature layer depicts land use within northeastern Illinois broken out into 57 categories. Parcels were dissolved on common land use types, and polygons were generated for non-parcel areas (e.g. road rights-of-way) and assigned a generic \u201cnon-parcel\u201d category.&lt;/span&gt;&lt;/span&gt;&lt;/p&gt;&lt;div style=\"background-color:rgb(255, 255, 255); border:0px solid currentcolor; box-sizing:border-box; color:rgb(74, 74, 74); font-family:&amp;quot;Avenir Next&amp;quot;, Avenir, &amp;quot;Helvetica Neue&amp;quot;, sans-serif; font-size:16px; font-style:normal; font-variant-caps:normal; font-variant-ligatures:normal; font-weight:400; letter-spacing:normal; line-height:1.5; text-align:start; text-decoration-color:initial; text-decoration-style:initial; text-indent:0px; text-transform:none; word-spacing:0px;\"&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"font-family:inherit; font-size:large;\"&gt;&lt;font style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"border:0px solid currentcolor; box-sizing:border-box; line-height:1.5;\"&gt;&lt;strong&gt;How can it be used? What projects use this data?&lt;/strong&gt;&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;br&gt;&lt;span style=\"font-family:inherit;\"&gt;&lt;span style=\"border:0px solid currentcolor; box-sizing:border-box; line-height:1.5;\"&gt;Land Use data can be used for forecasting, land use and transportation modeling, existing conditions reports and general research.&lt;/span&gt;&lt;/span&gt;&lt;br&gt;&amp;nbsp;&lt;/div&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"font-family:inherit; font-size:large;\"&gt;&lt;font style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"border:0px solid currentcolor; box-sizing:border-box; line-height:1.5;\"&gt;&lt;strong&gt;Who created this data? How and when?&lt;/strong&gt;&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&amp;nbsp;&lt;/div&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"font-family:inherit; font-size:medium;\"&gt;&lt;span style=\"border:0px solid currentcolor; box-sizing:border-box; line-height:1.5;\"&gt;Data was created by CMAP staff, updating the previous 2020 inventory using Spring 2023 aerial photography as the base, supplemented by County Assessor files and other data.&lt;/span&gt;&lt;/span&gt;&lt;br&gt;&amp;nbsp;&lt;/div&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"font-family:inherit; font-size:large;\"&gt;&lt;font style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"border:0px solid currentcolor; box-sizing:border-box; line-height:1.5;\"&gt;&lt;strong&gt;Where can I find the latest data?&amp;nbsp;How frequently is it updated?&lt;/strong&gt;&lt;/span&gt;&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&amp;nbsp;&lt;/div&gt;&lt;div style=\"border:0px solid currentcolor; box-sizing:border-box; font-family:inherit; line-height:1.5;\"&gt;&lt;span style=\"font-family:inherit; font-size:medium;\"&gt;&lt;span style=\"border:0px solid currentcolor; box-sizing:border-box; line-height:1.5;\"&gt;Land Use Inventory files are considered final upon publication. New Land Use Inventories are produced every 3 to 5 years. They may be updated as necessary to correct data flaws, and the original files replaced.&amp;nbsp;&lt;/span&gt;&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;",
+  "copyrightText": "Not restricted. Users are expected to cite the Chicago Metropolitan Agency for Planning (CMAP) as the source of these data.",
+  "defaultVisibility": true,
+  "serverGens": {
+    "minServerGen": 1624496,
+    "serverGen": 1624503
+  },
+  "editingInfo": {
+    "lastEditDate": 1789512850916,
+    "schemaLastEditDate": 1789512850916,
+    "dataLastEditDate": 1789512836593
+  },
+  "multiScaleGeometryStatus": "InProgress",
+  "updateLayerDefinitionStatus": "InProgress",
+  "relationships": [],
+  "isDataVersioned": false,
+  "hasContingentValuesDefinition": false,
+  "supportsAppend": true,
+  "supportsCalculate": true,
+  "supportsASyncCalculate": true,
+  "supportsTruncate": false,
+  "supportsAttachmentsByUploadId": true,
+  "supportsAttachmentsResizing": true,
+  "supportsRollbackOnFailureParameter": true,
+  "supportsStatistics": true,
+  "supportsExceedsLimitStatistics": true,
+  "supportsAdvancedQueries": true,
+  "supportsValidateSql": true,
+  "supportsCoordinatesQuantization": true,
+  "supportsLayerOverrides": true,
+  "supportsTilesAndBasicQueriesMode": true,
+  "supportsFieldDescriptionProperty": true,
+  "supportsQuantizationEditMode": true,
+  "supportsColumnStoreIndex": true,
+  "supportsApplyEditsWithGlobalIds": true,
+  "supportsMultiScaleGeometry": true,
+  "supportsReturningQueryGeometry": true,
+  "enableNullGeometry": false,
+  "hasGeometryProperties": true,
+  "geometryProperties": {
+    "shapeAreaFieldName": "Shape__Area",
+    "shapeLengthFieldName": "Shape__Length",
+    "units": "esriMeters"
+  },
+  "advancedQueryCapabilities": {
+    "supportsPagination": true,
+    "supportsPaginationOnAggregatedQueries": true,
+    "supportsQueryRelatedPagination": true,
+    "supportsQueryWithDistance": true,
+    "supportsOutDistance": true,
+    "supportsReturningQueryExtent": true,
+    "supportsStatistics": true,
+    "supportsOrderBy": true,
+    "supportsDistinct": true,
+    "supportsQueryWithResultType": true,
+    "supportsSqlExpression": true,
+    "supportsTimeRelation": true,
+    "supportsAdvancedQueryRelated": true,
+    "supportsCountDistinct": true,
+    "supportsPercentileStatistics": true,
+    "supportsApproxPercentileStatistics": true,
+    "supportsSpatialAggregationStatistics": true,
+    "supportsTrueCurve": true,
+    "supportedSpatialAggregationStatistics": [
+      "EnvelopeAggregate",
+      "CentroidAggregate",
+      "ConvexHullAggregate"
+    ],
+    "supportsLod": true,
+    "supportsQueryWithLodSR": false,
+    "supportedLodTypes": [
+      "geohash"
+    ],
+    "supportsReturningGeometryCentroid": true,
+    "supportsReturningGeometryEnvelope": true,
+    "supportsReturningGeometryProperties": true,
+    "supportsQueryWithDatumTransformation": true,
+    "supportsCurrentUserQueries": true,
+    "supportsHavingClause": true,
+    "supportsOutFieldSQLExpression": true,
+    "supportsMaxRecordCountFactor": true,
+    "supportsTopFeaturesQuery": true,
+    "supportsDisjointSpatialRel": true,
+    "supportsQueryWithCacheHint": true,
+    "supportedOperationsWithCacheHint": [
+      "query",
+      "queryTopFilter",
+      "queryAnalytics",
+      "queryAttachments",
+      "queryRelated",
+      "queryBins",
+      "queryPivot"
+    ],
+    "supportsQueryAnalytic": true,
+    "supportsQueryPivot": true,
+    "supportsQueryBins": true,
+    "supportsDefaultSR": true,
+    "supportsTranslations": false,
+    "supportsAggIds": true,
+    "supportsQueryWithCollation": true,
+    "supportsISODOW": true,
+    "supportsISOWeek": true,
+    "supportsFullTextSearch": true,
+    "fullTextSearchCapabilities": {
+      "supportsAccentSensitivity": true,
+      "supportsStopWords": true,
+      "supportsSearchOperator": true,
+      "supportsOperator": true
+    }
+  },
+  "advancedQueryAnalyticCapabilities": {
+    "supportsLinearRegression": true,
+    "supportsTrendlineRegression": true,
+    "supportsAsync": true,
+    "supportsPercentileAnalytic": true
+  },
+  "queryBinsCapabilities": {
+    "supportsAsync": true,
+    "supportsAutoIntervalBin": true,
+    "supportsFixedIntervalBin": true,
+    "supportsFixedBoundariesBin": true,
+    "supportsDateBin": true,
+    "supportsClassificationBin": true,
+    "supportsStackBy": true,
+    "supportsSplitBy": true,
+    "supportsFirstDayOfWeek": true,
+    "supportsSnapToData": true,
+    "supportsReturnFullIntervalBin": true,
+    "supportsReturnStackValueRange": true,
+    "supportsNormalization": true,
+    "supportedStatisticTypes": [
+      "COUNT",
+      "SUM",
+      "AVG",
+      "VAR",
+      "STDDEV",
+      "MIN",
+      "MAX",
+      "PERCENTILE_CONT",
+      "PERCENTILE_DISC",
+      "APPROX_PERCENTILE_CONT",
+      "APPROX_PERCENTILE_DISC",
+      "CentroidAggregate",
+      "EnvelopeAggregate",
+      "ConvexHullAggregate"
+    ],
+    "supportedNormalizationTypes": [
+      "boxCox",
+      "field",
+      "inverse",
+      "log",
+      "naturalLog",
+      "percentOfTotal",
+      "squareRoot"
+    ]
+  },
+  "supportedOperationsWithCollation": "query,addField,updateField",
+  "advancedEditingCapabilities": {
+    "supportedSqlFormatsInCalculate": [
+      "standard"
+    ],
+    "supportsAsyncApplyEdits": true,
+    "supportsReturnEditResults": true,
+    "supportsApplyEditsbyUploadID": true,
+    "supportedApplyEditsUploadIDFormats": "JSON,PBF",
+    "supportsTranslation": false,
+    "supportsMaxTranslations": 10
+  },
+  "infoInEstimates": [
+    "extent",
+    "count"
+  ],
+  "useStandardizedQueries": true,
+  "geometryType": "esriGeometryPolygon",
+  "minScale": 83195,
+  "maxScale": 624,
+  "extent": {
+    "xmin": -9874894.226398181,
+    "ymin": 5041708.4021581225,
+    "xmax": -9741746.572364628,
+    "ymax": 5235577.510839571,
+    "spatialReference": {
+      "wkid": 102100,
+      "latestWkid": 3857
+    }
+  },
+  "spatialReference": {
+    "wkid": 102100,
+    "latestWkid": 3857
+  },
+  "drawingInfo": {
+    "renderer": {
+      "type": "simple",
+      "symbol": {
+        "type": "esriSFS",
+        "style": "esriSFSSolid",
+        "color": [
+          252,
+          225,
+          56,
+          191
+        ],
+        "outline": {
+          "type": "esriSLS",
+          "style": "esriSLSSolid",
+          "color": [
+            0,
+            0,
+            0,
+            255
+          ],
+          "width": 0.75
+        }
+      }
+    },
+    "transparency": 0,
+    "labelingInfo": null
+  },
+  "allowGeometryUpdates": true,
+  "trueCurveSupportMode": "OGC",
+  "supportedCurveTypes": [
+    "esriGeometryCircularArc"
+  ],
+  "supportedTrueCurvePbfFeatureEncodings": [
+    "esriCompressedShapeBuffer",
+    "esriDefault"
+  ],
+  "allowTrueCurvesUpdates": true,
+  "onlyAllowTrueCurveUpdatesByTrueCurveClients": true,
+  "hasAttachments": false,
+  "viewSourceHasAttachments": false,
+  "htmlPopupType": "esriServerHTMLPopupTypeNone",
+  "hasMetadata": true,
+  "hasM": false,
+  "hasZ": false,
+  "objectIdField": "OBJECTID",
+  "uniqueIdField": {
+    "name": "OBJECTID",
+    "isSystemMaintained": true
+  },
+  "globalIdField": "GlobalID",
+  "typeIdField": "",
+  "collation": {
+    "locale": "neutral",
+    "caseSensitive": false,
+    "accentSensitive": true
+  },
+  "fields": [
+    {
+      "name": "OBJECTID",
+      "type": "esriFieldTypeOID",
+      "alias": "OBJECTID",
+      "sqlType": "sqlTypeOther",
+      "nullable": false,
+      "editable": false,
+      "domain": null,
+      "defaultValue": "",
+      "required": true
+    },
+    {
+      "name": "COUNTY",
+      "type": "esriFieldTypeString",
+      "alias": "COUNTY",
+      "sqlType": "sqlTypeOther",
+      "length": 3,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": ""
+    },
+    {
+      "name": "LANDUSE",
+      "type": "esriFieldTypeString",
+      "alias": "LANDUSE",
+      "sqlType": "sqlTypeOther",
+      "length": 4,
+      "nullable": true,
+      "editable": true,
+      "domain": {
+        "type": "codedValue",
+        "name": "landUseCode",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Land use code",
+        "codedValues": [
+          {
+            "name": "RES_SF_DETACHED",
+            "code": "1111"
+          },
+          {
+            "name": "RES_SF_ATTACHED",
+            "code": "1112"
+          },
+          {
+            "name": "RES_MF",
+            "code": "1130"
+          },
+          {
+            "name": "RES_MOBILE",
+            "code": "1140"
+          },
+          {
+            "name": "RES_COMMON",
+            "code": "1151"
+          },
+          {
+            "name": "COM_MALL",
+            "code": "1211"
+          },
+          {
+            "name": "COM_REGIONAL",
+            "code": "1212"
+          },
+          {
+            "name": "COM_BIGBOX",
+            "code": "1214"
+          },
+          {
+            "name": "COM_URBMIX",
+            "code": "1215"
+          },
+          {
+            "name": "COM_URBMIXwRES",
+            "code": "1216"
+          },
+          {
+            "name": "COM_OFFICE",
+            "code": "1220"
+          },
+          {
+            "name": "COM_CULT_ENT",
+            "code": "1240"
+          },
+          {
+            "name": "COM_HOTEL",
+            "code": "1250"
+          },
+          {
+            "name": "INST_MEDICAL",
+            "code": "1310"
+          },
+          {
+            "name": "INST_EDU_K12",
+            "code": "1321"
+          },
+          {
+            "name": "INST_EDU_HIGHER",
+            "code": "1322"
+          },
+          {
+            "name": "INST_GOVT",
+            "code": "1330"
+          },
+          {
+            "name": "INST_PRISON",
+            "code": "1340"
+          },
+          {
+            "name": "INST_RELIGIOUS",
+            "code": "1350"
+          },
+          {
+            "name": "INST_CEMETERY",
+            "code": "1360"
+          },
+          {
+            "name": "INST_OTHER",
+            "code": "1370"
+          },
+          {
+            "name": "INST_NATLAB",
+            "code": "1380"
+          },
+          {
+            "name": "IND_MINERAL",
+            "code": "1410"
+          },
+          {
+            "name": "IND_GENERAL",
+            "code": "1420"
+          },
+          {
+            "name": "IND_MANUF_100K",
+            "code": "1431"
+          },
+          {
+            "name": "IND_WAREH_100K",
+            "code": "1432"
+          },
+          {
+            "name": "IND_FLEX_100K",
+            "code": "1433"
+          },
+          {
+            "name": "IND_STORAGE",
+            "code": "1450"
+          },
+          {
+            "name": "TCU_ROW_RAIL",
+            "code": "1511"
+          },
+          {
+            "name": "TCU_ROW_ROAD",
+            "code": "1512"
+          },
+          {
+            "name": "TCU_OTH_LINEAR",
+            "code": "1520"
+          },
+          {
+            "name": "TCU_AIR",
+            "code": "1530"
+          },
+          {
+            "name": "TCU_PARKING",
+            "code": "1540"
+          },
+          {
+            "name": "TCU_COMM",
+            "code": "1550"
+          },
+          {
+            "name": "TCU_ROW_UTIL",
+            "code": "1561"
+          },
+          {
+            "name": "TCU_WWTP",
+            "code": "1562"
+          },
+          {
+            "name": "TCU_LANDFILL",
+            "code": "1563"
+          },
+          {
+            "name": "TCU_OTH_UTIL",
+            "code": "1564"
+          },
+          {
+            "name": "TCU_STORMWATER",
+            "code": "1565"
+          },
+          {
+            "name": "TCU_INTERMODAL",
+            "code": "1570"
+          },
+          {
+            "name": "AG",
+            "code": "2000"
+          },
+          {
+            "name": "OS_REC",
+            "code": "3100"
+          },
+          {
+            "name": "OS_GOLF",
+            "code": "3200"
+          },
+          {
+            "name": "OS_CONS",
+            "code": "3300"
+          },
+          {
+            "name": "OS_PRIVATE",
+            "code": "3400"
+          },
+          {
+            "name": "OS_TRAIL",
+            "code": "3500"
+          },
+          {
+            "name": "VACANT_RES",
+            "code": "4110"
+          },
+          {
+            "name": "VACANT_COM",
+            "code": "4120"
+          },
+          {
+            "name": "VACANT_IND",
+            "code": "4130"
+          },
+          {
+            "name": "VACANT_OTHER",
+            "code": "4140"
+          },
+          {
+            "name": "CONST_RES",
+            "code": "4210"
+          },
+          {
+            "name": "CONST_COM",
+            "code": "4220"
+          },
+          {
+            "name": "CONST_IND",
+            "code": "4230"
+          },
+          {
+            "name": "CONST_OTHER",
+            "code": "4240"
+          },
+          {
+            "name": "WATER",
+            "code": "5000"
+          },
+          {
+            "name": "UNCODEABLE",
+            "code": "9999"
+          }
+        ]
+      },
+      "defaultValue": ""
+    },
+    {
+      "name": "LANDUSE2",
+      "type": "esriFieldTypeString",
+      "alias": "LANDUSE2",
+      "sqlType": "sqlTypeOther",
+      "length": 20,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": ""
+    },
+    {
+      "name": "FAC_NAME",
+      "type": "esriFieldTypeString",
+      "alias": "FAC_NAME",
+      "sqlType": "sqlTypeOther",
+      "length": 100,
+      "nullable": true,
+      "editable": true,
+      "domain": null,
+      "defaultValue": ""
+    },
+    {
+      "name": "OS_MGMT",
+      "type": "esriFieldTypeString",
+      "alias": "OS_MGMT",
+      "sqlType": "sqlTypeOther",
+      "length": 4,
+      "nullable": true,
+      "editable": true,
+      "domain": {
+        "type": "codedValue",
+        "name": "OSMGMT",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Open Space Management code",
+        "codedValues": [
+          {
+            "name": "Municipality/Park District/Township",
+            "code": "MUNI"
+          },
+          {
+            "name": "County",
+            "code": "CNTY"
+          },
+          {
+            "name": "State",
+            "code": "STA"
+          },
+          {
+            "name": "Federal",
+            "code": "FED"
+          },
+          {
+            "name": "Private or Unknown",
+            "code": "XXXX"
+          }
+        ]
+      },
+      "defaultValue": ""
+    },
+    {
+      "name": "PLATTED",
+      "type": "esriFieldTypeString",
+      "alias": "PLATTED",
+      "sqlType": "sqlTypeOther",
+      "length": 1,
+      "nullable": true,
+      "editable": true,
+      "domain": {
+        "type": "codedValue",
+        "name": "PLATTED",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Parcel platted as",
+        "codedValues": [
+          {
+            "name": "Platted Residential",
+            "code": "R"
+          },
+          {
+            "name": "Platted Commercial",
+            "code": "C"
+          },
+          {
+            "name": "Platted Industrial",
+            "code": "I"
+          },
+          {
+            "name": "Platted Other",
+            "code": "O"
+          }
+        ]
+      },
+      "defaultValue": ""
+    },
+    {
+      "name": "MODIFIER",
+      "type": "esriFieldTypeString",
+      "alias": "MODIFIER",
+      "sqlType": "sqlTypeOther",
+      "length": 1,
+      "nullable": true,
+      "editable": true,
+      "domain": {
+        "type": "codedValue",
+        "name": "MODIFIER",
+        "mergePolicy": "esriMPTDefaultValue",
+        "splitPolicy": "esriSPTDefaultValue",
+        "description": "Modifier",
+        "codedValues": [
+          {
+            "name": "Multi-use",
+            "code": "M"
+          },
+          {
+            "name": "Stalled construction",
+            "code": "S"
+          },
+          {
+            "name": "Transitional",
+            "code": "T"
+          }
+        ]
+      },
+      "defaultValue": ""
+    },
+    {
+      "name": "Shape__Area",
+      "type": "esriFieldTypeDouble",
+      "alias": "Shape__Area",
+      "sqlType": "sqlTypeDouble",
+      "nullable": true,
+      "editable": false,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "Shape__Length",
+      "type": "esriFieldTypeDouble",
+      "alias": "Shape__Length",
+      "sqlType": "sqlTypeDouble",
+      "nullable": true,
+      "editable": false,
+      "domain": null,
+      "defaultValue": null
+    },
+    {
+      "name": "GlobalID",
+      "type": "esriFieldTypeGlobalID",
+      "alias": "GlobalID",
+      "sqlType": "sqlTypeOther",
+      "length": 38,
+      "nullable": false,
+      "editable": false,
+      "domain": null,
+      "defaultValue": "NEWID() WITH VALUES"
+    }
+  ],
+  "indexes": [
+    {
+      "name": "Shape__Area_Index",
+      "fields": "Shape__Area",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "Shape__Length_Index",
+      "fields": "Shape__Length",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "PK__LUI_2023__F4B70D8589852507",
+      "fields": "OBJECTID",
+      "isAscending": true,
+      "isUnique": true,
+      "description": "clustered, unique, primary key",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "user_19812.LUI_2023_GDB_LANDUSE2023_DISSOLVED_V1_Shape_sidx",
+      "fields": "Shape",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "Shape Index",
+      "indexType": "Spatial"
+    },
+    {
+      "name": "GlobalID_Index",
+      "fields": "GlobalID",
+      "isAscending": false,
+      "isUnique": true,
+      "description": "",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "COUNTY_Index",
+      "fields": "COUNTY",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "COUNTY_Index",
+      "indexType": "Attribute"
+    },
+    {
+      "name": "LANDUSE_Index",
+      "fields": "LANDUSE",
+      "isAscending": true,
+      "isUnique": false,
+      "description": "LANDUSE_Index",
+      "indexType": "Attribute"
+    }
+  ],
+  "dateFieldsTimeReference": {
+    "timeZone": "UTC",
+    "timeZoneIANA": "Etc/UTC",
+    "respectsDaylightSaving": false
+  },
+  "preferredTimeReference": null,
+  "types": [],
+  "templates": [
+    {
+      "name": "New Feature",
+      "description": "",
+      "drawingTool": "esriFeatureEditToolPolygon",
+      "prototype": {
+        "attributes": {
+          "COUNTY": null,
+          "LANDUSE": null,
+          "LANDUSE2": null,
+          "FAC_NAME": null,
+          "OS_MGMT": null,
+          "PLATTED": null,
+          "MODIFIER": null
+        }
+      }
+    }
+  ],
+  "supportedQueryFormats": "JSON, geoJSON, PBF",
+  "supportedAppendFormats": "sqlite,geoPackage,shapefile,filegdb,featureCollection,geojson,csv,excel,jsonl,featureService,pbf",
+  "supportedAppendSourceFilterFormats": "sqlite,geoPackage,shapefile,filegdb,featureService",
+  "supportedExportFormats": "csv,shapefile,sqlite,geoPackage,filegdb,featureCollection,geojson,kml,excel,parquet",
+  "supportedConvertFileFormats": "JSON,PBF,Parquet",
+  "supportedConvertContentFormats": "LayerEditCollection,FeatureCollection",
+  "supportedSpatialRelationships": [
+    "esriSpatialRelIntersects",
+    "esriSpatialRelContains",
+    "esriSpatialRelCrosses",
+    "esriSpatialRelEnvelopeIntersects",
+    "esriSpatialRelIndexIntersects",
+    "esriSpatialRelOverlaps",
+    "esriSpatialRelTouches",
+    "esriSpatialRelWithin",
+    "esriSpatialRelDisjoint",
+    "esriSpatialRelRelation"
+  ],
+  "guidFormat": "",
+  "supportsContingentValues": true,
+  "supportsEditingContingentValues": true,
+  "supportedContingentValuesFormats": "JSON, PBF",
+  "supportsFieldGroups": true,
+  "supportedSyncDataOptions": 260,
+  "hasStaticData": false,
+  "maxRecordCount": 2000,
+  "standardMaxRecordCount": 2000,
+  "maxIdsCount": 1000000,
+  "standardMaxRecordCountNoGeometry": 32000,
+  "tileMaxRecordCount": 4000,
+  "maxRecordCountFactor": 1,
+  "capabilities": "Query,Extract,ChangeTracking"
+}

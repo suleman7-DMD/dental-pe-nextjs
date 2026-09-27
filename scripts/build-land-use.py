@@ -43,6 +43,7 @@ def get(url, params):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--cache', type=Path, required=True)
+    p.add_argument('--resume-clipped', action='store_true', help='Resume after the last fully written feature in a previous interrupted run')
     args = p.parse_args()
     cache = args.cache
     cache.mkdir(parents=True, exist_ok=True)
@@ -89,7 +90,18 @@ def main():
     names = set()
     seen = set()
     raw = cache / 'clipped.geojsonl.gz'
-    with gzip.open(raw, 'wt', compresslevel=3) as out, ThreadPoolExecutor(max_workers=4) as pool:
+    last_written = None
+    if args.resume_clipped and raw.exists():
+        with gzip.open(raw, 'rt') as prior:
+            for line in prior:
+                f = json.loads(line)
+                counts[f['properties']['code']] += 1
+                if f['properties']['name']:
+                    names.add(f['properties']['name'])
+                last_written = f['id']
+    resuming = last_written is not None
+    null_geometry_ids = []
+    with gzip.open(raw, 'at' if resuming else 'wt', compresslevel=3) as out, ThreadPoolExecutor(max_workers=4) as pool:
         for i, path in enumerate(pool.map(download, enumerate(chunks))):
             with gzip.open(path, 'rt') as compressed:
                 page = json.load(compressed)
@@ -98,6 +110,13 @@ def main():
                 oid = props['OBJECTID']
                 assert oid not in seen
                 seen.add(oid)
+                if f['geometry'] is None:
+                    null_geometry_ids.append(oid)
+                    continue
+                if resuming:
+                    if oid == last_written:
+                        resuming = False
+                    continue
                 g = make_valid(shape(f['geometry']))
                 if not prepared.intersects(g):
                     continue
@@ -115,6 +134,7 @@ def main():
             if i % 20 == 0:
                 print(f'Processed {i+1}/{len(chunks)} pages; {sum(counts.values())} clipped features', flush=True)
     assert seen == set(ids), 'Incomplete source download'
+    assert not resuming, 'Resume marker missing from source'
     metadata = get(CMAP, {'f':'json'})
     (output / 'source-schema.json').write_text(json.dumps(metadata, indent=2) + '\n')
     archive = output / 'chicagoland-2023.pmtiles'
@@ -125,7 +145,7 @@ def main():
         shutil.copyfileobj(stream, process.stdin)
     process.stdin.close()
     assert process.wait() == 0, 'Tile build failed'
-    manifest = dict(source=CMAP, sourceYear=2023, retrievedAt=datetime.now(timezone.utc).isoformat(), boundarySource=ZCTA, watchedZipCount=len(zips), matchedZctaCount=len(found), missingZctas=sorted(set(zips)-found), bounds=bounds, sourceFeatures=len(ids), clippedFeatures=sum(counts.values()), countsByCode=dict(sorted(counts.items())), archiveBytes=archive.stat().st_size, archiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest(), minzoom=7, maxzoom=14)
+    manifest = dict(source=CMAP, sourceYear=2023, retrievedAt=datetime.now(timezone.utc).isoformat(), boundarySource=ZCTA, watchedZipCount=len(zips), matchedZctaCount=len(found), missingZctas=sorted(set(zips)-found), bounds=bounds, sourceFeatures=len(ids), nullGeometryIds=null_geometry_ids, clippedFeatures=sum(counts.values()), countsByCode=dict(sorted(counts.items())), archiveBytes=archive.stat().st_size, archiveSha256=hashlib.sha256(archive.read_bytes()).hexdigest(), minzoom=7, maxzoom=14)
     (public / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
     (output / 'named-facilities.json').write_text(json.dumps(sorted(names), indent=2) + '\n')
     print(json.dumps(manifest, indent=2), flush=True)

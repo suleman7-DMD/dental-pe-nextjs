@@ -1,5 +1,6 @@
 import { open } from 'node:fs/promises'
 import path from 'node:path'
+import { gzipSync } from 'node:zlib'
 import { PMTiles, type Source } from 'pmtiles'
 import { LAND_USE_VERSION, validLandUseTile } from '@/lib/maps/land-use'
 
@@ -24,7 +25,7 @@ class LocalArchive implements Source {
 }
 const archive = new PMTiles(new LocalArchive())
 
-export async function GET(_request: Request, { params }: { params: Promise<{ version: string; z: string; x: string; y: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ version: string; z: string; x: string; y: string }> }) {
   const raw = await params
   if (raw.version !== LAND_USE_VERSION) return new Response('Unknown land-use version', { status: 404 })
   if (![raw.z, raw.x, raw.y].every(v => /^\d{1,5}$/.test(v))) return new Response('Invalid tile', { status: 400 })
@@ -33,8 +34,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ver
   try {
     const tile = await archive.getZxy(z, x, y)
     // A valid empty protobuf tile explicitly means outside the archived coverage.
-    return new Response(tile?.data ?? new ArrayBuffer(0), { headers: {
+    const data = new Uint8Array(tile?.data ?? new ArrayBuffer(0))
+    // Vector tiles compress ~3x; the platform does not gzip this content type on its own.
+    const gzip = data.byteLength > 1024 && /\bgzip\b/.test(request.headers.get('accept-encoding') ?? '')
+    return new Response(gzip ? gzipSync(data) : data, { headers: {
       'Content-Type': 'application/vnd.mapbox-vector-tile',
+      ...(gzip ? { 'Content-Encoding': 'gzip' } : {}),
+      Vary: 'Accept-Encoding',
       'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
       'X-Content-Type-Options': 'nosniff',
     } })
