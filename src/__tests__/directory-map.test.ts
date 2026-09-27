@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapRoster, mapState } from '@/lib/maps/directory-map'
+import { changedStatuses, mapRoster, mapState } from '@/lib/maps/directory-map'
 import { applyOfficeGeocodes, mapIssue, type LiveOffice } from '@/lib/directory/live-directory'
 import type { DirectoryWebCheck } from '@/lib/supabase/queries/directory-web-checks'
 const row = (id:string, effect?:DirectoryWebCheck['effect']) => ({ location_id:id, npi:id, address:'100 Main St', latitude:41.8, longitude:-87.6,
@@ -57,5 +57,18 @@ describe('address geocode snapshot fills missing and moved dots', () => {
     const [out] = applyOfficeGeocodes([changed], geo)
     expect(out.coord_source).toBeUndefined()
     expect(mapIssue(out)).toBe('missing_coordinates')
+  })
+})
+
+describe('live status changes', () => {
+  it('flags only offices whose status flipped, never selection changes', () => {
+    const before = new Map([['a', 'unchecked'], ['b', 'unresolved'], ['c', 'confirmed']] as const)
+    const after = new Map([['a', 'confirmed'], ['b', 'unresolved'], ['d', 'unchecked']] as const)
+    expect(changedStatuses(before, after)).toEqual(['a'])
+    expect(changedStatuses(new Map(), after)).toEqual([])
+  })
+  it('accepts a set of active groups', () => {
+    const rows = [row('a','open_verified'),row('c','needs_review'),row('d')]
+    expect(mapRoster(rows, ['confirmed','unchecked']).mapped.map(p=>p.location_id)).toEqual(['a','d'])
   })
 })
