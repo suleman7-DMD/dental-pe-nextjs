@@ -41,6 +41,9 @@ import { summarizeBuckets, tierToBucket, type BucketSummary } from '@/lib/census
 import { countSourceClassesFromRows, type SourceClassCounts } from '@/lib/census/zip-census'
 import { CensusBucketSummaryCard } from '@/components/data-display/census-bucket-summary'
 import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
+import { fetchDirectoryWebCheckMapSafe } from '@/lib/supabase/queries/directory-web-checks'
+import { applyWebChecks } from '@/lib/directory/web-checks'
+import { WebCheckSummary } from './web-check-summary'
 import { useDirectoryProviderResearch } from '@/lib/hooks/use-directory-provider-research'
 import type { DirectoryResearchFilter } from '@/lib/utils/directory-contacts'
 import { computeJobOpportunityScore } from '@/lib/utils/scoring'
@@ -153,8 +156,19 @@ function universeForZips(zipScores: ZipScore[], zipList: string[]): number {
  * (staff size, retirement age, volume) are census-scoped where they imply
  * ownership (retirement/high-vol restrict to reviewed dentist-owned tiers).
  */
-function computeCensusKpis(allPractices: Practice[], universe: number): ServerKpis {
+/**
+ * `allPractices` are the rows the directory shows; `removedByWebCheck` are rows a
+ * web check took off the list (closed, moved, duplicate…). Directory counts use
+ * the shown rows; ownership summaries use both, because their denominator is
+ * the zip_scores GP universe, which still counts the removed rows.
+ */
+function computeCensusKpis(
+  allPractices: Practice[],
+  universe: number,
+  removedByWebCheck: Practice[] = []
+): ServerKpis {
   const gpPractices = allPractices.filter(isGpRow)
+  const ownershipRows = [...gpPractices, ...removedByWebCheck.filter(isGpRow)]
   const currentYear = new Date().getFullYear()
   let large_count = 0
   let retirement_risk = 0
@@ -181,14 +195,14 @@ function computeCensusKpis(allPractices: Practice[], universe: number): ServerKp
     retirement_risk,
     highVolCount,
     bucketSummary: summarizeBuckets(
-      gpPractices.map((p) => ({
+      ownershipRows.map((p) => ({
         ownership_tier: p.ownership_tier ?? null,
         pe_backed: p.pe_backed ?? null,
       })),
       universe
     ),
     sourceClasses: countSourceClassesFromRows(
-      gpPractices.map((p) => ({
+      ownershipRows.map((p) => ({
         ownership_tier: p.ownership_tier ?? null,
         census_review_status: p.census_review_status ?? null,
       })),
@@ -295,6 +309,8 @@ function JobMarketShellInner({
   // ── State ──────────────────────────────────────────────────────────────
   // Full practice data — loaded lazily only when a data-heavy tab is active
   const [practices, setPractices] = useState<Practice[] | null>(null)
+  // Rows a web check removed from the list and map (shown with evidence in WebCheckSummary)
+  const [removedPractices, setRemovedPractices] = useState<Practice[]>([])
   const [researchFilter, setResearchFilter] = useState<DirectoryResearchFilter>('all')
   const providerResearch = useDirectoryProviderResearch(practices !== null)
   const defaultLoc = LIVING_LOCATIONS[defaultLocationKey]
@@ -322,17 +338,22 @@ function JobMarketShellInner({
 
       setLoading(true)
       try {
-        const locations = await fetchPracticeLocations(supabase, {
-          zips: zipList,
-          gpOnly: true,
-          orderBy: 'practice_name',
-          ascending: true,
-        })
-        const allPractices = locations
-          .map(practiceLocationToLaunchpadRecord)
-          .map(locationPracticeToPractice)
+        const [locations, webChecks] = await Promise.all([
+          fetchPracticeLocations(supabase, {
+            zips: zipList,
+            gpOnly: true,
+            orderBy: 'practice_name',
+            ascending: true,
+          }),
+          fetchDirectoryWebCheckMapSafe(supabase),
+        ])
+        const { visible: allPractices, removed } = applyWebChecks(
+          locations.map(practiceLocationToLaunchpadRecord).map(locationPracticeToPractice),
+          webChecks
+        )
 
         setPractices(allPractices)
+        setRemovedPractices(removed)
         setLoadedLocation(locationKey)
 
         // Filter zip_scores for this location
@@ -342,7 +363,7 @@ function JobMarketShellInner({
         setZipScores(filteredZs)
 
         // Compute client-side KPIs from fetched data
-        setClientKpis(computeCensusKpis(allPractices, universeForZips(initialZipScores, zipList)))
+        setClientKpis(computeCensusKpis(allPractices, universeForZips(initialZipScores, zipList), removed))
       } finally {
         setLoading(false)
       }
@@ -356,10 +377,15 @@ function JobMarketShellInner({
     if (zipList.length === 0) return
 
     try {
-      const allPracticesForKpis = (await fetchPracticeLocations(supabase, { zips: zipList, gpOnly: true }))
-        .map(practiceLocationToLaunchpadRecord)
-        .map(locationPracticeToPractice)
-      setClientKpis(computeCensusKpis(allPracticesForKpis, universeForZips(initialZipScores, zipList)))
+      const [locations, webChecks] = await Promise.all([
+        fetchPracticeLocations(supabase, { zips: zipList, gpOnly: true }),
+        fetchDirectoryWebCheckMapSafe(supabase),
+      ])
+      const { visible, removed } = applyWebChecks(
+        locations.map(practiceLocationToLaunchpadRecord).map(locationPracticeToPractice),
+        webChecks
+      )
+      setClientKpis(computeCensusKpis(visible, universeForZips(initialZipScores, zipList), removed))
     } catch {
       // Silently handle — KPIs will show server defaults
     }
@@ -383,12 +409,14 @@ function JobMarketShellInner({
         // Reverted to (or started at) default — no fetch needed, just
         // filter zipScores from the server-provided initialZipScores.
         setPractices(null)
+        setRemovedPractices([])
         setLoadedLocation(null)
         setClientKpis(null)
         setZipScores(initialZipScores.filter(zs => defaultLoc.commutable_zips.includes(zs.zip_code)))
       } else {
         // Non-default location — reset and fetch
         setPractices(null)
+        setRemovedPractices([])
         setLoadedLocation(null)
         setClientKpis(null)
 
@@ -667,6 +695,7 @@ function JobMarketShellInner({
           <p role="alert" className="text-xs text-[#C23B3B]">Older provider research could not be loaded. Its coverage counts are incomplete.</p>}
         {activeTab === 'map' && (
           <div key="map">
+            {practices ? <WebCheckSummary practices={practices} removed={removedPractices} /> : null}
             {practices ? (
               <PracticeDensityMap
                 providerResearch={providerResearch.data}
@@ -687,6 +716,7 @@ function JobMarketShellInner({
         {/* Directory Tab */}
         {activeTab === 'directory' && (
           <div key="directory">
+            {practices ? <WebCheckSummary practices={practices} removed={removedPractices} /> : null}
             {practices ? (
               <PracticeDirectory
                 providerResearch={providerResearch.data}

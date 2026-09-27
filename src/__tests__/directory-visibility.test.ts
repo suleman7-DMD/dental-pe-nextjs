@@ -68,14 +68,14 @@ describe('directory inclusion is independent of map coordinates and ownership re
     const html = renderToStaticMarkup(React.createElement(PracticeDensityMap, {
       practices: [unlocated], centerLat: 41.88, centerLon: -87.62,
     }))
-    expect(html).toContain('0 offices mapped')
-    expect(html).toContain('1 not pinned of 1 tracked offices')
-    expect(html).toContain('Find these offices in the Directory')
+    expect(html).toContain('data-mapped-count="0"')
+    expect(html).toContain('1 have no usable stored coordinates')
+    expect(html).toContain('No ZIP-center placeholders')
     expect(html).toContain('Population density')
     expect(html).toContain('Median household income')
     expect(html).toContain('Education: bachelor’s degree or higher')
-    expect(html).toContain('None — practices only')
-    expect(html).toContain('People per square mile')
+    expect(html).toContain('Practices only')
+    expect(html).toContain('Why some practices have no dot')
     expect(html).toContain('This is not a saturation score')
   })
 
@@ -85,25 +85,22 @@ describe('directory inclusion is independent of map coordinates and ownership re
     const html = renderToStaticMarkup(React.createElement(PracticeDensityMap, {
       practices: rows, centerLat: 41.88, centerLon: -87.62,
     }))
-    expect(html).toContain('2 offices mapped')
-    expect(html).toContain('1 not pinned of 3 tracked offices')
+    expect(html).toContain('data-mapped-count="2"')
+    expect(html).toContain('1 have no usable stored coordinates')
     const visibleText = html.replace(/<[^>]*>/g, '')
-    expect(visibleText).toContain('Website/doctor evidence + coordinates: 1')
+    expect(visibleText).toContain('including records not yet checked')
     expect(visibleText).not.toContain('hidden')
   })
 
-  it('reconciles each office into one map disposition and accounts for selected filters', () => {
+  it('maps unchecked records without an ownership-evidence gate', () => {
     const offices = [located, { ...located, location_id: 'missing-coords', latitude: null },
       { ...unlocated, location_id: 'no-evidence', latitude: 41.8, longitude: -87.7 }, unlocated]
-    const render = (researchFilter: 'all' | 'recent_evidence') => renderToStaticMarkup(React.createElement(PracticeDensityMap, {
-      practices: offices, centerLat: 41.88, centerLon: -87.62, researchFilter,
+    const text = renderToStaticMarkup(React.createElement(PracticeDensityMap, {
+      practices: offices, centerLat: 41.88, centerLon: -87.62,
     })).replace(/<[^>]*>/g, '')
-    const text = render('all')
-    expect(text).toContain('1 offices mapped · 3 not pinned of 4 tracked offices')
-    expect(text).toContain('office evidence, but no usable coordinates: 1')
-    expect(text).toContain('coordinates, but insufficient office evidence: 1')
-    expect(text).toContain('missing both coordinates and office evidence: 1')
-    expect(render('recent_evidence')).toContain('Outside selected research filter: 4')
+    expect(text).toContain('2 mapped of 4 listed')
+    expect(text).toContain('2 have no usable stored coordinates')
+    expect(text).toContain('Removed records never appear')
   })
 
   it.each([

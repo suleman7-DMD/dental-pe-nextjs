@@ -6,7 +6,7 @@ export type LandUseStatus = 'idle' | 'loading' | 'ready' | 'error' | 'zoomed-out
 type Presentation = { mode: LandUseMode | null; opacity: number }
 
 /** Lazy source: no archive or boundary traffic until the user selects land use. */
-export function attachLandUse(map: mapboxgl.Map, gl: typeof mapboxgl, status: (value: LandUseStatus) => void) {
+export function attachLandUse(map: mapboxgl.Map, gl: typeof mapboxgl, status: (value: LandUseStatus) => void, officeLayer = 'practice-dots') {
   let current: Presentation = { mode: null, opacity: 0.65 }
   let failed = false
   const popup = new gl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '310px' })
@@ -37,7 +37,7 @@ export function attachLandUse(map: mapboxgl.Map, gl: typeof mapboxgl, status: (v
 
   function inspect(e: mapboxgl.MapLayerMouseEvent) {
     if (!current.mode || current.opacity === 0 || !e.features?.[0] ||
-      (map.getLayer('practice-dots') && map.queryRenderedFeatures(e.point, { layers: ['practice-dots'] }).length)) {
+      (map.getLayer(officeLayer) && map.queryRenderedFeatures(e.point, { layers: [officeLayer] }).length)) {
       popup.remove()
       return
     }
@@ -74,7 +74,7 @@ export function attachLandUse(map: mapboxgl.Map, gl: typeof mapboxgl, status: (v
   map.on('mouseleave', LAND_USE_FILL, clear)
   map.on('movestart', clear)
   map.on('zoomend', zoom)
-  map.on('mouseenter', 'practice-dots', clear)
+  map.on('mouseenter', officeLayer, clear)
 
   function set(value: Presentation) {
     current = value
@@ -104,6 +104,6 @@ export function attachLandUse(map: mapboxgl.Map, gl: typeof mapboxgl, status: (v
     map.off('mouseleave', LAND_USE_FILL, clear)
     map.off('movestart', clear)
     map.off('zoomend', zoom)
-    map.off('mouseenter', 'practice-dots', clear)
+    map.off('mouseenter', officeLayer, clear)
   } }
 }

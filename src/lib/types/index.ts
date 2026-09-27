@@ -2,6 +2,8 @@
 // Shared TypeScript types for the Dental PE Intelligence Dashboard
 // ────────────────────────────────────────────────────────────────────────────
 
+import type { DirectoryWebCheck } from '@/lib/supabase/queries/directory-web-checks'
+
 export interface Deal {
   id: number
   deal_date: string | null
@@ -72,6 +74,8 @@ export interface Practice {
   ownership_confidence?: string | null
   network_id?: string | null
   census_review_status?: string | null
+  /** Latest rapid web check (directory_web_checks), attached by the Directory page. */
+  web_check?: DirectoryWebCheck | null
 }
 
 export interface WatchedZip {

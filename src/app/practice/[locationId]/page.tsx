@@ -1,4 +1,8 @@
 import Link from "next/link"
+import { applyWebCheck } from "@/lib/directory/web-checks"
+import { researchState } from "@/lib/directory/live-directory"
+import { ResearchBadge } from "@/components/directory/live-summary"
+import { DetailRefresh } from "@/components/directory/detail-refresh"
 import { notFound } from "next/navigation"
 import { ArrowLeft, Globe2, MapPin, Phone } from "lucide-react"
 import { createServerClient } from "@/lib/supabase/server"
@@ -8,9 +12,9 @@ import {
 } from "@/lib/supabase/queries/practice-locations"
 import { fetchJobHuntVerification } from "@/lib/supabase/queries/job-hunt-verification"
 import { JobHuntVerificationCard } from "@/components/data-display/job-hunt-verification-card"
+import { fetchDirectoryWebCheck } from "@/lib/supabase/queries/directory-web-checks"
+import { DirectoryWebCheckCard } from "@/components/data-display/directory-web-check-card"
 import {
-  CensusBadge,
-  ReviewStatusBadge,
   formatNetworkName,
 } from "@/components/data-display/census-badge"
 import {
@@ -46,12 +50,16 @@ export default async function PracticePage({
 }) {
   const { locationId } = await params
   const supabase = await createServerClient()
-  const [row, verification] = await Promise.all([
+  const [baseRow, verification, webCheck] = await Promise.all([
     fetchPracticeLocationById(supabase, locationId),
     fetchJobHuntVerification(supabase, locationId),
+    fetchDirectoryWebCheck(supabase, locationId),
   ])
 
-  if (!row) notFound()
+  if (!baseRow) notFound()
+  const corrected = applyWebCheck({ ...baseRow, address: baseRow.normalized_address }, webCheck)
+  const row = { ...corrected, normalized_address: corrected.address }
+
 
   const siblings: NetworkSiblingSummary[] = row.network_id
     ? (await fetchNetworkSiblings(supabase, row.network_id, row.location_id)).map(
@@ -69,7 +77,7 @@ export default async function PracticePage({
   // Website-verified public name outranks the census/registry name; the
   // legal entity stays visible as a secondary "Legal/census name" line.
   const censusName = displayName(row)
-  const name = verifiedDisplayName(row, verification?.public_practice_name)
+  const name = webCheck?.effect === "open_corrected" && webCheck.observed.name ? webCheck.observed.name : verifiedDisplayName(row, verification?.public_practice_name)
   const legalLine =
     row.practice_name && row.practice_name !== name
       ? row.practice_name
@@ -79,7 +87,7 @@ export default async function PracticePage({
   const addressLine = [row.normalized_address, row.city, row.state, row.zip]
     .filter(Boolean)
     .join(", ")
-  const website = websiteTrust(row.website, verification)
+  const website = websiteTrust(row.website, webCheck?.effect === "open_corrected" && webCheck.observed.website ? null : verification)
   const practiceWebsite = website.url ? websiteHref(website.url) : null
   const sourceClass = deriveSourceClass(
     row.ownership_tier,
@@ -90,6 +98,7 @@ export default async function PracticePage({
 
   return (
     <main className="min-h-screen bg-[#FAFAF7]">
+      <DetailRefresh />
       <div className="mx-auto max-w-6xl px-6 py-8">
         <Link
           href="/directory"
@@ -103,8 +112,7 @@ export default async function PracticePage({
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <ReviewStatusBadge tier={row.ownership_tier} />
-                <CensusBadge tier={row.ownership_tier} peBacked={row.pe_backed} />
+                {webCheck?.effect === "removed" ? <span className="text-sm font-medium text-red-700">Removed from the directory</span> : <ResearchBadge state={researchState({ web_check: webCheck })} />}
               </div>
               <h1 className="mt-4 font-sans text-3xl font-bold leading-tight text-[#1A1A1A]">
                 {name}
@@ -149,7 +157,7 @@ export default async function PracticePage({
               </div>
             </div>
 
-            <div className="grid w-full gap-2 rounded-lg border border-[#E8E5DE] bg-[#FAFAF7] p-4 text-sm lg:w-[340px]">
+            <details className="w-full space-y-2 rounded-lg border border-[#E8E5DE] bg-[#FAFAF7] p-3 text-sm lg:w-[300px]"><summary className="cursor-pointer text-[#6B6B60]">Ownership &amp; staffing on file</summary>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[#6B6B60]">Job-hunt lane</span>
                 <span
@@ -207,9 +215,15 @@ export default async function PracticePage({
                   ? `Still missing: ${lane.missing.join(" · ")}`
                   : "Nothing missing — verified record on file."}
               </p>
-            </div>
+            </details>
           </div>
         </section>
+
+        {webCheck ? (
+          <section className="mt-6">
+            <DirectoryWebCheckCard check={webCheck} />
+          </section>
+        ) : null}
 
         {verification ? (
           <section className="mt-6">
@@ -217,7 +231,7 @@ export default async function PracticePage({
           </section>
         ) : null}
 
-        <UsePracticeCard row={row} />
+        <details className="my-4 rounded-lg border border-[#E8E5DE] bg-white p-4"><summary className="cursor-pointer text-sm text-[#6B6B60]">Research &amp; outreach tools</summary><UsePracticeCard row={row} /></details>
 
         <PracticeTabs row={row} siblings={siblings} />
 

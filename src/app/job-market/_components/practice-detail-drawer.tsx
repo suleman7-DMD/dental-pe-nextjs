@@ -17,6 +17,7 @@ import { displayName, verifiedDisplayName } from '@/lib/census/display-name'
 import { deriveJobLane } from '@/lib/census/job-lane'
 import { useJobHuntVerificationMap } from '@/lib/hooks/use-job-hunt-verification'
 import { JobHuntVerificationCard } from '@/components/data-display/job-hunt-verification-card'
+import { DirectoryWebCheckCard } from '@/components/data-display/directory-web-check-card'
 
 import type { Practice } from '@/lib/types'
 
@@ -303,6 +304,13 @@ export function PracticeDetailDrawer({
               </p>
             </div>
           </div>
+
+          {/* ── Directory web check — is this a current GP office, as listed ── */}
+          {p.web_check ? (
+            <div className="px-4 pb-3">
+              <DirectoryWebCheckCard check={p.web_check} />
+            </div>
+          ) : null}
 
           {/* ── Job-hunt verification — what the practice's own website says ── */}
           {verification ? (
